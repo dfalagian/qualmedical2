@@ -1,26 +1,24 @@
 import { ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { 
-  Building2, 
   FileText, 
   Receipt, 
   MessageSquare, 
   ShoppingCart, 
-  LogOut,
   Settings,
   Home
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "react-router-dom";
+import { DashboardHeader } from "./DashboardHeader";
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
-  const { user, loading, signOut, isAdmin } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -51,26 +49,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-card shadow-sm">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
-              <Building2 className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold">Sistema de Proveedores</h1>
-              <p className="text-xs text-muted-foreground">
-                {isAdmin ? "Administrador" : "Proveedor"}
-              </p>
-            </div>
-          </div>
-          <Button variant="outline" onClick={signOut} size="sm">
-            <LogOut className="mr-2 h-4 w-4" />
-            Cerrar Sesión
-          </Button>
-        </div>
-      </header>
+      <DashboardHeader />
 
       <div className="container flex gap-6 py-6">
         {/* Sidebar */}
@@ -85,10 +64,10 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                   key={item.name}
                   to={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
+                    "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200",
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-md"
-                      : "text-foreground hover:bg-secondary"
+                      ? "bg-gradient-primary text-primary-foreground shadow-md"
+                      : "text-foreground hover:bg-accent/20 hover:text-accent-foreground"
                   )}
                 >
                   <Icon className="h-5 w-5" />

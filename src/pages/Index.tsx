@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Building2, FileCheck, Receipt, MessageSquare, ShoppingCart } from "lucide-react";
+import { FileCheck, Receipt, MessageSquare, ShoppingCart } from "lucide-react";
+import qualmedicalLogo from "@/assets/qualmedical-logo.jpg";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -31,13 +32,17 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-primary py-20 px-4">
+      <section className="relative overflow-hidden bg-gradient-brand py-20 px-4">
         <div className="container mx-auto text-center">
-          <div className="mx-auto mb-6 w-20 h-20 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-            <Building2 className="h-12 w-12 text-white" />
+          <div className="mx-auto mb-6 bg-white/95 backdrop-blur-sm rounded-2xl p-6 inline-block">
+            <img 
+              src={qualmedicalLogo} 
+              alt="QualMedical Farma" 
+              className="h-20 w-auto"
+            />
           </div>
           <h1 className="mb-4 text-4xl md:text-5xl lg:text-6xl font-bold text-white">
-            Sistema de Gestión de Proveedores
+            Portal de Proveedores
           </h1>
           <p className="mb-8 text-xl text-white/90 max-w-2xl mx-auto">
             Plataforma integral para la gestión eficiente de proveedores mexicanos

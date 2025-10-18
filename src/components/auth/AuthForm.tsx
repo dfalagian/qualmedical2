@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Building2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import qualmedicalLogo from "@/assets/qualmedical-logo.jpg";
 
 export const AuthForm = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -59,8 +60,12 @@ export const AuthForm = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-2 text-center">
-          <div className="mx-auto w-12 h-12 bg-gradient-primary rounded-lg flex items-center justify-center mb-2">
-            <Building2 className="h-6 w-6 text-primary-foreground" />
+          <div className="mx-auto mb-4">
+            <img 
+              src={qualmedicalLogo} 
+              alt="QualMedical Farma" 
+              className="h-16 w-auto mx-auto"
+            />
           </div>
           <CardTitle className="text-2xl font-bold">
             {isLogin ? "Iniciar Sesión" : "Crear Cuenta"}

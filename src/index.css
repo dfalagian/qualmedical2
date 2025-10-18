@@ -8,26 +8,28 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 220 20% 97%;
-    --foreground: 220 15% 15%;
+    --background: 0 0% 98%;
+    --foreground: 180 40% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 15%;
+    --card-foreground: 180 40% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 15%;
+    --popover-foreground: 180 40% 15%;
 
-    --primary: 217 91% 45%;
+    /* Verde azulado corporativo - QualMedical */
+    --primary: 174 76% 36%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 95%;
-    --secondary-foreground: 220 15% 20%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 180 40% 20%;
 
-    --muted: 220 15% 95%;
-    --muted-foreground: 220 10% 45%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 180 10% 45%;
 
-    --accent: 217 91% 55%;
-    --accent-foreground: 0 0% 100%;
+    /* Verde lima corporativo - QualMedical */
+    --accent: 75 65% 55%;
+    --accent-foreground: 180 40% 15%;
 
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
@@ -38,53 +40,53 @@ All colors MUST be HSL.
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 88%;
-    --input: 220 13% 91%;
-    --ring: 217 91% 45%;
+    --border: 180 10% 88%;
+    --input: 180 10% 91%;
+    --ring: 174 76% 36%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 15% 20%;
-    --sidebar-primary: 217 91% 45%;
+    --sidebar-foreground: 180 40% 20%;
+    --sidebar-primary: 174 76% 36%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 15% 96%;
-    --sidebar-accent-foreground: 220 15% 20%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217 91% 45%;
+    --sidebar-accent: 75 65% 95%;
+    --sidebar-accent-foreground: 180 40% 20%;
+    --sidebar-border: 180 10% 91%;
+    --sidebar-ring: 174 76% 36%;
 
-    /* Gradientes corporativos */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 45%) 0%, hsl(217 91% 55%) 100%);
-    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%) 0%, hsl(142 71% 55%) 100%);
-    --gradient-warning: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(38 92% 60%) 100%);
+    /* Gradientes QualMedical */
+    --gradient-primary: linear-gradient(135deg, hsl(174 76% 36%) 0%, hsl(174 76% 46%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(75 65% 55%) 0%, hsl(75 65% 65%) 100%);
+    --gradient-brand: linear-gradient(135deg, hsl(174 76% 36%) 0%, hsl(75 65% 55%) 100%);
     
     /* Sombras profesionales */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --shadow-sm: 0 1px 2px 0 rgba(26, 155, 142, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(26, 155, 142, 0.1), 0 2px 4px -1px rgba(26, 155, 142, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(26, 155, 142, 0.1), 0 4px 6px -2px rgba(26, 155, 142, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(26, 155, 142, 0.1), 0 10px 10px -5px rgba(26, 155, 142, 0.04);
   }
 
   .dark {
-    --background: 220 25% 10%;
-    --foreground: 220 10% 95%;
+    --background: 180 30% 8%;
+    --foreground: 0 0% 95%;
 
-    --card: 220 20% 13%;
-    --card-foreground: 220 10% 95%;
+    --card: 180 25% 11%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 220 20% 13%;
-    --popover-foreground: 220 10% 95%;
+    --popover: 180 25% 11%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 217 91% 55%;
+    --primary: 174 76% 46%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 20% 18%;
-    --secondary-foreground: 220 10% 95%;
+    --secondary: 180 20% 16%;
+    --secondary-foreground: 0 0% 95%;
 
-    --muted: 220 20% 18%;
-    --muted-foreground: 220 10% 65%;
+    --muted: 180 20% 16%;
+    --muted-foreground: 180 10% 65%;
 
-    --accent: 217 91% 55%;
+    --accent: 75 65% 60%;
     --accent-foreground: 0 0% 100%;
 
     --success: 142 71% 55%;
@@ -96,18 +98,18 @@ All colors MUST be HSL.
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 20% 20%;
-    --input: 220 20% 20%;
-    --ring: 217 91% 55%;
+    --border: 180 20% 18%;
+    --input: 180 20% 18%;
+    --ring: 174 76% 46%;
 
-    --sidebar-background: 220 20% 13%;
-    --sidebar-foreground: 220 10% 95%;
-    --sidebar-primary: 217 91% 55%;
+    --sidebar-background: 180 25% 11%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 174 76% 46%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 20% 18%;
-    --sidebar-accent-foreground: 220 10% 95%;
-    --sidebar-border: 220 20% 20%;
-    --sidebar-ring: 217 91% 55%;
+    --sidebar-accent: 180 20% 16%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 180 20% 18%;
+    --sidebar-ring: 174 76% 46%;
   }
 }
 
