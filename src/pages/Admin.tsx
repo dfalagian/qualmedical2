@@ -33,6 +33,8 @@ const Admin = () => {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  console.log('Admin page render - isAdmin:', isAdmin);
+
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
     defaultValues: {
