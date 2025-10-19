@@ -21,8 +21,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const { user, loading, isAdmin, userRole } = useAuth();
   const location = useLocation();
 
-  console.log('DashboardLayout render:', { loading, isAdmin, userRole, user: user?.id });
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -48,8 +46,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       { name: "Administración", href: "/dashboard/admin", icon: Settings },
     ] : []),
   ];
-
-  console.log('Navigation items:', navigation.map(n => n.name));
 
   return (
     <div className="min-h-screen bg-background">
