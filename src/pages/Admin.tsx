@@ -28,12 +28,12 @@ const userFormSchema = z.object({
 type UserFormValues = z.infer<typeof userFormSchema>;
 
 const Admin = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading } = useAuth();
   const queryClient = useQueryClient();
   const [editingUser, setEditingUser] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  console.log('Admin page render - isAdmin:', isAdmin);
+  console.log('Admin page render - isAdmin:', isAdmin, 'loading:', loading);
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
@@ -159,6 +159,17 @@ const Admin = () => {
       updateUserMutation.mutate({ userId: editingUser.id, data });
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return <Navigate to="/dashboard" replace />;
