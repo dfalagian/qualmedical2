@@ -9,10 +9,12 @@ export const useAuth = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(false);
   const navigate = useNavigate();
 
   const fetchUserRole = async (userId: string) => {
     try {
+      setRoleLoading(true);
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
@@ -22,13 +24,16 @@ export const useAuth = () => {
       if (error) {
         console.error("Error fetching role:", error);
         setUserRole(null);
+        setRoleLoading(false);
         return;
       }
 
       setUserRole(data?.role || null);
+      setRoleLoading(false);
     } catch (error) {
       console.error("Error in fetchUserRole:", error);
       setUserRole(null);
+      setRoleLoading(false);
     }
   };
 
@@ -85,7 +90,7 @@ export const useAuth = () => {
   return {
     user,
     session,
-    loading,
+    loading: loading || roleLoading,
     userRole,
     signOut,
     isAdmin: userRole === "admin",
