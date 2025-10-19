@@ -14,12 +14,13 @@ export const useAuth = () => {
   useEffect(() => {
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
+      async (event, currentSession) => {
+        console.log('Auth state changed:', event, currentSession?.user?.id);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
         if (currentSession?.user) {
-          fetchUserRole(currentSession.user.id);
+          await fetchUserRole(currentSession.user.id);
         } else {
           setUserRole(null);
         }
@@ -29,12 +30,13 @@ export const useAuth = () => {
     );
 
     // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
+      console.log('Initial session check:', currentSession?.user?.id);
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        fetchUserRole(currentSession.user.id);
+        await fetchUserRole(currentSession.user.id);
       }
       
       setLoading(false);
@@ -45,6 +47,7 @@ export const useAuth = () => {
 
   const fetchUserRole = async (userId: string) => {
     try {
+      console.log('Fetching role for user:', userId);
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
@@ -57,6 +60,7 @@ export const useAuth = () => {
         return;
       }
 
+      console.log('User role fetched:', data?.role);
       setUserRole(data?.role || null);
     } catch (error) {
       console.error("Error in fetchUserRole:", error);
