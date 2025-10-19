@@ -49,6 +49,8 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     ] : []),
   ];
 
+  console.log('Navigation items:', navigation.map(n => n.name));
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader />
