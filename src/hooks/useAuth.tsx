@@ -14,7 +14,6 @@ export const useAuth = () => {
 
   const fetchUserRole = async (userId: string) => {
     try {
-      setRoleLoading(true);
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
@@ -45,12 +44,14 @@ export const useAuth = () => {
         setUser(currentSession?.user ?? null);
         
         if (currentSession?.user) {
+          setRoleLoading(true);
           // Defer Supabase calls with setTimeout to avoid blocking
           setTimeout(() => {
             fetchUserRole(currentSession.user.id);
           }, 0);
         } else {
           setUserRole(null);
+          setRoleLoading(false);
         }
         
         setLoading(false);
@@ -63,10 +64,13 @@ export const useAuth = () => {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
+        setRoleLoading(true);
         // Defer Supabase calls with setTimeout
         setTimeout(() => {
           fetchUserRole(currentSession.user.id);
         }, 0);
+      } else {
+        setRoleLoading(false);
       }
       
       setLoading(false);
