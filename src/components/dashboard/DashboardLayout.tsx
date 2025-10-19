@@ -7,7 +7,8 @@ import {
   MessageSquare, 
   ShoppingCart, 
   Settings,
-  Home
+  Home,
+  Camera
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "react-router-dom";
@@ -41,6 +42,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { name: "Documentos", href: "/dashboard/documents", icon: FileText },
     { name: "Facturas", href: "/dashboard/invoices", icon: Receipt },
     { name: "Mensajes", href: "/dashboard/messages", icon: MessageSquare },
+    { name: "Contador de Medicamentos", href: "/dashboard/medicine-counter", icon: Camera },
     ...(isAdmin ? [
       { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
       { name: "Administración", href: "/dashboard/admin", icon: Settings },
