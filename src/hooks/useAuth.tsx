@@ -9,20 +9,25 @@ export const useAuth = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => {
         console.log('Auth state changed:', event, currentSession?.user?.id);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
         if (currentSession?.user) {
-          await fetchUserRole(currentSession.user.id);
+          setRoleLoading(true);
+          setTimeout(() => {
+            fetchUserRole(currentSession.user.id);
+          }, 0);
         } else {
           setUserRole(null);
+          setRoleLoading(false);
         }
         
         setLoading(false);
@@ -30,13 +35,18 @@ export const useAuth = () => {
     );
 
     // Then check for existing session
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       console.log('Initial session check:', currentSession?.user?.id);
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        await fetchUserRole(currentSession.user.id);
+        setRoleLoading(true);
+        setTimeout(() => {
+          fetchUserRole(currentSession.user.id);
+        }, 0);
+      } else {
+        setRoleLoading(false);
       }
       
       setLoading(false);
@@ -52,19 +62,22 @@ export const useAuth = () => {
         .from("user_roles")
         .select("role")
         .eq("user_id", userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("Error fetching role:", error);
         setUserRole(null);
+        setRoleLoading(false);
         return;
       }
 
       console.log('User role fetched:', data?.role);
       setUserRole(data?.role || null);
+      setRoleLoading(false);
     } catch (error) {
       console.error("Error in fetchUserRole:", error);
       setUserRole(null);
+      setRoleLoading(false);
     }
   };
 
@@ -83,7 +96,7 @@ export const useAuth = () => {
   return {
     user,
     session,
-    loading,
+    loading: loading || roleLoading,
     userRole,
     signOut,
     isAdmin: userRole === "admin",
