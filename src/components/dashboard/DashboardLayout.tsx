@@ -18,8 +18,10 @@ interface DashboardLayoutProps {
 }
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
-  const { user, loading, isAdmin } = useAuth();
+  const { user, loading, isAdmin, userRole } = useAuth();
   const location = useLocation();
+
+  console.log('DashboardLayout render:', { loading, isAdmin, userRole, user: user?.id });
 
   if (loading) {
     return (
