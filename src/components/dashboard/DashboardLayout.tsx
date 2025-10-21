@@ -46,6 +46,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     ...(isAdmin ? [
       { name: "Validación Actas", href: "/dashboard/documents-admin", icon: FileText },
       { name: "Validación Constancias", href: "/dashboard/constancia-fiscal-admin", icon: FileText },
+      { name: "Validación Domicilios", href: "/dashboard/comprobante-domicilio-admin", icon: FileText },
       { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
       { name: "Administración", href: "/dashboard/admin", icon: Settings },
     ] : []),

@@ -58,6 +58,7 @@ export type Database = {
       documents: {
         Row: {
           actividad_economica: string | null
+          codigo_postal: string | null
           created_at: string | null
           document_type: Database["public"]["Enums"]["document_type"]
           extracted_at: string | null
@@ -82,6 +83,7 @@ export type Database = {
         }
         Insert: {
           actividad_economica?: string | null
+          codigo_postal?: string | null
           created_at?: string | null
           document_type: Database["public"]["Enums"]["document_type"]
           extracted_at?: string | null
@@ -106,6 +108,7 @@ export type Database = {
         }
         Update: {
           actividad_economica?: string | null
+          codigo_postal?: string | null
           created_at?: string | null
           document_type?: Database["public"]["Enums"]["document_type"]
           extracted_at?: string | null

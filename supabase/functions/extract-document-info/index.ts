@@ -143,6 +143,30 @@ serve(async (req) => {
         ],
         tool_choice: { type: 'function', function: { name: 'extract_constancia_info' } }
       };
+    } else if (document.document_type === 'comprobante_domicilio') {
+      systemPrompt = 'Eres un asistente especializado en extraer información de comprobantes de domicilio (recibos de luz, agua, teléfono, predial, etc.). Extrae la información solicitada de forma precisa y estructurada.';
+      userPrompt = 'Extrae la siguiente información del comprobante de domicilio: Razón Social o Nombre del titular, y Código Postal. Si algún dato no está disponible, indica "No encontrado".';
+      toolConfig = {
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'extract_comprobante_domicilio_info',
+              description: 'Extraer información estructurada del comprobante de domicilio',
+              parameters: {
+                type: 'object',
+                properties: {
+                  razon_social: { type: 'string', description: 'Razón social o nombre del titular del servicio' },
+                  codigo_postal: { type: 'string', description: 'Código postal del domicilio (5 dígitos)' }
+                },
+                required: ['razon_social', 'codigo_postal'],
+                additionalProperties: false
+              }
+            }
+          }
+        ],
+        tool_choice: { type: 'function', function: { name: 'extract_comprobante_domicilio_info' } }
+      };
     } else {
       throw new Error(`Tipo de documento no soportado para extracción: ${document.document_type}`);
     }
@@ -238,6 +262,13 @@ serve(async (req) => {
         actividad_economica: extractedInfo.actividad_economica,
         regimen_tributario: extractedInfo.regimen_tributario,
         fecha_emision: extractedInfo.fecha_emision,
+        extraction_status: 'completed',
+        extracted_at: new Date().toISOString()
+      };
+    } else if (document.document_type === 'comprobante_domicilio') {
+      updateFields = {
+        razon_social: extractedInfo.razon_social,
+        codigo_postal: extractedInfo.codigo_postal,
         extraction_status: 'completed',
         extracted_at: new Date().toISOString()
       };
