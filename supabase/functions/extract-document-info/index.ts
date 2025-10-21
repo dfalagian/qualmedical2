@@ -73,7 +73,16 @@ serve(async (req) => {
 
     // Convertir el PDF a base64
     const arrayBuffer = await fileData.arrayBuffer();
-    const base64Pdf = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    // Convertir a base64 en chunks para evitar stack overflow
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+      binary += String.fromCharCode(...chunk);
+    }
+    const base64Pdf = btoa(binary);
 
     console.log('Llamando a Lovable AI para extraer información');
     console.log('Tipo de documento:', document.document_type);
