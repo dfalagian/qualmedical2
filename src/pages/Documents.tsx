@@ -81,8 +81,8 @@ const Documents = () => {
 
       if (insertError) throw insertError;
 
-      // Si es acta constitutiva, constancia fiscal o comprobante de domicilio, procesar automáticamente
-      if ((selectedType === "acta_constitutiva" || selectedType === "constancia_fiscal" || selectedType === "comprobante_domicilio") && insertedDoc) {
+      // Si es un documento que requiere extracción automática, procesar
+      if ((selectedType === "acta_constitutiva" || selectedType === "constancia_fiscal" || selectedType === "comprobante_domicilio" || selectedType === "aviso_funcionamiento") && insertedDoc) {
         toast.info("Procesando documento con IA...");
         
         try {
@@ -264,7 +264,7 @@ const Documents = () => {
                        {doc.notes && (
                         <p className="text-sm mt-1 italic">Notas: {doc.notes}</p>
                        )}
-                       {(doc.document_type === "acta_constitutiva" || doc.document_type === "constancia_fiscal" || doc.document_type === "comprobante_domicilio") && doc.extraction_status && (
+                       {(doc.document_type === "acta_constitutiva" || doc.document_type === "constancia_fiscal" || doc.document_type === "comprobante_domicilio" || doc.document_type === "aviso_funcionamiento") && doc.extraction_status && (
                         <div className="mt-2 text-sm">
                           {doc.extraction_status === "completed" && (
                             <span className="text-success">✓ Información extraída</span>

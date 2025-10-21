@@ -167,6 +167,29 @@ serve(async (req) => {
         ],
         tool_choice: { type: 'function', function: { name: 'extract_comprobante_domicilio_info' } }
       };
+    } else if (document.document_type === 'aviso_funcionamiento') {
+      systemPrompt = 'Eres un asistente especializado en extraer información de avisos de funcionamiento mexicanos. Extrae la información solicitada de forma precisa y estructurada.';
+      userPrompt = 'Extrae la siguiente información del aviso de funcionamiento: Razón Social de la empresa. Si el dato no está disponible, indica "No encontrado".';
+      toolConfig = {
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'extract_aviso_funcionamiento_info',
+              description: 'Extraer información estructurada del aviso de funcionamiento',
+              parameters: {
+                type: 'object',
+                properties: {
+                  razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' }
+                },
+                required: ['razon_social'],
+                additionalProperties: false
+              }
+            }
+          }
+        ],
+        tool_choice: { type: 'function', function: { name: 'extract_aviso_funcionamiento_info' } }
+      };
     } else {
       throw new Error(`Tipo de documento no soportado para extracción: ${document.document_type}`);
     }
@@ -269,6 +292,12 @@ serve(async (req) => {
       updateFields = {
         razon_social: extractedInfo.razon_social,
         codigo_postal: extractedInfo.codigo_postal,
+        extraction_status: 'completed',
+        extracted_at: new Date().toISOString()
+      };
+    } else if (document.document_type === 'aviso_funcionamiento') {
+      updateFields = {
+        razon_social: extractedInfo.razon_social,
         extraction_status: 'completed',
         extracted_at: new Date().toISOString()
       };
