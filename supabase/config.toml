@@ -1,1 +1,7 @@
 project_id = "cjhmbqmhfbspgirnkjkm"
+
+[functions.extract-document-info]
+verify_jwt = true
+
+[functions.count-medicine-boxes]
+verify_jwt = true

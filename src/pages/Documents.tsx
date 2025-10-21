@@ -66,7 +66,7 @@ const Documents = () => {
         .getPublicUrl(fileName);
 
       // Insert document record
-      const { error: insertError } = await supabase
+      const { data: insertedDoc, error: insertError } = await supabase
         .from("documents")
         .insert([{
           supplier_id: user.id,
@@ -74,9 +74,31 @@ const Documents = () => {
           file_url: publicUrl,
           file_name: file.name,
           notes: notes || null,
-        }]);
+        }])
+        .select()
+        .single();
 
       if (insertError) throw insertError;
+
+      // Si es acta constitutiva, procesar automáticamente
+      if (selectedType === "acta_constitutiva" && insertedDoc) {
+        toast.info("Procesando documento con IA...");
+        
+        try {
+          const { error: extractError } = await supabase.functions.invoke('extract-document-info', {
+            body: { documentId: insertedDoc.id }
+          });
+
+          if (extractError) {
+            console.error("Error extrayendo información:", extractError);
+            toast.warning("Documento subido pero falló la extracción automática");
+          } else {
+            toast.success("Información extraída exitosamente");
+          }
+        } catch (error) {
+          console.error("Error al llamar función de extracción:", error);
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Documento subido exitosamente");
@@ -238,9 +260,22 @@ const Documents = () => {
                           Proveedor: {doc.profiles.company_name || doc.profiles.full_name}
                         </p>
                       )}
-                      {doc.notes && (
+                       {doc.notes && (
                         <p className="text-sm mt-1 italic">Notas: {doc.notes}</p>
-                      )}
+                       )}
+                       {doc.document_type === "acta_constitutiva" && doc.extraction_status && (
+                        <div className="mt-2 text-sm">
+                          {doc.extraction_status === "completed" && (
+                            <span className="text-success">✓ Información extraída</span>
+                          )}
+                          {doc.extraction_status === "processing" && (
+                            <span className="text-muted-foreground">⏳ Procesando...</span>
+                          )}
+                          {doc.extraction_status === "failed" && (
+                            <span className="text-destructive">✗ Falló la extracción</span>
+                          )}
+                        </div>
+                       )}
                     </div>
 
                     <div className="flex gap-2">

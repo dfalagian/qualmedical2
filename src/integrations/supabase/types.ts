@@ -59,10 +59,16 @@ export type Database = {
         Row: {
           created_at: string | null
           document_type: Database["public"]["Enums"]["document_type"]
+          extracted_at: string | null
+          extraction_status: string | null
           file_name: string
           file_url: string
           id: string
           notes: string | null
+          objeto_social: string | null
+          razon_social: string | null
+          registro_publico: string | null
+          representante_legal: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["document_status"] | null
@@ -73,10 +79,16 @@ export type Database = {
         Insert: {
           created_at?: string | null
           document_type: Database["public"]["Enums"]["document_type"]
+          extracted_at?: string | null
+          extraction_status?: string | null
           file_name: string
           file_url: string
           id?: string
           notes?: string | null
+          objeto_social?: string | null
+          razon_social?: string | null
+          registro_publico?: string | null
+          representante_legal?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
@@ -87,10 +99,16 @@ export type Database = {
         Update: {
           created_at?: string | null
           document_type?: Database["public"]["Enums"]["document_type"]
+          extracted_at?: string | null
+          extraction_status?: string | null
           file_name?: string
           file_url?: string
           id?: string
           notes?: string | null
+          objeto_social?: string | null
+          razon_social?: string | null
+          registro_publico?: string | null
+          representante_legal?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
