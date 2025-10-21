@@ -20,6 +20,7 @@ const DOCUMENT_TYPES = [
   { value: "constancia_fiscal", label: "Constancia de Situación Fiscal" },
   { value: "acta_constitutiva", label: "Acta Constitutiva" },
   { value: "comprobante_domicilio", label: "Comprobante de Domicilio" },
+  { value: "aviso_funcionamiento", label: "Aviso de Funcionamiento" },
 ];
 
 const Documents = () => {

@@ -388,6 +388,7 @@ export type Database = {
         | "constancia_fiscal"
         | "acta_constitutiva"
         | "comprobante_domicilio"
+        | "aviso_funcionamiento"
       payment_status: "pendiente" | "procesando" | "pagado" | "rechazado"
       user_role: "admin" | "proveedor"
     }
@@ -525,6 +526,7 @@ export const Constants = {
         "constancia_fiscal",
         "acta_constitutiva",
         "comprobante_domicilio",
+        "aviso_funcionamiento",
       ],
       payment_status: ["pendiente", "procesando", "pagado", "rechazado"],
       user_role: ["admin", "proveedor"],
