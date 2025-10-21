@@ -145,7 +145,7 @@ serve(async (req) => {
       };
     } else if (document.document_type === 'comprobante_domicilio') {
       systemPrompt = 'Eres un asistente especializado en extraer información de comprobantes de domicilio (recibos de luz, agua, teléfono, predial, etc.). Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información del comprobante de domicilio: Razón Social o Nombre del titular, y Código Postal. Si algún dato no está disponible, indica "No encontrado".';
+      userPrompt = 'Extrae la siguiente información del comprobante de domicilio: Razón Social o Nombre del titular, RFC (si está disponible), y Código Postal. Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
         tools: [
           {
@@ -157,6 +157,7 @@ serve(async (req) => {
                 type: 'object',
                 properties: {
                   razon_social: { type: 'string', description: 'Razón social o nombre del titular del servicio' },
+                  rfc: { type: 'string', description: 'RFC del titular (si está disponible en el documento)' },
                   codigo_postal: { type: 'string', description: 'Código postal del domicilio (5 dígitos)' }
                 },
                 required: ['razon_social', 'codigo_postal'],
@@ -325,6 +326,7 @@ serve(async (req) => {
     } else if (document.document_type === 'comprobante_domicilio') {
       updateFields = {
         razon_social: extractedInfo.razon_social,
+        rfc: extractedInfo.rfc || null,
         codigo_postal: extractedInfo.codigo_postal,
         extraction_status: 'completed',
         extracted_at: new Date().toISOString(),
@@ -354,6 +356,80 @@ serve(async (req) => {
     }
 
     console.log('Documento actualizado exitosamente');
+
+    // Realizar validación cruzada de RFC si es necesario
+    if (document.document_type === 'constancia_fiscal' || document.document_type === 'comprobante_domicilio') {
+      console.log('Iniciando validación cruzada de RFC...');
+      
+      // Obtener todos los documentos del proveedor
+      const { data: supplierDocs, error: docsError } = await supabaseClient
+        .from('documents')
+        .select('id, document_type, rfc, extraction_status')
+        .eq('supplier_id', document.supplier_id)
+        .in('document_type', ['constancia_fiscal', 'comprobante_domicilio'])
+        .eq('extraction_status', 'completed');
+
+      if (!docsError && supplierDocs) {
+        const constanciaFiscal = supplierDocs.find(d => d.document_type === 'constancia_fiscal');
+        const comprobanteDomicilio = supplierDocs.find(d => d.document_type === 'comprobante_domicilio');
+
+        if (constanciaFiscal && comprobanteDomicilio && constanciaFiscal.rfc && comprobanteDomicilio.rfc) {
+          console.log('Comparando RFCs:', {
+            constancia: constanciaFiscal.rfc,
+            comprobante: comprobanteDomicilio.rfc
+          });
+
+          if (constanciaFiscal.rfc !== comprobanteDomicilio.rfc) {
+            // RFC no coincide, actualizar ambos documentos
+            const rfcError = `El RFC no coincide entre documentos. Constancia: ${constanciaFiscal.rfc}, Comprobante: ${comprobanteDomicilio.rfc}`;
+            
+            await supabaseClient
+              .from('documents')
+              .update({
+                validation_errors: [rfcError],
+                is_valid: false
+              })
+              .eq('id', constanciaFiscal.id);
+
+            await supabaseClient
+              .from('documents')
+              .update({
+                validation_errors: [rfcError],
+                is_valid: false
+              })
+              .eq('id', comprobanteDomicilio.id);
+
+            console.log('RFCs no coinciden, documentos marcados como inválidos');
+          } else {
+            // RFC coincide, limpiar errores de RFC si existen
+            console.log('RFCs coinciden correctamente');
+            
+            // Limpiar solo errores de RFC, mantener otros errores
+            for (const doc of [constanciaFiscal, comprobanteDomicilio]) {
+              const { data: currentDoc } = await supabaseClient
+                .from('documents')
+                .select('validation_errors')
+                .eq('id', doc.id)
+                .single();
+
+              if (currentDoc && currentDoc.validation_errors) {
+                const filteredErrors = currentDoc.validation_errors.filter(
+                  (err: string) => !err.includes('RFC no coincide')
+                );
+                
+                await supabaseClient
+                  .from('documents')
+                  .update({
+                    validation_errors: filteredErrors,
+                    is_valid: filteredErrors.length === 0
+                  })
+                  .eq('id', doc.id);
+              }
+            }
+          }
+        }
+      }
+    }
 
     return new Response(
       JSON.stringify({

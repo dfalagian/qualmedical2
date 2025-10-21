@@ -106,6 +106,7 @@ const ComprobanteDomicilioAdmin = () => {
                     <TableRow>
                       <TableHead>Proveedor</TableHead>
                       <TableHead>Titular del Servicio</TableHead>
+                      <TableHead>RFC</TableHead>
                       <TableHead>Código Postal</TableHead>
                       <TableHead>Archivo</TableHead>
                       <TableHead>Estado</TableHead>
@@ -119,11 +120,21 @@ const ComprobanteDomicilioAdmin = () => {
                           {doc.profiles?.company_name || doc.profiles?.full_name || "N/A"}
                         </TableCell>
                         <TableCell>{doc.razon_social || "-"}</TableCell>
-                        <TableCell className="font-mono text-sm">{doc.codigo_postal || "-"}</TableCell>
+                        <TableCell className="font-mono text-sm">{doc.rfc || "-"}</TableCell>
+                        <TableCell className="max-w-xs truncate">{doc.codigo_postal || "-"}</TableCell>
                         <TableCell className="text-sm text-muted-foreground truncate max-w-xs">
                           {doc.file_name}
                         </TableCell>
-                        <TableCell>{getExtractionBadge(doc.extraction_status)}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            {getExtractionBadge(doc.extraction_status)}
+                            {!doc.is_valid && doc.validation_errors && doc.validation_errors.length > 0 && (
+                              <Badge variant="destructive" className="text-xs">
+                                ⚠️ Validación
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Dialog>
@@ -152,6 +163,10 @@ const ComprobanteDomicilioAdmin = () => {
                                       <p>{selectedDoc.razon_social || "No extraído"}</p>
                                     </div>
                                     <div>
+                                      <h4 className="font-semibold text-sm text-muted-foreground">RFC</h4>
+                                      <p className="font-mono text-lg">{selectedDoc.rfc || "No extraído"}</p>
+                                    </div>
+                                    <div>
                                       <h4 className="font-semibold text-sm text-muted-foreground">Código Postal</h4>
                                       <p className="font-mono text-lg">{selectedDoc.codigo_postal || "No extraído"}</p>
                                     </div>
@@ -163,6 +178,21 @@ const ComprobanteDomicilioAdmin = () => {
                                       <h4 className="font-semibold text-sm text-muted-foreground">Estado de Extracción</h4>
                                       <div className="mt-1">{getExtractionBadge(selectedDoc.extraction_status)}</div>
                                     </div>
+                                    {selectedDoc.validation_errors && selectedDoc.validation_errors.length > 0 && (
+                                      <div className="border-l-4 border-destructive bg-destructive/10 p-4 rounded">
+                                        <h4 className="font-semibold text-sm text-destructive mb-2">⚠️ Errores de Validación</h4>
+                                        <ul className="list-disc list-inside space-y-1">
+                                          {selectedDoc.validation_errors.map((error: string, idx: number) => (
+                                            <li key={idx} className="text-sm text-destructive">{error}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {selectedDoc.is_valid && selectedDoc.extraction_status === 'completed' && (
+                                      <div className="border-l-4 border-success bg-success/10 p-4 rounded">
+                                        <p className="text-sm text-success font-medium">✓ Documento válido</p>
+                                      </div>
+                                    )}
                                     {selectedDoc.notes && (
                                       <div>
                                         <h4 className="font-semibold text-sm text-muted-foreground">Notas</h4>
