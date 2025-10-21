@@ -118,7 +118,7 @@ serve(async (req) => {
       };
     } else if (document.document_type === 'constancia_fiscal') {
       systemPrompt = 'Eres un asistente especializado en extraer información de constancias de situación fiscal mexicanas. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información de la constancia de situación fiscal: Razón Social, RFC, Actividad Económica, Régimen Tributario, Código Postal, y Fecha de Emisión. Si algún dato no está disponible, indica "No encontrado".';
+      userPrompt = 'Extrae la siguiente información de la constancia de situación fiscal: Razón Social, RFC, Actividad Económica, Régimen Tributario, Dirección del domicilio fiscal, Código Postal, y Fecha de Emisión. Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
         tools: [
           {
@@ -133,10 +133,11 @@ serve(async (req) => {
                   rfc: { type: 'string', description: 'RFC del contribuyente' },
                   actividad_economica: { type: 'string', description: 'Actividad económica principal' },
                   regimen_tributario: { type: 'string', description: 'Régimen tributario del contribuyente' },
+                  direccion: { type: 'string', description: 'Dirección completa del domicilio fiscal' },
                   codigo_postal: { type: 'string', description: 'Código postal del domicilio fiscal (5 dígitos)' },
                   fecha_emision: { type: 'string', description: 'Fecha de emisión de la constancia en formato YYYY-MM-DD' }
                 },
-                required: ['razon_social', 'rfc', 'actividad_economica', 'regimen_tributario', 'codigo_postal', 'fecha_emision'],
+                required: ['razon_social', 'rfc', 'actividad_economica', 'regimen_tributario', 'direccion', 'codigo_postal', 'fecha_emision'],
                 additionalProperties: false
               }
             }
@@ -321,6 +322,7 @@ serve(async (req) => {
         rfc: extractedInfo.rfc,
         actividad_economica: extractedInfo.actividad_economica,
         regimen_tributario: extractedInfo.regimen_tributario,
+        direccion: extractedInfo.direccion,
         codigo_postal: extractedInfo.codigo_postal,
         fecha_emision: extractedInfo.fecha_emision,
         extraction_status: 'completed',
@@ -363,9 +365,9 @@ serve(async (req) => {
 
     console.log('Documento actualizado exitosamente');
 
-    // Realizar validación cruzada de RFC si es necesario
+    // Realizar validación cruzada entre constancia_fiscal y comprobante_domicilio
     if (document.document_type === 'constancia_fiscal' || document.document_type === 'comprobante_domicilio') {
-      console.log('Iniciando validación cruzada de RFC...');
+      console.log('Iniciando validación cruzada entre constancia fiscal y comprobante domicilio...');
       
       // Obtener todos los documentos del proveedor
       const { data: supplierDocs, error: docsError } = await supabaseClient
@@ -448,6 +450,107 @@ serve(async (req) => {
               if (currentDoc && currentDoc.validation_errors) {
                 const filteredErrors = currentDoc.validation_errors.filter(
                   (err: string) => !err.includes('RFC no coincide') && !err.includes('Razón Social no coincide') && !err.includes('Código Postal no coincide')
+                );
+                
+                await supabaseClient
+                  .from('documents')
+                  .update({
+                    validation_errors: filteredErrors,
+                    is_valid: filteredErrors.length === 0
+                  })
+                  .eq('id', doc.id);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Realizar validación cruzada entre aviso_funcionamiento y constancia_fiscal
+    if (document.document_type === 'aviso_funcionamiento' || document.document_type === 'constancia_fiscal') {
+      console.log('Iniciando validación cruzada entre aviso de funcionamiento y constancia fiscal...');
+      
+      // Obtener todos los documentos del proveedor
+      const { data: supplierDocs, error: docsError } = await supabaseClient
+        .from('documents')
+        .select('id, document_type, razon_social, direccion, extraction_status')
+        .eq('supplier_id', document.supplier_id)
+        .in('document_type', ['constancia_fiscal', 'aviso_funcionamiento'])
+        .eq('extraction_status', 'completed');
+
+      if (!docsError && supplierDocs) {
+        const constanciaFiscal = supplierDocs.find(d => d.document_type === 'constancia_fiscal');
+        const avisoFuncionamiento = supplierDocs.find(d => d.document_type === 'aviso_funcionamiento');
+
+        if (constanciaFiscal && avisoFuncionamiento) {
+          console.log('Validando Razón Social y Dirección:', {
+            constancia: { razon_social: constanciaFiscal.razon_social, direccion: constanciaFiscal.direccion },
+            aviso: { razon_social: avisoFuncionamiento.razon_social, direccion: avisoFuncionamiento.direccion }
+          });
+
+          const errors: string[] = [];
+
+          // Validar Razón Social (normalizar para comparación)
+          if (constanciaFiscal.razon_social && avisoFuncionamiento.razon_social) {
+            const razonSocialConstancia = constanciaFiscal.razon_social.trim().toLowerCase();
+            const razonSocialAviso = avisoFuncionamiento.razon_social.trim().toLowerCase();
+            
+            if (razonSocialConstancia !== razonSocialAviso) {
+              errors.push(`La Razón Social no coincide entre documentos. Constancia Fiscal: "${constanciaFiscal.razon_social}", Aviso de Funcionamiento: "${avisoFuncionamiento.razon_social}"`);
+            }
+          }
+
+          // Validar Dirección (normalizar para comparación)
+          if (constanciaFiscal.direccion && avisoFuncionamiento.direccion) {
+            const direccionConstancia = constanciaFiscal.direccion.trim().toLowerCase();
+            const direccionAviso = avisoFuncionamiento.direccion.trim().toLowerCase();
+            
+            if (direccionConstancia !== direccionAviso) {
+              errors.push(`La Dirección no coincide entre documentos. Constancia Fiscal: "${constanciaFiscal.direccion}", Aviso de Funcionamiento: "${avisoFuncionamiento.direccion}"`);
+            }
+          }
+
+          if (errors.length > 0) {
+            // Hay errores, actualizar ambos documentos
+            console.log('Errores de validación encontrados:', errors);
+            
+            for (const doc of [constanciaFiscal, avisoFuncionamiento]) {
+              // Obtener errores actuales y combinar
+              const { data: currentDoc } = await supabaseClient
+                .from('documents')
+                .select('validation_errors')
+                .eq('id', doc.id)
+                .single();
+
+              const currentErrors = currentDoc?.validation_errors || [];
+              // Filtrar errores antiguos entre aviso y constancia, agregar nuevos
+              const filteredErrors = currentErrors.filter(
+                (err: string) => !err.includes('Razón Social no coincide entre documentos. Constancia Fiscal') && !err.includes('Dirección no coincide entre documentos. Constancia Fiscal')
+              );
+              const combinedErrors = [...filteredErrors, ...errors];
+
+              await supabaseClient
+                .from('documents')
+                .update({
+                  validation_errors: combinedErrors,
+                  is_valid: false
+                })
+                .eq('id', doc.id);
+            }
+          } else {
+            // No hay errores, limpiar errores de validación entre aviso y constancia
+            console.log('Razón Social y Dirección coinciden correctamente');
+            
+            for (const doc of [constanciaFiscal, avisoFuncionamiento]) {
+              const { data: currentDoc } = await supabaseClient
+                .from('documents')
+                .select('validation_errors')
+                .eq('id', doc.id)
+                .single();
+
+              if (currentDoc && currentDoc.validation_errors) {
+                const filteredErrors = currentDoc.validation_errors.filter(
+                  (err: string) => !err.includes('Razón Social no coincide entre documentos. Constancia Fiscal') && !err.includes('Dirección no coincide entre documentos. Constancia Fiscal')
                 );
                 
                 await supabaseClient
