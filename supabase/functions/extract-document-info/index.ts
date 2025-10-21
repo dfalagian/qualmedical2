@@ -145,7 +145,7 @@ serve(async (req) => {
       };
     } else if (document.document_type === 'comprobante_domicilio') {
       systemPrompt = 'Eres un asistente especializado en extraer información de comprobantes de domicilio (recibos de luz, agua, teléfono, predial, etc.). Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información del comprobante de domicilio: Razón Social o Nombre del titular, RFC (si está disponible), y Código Postal. Si algún dato no está disponible, indica "No encontrado".';
+      userPrompt = 'Extrae la siguiente información del comprobante de domicilio: Razón Social o Nombre del titular, RFC (si está disponible), Código Postal, y Fecha de Emisión. Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
         tools: [
           {
@@ -158,9 +158,10 @@ serve(async (req) => {
                 properties: {
                   razon_social: { type: 'string', description: 'Razón social o nombre del titular del servicio' },
                   rfc: { type: 'string', description: 'RFC del titular (si está disponible en el documento)' },
-                  codigo_postal: { type: 'string', description: 'Código postal del domicilio (5 dígitos)' }
+                  codigo_postal: { type: 'string', description: 'Código postal del domicilio (5 dígitos)' },
+                  fecha_emision: { type: 'string', description: 'Fecha de emisión del comprobante en formato YYYY-MM-DD' }
                 },
-                required: ['razon_social', 'codigo_postal'],
+                required: ['razon_social', 'codigo_postal', 'fecha_emision'],
                 additionalProperties: false
               }
             }
@@ -274,8 +275,8 @@ serve(async (req) => {
     const validationErrors: string[] = [];
     let isValid = true;
 
-    // Validaciones para constancia fiscal
-    if (document.document_type === 'constancia_fiscal' && extractedInfo.fecha_emision) {
+    // Validaciones de fecha de emisión (constancia fiscal y comprobante domicilio)
+    if ((document.document_type === 'constancia_fiscal' || document.document_type === 'comprobante_domicilio') && extractedInfo.fecha_emision) {
       try {
         const fechaEmision = new Date(extractedInfo.fecha_emision);
         const hoy = new Date();
@@ -283,11 +284,13 @@ serve(async (req) => {
         tresMesesAtras.setMonth(tresMesesAtras.getMonth() - 3);
 
         if (fechaEmision < tresMesesAtras) {
-          validationErrors.push('La constancia tiene más de 3 meses de antigüedad. Se requiere una constancia actualizada.');
+          const tipoDoc = document.document_type === 'constancia_fiscal' ? 'La constancia' : 'El comprobante';
+          validationErrors.push(`${tipoDoc} tiene más de 3 meses de antigüedad. Se requiere un documento actualizado.`);
           isValid = false;
         }
 
         console.log('Validación de fecha:', {
+          tipoDocumento: document.document_type,
           fechaEmision: fechaEmision.toISOString(),
           tresMesesAtras: tresMesesAtras.toISOString(),
           esValida: fechaEmision >= tresMesesAtras
@@ -328,6 +331,7 @@ serve(async (req) => {
         razon_social: extractedInfo.razon_social,
         rfc: extractedInfo.rfc || null,
         codigo_postal: extractedInfo.codigo_postal,
+        fecha_emision: extractedInfo.fecha_emision,
         extraction_status: 'completed',
         extracted_at: new Date().toISOString(),
         validation_errors: validationErrors,
