@@ -49,9 +49,9 @@ serve(async (req) => {
       .update({ extraction_status: 'processing' })
       .eq('id', documentId);
 
-    console.log('Descargando PDF desde:', document.file_url);
+    console.log('Descargando imagen desde:', document.file_url);
 
-    // Descargar el PDF desde storage
+    // Descargar la imagen desde storage
     const { data: fileData, error: downloadError } = await supabaseClient
       .storage
       .from('documents')
@@ -71,7 +71,7 @@ serve(async (req) => {
 
     console.log('Archivo descargado, tamaño:', fileData.size);
 
-    // Convertir el PDF a base64
+    // Convertir la imagen a base64
     const arrayBuffer = await fileData.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     
@@ -82,7 +82,7 @@ serve(async (req) => {
       const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
       binary += String.fromCharCode(...chunk);
     }
-    const base64Pdf = btoa(binary);
+    const base64Image = btoa(binary);
 
     console.log('Llamando a Lovable AI para extraer información');
     console.log('Tipo de documento:', document.document_type);
@@ -208,7 +208,7 @@ serve(async (req) => {
       throw new Error(`Tipo de documento no soportado para extracción: ${document.document_type}`);
     }
 
-    // Llamar a Lovable AI para extraer información usando document part
+    // Llamar a Lovable AI para extraer información de la imagen
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -227,10 +227,9 @@ serve(async (req) => {
                 text: userPrompt 
               },
               {
-                type: 'document',
-                document: { 
-                  data: base64Pdf,
-                  mime_type: 'application/pdf'
+                type: 'image_url',
+                image_url: { 
+                  url: `data:image/jpeg;base64,${base64Image}` 
                 }
               }
             ]

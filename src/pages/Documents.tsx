@@ -174,7 +174,7 @@ const Documents = () => {
                 <Upload className="h-5 w-5" />
                 Subir Nuevo Documento
               </CardTitle>
-              <CardDescription>Solo se permiten archivos PDF</CardDescription>
+              <CardDescription>Solo se permiten imágenes JPG, JPEG o PNG</CardDescription>
             </CardHeader>
             <CardContent>
               <form
@@ -201,11 +201,11 @@ const Documents = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="file">Archivo PDF *</Label>
+                  <Label htmlFor="file">Imagen (JPG, JPEG o PNG) *</Label>
                   <Input
                     id="file"
                     type="file"
-                    accept=".pdf"
+                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                     onChange={(e) => setFile(e.target.files?.[0] || null)}
                     required
                   />
