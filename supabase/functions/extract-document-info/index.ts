@@ -208,6 +208,7 @@ serve(async (req) => {
       throw new Error(`Tipo de documento no soportado para extracción: ${document.document_type}`);
     }
 
+    // Llamar a Lovable AI para extraer información usando document part
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -221,10 +222,16 @@ serve(async (req) => {
           {
             role: 'user',
             content: [
-              { type: 'text', text: userPrompt },
+              { 
+                type: 'text', 
+                text: userPrompt 
+              },
               {
-                type: 'image_url',
-                image_url: { url: `data:application/pdf;base64,${base64Pdf}` }
+                type: 'document',
+                document: { 
+                  data: base64Pdf,
+                  mime_type: 'application/pdf'
+                }
               }
             ]
           }
