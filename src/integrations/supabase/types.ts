@@ -68,6 +68,7 @@ export type Database = {
           file_name: string
           file_url: string
           id: string
+          is_valid: boolean | null
           notes: string | null
           objeto_social: string | null
           razon_social: string | null
@@ -80,6 +81,7 @@ export type Database = {
           status: Database["public"]["Enums"]["document_status"] | null
           supplier_id: string
           updated_at: string | null
+          validation_errors: Json | null
           version: number | null
         }
         Insert: {
@@ -94,6 +96,7 @@ export type Database = {
           file_name: string
           file_url: string
           id?: string
+          is_valid?: boolean | null
           notes?: string | null
           objeto_social?: string | null
           razon_social?: string | null
@@ -106,6 +109,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["document_status"] | null
           supplier_id: string
           updated_at?: string | null
+          validation_errors?: Json | null
           version?: number | null
         }
         Update: {
@@ -120,6 +124,7 @@ export type Database = {
           file_name?: string
           file_url?: string
           id?: string
+          is_valid?: boolean | null
           notes?: string | null
           objeto_social?: string | null
           razon_social?: string | null
@@ -132,6 +137,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["document_status"] | null
           supplier_id?: string
           updated_at?: string | null
+          validation_errors?: Json | null
           version?: number | null
         }
         Relationships: [

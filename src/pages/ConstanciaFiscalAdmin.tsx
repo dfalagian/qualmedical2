@@ -132,7 +132,16 @@ const ConstanciaFiscalAdmin = () => {
                         <TableCell className="font-mono text-sm">{doc.rfc || "-"}</TableCell>
                         <TableCell className="max-w-xs truncate">{doc.regimen_tributario || "-"}</TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(doc.fecha_emision)}</TableCell>
-                        <TableCell>{getExtractionBadge(doc.extraction_status)}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            {getExtractionBadge(doc.extraction_status)}
+                            {!doc.is_valid && doc.validation_errors && doc.validation_errors.length > 0 && (
+                              <Badge variant="destructive" className="text-xs">
+                                ⚠️ Validación
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Dialog>
@@ -180,6 +189,21 @@ const ConstanciaFiscalAdmin = () => {
                                       <h4 className="font-semibold text-sm text-muted-foreground">Estado de Extracción</h4>
                                       <div className="mt-1">{getExtractionBadge(selectedDoc.extraction_status)}</div>
                                     </div>
+                                    {selectedDoc.validation_errors && selectedDoc.validation_errors.length > 0 && (
+                                      <div className="border-l-4 border-destructive bg-destructive/10 p-4 rounded">
+                                        <h4 className="font-semibold text-sm text-destructive mb-2">⚠️ Errores de Validación</h4>
+                                        <ul className="list-disc list-inside space-y-1">
+                                          {selectedDoc.validation_errors.map((error: string, idx: number) => (
+                                            <li key={idx} className="text-sm text-destructive">{error}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {selectedDoc.is_valid && selectedDoc.extraction_status === 'completed' && (
+                                      <div className="border-l-4 border-success bg-success/10 p-4 rounded">
+                                        <p className="text-sm text-success font-medium">✓ Documento válido y vigente</p>
+                                      </div>
+                                    )}
                                     <div className="flex gap-2 pt-4">
                                       <Button variant="outline" size="sm" asChild>
                                         <a href={selectedDoc.file_url} target="_blank" rel="noopener noreferrer">

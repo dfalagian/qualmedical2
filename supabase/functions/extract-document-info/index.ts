@@ -269,6 +269,35 @@ serve(async (req) => {
     const extractedInfo = JSON.parse(toolCall.function.arguments);
     console.log('Información extraída:', extractedInfo);
 
+    // Validar información extraída
+    const validationErrors: string[] = [];
+    let isValid = true;
+
+    // Validaciones para constancia fiscal
+    if (document.document_type === 'constancia_fiscal' && extractedInfo.fecha_emision) {
+      try {
+        const fechaEmision = new Date(extractedInfo.fecha_emision);
+        const hoy = new Date();
+        const tresMesesAtras = new Date();
+        tresMesesAtras.setMonth(tresMesesAtras.getMonth() - 3);
+
+        if (fechaEmision < tresMesesAtras) {
+          validationErrors.push('La constancia tiene más de 3 meses de antigüedad. Se requiere una constancia actualizada.');
+          isValid = false;
+        }
+
+        console.log('Validación de fecha:', {
+          fechaEmision: fechaEmision.toISOString(),
+          tresMesesAtras: tresMesesAtras.toISOString(),
+          esValida: fechaEmision >= tresMesesAtras
+        });
+      } catch (error) {
+        console.error('Error validando fecha:', error);
+        validationErrors.push('No se pudo validar la fecha de emisión');
+        isValid = false;
+      }
+    }
+
     // Preparar campos a actualizar según el tipo de documento
     if (document.document_type === 'acta_constitutiva') {
       updateFields = {
@@ -277,7 +306,9 @@ serve(async (req) => {
         objeto_social: extractedInfo.objeto_social,
         registro_publico: extractedInfo.registro_publico,
         extraction_status: 'completed',
-        extracted_at: new Date().toISOString()
+        extracted_at: new Date().toISOString(),
+        validation_errors: validationErrors,
+        is_valid: isValid
       };
     } else if (document.document_type === 'constancia_fiscal') {
       updateFields = {
@@ -287,21 +318,27 @@ serve(async (req) => {
         regimen_tributario: extractedInfo.regimen_tributario,
         fecha_emision: extractedInfo.fecha_emision,
         extraction_status: 'completed',
-        extracted_at: new Date().toISOString()
+        extracted_at: new Date().toISOString(),
+        validation_errors: validationErrors,
+        is_valid: isValid
       };
     } else if (document.document_type === 'comprobante_domicilio') {
       updateFields = {
         razon_social: extractedInfo.razon_social,
         codigo_postal: extractedInfo.codigo_postal,
         extraction_status: 'completed',
-        extracted_at: new Date().toISOString()
+        extracted_at: new Date().toISOString(),
+        validation_errors: validationErrors,
+        is_valid: isValid
       };
     } else if (document.document_type === 'aviso_funcionamiento') {
       updateFields = {
         razon_social: extractedInfo.razon_social,
         direccion: extractedInfo.direccion,
         extraction_status: 'completed',
-        extracted_at: new Date().toISOString()
+        extracted_at: new Date().toISOString(),
+        validation_errors: validationErrors,
+        is_valid: isValid
       };
     }
 

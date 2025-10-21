@@ -275,6 +275,11 @@ const Documents = () => {
                           {doc.extraction_status === "failed" && (
                             <span className="text-destructive">✗ Falló la extracción</span>
                           )}
+                          {!doc.is_valid && doc.validation_errors && doc.validation_errors.length > 0 && (
+                            <div className="mt-1 text-destructive text-xs">
+                              ⚠️ {doc.validation_errors[0]}
+                            </div>
+                          )}
                         </div>
                        )}
                     </div>
