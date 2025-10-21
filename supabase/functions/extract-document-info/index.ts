@@ -118,7 +118,7 @@ serve(async (req) => {
       };
     } else if (document.document_type === 'constancia_fiscal') {
       systemPrompt = 'Eres un asistente especializado en extraer información de constancias de situación fiscal mexicanas. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información de la constancia de situación fiscal: Razón Social, RFC, Actividad Económica, Régimen Tributario, y Fecha de Emisión. Si algún dato no está disponible, indica "No encontrado".';
+      userPrompt = 'Extrae la siguiente información de la constancia de situación fiscal: Razón Social, RFC, Actividad Económica, Régimen Tributario, Código Postal, y Fecha de Emisión. Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
         tools: [
           {
@@ -133,9 +133,10 @@ serve(async (req) => {
                   rfc: { type: 'string', description: 'RFC del contribuyente' },
                   actividad_economica: { type: 'string', description: 'Actividad económica principal' },
                   regimen_tributario: { type: 'string', description: 'Régimen tributario del contribuyente' },
+                  codigo_postal: { type: 'string', description: 'Código postal del domicilio fiscal (5 dígitos)' },
                   fecha_emision: { type: 'string', description: 'Fecha de emisión de la constancia en formato YYYY-MM-DD' }
                 },
-                required: ['razon_social', 'rfc', 'actividad_economica', 'regimen_tributario', 'fecha_emision'],
+                required: ['razon_social', 'rfc', 'actividad_economica', 'regimen_tributario', 'codigo_postal', 'fecha_emision'],
                 additionalProperties: false
               }
             }
@@ -320,6 +321,7 @@ serve(async (req) => {
         rfc: extractedInfo.rfc,
         actividad_economica: extractedInfo.actividad_economica,
         regimen_tributario: extractedInfo.regimen_tributario,
+        codigo_postal: extractedInfo.codigo_postal,
         fecha_emision: extractedInfo.fecha_emision,
         extraction_status: 'completed',
         extracted_at: new Date().toISOString(),
@@ -368,7 +370,7 @@ serve(async (req) => {
       // Obtener todos los documentos del proveedor
       const { data: supplierDocs, error: docsError } = await supabaseClient
         .from('documents')
-        .select('id, document_type, rfc, razon_social, extraction_status')
+        .select('id, document_type, rfc, razon_social, codigo_postal, extraction_status')
         .eq('supplier_id', document.supplier_id)
         .in('document_type', ['constancia_fiscal', 'comprobante_domicilio'])
         .eq('extraction_status', 'completed');
@@ -378,9 +380,9 @@ serve(async (req) => {
         const comprobanteDomicilio = supplierDocs.find(d => d.document_type === 'comprobante_domicilio');
 
         if (constanciaFiscal && comprobanteDomicilio) {
-          console.log('Validando RFC y Razón Social:', {
-            constancia: { rfc: constanciaFiscal.rfc, razon_social: constanciaFiscal.razon_social },
-            comprobante: { rfc: comprobanteDomicilio.rfc, razon_social: comprobanteDomicilio.razon_social }
+          console.log('Validando RFC, Razón Social y Código Postal:', {
+            constancia: { rfc: constanciaFiscal.rfc, razon_social: constanciaFiscal.razon_social, codigo_postal: constanciaFiscal.codigo_postal },
+            comprobante: { rfc: comprobanteDomicilio.rfc, razon_social: comprobanteDomicilio.razon_social, codigo_postal: comprobanteDomicilio.codigo_postal }
           });
 
           const errors: string[] = [];
@@ -400,6 +402,11 @@ serve(async (req) => {
             }
           }
 
+          // Validar Código Postal
+          if (constanciaFiscal.codigo_postal && comprobanteDomicilio.codigo_postal && constanciaFiscal.codigo_postal !== comprobanteDomicilio.codigo_postal) {
+            errors.push(`El Código Postal no coincide entre documentos. Constancia: ${constanciaFiscal.codigo_postal}, Comprobante: ${comprobanteDomicilio.codigo_postal}`);
+          }
+
           if (errors.length > 0) {
             // Hay errores, actualizar ambos documentos
             console.log('Errores de validación encontrados:', errors);
@@ -413,9 +420,9 @@ serve(async (req) => {
                 .single();
 
               const currentErrors = currentDoc?.validation_errors || [];
-              // Filtrar errores antiguos de RFC y Razón Social, agregar nuevos
+              // Filtrar errores antiguos de RFC, Razón Social y Código Postal, agregar nuevos
               const filteredErrors = currentErrors.filter(
-                (err: string) => !err.includes('RFC no coincide') && !err.includes('Razón Social no coincide')
+                (err: string) => !err.includes('RFC no coincide') && !err.includes('Razón Social no coincide') && !err.includes('Código Postal no coincide')
               );
               const combinedErrors = [...filteredErrors, ...errors];
 
@@ -428,8 +435,8 @@ serve(async (req) => {
                 .eq('id', doc.id);
             }
           } else {
-            // No hay errores, limpiar errores de RFC y Razón Social
-            console.log('RFC y Razón Social coinciden correctamente');
+            // No hay errores, limpiar errores de RFC, Razón Social y Código Postal
+            console.log('RFC, Razón Social y Código Postal coinciden correctamente');
             
             for (const doc of [constanciaFiscal, comprobanteDomicilio]) {
               const { data: currentDoc } = await supabaseClient
@@ -440,7 +447,7 @@ serve(async (req) => {
 
               if (currentDoc && currentDoc.validation_errors) {
                 const filteredErrors = currentDoc.validation_errors.filter(
-                  (err: string) => !err.includes('RFC no coincide') && !err.includes('Razón Social no coincide')
+                  (err: string) => !err.includes('RFC no coincide') && !err.includes('Razón Social no coincide') && !err.includes('Código Postal no coincide')
                 );
                 
                 await supabaseClient
