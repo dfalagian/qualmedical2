@@ -364,7 +364,7 @@ serve(async (req) => {
       // Obtener todos los documentos del proveedor
       const { data: supplierDocs, error: docsError } = await supabaseClient
         .from('documents')
-        .select('id, document_type, rfc, extraction_status')
+        .select('id, document_type, rfc, razon_social, extraction_status')
         .eq('supplier_id', document.supplier_id)
         .in('document_type', ['constancia_fiscal', 'comprobante_domicilio'])
         .eq('extraction_status', 'completed');
@@ -373,38 +373,60 @@ serve(async (req) => {
         const constanciaFiscal = supplierDocs.find(d => d.document_type === 'constancia_fiscal');
         const comprobanteDomicilio = supplierDocs.find(d => d.document_type === 'comprobante_domicilio');
 
-        if (constanciaFiscal && comprobanteDomicilio && constanciaFiscal.rfc && comprobanteDomicilio.rfc) {
-          console.log('Comparando RFCs:', {
-            constancia: constanciaFiscal.rfc,
-            comprobante: comprobanteDomicilio.rfc
+        if (constanciaFiscal && comprobanteDomicilio) {
+          console.log('Validando RFC y Razón Social:', {
+            constancia: { rfc: constanciaFiscal.rfc, razon_social: constanciaFiscal.razon_social },
+            comprobante: { rfc: comprobanteDomicilio.rfc, razon_social: comprobanteDomicilio.razon_social }
           });
 
-          if (constanciaFiscal.rfc !== comprobanteDomicilio.rfc) {
-            // RFC no coincide, actualizar ambos documentos
-            const rfcError = `El RFC no coincide entre documentos. Constancia: ${constanciaFiscal.rfc}, Comprobante: ${comprobanteDomicilio.rfc}`;
+          const errors: string[] = [];
+
+          // Validar RFC
+          if (constanciaFiscal.rfc && comprobanteDomicilio.rfc && constanciaFiscal.rfc !== comprobanteDomicilio.rfc) {
+            errors.push(`El RFC no coincide entre documentos. Constancia: ${constanciaFiscal.rfc}, Comprobante: ${comprobanteDomicilio.rfc}`);
+          }
+
+          // Validar Razón Social (normalizar para comparación)
+          if (constanciaFiscal.razon_social && comprobanteDomicilio.razon_social) {
+            const razonSocialConstancia = constanciaFiscal.razon_social.trim().toLowerCase();
+            const razonSocialComprobante = comprobanteDomicilio.razon_social.trim().toLowerCase();
             
-            await supabaseClient
-              .from('documents')
-              .update({
-                validation_errors: [rfcError],
-                is_valid: false
-              })
-              .eq('id', constanciaFiscal.id);
+            if (razonSocialConstancia !== razonSocialComprobante) {
+              errors.push(`La Razón Social no coincide entre documentos. Constancia: "${constanciaFiscal.razon_social}", Comprobante: "${comprobanteDomicilio.razon_social}"`);
+            }
+          }
 
-            await supabaseClient
-              .from('documents')
-              .update({
-                validation_errors: [rfcError],
-                is_valid: false
-              })
-              .eq('id', comprobanteDomicilio.id);
+          if (errors.length > 0) {
+            // Hay errores, actualizar ambos documentos
+            console.log('Errores de validación encontrados:', errors);
+            
+            for (const doc of [constanciaFiscal, comprobanteDomicilio]) {
+              // Obtener errores actuales y combinar
+              const { data: currentDoc } = await supabaseClient
+                .from('documents')
+                .select('validation_errors')
+                .eq('id', doc.id)
+                .single();
 
-            console.log('RFCs no coinciden, documentos marcados como inválidos');
+              const currentErrors = currentDoc?.validation_errors || [];
+              // Filtrar errores antiguos de RFC y Razón Social, agregar nuevos
+              const filteredErrors = currentErrors.filter(
+                (err: string) => !err.includes('RFC no coincide') && !err.includes('Razón Social no coincide')
+              );
+              const combinedErrors = [...filteredErrors, ...errors];
+
+              await supabaseClient
+                .from('documents')
+                .update({
+                  validation_errors: combinedErrors,
+                  is_valid: false
+                })
+                .eq('id', doc.id);
+            }
           } else {
-            // RFC coincide, limpiar errores de RFC si existen
-            console.log('RFCs coinciden correctamente');
+            // No hay errores, limpiar errores de RFC y Razón Social
+            console.log('RFC y Razón Social coinciden correctamente');
             
-            // Limpiar solo errores de RFC, mantener otros errores
             for (const doc of [constanciaFiscal, comprobanteDomicilio]) {
               const { data: currentDoc } = await supabaseClient
                 .from('documents')
@@ -414,7 +436,7 @@ serve(async (req) => {
 
               if (currentDoc && currentDoc.validation_errors) {
                 const filteredErrors = currentDoc.validation_errors.filter(
-                  (err: string) => !err.includes('RFC no coincide')
+                  (err: string) => !err.includes('RFC no coincide') && !err.includes('Razón Social no coincide')
                 );
                 
                 await supabaseClient
