@@ -169,7 +169,7 @@ serve(async (req) => {
       };
     } else if (document.document_type === 'aviso_funcionamiento') {
       systemPrompt = 'Eres un asistente especializado en extraer información de avisos de funcionamiento mexicanos. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información del aviso de funcionamiento: Razón Social de la empresa. Si el dato no está disponible, indica "No encontrado".';
+      userPrompt = 'Extrae la siguiente información del aviso de funcionamiento: Razón Social de la empresa y la Dirección completa del establecimiento. Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
         tools: [
           {
@@ -180,9 +180,10 @@ serve(async (req) => {
               parameters: {
                 type: 'object',
                 properties: {
-                  razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' }
+                  razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
+                  direccion: { type: 'string', description: 'Dirección completa del establecimiento' }
                 },
-                required: ['razon_social'],
+                required: ['razon_social', 'direccion'],
                 additionalProperties: false
               }
             }
@@ -298,6 +299,7 @@ serve(async (req) => {
     } else if (document.document_type === 'aviso_funcionamiento') {
       updateFields = {
         razon_social: extractedInfo.razon_social,
+        direccion: extractedInfo.direccion,
         extraction_status: 'completed',
         extracted_at: new Date().toISOString()
       };

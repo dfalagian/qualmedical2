@@ -106,8 +106,7 @@ const AvisoFuncionamientoAdmin = () => {
                     <TableRow>
                       <TableHead>Proveedor</TableHead>
                       <TableHead>Razón Social</TableHead>
-                      <TableHead>Archivo</TableHead>
-                      <TableHead>Fecha de Carga</TableHead>
+                      <TableHead>Dirección</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
@@ -119,12 +118,7 @@ const AvisoFuncionamientoAdmin = () => {
                           {doc.profiles?.company_name || doc.profiles?.full_name || "N/A"}
                         </TableCell>
                         <TableCell>{doc.razon_social || "-"}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground truncate max-w-xs">
-                          {doc.file_name}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm">
-                          {new Date(doc.created_at).toLocaleDateString('es-MX')}
-                        </TableCell>
+                        <TableCell className="max-w-xs truncate">{doc.direccion || "-"}</TableCell>
                         <TableCell>{getExtractionBadge(doc.extraction_status)}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
@@ -152,6 +146,10 @@ const AvisoFuncionamientoAdmin = () => {
                                     <div>
                                       <h4 className="font-semibold text-sm text-muted-foreground">Razón Social</h4>
                                       <p>{selectedDoc.razon_social || "No extraído"}</p>
+                                    </div>
+                                    <div>
+                                      <h4 className="font-semibold text-sm text-muted-foreground">Dirección</h4>
+                                      <p className="text-sm">{selectedDoc.direccion || "No extraído"}</p>
                                     </div>
                                     <div>
                                       <h4 className="font-semibold text-sm text-muted-foreground">Nombre del Archivo</h4>

@@ -60,6 +60,7 @@ export type Database = {
           actividad_economica: string | null
           codigo_postal: string | null
           created_at: string | null
+          direccion: string | null
           document_type: Database["public"]["Enums"]["document_type"]
           extracted_at: string | null
           extraction_status: string | null
@@ -85,6 +86,7 @@ export type Database = {
           actividad_economica?: string | null
           codigo_postal?: string | null
           created_at?: string | null
+          direccion?: string | null
           document_type: Database["public"]["Enums"]["document_type"]
           extracted_at?: string | null
           extraction_status?: string | null
@@ -110,6 +112,7 @@ export type Database = {
           actividad_economica?: string | null
           codigo_postal?: string | null
           created_at?: string | null
+          direccion?: string | null
           document_type?: Database["public"]["Enums"]["document_type"]
           extracted_at?: string | null
           extraction_status?: string | null
