@@ -76,11 +76,75 @@ serve(async (req) => {
     const base64Pdf = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
     console.log('Llamando a Lovable AI para extraer información');
+    console.log('Tipo de documento:', document.document_type);
 
     // Llamar a Lovable AI para extraer información
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY no está configurado');
+    }
+
+    // Configurar el prompt y herramientas según el tipo de documento
+    let systemPrompt = '';
+    let userPrompt = '';
+    let toolConfig: any = null;
+    let updateFields: any = {};
+
+    if (document.document_type === 'acta_constitutiva') {
+      systemPrompt = 'Eres un asistente especializado en extraer información de actas constitutivas mexicanas. Extrae la información solicitada de forma precisa y estructurada.';
+      userPrompt = 'Extrae la siguiente información del acta constitutiva: Razón Social, Representante Legal, Objeto Social, y Registro Público. Si algún dato no está disponible, indica "No encontrado".';
+      toolConfig = {
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'extract_acta_info',
+              description: 'Extraer información estructurada del acta constitutiva',
+              parameters: {
+                type: 'object',
+                properties: {
+                  razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
+                  representante_legal: { type: 'string', description: 'Nombre completo del representante legal' },
+                  objeto_social: { type: 'string', description: 'Descripción del objeto social de la empresa' },
+                  registro_publico: { type: 'string', description: 'Información del registro público (número, fecha, notaría, etc.)' }
+                },
+                required: ['razon_social', 'representante_legal', 'objeto_social', 'registro_publico'],
+                additionalProperties: false
+              }
+            }
+          }
+        ],
+        tool_choice: { type: 'function', function: { name: 'extract_acta_info' } }
+      };
+    } else if (document.document_type === 'constancia_fiscal') {
+      systemPrompt = 'Eres un asistente especializado en extraer información de constancias de situación fiscal mexicanas. Extrae la información solicitada de forma precisa y estructurada.';
+      userPrompt = 'Extrae la siguiente información de la constancia de situación fiscal: Razón Social, RFC, Actividad Económica, Régimen Tributario, y Fecha de Emisión. Si algún dato no está disponible, indica "No encontrado".';
+      toolConfig = {
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'extract_constancia_info',
+              description: 'Extraer información estructurada de la constancia de situación fiscal',
+              parameters: {
+                type: 'object',
+                properties: {
+                  razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
+                  rfc: { type: 'string', description: 'RFC del contribuyente' },
+                  actividad_economica: { type: 'string', description: 'Actividad económica principal' },
+                  regimen_tributario: { type: 'string', description: 'Régimen tributario del contribuyente' },
+                  fecha_emision: { type: 'string', description: 'Fecha de emisión de la constancia en formato YYYY-MM-DD' }
+                },
+                required: ['razon_social', 'rfc', 'actividad_economica', 'regimen_tributario', 'fecha_emision'],
+                additionalProperties: false
+              }
+            }
+          }
+        ],
+        tool_choice: { type: 'function', function: { name: 'extract_constancia_info' } }
+      };
+    } else {
+      throw new Error(`Tipo de documento no soportado para extracción: ${document.document_type}`);
     }
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -92,59 +156,19 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          {
-            role: 'system',
-            content: 'Eres un asistente especializado en extraer información de actas constitutivas mexicanas. Extrae la información solicitada de forma precisa y estructurada.'
-          },
+          { role: 'system', content: systemPrompt },
           {
             role: 'user',
             content: [
-              {
-                type: 'text',
-                text: 'Extrae la siguiente información del acta constitutiva: Razón Social, Representante Legal, Objeto Social, y Registro Público. Si algún dato no está disponible, indica "No encontrado".'
-              },
+              { type: 'text', text: userPrompt },
               {
                 type: 'image_url',
-                image_url: {
-                  url: `data:application/pdf;base64,${base64Pdf}`
-                }
+                image_url: { url: `data:application/pdf;base64,${base64Pdf}` }
               }
             ]
           }
         ],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'extract_acta_info',
-              description: 'Extraer información estructurada del acta constitutiva',
-              parameters: {
-                type: 'object',
-                properties: {
-                  razon_social: {
-                    type: 'string',
-                    description: 'Razón social o nombre legal de la empresa'
-                  },
-                  representante_legal: {
-                    type: 'string',
-                    description: 'Nombre completo del representante legal'
-                  },
-                  objeto_social: {
-                    type: 'string',
-                    description: 'Descripción del objeto social de la empresa'
-                  },
-                  registro_publico: {
-                    type: 'string',
-                    description: 'Información del registro público (número, fecha, notaría, etc.)'
-                  }
-                },
-                required: ['razon_social', 'representante_legal', 'objeto_social', 'registro_publico'],
-                additionalProperties: false
-              }
-            }
-          }
-        ],
-        tool_choice: { type: 'function', function: { name: 'extract_acta_info' } }
+        ...toolConfig
       }),
     });
 
@@ -197,17 +221,32 @@ serve(async (req) => {
     const extractedInfo = JSON.parse(toolCall.function.arguments);
     console.log('Información extraída:', extractedInfo);
 
-    // Actualizar el documento con la información extraída
-    const { error: updateError } = await supabaseClient
-      .from('documents')
-      .update({
+    // Preparar campos a actualizar según el tipo de documento
+    if (document.document_type === 'acta_constitutiva') {
+      updateFields = {
         razon_social: extractedInfo.razon_social,
         representante_legal: extractedInfo.representante_legal,
         objeto_social: extractedInfo.objeto_social,
         registro_publico: extractedInfo.registro_publico,
         extraction_status: 'completed',
         extracted_at: new Date().toISOString()
-      })
+      };
+    } else if (document.document_type === 'constancia_fiscal') {
+      updateFields = {
+        razon_social: extractedInfo.razon_social,
+        rfc: extractedInfo.rfc,
+        actividad_economica: extractedInfo.actividad_economica,
+        regimen_tributario: extractedInfo.regimen_tributario,
+        fecha_emision: extractedInfo.fecha_emision,
+        extraction_status: 'completed',
+        extracted_at: new Date().toISOString()
+      };
+    }
+
+    // Actualizar el documento con la información extraída
+    const { error: updateError } = await supabaseClient
+      .from('documents')
+      .update(updateFields)
       .eq('id', documentId);
 
     if (updateError) {

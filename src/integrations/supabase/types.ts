@@ -57,60 +57,72 @@ export type Database = {
       }
       documents: {
         Row: {
+          actividad_economica: string | null
           created_at: string | null
           document_type: Database["public"]["Enums"]["document_type"]
           extracted_at: string | null
           extraction_status: string | null
+          fecha_emision: string | null
           file_name: string
           file_url: string
           id: string
           notes: string | null
           objeto_social: string | null
           razon_social: string | null
+          regimen_tributario: string | null
           registro_publico: string | null
           representante_legal: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          rfc: string | null
           status: Database["public"]["Enums"]["document_status"] | null
           supplier_id: string
           updated_at: string | null
           version: number | null
         }
         Insert: {
+          actividad_economica?: string | null
           created_at?: string | null
           document_type: Database["public"]["Enums"]["document_type"]
           extracted_at?: string | null
           extraction_status?: string | null
+          fecha_emision?: string | null
           file_name: string
           file_url: string
           id?: string
           notes?: string | null
           objeto_social?: string | null
           razon_social?: string | null
+          regimen_tributario?: string | null
           registro_publico?: string | null
           representante_legal?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          rfc?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
           supplier_id: string
           updated_at?: string | null
           version?: number | null
         }
         Update: {
+          actividad_economica?: string | null
           created_at?: string | null
           document_type?: Database["public"]["Enums"]["document_type"]
           extracted_at?: string | null
           extraction_status?: string | null
+          fecha_emision?: string | null
           file_name?: string
           file_url?: string
           id?: string
           notes?: string | null
           objeto_social?: string | null
           razon_social?: string | null
+          regimen_tributario?: string | null
           registro_publico?: string | null
           representante_legal?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          rfc?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
           supplier_id?: string
           updated_at?: string | null

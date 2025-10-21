@@ -44,7 +44,8 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { name: "Mensajes", href: "/dashboard/messages", icon: MessageSquare },
     { name: "Contador de Medicamentos", href: "/dashboard/medicine-counter", icon: Camera },
     ...(isAdmin ? [
-      { name: "Validación de Documentos", href: "/dashboard/documents-admin", icon: FileText },
+      { name: "Validación Actas", href: "/dashboard/documents-admin", icon: FileText },
+      { name: "Validación Constancias", href: "/dashboard/constancia-fiscal-admin", icon: FileText },
       { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
       { name: "Administración", href: "/dashboard/admin", icon: Settings },
     ] : []),

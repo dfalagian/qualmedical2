@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Documents from "./pages/Documents";
 import DocumentsAdmin from "./pages/DocumentsAdmin";
+import ConstanciaFiscalAdmin from "./pages/ConstanciaFiscalAdmin";
 import Invoices from "./pages/Invoices";
 import Messages from "./pages/Messages";
 import PurchaseOrders from "./pages/PurchaseOrders";
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/documents" element={<Documents />} />
           <Route path="/dashboard/documents-admin" element={<DocumentsAdmin />} />
+          <Route path="/dashboard/constancia-fiscal-admin" element={<ConstanciaFiscalAdmin />} />
           <Route path="/dashboard/invoices" element={<Invoices />} />
           <Route path="/dashboard/messages" element={<Messages />} />
           <Route path="/dashboard/orders" element={<PurchaseOrders />} />
