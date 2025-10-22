@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Settings, Users, ShieldCheck, Pencil, Trash2 } from "lucide-react";
+import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -25,19 +26,44 @@ const userFormSchema = z.object({
   phone: z.string().optional(),
 });
 
+const createUserFormSchema = z.object({
+  full_name: z.string().min(1, "El nombre es requerido"),
+  email: z.string().email("Email inválido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  role: z.enum(["admin", "proveedor"], { required_error: "Selecciona un rol" }),
+  company_name: z.string().optional(),
+  rfc: z.string().optional(),
+  phone: z.string().optional(),
+});
+
 type UserFormValues = z.infer<typeof userFormSchema>;
+type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
 
 const Admin = () => {
   const { isAdmin, loading } = useAuth();
   const queryClient = useQueryClient();
   const [editingUser, setEditingUser] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
     defaultValues: {
       full_name: "",
       email: "",
+      company_name: "",
+      rfc: "",
+      phone: "",
+    },
+  });
+
+  const createForm = useForm<CreateUserFormValues>({
+    resolver: zodResolver(createUserFormSchema),
+    defaultValues: {
+      full_name: "",
+      email: "",
+      password: "",
+      role: "proveedor",
       company_name: "",
       rfc: "",
       phone: "",
@@ -140,6 +166,56 @@ const Admin = () => {
     },
   });
 
+  const createUserMutation = useMutation({
+    mutationFn: async (data: CreateUserFormValues) => {
+      // Create auth user
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: data.email,
+        password: data.password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: data.full_name,
+        },
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error("No se pudo crear el usuario");
+
+      // Create profile
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert({
+          id: authData.user.id,
+          email: data.email,
+          full_name: data.full_name,
+          company_name: data.company_name || null,
+          rfc: data.rfc || null,
+          phone: data.phone || null,
+        });
+
+      if (profileError) throw profileError;
+
+      // Assign role
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert({
+          user_id: authData.user.id,
+          role: data.role,
+        });
+
+      if (roleError) throw roleError;
+    },
+    onSuccess: () => {
+      toast.success("Usuario creado correctamente");
+      queryClient.invalidateQueries({ queryKey: ["all_users"] });
+      setCreateDialogOpen(false);
+      createForm.reset();
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al crear usuario");
+    },
+  });
+
   const handleEditUser = (user: any) => {
     setEditingUser(user);
     form.reset({
@@ -156,6 +232,10 @@ const Admin = () => {
     if (editingUser) {
       updateUserMutation.mutate({ userId: editingUser.id, data });
     }
+  };
+
+  const onCreateSubmit = (data: CreateUserFormValues) => {
+    createUserMutation.mutate(data);
   };
 
   if (loading) {
@@ -185,13 +265,151 @@ const Admin = () => {
 
         <Card className="shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Gestión de Usuarios
-            </CardTitle>
-            <CardDescription>
-              Administra los roles de los usuarios del sistema
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Gestión de Usuarios
+                </CardTitle>
+                <CardDescription>
+                  Administra los roles de los usuarios del sistema
+                </CardDescription>
+              </div>
+              <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Crear Usuario
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+                    <DialogDescription>
+                      Completa los datos del nuevo usuario
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Form {...createForm}>
+                    <form onSubmit={createForm.handleSubmit(onCreateSubmit)} className="space-y-4">
+                      <FormField
+                        control={createForm.control}
+                        name="full_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nombre Completo</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input {...field} type="email" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contraseña</FormLabel>
+                            <FormControl>
+                              <Input {...field} type="password" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="role"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Rol</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecciona un rol" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="proveedor">Proveedor</SelectItem>
+                                <SelectItem value="admin">Administrador</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="company_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Empresa (opcional)</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="rfc"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>RFC (opcional)</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Teléfono (opcional)</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setCreateDialogOpen(false);
+                            createForm.reset();
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button type="submit" disabled={createUserMutation.isPending}>
+                          {createUserMutation.isPending ? "Creando..." : "Crear Usuario"}
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
