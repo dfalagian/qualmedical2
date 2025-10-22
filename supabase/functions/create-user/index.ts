@@ -87,7 +87,15 @@ serve(async (req) => {
 
     if (authError) {
       console.error("Auth error:", authError);
-      throw new Error("Error al crear autenticación: " + authError.message);
+      let errorMessage = "Error al crear autenticación";
+      
+      if (authError.message.includes("already been registered") || authError.message.includes("email_exists")) {
+        errorMessage = "Este email ya está registrado en el sistema";
+      } else {
+        errorMessage = authError.message;
+      }
+      
+      throw new Error(errorMessage);
     }
     
     if (!authData.user) {
