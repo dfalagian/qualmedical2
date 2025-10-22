@@ -80,8 +80,13 @@ const Admin = () => {
         .order("created_at", { ascending: false });
 
       if (profilesError) throw profilesError;
+      
+      console.log("Users fetched:", profiles);
+      
       return profiles;
     },
+    refetchInterval: false,
+    staleTime: 0, // Always treat data as stale to ensure fresh data
   });
 
   const toggleAdminMutation = useMutation({
