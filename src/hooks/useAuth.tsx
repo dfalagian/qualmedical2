@@ -81,13 +81,24 @@ export const useAuth = () => {
 
   const signOut = async () => {
     try {
+      // Clear local state first
+      setUser(null);
+      setSession(null);
+      setUserRole(null);
+      
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      if (error) {
+        console.error("SignOut error:", error);
+        throw error;
+      }
       
       toast.success("Sesión cerrada correctamente");
       navigate("/auth");
     } catch (error: any) {
-      toast.error("Error al cerrar sesión");
+      console.error("Error al cerrar sesión:", error);
+      toast.error("Error al cerrar sesión: " + (error.message || "Error desconocido"));
+      // Navigate anyway to clear the UI
+      navigate("/auth");
     }
   };
 
