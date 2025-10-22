@@ -9,9 +9,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Send, Mail, MailOpen } from "lucide-react";
+import { MessageSquare, Send, Mail, MailOpen, Reply, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 // Constantes de seguridad
 const MAX_SUBJECT_LENGTH = 200;
@@ -23,6 +25,10 @@ const Messages = () => {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [selectedRecipient, setSelectedRecipient] = useState("");
+  const [replyDialogOpen, setReplyDialogOpen] = useState(false);
+  const [replyToMessage, setReplyToMessage] = useState<any>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
 
   const { data: messages, isLoading: messagesLoading } = useQuery({
     queryKey: ["messages"],
@@ -186,6 +192,40 @@ const Messages = () => {
     },
   });
 
+  const deleteMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const { error } = await supabase
+        .from("messages")
+        .delete()
+        .eq("id", messageId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Mensaje eliminado");
+      queryClient.invalidateQueries({ queryKey: ["messages"] });
+      setDeleteDialogOpen(false);
+      setMessageToDelete(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar mensaje");
+    },
+  });
+
+  const handleReply = (msg: any) => {
+    const replyTo = msg.from_user_id === user?.id ? msg.to_user_id : msg.from_user_id;
+    setReplyToMessage(msg);
+    setSelectedRecipient(replyTo);
+    setSubject(`Re: ${msg.subject}`);
+    setMessage("");
+    setReplyDialogOpen(true);
+  };
+
+  const handleDelete = (messageId: string) => {
+    setMessageToDelete(messageId);
+    setDeleteDialogOpen(true);
+  };
+
   const recipientList = isAdmin ? suppliers : adminUsers;
 
   return (
@@ -344,7 +384,7 @@ const Messages = () => {
                           )}
                         </div>
                         
-                        <div className={`p-4 rounded-lg border ${
+                         <div className={`p-4 rounded-lg border ${
                           isSent 
                             ? 'bg-primary/5 border-primary/20' 
                             : isReceived && !msg.read 
@@ -353,15 +393,39 @@ const Messages = () => {
                         }`}>
                           <h4 className="font-semibold text-sm mb-2">{msg.subject}</h4>
                           <p className="text-sm mb-2 whitespace-pre-wrap">{msg.message}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(msg.created_at).toLocaleString('es-MX', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
+                          <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50">
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(msg.created_at).toLocaleString('es-MX', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleReply(msg)}
+                                className="h-7 text-xs"
+                              >
+                                <Reply className="h-3 w-3 mr-1" />
+                                Responder
+                              </Button>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(msg.id)}
+                                  className="h-7 text-xs text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Eliminar
+                                </Button>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -375,6 +439,96 @@ const Messages = () => {
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={replyDialogOpen} onOpenChange={setReplyDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Reply className="h-5 w-5" />
+                Responder Mensaje
+              </DialogTitle>
+              <DialogDescription>
+                Respondiendo a: {replyToMessage?.from_profile?.company_name || replyToMessage?.from_profile?.full_name}
+              </DialogDescription>
+            </DialogHeader>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                sendMessageMutation.mutate();
+                setReplyDialogOpen(false);
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="reply-subject">Asunto *</Label>
+                <Input
+                  id="reply-subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value.substring(0, MAX_SUBJECT_LENGTH))}
+                  placeholder="Asunto del mensaje"
+                  required
+                  maxLength={MAX_SUBJECT_LENGTH}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {subject.length}/{MAX_SUBJECT_LENGTH} caracteres
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reply-message">Mensaje *</Label>
+                <Textarea
+                  id="reply-message"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value.substring(0, MAX_MESSAGE_LENGTH))}
+                  placeholder="Escribe tu respuesta..."
+                  rows={6}
+                  required
+                  maxLength={MAX_MESSAGE_LENGTH}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {message.length}/{MAX_MESSAGE_LENGTH} caracteres
+                </p>
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => setReplyDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={sendMessageMutation.isPending}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {sendMessageMutation.isPending ? "Enviando..." : "Enviar Respuesta"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar mensaje?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. El mensaje será eliminado permanentemente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => messageToDelete && deleteMessageMutation.mutate(messageToDelete)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteMessageMutation.isPending ? "Eliminando..." : "Eliminar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );
