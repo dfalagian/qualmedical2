@@ -59,13 +59,36 @@ const Messages = () => {
     queryKey: ["admins"],
     enabled: !isAdmin,
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Primero obtenemos los user_ids de los admins
+      const { data: adminRoles, error: rolesError } = await supabase
         .from("user_roles")
-        .select("user_id, profiles(id, full_name, email)")
+        .select("user_id")
         .eq("role", "admin");
 
-      if (error) throw error;
-      return data.map(d => d.profiles).filter(Boolean);
+      if (rolesError) {
+        console.error("Error fetching admin roles:", rolesError);
+        throw rolesError;
+      }
+
+      if (!adminRoles || adminRoles.length === 0) {
+        console.log("No admin users found in user_roles");
+        return [];
+      }
+
+      // Luego obtenemos los perfiles de esos usuarios
+      const adminIds = adminRoles.map(r => r.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", adminIds);
+
+      if (profilesError) {
+        console.error("Error fetching admin profiles:", profilesError);
+        throw profilesError;
+      }
+
+      console.log("Admin profiles found:", profiles);
+      return profiles || [];
     },
   });
 
