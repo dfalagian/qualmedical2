@@ -69,9 +69,14 @@ const Messages = () => {
     },
   });
 
+  // Auto-select first admin for suppliers
+  const defaultRecipient = !isAdmin && adminUsers && adminUsers.length > 0 ? adminUsers[0].id : "";
+
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
-      if (!subject || !message || !selectedRecipient || !user) {
+      const recipientId = isAdmin ? selectedRecipient : defaultRecipient;
+      
+      if (!subject || !message || !recipientId || !user) {
         throw new Error("Todos los campos son obligatorios");
       }
 
@@ -93,7 +98,7 @@ const Messages = () => {
         .from("messages")
         .insert({
           from_user_id: user.id,
-          to_user_id: selectedRecipient,
+          to_user_id: recipientId,
           subject: sanitizedSubject,
           message: sanitizedMessage,
         });
@@ -154,21 +159,32 @@ const Messages = () => {
               }}
               className="space-y-4"
             >
-              <div className="space-y-2">
-                <Label htmlFor="recipient">Destinatario *</Label>
-                <Select value={selectedRecipient} onValueChange={setSelectedRecipient} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona un destinatario" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {recipientList?.map((recipient: any) => (
-                      <SelectItem key={recipient.id} value={recipient.id}>
-                        {recipient.company_name || recipient.full_name} ({recipient.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isAdmin && (
+                <div className="space-y-2">
+                  <Label htmlFor="recipient">Destinatario *</Label>
+                  <Select value={selectedRecipient} onValueChange={setSelectedRecipient} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un proveedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {recipientList?.map((recipient: any) => (
+                        <SelectItem key={recipient.id} value={recipient.id}>
+                          {recipient.company_name || recipient.full_name} ({recipient.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              {!isAdmin && (
+                <div className="space-y-2">
+                  <Label>Destinatario</Label>
+                  <div className="px-3 py-2 border rounded-md bg-muted/50">
+                    <p className="text-sm font-medium">Administración del Sistema</p>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="subject">Asunto *</Label>
@@ -213,67 +229,76 @@ const Messages = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
-              Bandeja de Entrada
+              Historial de Conversaciones
             </CardTitle>
           </CardHeader>
           <CardContent>
             {messagesLoading ? (
               <p className="text-center py-8 text-muted-foreground">Cargando mensajes...</p>
             ) : messages && messages.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {messages.map((msg: any) => {
                   const isReceived = msg.to_user_id === user?.id;
                   const otherParty = isReceived ? msg.from_profile : msg.to_profile;
+                  const isSent = msg.from_user_id === user?.id;
 
                   return (
                     <div
                       key={msg.id}
-                      className={`p-4 border rounded-lg transition-colors cursor-pointer ${
-                        isReceived && !msg.read
-                          ? "bg-accent/10 border-accent"
-                          : "hover:bg-accent/5"
-                      }`}
+                      className={`flex ${isSent ? 'justify-end' : 'justify-start'}`}
                       onClick={() => {
                         if (isReceived && !msg.read) {
                           markAsReadMutation.mutate(msg.id);
                         }
                       }}
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          {isReceived ? (
-                            msg.read ? (
-                              <MailOpen className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <Mail className="h-4 w-4 text-accent" />
-                            )
-                          ) : (
-                            <Send className="h-4 w-4 text-primary" />
+                      <div className={`max-w-[75%] ${isSent ? 'ml-auto' : 'mr-auto'}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          {!isSent && (
+                            <>
+                              {msg.read ? (
+                                <MailOpen className="h-3 w-3 text-muted-foreground" />
+                              ) : (
+                                <Mail className="h-3 w-3 text-accent" />
+                              )}
+                              <span className="text-xs font-medium text-muted-foreground">
+                                {otherParty?.company_name || otherParty?.full_name}
+                              </span>
+                            </>
                           )}
-                          <h4 className="font-semibold">{msg.subject}</h4>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isReceived ? (
-                            <Badge variant="secondary">Recibido</Badge>
-                          ) : (
-                            <Badge className="bg-primary">Enviado</Badge>
+                          {isSent && (
+                            <>
+                              <span className="text-xs font-medium text-muted-foreground">
+                                Tú
+                              </span>
+                              <Send className="h-3 w-3 text-primary" />
+                            </>
                           )}
                           {isReceived && !msg.read && (
-                            <Badge className="bg-accent">Nuevo</Badge>
+                            <Badge className="bg-accent text-xs py-0">Nuevo</Badge>
                           )}
                         </div>
+                        
+                        <div className={`p-4 rounded-lg border ${
+                          isSent 
+                            ? 'bg-primary/5 border-primary/20' 
+                            : isReceived && !msg.read 
+                              ? 'bg-accent/10 border-accent'
+                              : 'bg-card border-border'
+                        }`}>
+                          <h4 className="font-semibold text-sm mb-2">{msg.subject}</h4>
+                          <p className="text-sm mb-2 whitespace-pre-wrap">{msg.message}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(msg.created_at).toLocaleString('es-MX', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
                       </div>
-
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {isReceived ? "De: " : "Para: "}
-                        {otherParty?.company_name || otherParty?.full_name}
-                      </p>
-
-                      <p className="text-sm mb-2">{msg.message}</p>
-
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(msg.created_at).toLocaleString('es-MX')}
-                      </p>
                     </div>
                   );
                 })}
