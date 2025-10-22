@@ -22,7 +22,7 @@ const ConstanciaFiscalAdmin = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("documents")
-        .select("*, profiles(full_name, company_name)")
+        .select("*, profiles!documents_supplier_id_fkey(full_name, company_name)")
         .eq("document_type", "constancia_fiscal")
         .order("created_at", { ascending: false });
 
