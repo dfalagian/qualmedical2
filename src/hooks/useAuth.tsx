@@ -87,7 +87,9 @@ export const useAuth = () => {
       setUserRole(null);
       
       const { error } = await supabase.auth.signOut();
-      if (error) {
+      
+      // "Auth session missing" is not really an error - it means we're already logged out
+      if (error && !error.message.includes("Auth session missing")) {
         console.error("SignOut error:", error);
         throw error;
       }
