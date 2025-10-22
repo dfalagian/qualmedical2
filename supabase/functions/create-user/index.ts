@@ -73,6 +73,7 @@ serve(async (req) => {
     console.log("Admin verified, proceeding with user creation");
 
     const { email, password, full_name, role, company_name, rfc, phone } = await req.json();
+    console.log("Creating user with email:", email, "role:", role);
 
     // Create auth user
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -84,10 +85,20 @@ serve(async (req) => {
       },
     });
 
-    if (authError) throw authError;
-    if (!authData.user) throw new Error("No se pudo crear el usuario");
+    if (authError) {
+      console.error("Auth error:", authError);
+      throw new Error("Error al crear autenticación: " + authError.message);
+    }
+    
+    if (!authData.user) {
+      console.error("No user data returned");
+      throw new Error("No se pudo crear el usuario");
+    }
+
+    console.log("Auth user created:", authData.user.id);
 
     // Create profile
+    console.log("Creating profile for user:", authData.user.id);
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .insert({
@@ -99,9 +110,15 @@ serve(async (req) => {
         phone: phone || null,
       });
 
-    if (profileError) throw profileError;
+    if (profileError) {
+      console.error("Profile error:", profileError);
+      throw new Error("Error al crear perfil: " + profileError.message);
+    }
+
+    console.log("Profile created successfully");
 
     // Assign role
+    console.log("Assigning role:", role);
     const { error: roleInsertError } = await supabaseAdmin
       .from("user_roles")
       .insert({
@@ -109,7 +126,12 @@ serve(async (req) => {
         role,
       });
 
-    if (roleInsertError) throw roleInsertError;
+    if (roleInsertError) {
+      console.error("Role insert error:", roleInsertError);
+      throw new Error("Error al asignar rol: " + roleInsertError.message);
+    }
+
+    console.log("User created successfully:", authData.user.id);
 
     return new Response(
       JSON.stringify({ success: true, user: authData.user }),
