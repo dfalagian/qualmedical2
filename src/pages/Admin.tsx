@@ -136,26 +136,15 @@ const Admin = () => {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      // First delete user roles
-      const { error: rolesError } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", userId);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No hay sesión activa");
 
-      if (rolesError) throw rolesError;
+      const response = await supabase.functions.invoke("delete-user", {
+        body: { userId },
+      });
 
-      // Then delete profile
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", userId);
-
-      if (profileError) throw profileError;
-
-      // Finally delete auth user (requires admin)
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-      
-      if (authError) throw authError;
+      if (response.error) throw response.error;
+      if (response.data?.error) throw new Error(response.data.error);
     },
     onSuccess: () => {
       toast.success("Usuario eliminado correctamente");

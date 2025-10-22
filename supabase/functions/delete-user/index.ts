@@ -1,0 +1,111 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
+    // Verify the requesting user is an admin
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('No se proporcionó autorización');
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user: requestingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !requestingUser) {
+      console.error('Auth verification failed:', authError);
+      throw new Error('No autorizado');
+    }
+
+    // Check if requesting user is admin
+    const { data: roleData, error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', requestingUser.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (roleError || !roleData) {
+      console.error('Admin check failed:', roleError);
+      throw new Error('No tienes permisos de administrador');
+    }
+
+    // Get user ID from request body
+    const { userId } = await req.json();
+
+    if (!userId) {
+      throw new Error('Se requiere el ID del usuario');
+    }
+
+    console.log('Deleting user:', userId);
+
+    // Delete user roles first
+    const { error: rolesError } = await supabaseAdmin
+      .from('user_roles')
+      .delete()
+      .eq('user_id', userId);
+
+    if (rolesError) {
+      console.error('Error deleting roles:', rolesError);
+      throw new Error('Error al eliminar roles del usuario');
+    }
+
+    // Delete profile
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .delete()
+      .eq('id', userId);
+
+    if (profileError) {
+      console.error('Error deleting profile:', profileError);
+      throw new Error('Error al eliminar perfil del usuario');
+    }
+
+    // Finally delete auth user
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+
+    if (deleteError) {
+      console.error('Error deleting auth user:', deleteError);
+      throw new Error('Error al eliminar usuario de autenticación');
+    }
+
+    console.log('User deleted successfully:', userId);
+
+    return new Response(
+      JSON.stringify({ success: true, message: 'Usuario eliminado correctamente' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
+  } catch (error) {
+    console.error('Error in delete-user function:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      }
+    );
+  }
+});
