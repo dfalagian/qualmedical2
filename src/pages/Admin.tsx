@@ -168,42 +168,23 @@ const Admin = () => {
 
   const createUserMutation = useMutation({
     mutationFn: async (data: CreateUserFormValues) => {
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: data.email,
-        password: data.password,
-        email_confirm: true,
-        user_metadata: {
-          full_name: data.full_name,
-        },
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No hay sesión activa");
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("No se pudo crear el usuario");
-
-      // Create profile
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .insert({
-          id: authData.user.id,
+      const response = await supabase.functions.invoke("create-user", {
+        body: {
           email: data.email,
+          password: data.password,
           full_name: data.full_name,
+          role: data.role,
           company_name: data.company_name || null,
           rfc: data.rfc || null,
           phone: data.phone || null,
-        });
+        },
+      });
 
-      if (profileError) throw profileError;
-
-      // Assign role
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({
-          user_id: authData.user.id,
-          role: data.role,
-        });
-
-      if (roleError) throw roleError;
+      if (response.error) throw response.error;
+      if (response.data?.error) throw new Error(response.data.error);
     },
     onSuccess: () => {
       toast.success("Usuario creado correctamente");
