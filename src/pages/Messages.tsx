@@ -55,7 +55,7 @@ const Messages = () => {
     },
   });
 
-  const { data: adminUsers } = useQuery({
+  const { data: adminUsers, isLoading: adminsLoading } = useQuery({
     queryKey: ["admins"],
     enabled: !isAdmin,
     queryFn: async () => {
@@ -70,7 +70,7 @@ const Messages = () => {
   });
 
   // Auto-select first admin for suppliers
-  const defaultRecipient = !isAdmin && adminUsers && adminUsers.length > 0 ? adminUsers[0].id : "";
+  const defaultRecipient = !isAdmin && adminUsers && adminUsers.length > 0 ? adminUsers[0].id : null;
 
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
@@ -217,9 +217,13 @@ const Messages = () => {
                 </p>
               </div>
 
-              <Button type="submit" className="w-full">
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={sendMessageMutation.isPending || (!isAdmin && adminsLoading)}
+              >
                 <Send className="h-4 w-4 mr-2" />
-                Enviar Mensaje
+                {sendMessageMutation.isPending ? "Enviando..." : "Enviar Mensaje"}
               </Button>
             </form>
           </CardContent>
