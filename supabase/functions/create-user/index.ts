@@ -12,6 +12,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Starting create-user function");
+    
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -24,15 +26,31 @@ serve(async (req) => {
     );
 
     // Verify the requesting user is an admin
-    const authHeader = req.headers.get("Authorization")!;
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-    if (userError || !user) {
-      throw new Error("Unauthorized");
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header");
+      throw new Error("No authorization header");
     }
 
+    const token = authHeader.replace("Bearer ", "");
+    console.log("Verifying user token");
+    
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError) {
+      console.error("User error:", userError);
+      throw new Error("Error al verificar usuario: " + userError.message);
+    }
+    
+    if (!user) {
+      console.error("No user found");
+      throw new Error("Usuario no encontrado");
+    }
+
+    console.log("User verified:", user.id);
+
     // Check if user is admin
+    console.log("Checking admin role for user:", user.id);
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
@@ -40,9 +58,19 @@ serve(async (req) => {
       .eq("role", "admin")
       .maybeSingle();
 
-    if (roleError || !roleData) {
+    console.log("Role check result:", { roleData, roleError });
+
+    if (roleError) {
+      console.error("Role error:", roleError);
+      throw new Error("Error al verificar permisos: " + roleError.message);
+    }
+    
+    if (!roleData) {
+      console.error("User is not admin");
       throw new Error("Solo los administradores pueden crear usuarios");
     }
+
+    console.log("Admin verified, proceeding with user creation");
 
     const { email, password, full_name, role, company_name, rfc, phone } = await req.json();
 
