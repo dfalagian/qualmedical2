@@ -48,6 +48,24 @@ const ConstanciaFiscalAdmin = () => {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const { error } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", documentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Documento eliminado");
+      queryClient.invalidateQueries({ queryKey: ["constancias-fiscales"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar documento");
+    },
+  });
+
   const getExtractionBadge = (status: string | null) => {
     switch (status) {
       case "completed":
@@ -241,6 +259,21 @@ const ConstanciaFiscalAdmin = () => {
                                 disabled={extractMutation.isPending}
                               >
                                 <RefreshCw className="h-4 w-4" />
+                              </Button>
+                            )}
+
+                            {(!doc.razon_social && !doc.rfc) && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm("¿Estás seguro de eliminar este documento sin datos?")) {
+                                    deleteMutation.mutate(doc.id);
+                                  }
+                                }}
+                                disabled={deleteMutation.isPending}
+                              >
+                                Eliminar
                               </Button>
                             )}
                           </div>
