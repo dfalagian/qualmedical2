@@ -55,15 +55,19 @@ const Messages = () => {
     },
   });
 
-  const { data: adminUsers, isLoading: adminsLoading } = useQuery({
+  const { data: adminUsers, isLoading: adminsLoading, error: adminsError } = useQuery({
     queryKey: ["admins"],
     enabled: !isAdmin,
     queryFn: async () => {
+      console.log("Fetching admin users...");
+      
       // Primero obtenemos los user_ids de los admins
       const { data: adminRoles, error: rolesError } = await supabase
         .from("user_roles")
         .select("user_id")
         .eq("role", "admin");
+
+      console.log("Admin roles query result:", { adminRoles, rolesError });
 
       if (rolesError) {
         console.error("Error fetching admin roles:", rolesError);
@@ -77,10 +81,14 @@ const Messages = () => {
 
       // Luego obtenemos los perfiles de esos usuarios
       const adminIds = adminRoles.map(r => r.user_id);
+      console.log("Admin IDs:", adminIds);
+      
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, full_name, email")
         .in("id", adminIds);
+
+      console.log("Admin profiles query result:", { profiles, profilesError });
 
       if (profilesError) {
         console.error("Error fetching admin profiles:", profilesError);
@@ -92,8 +100,13 @@ const Messages = () => {
     },
   });
 
+  // Log para debug
+  console.log("adminUsers state:", { adminUsers, adminsLoading, adminsError, isAdmin });
+
   // Auto-select first admin for suppliers
   const defaultRecipient = !isAdmin && adminUsers && adminUsers.length > 0 ? adminUsers[0].id : null;
+  
+  console.log("defaultRecipient calculated:", defaultRecipient);
 
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
