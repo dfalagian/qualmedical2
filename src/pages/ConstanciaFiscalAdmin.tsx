@@ -262,20 +262,18 @@ const ConstanciaFiscalAdmin = () => {
                               </Button>
                             )}
 
-                            {(!doc.razon_social && !doc.rfc) && (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => {
-                                  if (confirm("¿Estás seguro de eliminar este documento sin datos?")) {
-                                    deleteMutation.mutate(doc.id);
-                                  }
-                                }}
-                                disabled={deleteMutation.isPending}
-                              >
-                                Eliminar
-                              </Button>
-                            )}
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm("¿Estás seguro de eliminar este documento?")) {
+                                  deleteMutation.mutate(doc.id);
+                                }
+                              }}
+                              disabled={deleteMutation.isPending}
+                            >
+                              Eliminar
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
