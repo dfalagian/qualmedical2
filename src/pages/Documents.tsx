@@ -23,6 +23,11 @@ const DOCUMENT_TYPES = [
   { value: "aviso_funcionamiento", label: "Aviso de Funcionamiento" },
 ];
 
+// Constantes de seguridad
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png'];
+
 const Documents = () => {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
@@ -30,6 +35,33 @@ const Documents = () => {
   const [selectedType, setSelectedType] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
+
+  // Validación de archivo
+  const validateFile = (file: File): string | null => {
+    // Validar tamaño
+    if (file.size > MAX_FILE_SIZE) {
+      return "El archivo es demasiado grande. Máximo 10MB.";
+    }
+
+    // Validar tipo MIME
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      return "Tipo de archivo no permitido. Solo JPG, JPEG o PNG.";
+    }
+
+    // Validar extensión
+    const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      return "Extensión de archivo no válida.";
+    }
+
+    // Validar nombre de archivo (sin caracteres peligrosos)
+    const dangerousChars = /[<>:"\/\\|?*\x00-\x1f]/;
+    if (dangerousChars.test(file.name)) {
+      return "El nombre del archivo contiene caracteres no permitidos.";
+    }
+
+    return null;
+  };
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ["documents"],
@@ -50,21 +82,37 @@ const Documents = () => {
         throw new Error("Faltan datos requeridos");
       }
 
+      // Validar archivo antes de subir
+      const validationError = validateFile(file);
+      if (validationError) {
+        throw new Error(validationError);
+      }
+
+      // Validar notas (prevenir inyección)
+      if (notes.length > 1000) {
+        throw new Error("Las notas son demasiado largas (máximo 1000 caracteres)");
+      }
+
       setIsUploading(true);
 
-      // Upload file to storage
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      // Sanitizar nombre de archivo
+      const fileExt = file.name.split(".").pop()?.toLowerCase();
+      const sanitizedFileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
       const { error: uploadError } = await supabase.storage
         .from("documents")
-        .upload(fileName, file);
+        .upload(sanitizedFileName, file);
 
       if (uploadError) throw uploadError;
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from("documents")
-        .getPublicUrl(fileName);
+        .getPublicUrl(sanitizedFileName);
+
+      // Sanitizar datos antes de insertar
+      const sanitizedNotes = notes.trim().substring(0, 1000);
+      const sanitizedFileName2 = file.name.substring(0, 255); // Limitar longitud
 
       // Insert document record
       const { data: insertedDoc, error: insertError } = await supabase
@@ -73,8 +121,8 @@ const Documents = () => {
           supplier_id: user.id,
           document_type: selectedType as any,
           file_url: publicUrl,
-          file_name: file.name,
-          notes: notes || null,
+          file_name: sanitizedFileName2,
+          notes: sanitizedNotes || null,
         }])
         .select()
         .single();
@@ -105,7 +153,8 @@ const Documents = () => {
             }
           }
         } catch (error) {
-          console.error("Error al llamar función de extracción:", error);
+          // No revelar detalles del error al usuario
+          toast.error("Error al procesar el documento");
         }
       }
     },
@@ -214,9 +263,24 @@ const Documents = () => {
                     id="file"
                     type="file"
                     accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    onChange={(e) => {
+                      const selectedFile = e.target.files?.[0];
+                      if (selectedFile) {
+                        const error = validateFile(selectedFile);
+                        if (error) {
+                          toast.error(error);
+                          e.target.value = '';
+                          setFile(null);
+                          return;
+                        }
+                        setFile(selectedFile);
+                      }
+                    }}
                     required
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Máximo 10MB. Solo archivos JPG, JPEG o PNG.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -224,10 +288,14 @@ const Documents = () => {
                   <Textarea
                     id="notes"
                     value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
+                    onChange={(e) => setNotes(e.target.value.substring(0, 1000))}
                     placeholder="Agrega comentarios adicionales..."
                     rows={3}
+                    maxLength={1000}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    {notes.length}/1000 caracteres
+                  </p>
                 </div>
 
                 <Button type="submit" disabled={isUploading} className="w-full">

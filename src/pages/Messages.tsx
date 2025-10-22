@@ -13,6 +13,10 @@ import { MessageSquare, Send, Mail, MailOpen } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+// Constantes de seguridad
+const MAX_SUBJECT_LENGTH = 200;
+const MAX_MESSAGE_LENGTH = 5000;
+
 const Messages = () => {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
@@ -71,13 +75,27 @@ const Messages = () => {
         throw new Error("Todos los campos son obligatorios");
       }
 
+      // Validar y sanitizar inputs
+      const sanitizedSubject = subject.trim().substring(0, MAX_SUBJECT_LENGTH);
+      const sanitizedMessage = message.trim().substring(0, MAX_MESSAGE_LENGTH);
+
+      if (sanitizedSubject.length === 0 || sanitizedMessage.length === 0) {
+        throw new Error("El asunto y mensaje no pueden estar vacíos");
+      }
+
+      // Validar caracteres peligrosos en HTML
+      const dangerousPattern = /<script|javascript:|onerror=|onclick=/i;
+      if (dangerousPattern.test(sanitizedSubject) || dangerousPattern.test(sanitizedMessage)) {
+        throw new Error("Contenido no permitido detectado");
+      }
+
       const { error } = await supabase
         .from("messages")
         .insert({
           from_user_id: user.id,
           to_user_id: selectedRecipient,
-          subject,
-          message,
+          subject: sanitizedSubject,
+          message: sanitizedMessage,
         });
 
       if (error) throw error;
@@ -157,10 +175,14 @@ const Messages = () => {
                 <Input
                   id="subject"
                   value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
+                  onChange={(e) => setSubject(e.target.value.substring(0, MAX_SUBJECT_LENGTH))}
                   placeholder="Asunto del mensaje"
                   required
+                  maxLength={MAX_SUBJECT_LENGTH}
                 />
+                <p className="text-xs text-muted-foreground">
+                  {subject.length}/{MAX_SUBJECT_LENGTH} caracteres
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -168,11 +190,15 @@ const Messages = () => {
                 <Textarea
                   id="message"
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
+                  onChange={(e) => setMessage(e.target.value.substring(0, MAX_MESSAGE_LENGTH))}
                   placeholder="Escribe tu mensaje..."
                   rows={4}
                   required
+                  maxLength={MAX_MESSAGE_LENGTH}
                 />
+                <p className="text-xs text-muted-foreground">
+                  {message.length}/{MAX_MESSAGE_LENGTH} caracteres
+                </p>
               </div>
 
               <Button type="submit" className="w-full">
