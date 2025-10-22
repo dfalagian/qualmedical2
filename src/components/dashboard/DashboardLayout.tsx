@@ -40,6 +40,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   const navigation = [
     { name: "Inicio", href: "/dashboard", icon: Home },
+    ...(isAdmin ? [
+      { name: "Buscador de Proveedores", href: "/dashboard/supplier-documents", icon: Search },
+    ] : []),
     { name: "Documentos", href: "/dashboard/documents", icon: FileText },
     { name: "Facturas", href: "/dashboard/invoices", icon: Receipt },
     { name: "Mensajes", href: "/dashboard/messages", icon: MessageSquare },
@@ -49,7 +52,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       { name: "Validación Constancias", href: "/dashboard/constancia-fiscal-admin", icon: FileText },
       { name: "Validación Domicilios", href: "/dashboard/comprobante-domicilio-admin", icon: FileText },
       { name: "Validación Avisos", href: "/dashboard/aviso-funcionamiento-admin", icon: FileText },
-      { name: "Buscador de Proveedores", href: "/dashboard/supplier-documents", icon: Search },
       { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
       { name: "Administración", href: "/dashboard/admin", icon: Settings },
     ] : []),
