@@ -102,14 +102,22 @@ const Messages = () => {
       }
 
       console.log("Admin profiles found:", profiles);
-      return profiles || [];
+      
+      // Priorizar proveedores@qualmedical.com como destinatario principal
+      const sortedProfiles = profiles?.sort((a, b) => {
+        if (a.email === 'proveedores@qualmedical.com') return -1;
+        if (b.email === 'proveedores@qualmedical.com') return 1;
+        return 0;
+      });
+      
+      return sortedProfiles || [];
     },
   });
 
   // Log para debug
   console.log("adminUsers state:", { adminUsers, adminsLoading, adminsError, isAdmin });
 
-  // Auto-select first admin for suppliers
+  // Auto-select proveedores@qualmedical.com como destinatario por defecto
   const defaultRecipient = !isAdmin && adminUsers && adminUsers.length > 0 ? adminUsers[0].id : null;
   
   console.log("defaultRecipient calculated:", defaultRecipient);
