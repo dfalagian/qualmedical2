@@ -76,8 +76,27 @@ const Messages = () => {
     mutationFn: async () => {
       const recipientId = isAdmin ? selectedRecipient : defaultRecipient;
       
-      if (!subject || !message || !recipientId || !user) {
-        throw new Error("Todos los campos son obligatorios");
+      console.log("Sending message - Debug info:", {
+        isAdmin,
+        recipientId,
+        defaultRecipient,
+        selectedRecipient,
+        subject,
+        message,
+        user: user?.id,
+        adminUsers
+      });
+      
+      if (!subject || !message || !user) {
+        throw new Error("El asunto y mensaje son obligatorios");
+      }
+
+      if (!recipientId) {
+        if (!isAdmin) {
+          throw new Error("No se pudo encontrar un administrador. Por favor, contacte al soporte.");
+        } else {
+          throw new Error("Por favor, selecciona un destinatario");
+        }
       }
 
       // Validar y sanitizar inputs
@@ -181,7 +200,13 @@ const Messages = () => {
                 <div className="space-y-2">
                   <Label>Destinatario</Label>
                   <div className="px-3 py-2 border rounded-md bg-muted/50">
-                    <p className="text-sm font-medium">Administración del Sistema</p>
+                    {adminsLoading ? (
+                      <p className="text-sm text-muted-foreground">Cargando administradores...</p>
+                    ) : defaultRecipient ? (
+                      <p className="text-sm font-medium">Administración del Sistema</p>
+                    ) : (
+                      <p className="text-sm text-destructive">No se encontraron administradores</p>
+                    )}
                   </div>
                 </div>
               )}
