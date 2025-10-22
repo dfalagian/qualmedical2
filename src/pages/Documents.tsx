@@ -86,7 +86,7 @@ const Documents = () => {
         toast.info("Procesando documento con IA...");
         
         try {
-          const { error: extractError } = await supabase.functions.invoke('extract-document-info', {
+          const { data: extractData, error: extractError } = await supabase.functions.invoke('extract-document-info', {
             body: { documentId: insertedDoc.id }
           });
 
@@ -94,7 +94,15 @@ const Documents = () => {
             console.error("Error extrayendo información:", extractError);
             toast.warning("Documento subido pero falló la extracción automática");
           } else {
-            toast.success("Información extraída exitosamente");
+            // Mostrar advertencias si existen
+            if (extractData?.validation_errors && extractData.validation_errors.length > 0) {
+              toast.warning(
+                `⚠️ Advertencias encontradas:\n${extractData.validation_errors.join('\n')}`,
+                { duration: 8000 }
+              );
+            } else {
+              toast.success("✓ Información extraída exitosamente");
+            }
           }
         } catch (error) {
           console.error("Error al llamar función de extracción:", error);

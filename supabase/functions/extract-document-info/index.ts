@@ -582,10 +582,19 @@ serve(async (req) => {
       }
     }
 
+    // Obtener el documento actualizado con todos sus errores de validación
+    const { data: updatedDoc } = await supabaseClient
+      .from('documents')
+      .select('validation_errors, is_valid')
+      .eq('id', documentId)
+      .single();
+
     return new Response(
       JSON.stringify({
         success: true,
-        extractedInfo
+        extractedInfo,
+        validation_errors: updatedDoc?.validation_errors || [],
+        is_valid: updatedDoc?.is_valid ?? true
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
