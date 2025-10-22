@@ -172,8 +172,21 @@ const Admin = () => {
         },
       });
 
-      if (response.error) throw response.error;
-      if (response.data?.error) throw new Error(response.data.error);
+      console.log("Create user response:", response);
+
+      if (response.error) {
+        console.error("Response error:", response.error);
+        throw response.error;
+      }
+      
+      if (response.data?.error) {
+        console.error("Data error:", response.data.error);
+        throw new Error(response.data.error);
+      }
+
+      if (!response.data?.success) {
+        throw new Error("Error inesperado al crear usuario");
+      }
     },
     onSuccess: () => {
       toast.success("Usuario creado correctamente");
@@ -182,7 +195,9 @@ const Admin = () => {
       createForm.reset();
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al crear usuario");
+      console.error("Create user mutation error:", error);
+      const errorMessage = error.message || "Error al crear usuario";
+      toast.error(errorMessage);
     },
   });
 
