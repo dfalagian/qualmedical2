@@ -661,7 +661,7 @@ IMPORTANTE:
         razon_social: extractedInfo.razon_social,
         direccion: extractedInfo.direccion,
         representante_legal: extractedInfo.responsable_sanitario_nombre,
-        rfc: extractedInfo.responsable_sanitario_curp || null,
+        curp: extractedInfo.responsable_sanitario_curp || null,
         extraction_status: 'completed',
         extracted_at: new Date().toISOString(),
         validation_errors: validationErrors,
@@ -905,7 +905,7 @@ IMPORTANTE:
       // Obtener todos los documentos del proveedor
       const { data: supplierDocs, error: docsError } = await supabaseClient
         .from('documents')
-        .select('id, document_type, nombre_completo_ine, curp, representante_legal, rfc, extraction_status')
+        .select('id, document_type, nombre_completo_ine, curp, representante_legal, extraction_status')
         .eq('supplier_id', document.supplier_id)
         .in('document_type', ['ine', 'aviso_funcionamiento'])
         .eq('extraction_status', 'completed');
@@ -917,23 +917,23 @@ IMPORTANTE:
         if (ine && avisoFuncionamiento) {
           console.log('Validando Nombre Completo y CURP del Responsable Sanitario:', {
             ine: { nombre_completo: ine.nombre_completo_ine, curp: ine.curp },
-            aviso: { responsable_sanitario: avisoFuncionamiento.representante_legal, curp: avisoFuncionamiento.rfc }
+            aviso: { responsable_sanitario: avisoFuncionamiento.representante_legal, curp: avisoFuncionamiento.curp }
           });
 
           const errors: string[] = [];
 
           // PRIORIDAD 1: Validar CURP (identificador único más confiable)
           let curpCoincide = false;
-          if (ine.curp && avisoFuncionamiento.rfc) {
+          if (ine.curp && avisoFuncionamiento.curp) {
             // Verificar si el dato fue encontrado (no es "No encontrado")
-            if (avisoFuncionamiento.rfc.toLowerCase().includes('no encontrado')) {
+            if (avisoFuncionamiento.curp.toLowerCase().includes('no encontrado')) {
               errors.push(`⚠️ Los datos del responsable sanitario no se encontraron en la imagen del Aviso de Funcionamiento procesada. Si el documento tiene múltiples páginas, asegúrate de subir la página que contiene el "Apartado 5: Datos del responsable sanitario".`);
-            } else if (ine.curp.trim().toUpperCase() === avisoFuncionamiento.rfc.trim().toUpperCase()) {
+            } else if (ine.curp.trim().toUpperCase() === avisoFuncionamiento.curp.trim().toUpperCase()) {
               // CURP coincide - esto es suficiente para validar
               curpCoincide = true;
-              console.log('✅ CURP coincide perfectamente:', ine.curp);
+              console.log('✅ CURP del responsable sanitario coincide perfectamente:', ine.curp);
             } else {
-              errors.push(`El CURP del responsable sanitario no coincide. INE: ${ine.curp}, Aviso de Funcionamiento: ${avisoFuncionamiento.rfc}`);
+              errors.push(`El CURP del responsable sanitario no coincide. INE: ${ine.curp}, Aviso de Funcionamiento: ${avisoFuncionamiento.curp}`);
             }
           }
 
