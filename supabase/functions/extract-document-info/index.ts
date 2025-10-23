@@ -441,7 +441,19 @@ serve(async (req) => {
       };
     } else if (document.document_type === 'aviso_funcionamiento') {
       systemPrompt = 'Eres un asistente especializado en extraer información de avisos de funcionamiento mexicanos. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información del aviso de funcionamiento: Razón Social de la empresa, la Dirección completa del establecimiento, y los Datos del Responsable Sanitario. IMPORTANTE: El Responsable Sanitario está específicamente en el apartado 5 "Datos del responsable Sanitario (excepto para productos y servicios)", NO confundir con el propietario o representante legal de la empresa. Extrae el nombre completo y CURP del responsable sanitario que aparece en ese apartado. Si algún dato no está disponible, indica "No encontrado".';
+      userPrompt = `Extrae la siguiente información del aviso de funcionamiento: 
+
+1. Razón Social de la empresa
+2. Dirección completa del establecimiento
+3. Datos del Responsable Sanitario (nombre completo y CURP)
+
+IMPORTANTE: 
+- El Responsable Sanitario está específicamente en el apartado "5. Datos del responsable sanitario (excepto para productos y servicios)"
+- NO confundir con el propietario o representante legal de la empresa
+- El CURP del responsable sanitario es un código de 18 caracteres que aparece en el apartado 5
+- Si esta imagen NO contiene el apartado 5 con los datos del responsable sanitario, indica "No encontrado" para esos campos
+- Si algún otro dato no está visible en ESTA imagen, indica "No encontrado"`;
+
       toolConfig = {
         tools: [
           {
@@ -909,17 +921,27 @@ serve(async (req) => {
 
           // Validar Nombre Completo (normalizar para comparación)
           if (ine.nombre_completo_ine && avisoFuncionamiento.representante_legal) {
-            const nombreINE = ine.nombre_completo_ine.trim().toLowerCase();
-            const nombreAviso = avisoFuncionamiento.representante_legal.trim().toLowerCase();
-            
-            if (nombreINE !== nombreAviso) {
-              errors.push(`El Nombre Completo del responsable sanitario no coincide. INE: "${ine.nombre_completo_ine}", Aviso de Funcionamiento: "${avisoFuncionamiento.representante_legal}"`);
+            // Verificar si el dato fue encontrado (no es "No encontrado")
+            if (avisoFuncionamiento.representante_legal.toLowerCase().includes('no encontrado')) {
+              errors.push(`⚠️ Los datos del responsable sanitario no se encontraron en la imagen del Aviso de Funcionamiento procesada. Si el documento tiene múltiples páginas, asegúrate de subir la página que contiene el "Apartado 5: Datos del responsable sanitario".`);
+            } else {
+              const nombreINE = ine.nombre_completo_ine.trim().toLowerCase();
+              const nombreAviso = avisoFuncionamiento.representante_legal.trim().toLowerCase();
+              
+              if (nombreINE !== nombreAviso) {
+                errors.push(`El Nombre Completo del responsable sanitario no coincide. INE: "${ine.nombre_completo_ine}", Aviso de Funcionamiento: "${avisoFuncionamiento.representante_legal}"`);
+              }
             }
           }
 
           // Validar CURP
-          if (ine.curp && avisoFuncionamiento.rfc && ine.curp !== avisoFuncionamiento.rfc) {
-            errors.push(`El CURP del responsable sanitario no coincide. INE: ${ine.curp}, Aviso de Funcionamiento: ${avisoFuncionamiento.rfc}`);
+          if (ine.curp && avisoFuncionamiento.rfc) {
+            // Verificar si el dato fue encontrado (no es "No encontrado")
+            if (avisoFuncionamiento.rfc.toLowerCase().includes('no encontrado')) {
+              // Ya se agregó el error arriba, no duplicar
+            } else if (ine.curp !== avisoFuncionamiento.rfc) {
+              errors.push(`El CURP del responsable sanitario no coincide. INE: ${ine.curp}, Aviso de Funcionamiento: ${avisoFuncionamiento.rfc}`);
+            }
           }
 
           if (errors.length > 0) {
