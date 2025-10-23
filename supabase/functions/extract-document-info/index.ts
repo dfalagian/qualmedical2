@@ -6,6 +6,96 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Función auxiliar para generar prompts de validación
+function getValidationPrompt(documentType: string): string {
+  const prompts: Record<string, string> = {
+    'acta_constitutiva': `Analiza esta imagen y determina si es realmente un ACTA CONSTITUTIVA mexicana oficial.
+
+Un acta constitutiva válida debe contener:
+- Encabezado de notaría pública
+- Datos del notario público
+- Razón social de la empresa
+- Nombre(s) del representante legal
+- Objeto social de la empresa
+- Información del registro público
+- Sellos y firmas oficiales
+
+NO es válida si es:
+- Un ticket de compra
+- Una foto casual sin relación
+- Un documento diferente (factura, recibo, identificación, etc.)
+- Una captura de pantalla o imagen de baja calidad
+- Un documento extranjero o no mexicano
+
+Analiza cuidadosamente y responde con honestidad.`,
+
+    'constancia_fiscal': `Analiza esta imagen y determina si es realmente una CONSTANCIA DE SITUACIÓN FISCAL mexicana del SAT.
+
+Una constancia fiscal válida debe contener:
+- Logo del SAT (Servicio de Administración Tributaria)
+- RFC del contribuyente
+- Razón social o nombre
+- Régimen fiscal
+- Actividades económicas
+- Domicilio fiscal registrado
+- Código postal
+- Fecha de emisión
+- Código de barras o QR del SAT
+
+NO es válida si es:
+- Un ticket de compra
+- Una foto casual sin relación
+- Un recibo de servicios
+- Una identificación
+- Una captura de pantalla de baja calidad
+- Un documento que no es del SAT
+
+Analiza cuidadosamente y responde con honestidad.`,
+
+    'comprobante_domicilio': `Analiza esta imagen y determina si es realmente un COMPROBANTE DE DOMICILIO válido (recibo de luz, agua, teléfono, predial, etc.).
+
+Un comprobante de domicilio válido debe contener:
+- Logo de la empresa de servicios (CFE, Telmex, gobierno local, etc.)
+- Nombre del titular del servicio
+- Dirección completa y clara
+- Código postal
+- Fecha de emisión (no mayor a 3 meses)
+- Monto a pagar o pagado
+- Número de cuenta o servicio
+
+NO es válido si es:
+- Un ticket de compra
+- Una foto casual sin relación
+- Una identificación
+- Una captura de pantalla de baja calidad
+- Un documento muy antiguo (más de 3 meses)
+- Un documento extranjero
+
+Analiza cuidadosamente y responde con honestidad.`,
+
+    'aviso_funcionamiento': `Analiza esta imagen y determina si es realmente un AVISO DE FUNCIONAMIENTO mexicano oficial.
+
+Un aviso de funcionamiento válido debe contener:
+- Encabezado de autoridad sanitaria o gobierno local
+- Razón social de la empresa
+- Dirección completa del establecimiento
+- Número de registro o folio
+- Sellos oficiales
+- Fecha de expedición
+
+NO es válido si es:
+- Un ticket de compra
+- Una foto casual sin relación
+- Un documento diferente (factura, recibo, etc.)
+- Una captura de pantalla de baja calidad
+- Un documento extranjero
+
+Analiza cuidadosamente y responde con honestidad.`
+  };
+
+  return prompts[documentType] || 'Analiza si este documento es válido y del tipo correcto.';
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -84,7 +174,7 @@ serve(async (req) => {
     }
     const base64Image = btoa(binary);
 
-    console.log('Llamando a Lovable AI para extraer información');
+    console.log('Llamando a Lovable AI para extraer información y validar autenticidad');
     console.log('Tipo de documento:', document.document_type);
 
     // Llamar a Lovable AI para extraer información
@@ -93,6 +183,121 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY no está configurado');
     }
 
+    // PASO 1: Primero validar que el documento sea legítimo
+    console.log('Validando autenticidad del documento con IA...');
+    const validationPrompt = getValidationPrompt(document.document_type);
+    
+    const validationResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { 
+            role: 'system', 
+            content: 'Eres un experto en validación de documentos legales y fiscales mexicanos. Tu trabajo es determinar si una imagen contiene el tipo de documento esperado o si es una imagen falsa/irrelevante.' 
+          },
+          {
+            role: 'user',
+            content: [
+              { 
+                type: 'text', 
+                text: validationPrompt
+              },
+              {
+                type: 'image_url',
+                image_url: { 
+                  url: `data:image/jpeg;base64,${base64Image}` 
+                }
+              }
+            ]
+          }
+        ],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'validate_document',
+              description: 'Validar si el documento es auténtico y del tipo correcto',
+              parameters: {
+                type: 'object',
+                properties: {
+                  is_valid_type: { 
+                    type: 'boolean', 
+                    description: 'true si el documento es del tipo esperado, false si es una foto random, ticket, o documento no relacionado' 
+                  },
+                  confidence_score: { 
+                    type: 'number', 
+                    description: 'Puntuación de confianza de 0 a 100 sobre la autenticidad del documento' 
+                  },
+                  validation_notes: { 
+                    type: 'string', 
+                    description: 'Notas sobre por qué el documento es válido o no. Si es inválido, explicar qué se detectó en la imagen.' 
+                  },
+                  detected_issues: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Lista de problemas específicos detectados (baja calidad, texto ilegible, no es el documento correcto, etc.)'
+                  }
+                },
+                required: ['is_valid_type', 'confidence_score', 'validation_notes', 'detected_issues'],
+                additionalProperties: false
+              }
+            }
+          }
+        ],
+        tool_choice: { type: 'function', function: { name: 'validate_document' } }
+      }),
+    });
+
+    if (!validationResponse.ok) {
+      const errorText = await validationResponse.text();
+      console.error('Error validando documento:', validationResponse.status, errorText);
+      throw new Error('Error al validar el documento con IA');
+    }
+
+    const validationData = await validationResponse.json();
+    const validationCall = validationData.choices[0]?.message?.tool_calls?.[0];
+    
+    if (!validationCall) {
+      throw new Error('No se recibió validación del documento');
+    }
+
+    const validationResult = JSON.parse(validationCall.function.arguments);
+    console.log('Resultado de validación:', validationResult);
+
+    // Si el documento no es válido, marcarlo y no continuar con la extracción
+    if (!validationResult.is_valid_type || validationResult.confidence_score < 50) {
+      console.log('Documento rechazado por IA - no es del tipo correcto o confianza baja');
+      
+      const invalidationErrors = [
+        `⚠️ DOCUMENTO SOSPECHOSO: ${validationResult.validation_notes}`,
+        ...validationResult.detected_issues.map((issue: string) => `• ${issue}`)
+      ];
+
+      await supabaseClient
+        .from('documents')
+        .update({ 
+          extraction_status: 'failed',
+          validation_errors: invalidationErrors,
+          is_valid: false
+        })
+        .eq('id', documentId);
+
+      return new Response(
+        JSON.stringify({ 
+          error: 'Documento no válido',
+          validation_errors: invalidationErrors,
+          confidence_score: validationResult.confidence_score
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // PASO 2: Si el documento pasó la validación, extraer información
     // Configurar el prompt y herramientas según el tipo de documento
     let systemPrompt = '';
     let userPrompt = '';
@@ -378,7 +583,12 @@ serve(async (req) => {
       throw updateError;
     }
 
-    console.log('Documento actualizado exitosamente');
+    console.log('Documento actualizado exitosamente con confianza:', validationResult.confidence_score);
+
+    // Agregar nota de validación al inicio si hay advertencias
+    if (validationResult.detected_issues.length > 0) {
+      validationErrors.unshift(`Nivel de confianza: ${validationResult.confidence_score}% - ${validationResult.validation_notes}`);
+    }
 
     // Realizar validación cruzada entre constancia_fiscal y comprobante_domicilio
     if (document.document_type === 'constancia_fiscal' || document.document_type === 'comprobante_domicilio') {

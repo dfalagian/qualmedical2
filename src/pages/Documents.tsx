@@ -24,9 +24,9 @@ const DOCUMENT_TYPES = [
 ];
 
 // Constantes de seguridad
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
-const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png'];
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.pdf'];
 
 const Documents = () => {
   const { user, isAdmin } = useAuth();
@@ -40,12 +40,12 @@ const Documents = () => {
   const validateFile = (file: File): string | null => {
     // Validar tamaño
     if (file.size > MAX_FILE_SIZE) {
-      return "El archivo es demasiado grande. Máximo 10MB.";
+      return "El archivo es demasiado grande. Máximo 20MB.";
     }
 
     // Validar tipo MIME
     if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-      return "Tipo de archivo no permitido. Solo JPG, JPEG o PNG.";
+      return "Tipo de archivo no permitido. Solo JPG, JPEG, PNG o PDF.";
     }
 
     // Validar extensión
@@ -231,7 +231,13 @@ const Documents = () => {
                 <Upload className="h-5 w-5" />
                 Subir Nuevo Documento
               </CardTitle>
-              <CardDescription>Solo se permiten imágenes JPG, JPEG o PNG</CardDescription>
+              <CardDescription>
+                Formatos aceptados: PDF (recomendado), JPG, JPEG, PNG. Máximo 20MB.
+                <br />
+                <span className="text-primary font-medium">
+                  💡 Los documentos se validan automáticamente con IA
+                </span>
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <form
@@ -258,11 +264,11 @@ const Documents = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="file">Imagen (JPG, JPEG o PNG) *</Label>
+                  <Label htmlFor="file">Archivo (PDF recomendado, o JPG/JPEG/PNG) *</Label>
                   <Input
                     id="file"
                     type="file"
-                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                    accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
                     onChange={(e) => {
                       const selectedFile = e.target.files?.[0];
                       if (selectedFile) {
@@ -279,7 +285,9 @@ const Documents = () => {
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Máximo 10MB. Solo archivos JPG, JPEG o PNG.
+                    Máximo 20MB. PDF (preferido), JPG, JPEG o PNG. 
+                    <br />
+                    <span className="text-primary">Los PDFs son más seguros y difíciles de falsificar.</span>
                   </p>
                 </div>
 
@@ -341,19 +349,36 @@ const Documents = () => {
                         <p className="text-sm mt-1 italic">Notas: {doc.notes}</p>
                        )}
                        {(doc.document_type === "acta_constitutiva" || doc.document_type === "constancia_fiscal" || doc.document_type === "comprobante_domicilio" || doc.document_type === "aviso_funcionamiento") && doc.extraction_status && (
-                        <div className="mt-2 text-sm">
+                        <div className="mt-2 text-sm space-y-1">
                           {doc.extraction_status === "completed" && (
-                            <span className="text-success">✓ Información extraída</span>
+                            <span className="text-success flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3" />
+                              Información extraída por IA
+                            </span>
                           )}
                           {doc.extraction_status === "processing" && (
-                            <span className="text-muted-foreground">⏳ Procesando...</span>
+                            <span className="text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3 animate-spin" />
+                              Validando con IA...
+                            </span>
                           )}
                           {doc.extraction_status === "failed" && (
-                            <span className="text-destructive">✗ Falló la extracción</span>
+                            <span className="text-destructive flex items-center gap-1">
+                              <XCircle className="h-3 w-3" />
+                              Validación rechazada por IA
+                            </span>
                           )}
                           {!doc.is_valid && doc.validation_errors && doc.validation_errors.length > 0 && (
-                            <div className="mt-1 text-destructive text-xs">
-                              ⚠️ {doc.validation_errors[0]}
+                            <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md space-y-1">
+                              <p className="font-semibold text-destructive text-xs">⚠️ Alertas de validación:</p>
+                              {doc.validation_errors.slice(0, 3).map((error: string, idx: number) => (
+                                <p key={idx} className="text-destructive text-xs">• {error}</p>
+                              ))}
+                              {doc.validation_errors.length > 3 && (
+                                <p className="text-destructive text-xs italic">
+                                  +{doc.validation_errors.length - 3} alertas más
+                                </p>
+                              )}
                             </div>
                           )}
                         </div>
