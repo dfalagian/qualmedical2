@@ -34,7 +34,7 @@ const Documents = () => {
   const queryClient = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
   const [selectedType, setSelectedType] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [notes, setNotes] = useState("");
 
   // Validación de archivo
@@ -79,14 +79,20 @@ const Documents = () => {
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      if (!file || !selectedType || !user) {
+      if (files.length === 0 || !selectedType || !user) {
         throw new Error("Faltan datos requeridos");
       }
 
-      // Validar archivo antes de subir
-      const validationError = validateFile(file);
-      if (validationError) {
-        throw new Error(validationError);
+      if (files.length > 20) {
+        throw new Error("Máximo 20 archivos permitidos");
+      }
+
+      // Validar todos los archivos antes de subir
+      for (const file of files) {
+        const validationError = validateFile(file);
+        if (validationError) {
+          throw new Error(`${file.name}: ${validationError}`);
+        }
       }
 
       // Validar notas (prevenir inyección)
@@ -96,73 +102,82 @@ const Documents = () => {
 
       setIsUploading(true);
 
-      // Sanitizar nombre de archivo
-      const fileExt = file.name.split(".").pop()?.toLowerCase();
-      const sanitizedFileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(sanitizedFileName, file);
+      const uploadedDocs = [];
 
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from("documents")
-        .getPublicUrl(sanitizedFileName);
-
-      // Sanitizar datos antes de insertar
-      const sanitizedNotes = notes.trim().substring(0, 1000);
-      const sanitizedFileName2 = file.name.substring(0, 255); // Limitar longitud
-
-      // Insert document record
-      const { data: insertedDoc, error: insertError } = await supabase
-        .from("documents")
-        .insert([{
-          supplier_id: user.id,
-          document_type: selectedType as any,
-          file_url: publicUrl,
-          file_name: sanitizedFileName2,
-          notes: sanitizedNotes || null,
-        }])
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      // Si es un documento que requiere extracción automática, procesar
-      if ((selectedType === "acta_constitutiva" || selectedType === "constancia_fiscal" || selectedType === "comprobante_domicilio" || selectedType === "aviso_funcionamiento" || selectedType === "ine") && insertedDoc) {
-        toast.info("Procesando documento con IA...");
+      // Subir cada archivo
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         
-        try {
-          const { data: extractData, error: extractError } = await supabase.functions.invoke('extract-document-info', {
-            body: { documentId: insertedDoc.id }
-          });
+        // Sanitizar nombre de archivo
+        const fileExt = file.name.split(".").pop()?.toLowerCase();
+        const sanitizedFileName = `${user.id}/${Date.now()}_${i}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from("documents")
+          .upload(sanitizedFileName, file);
 
-          if (extractError) {
-            console.error("Error extrayendo información:", extractError);
-            toast.warning("Documento subido pero falló la extracción automática");
-          } else {
-            // Mostrar advertencias si existen
-            if (extractData?.validation_errors && extractData.validation_errors.length > 0) {
-              toast.warning(
-                `⚠️ Advertencias encontradas:\n${extractData.validation_errors.join('\n')}`,
-                { duration: 8000 }
-              );
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from("documents")
+          .getPublicUrl(sanitizedFileName);
+
+        // Sanitizar datos antes de insertar
+        const sanitizedNotes = notes.trim().substring(0, 1000);
+        const sanitizedFileName2 = file.name.substring(0, 255); // Limitar longitud
+
+        // Insert document record
+        const { data: insertedDoc, error: insertError } = await supabase
+          .from("documents")
+          .insert([{
+            supplier_id: user.id,
+            document_type: selectedType as any,
+            file_url: publicUrl,
+            file_name: sanitizedFileName2,
+            notes: sanitizedNotes || null,
+          }])
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        uploadedDocs.push(insertedDoc);
+      }
+
+      // Si es un documento que requiere extracción automática, procesar todos
+      if (selectedType === "acta_constitutiva" || selectedType === "constancia_fiscal" || selectedType === "comprobante_domicilio" || selectedType === "aviso_funcionamiento" || selectedType === "ine") {
+        toast.info(`Procesando ${uploadedDocs.length} documento(s) con IA...`);
+        
+        for (const doc of uploadedDocs) {
+          try {
+            const { data: extractData, error: extractError } = await supabase.functions.invoke('extract-document-info', {
+              body: { documentId: doc.id }
+            });
+
+            if (extractError) {
+              console.error("Error extrayendo información:", extractError);
             } else {
-              toast.success("✓ Información extraída exitosamente");
+              // Mostrar advertencias si existen
+              if (extractData?.validation_errors && extractData.validation_errors.length > 0) {
+                toast.warning(
+                  `⚠️ ${doc.file_name}: ${extractData.validation_errors.join(', ')}`,
+                  { duration: 5000 }
+                );
+              }
             }
+          } catch (error) {
+            console.error("Error procesando documento:", error);
           }
-        } catch (error) {
-          // No revelar detalles del error al usuario
-          toast.error("Error al procesar el documento");
         }
+        
+        toast.success(`✓ ${uploadedDocs.length} documento(s) procesados`);
       }
     },
     onSuccess: () => {
-      toast.success("Documento subido exitosamente");
+      toast.success(`${files.length} documento(s) subido(s) exitosamente`);
       queryClient.invalidateQueries({ queryKey: ["documents"] });
-      setFile(null);
+      setFiles([]);
       setSelectedType("");
       setNotes("");
       setIsUploading(false);
@@ -275,7 +290,7 @@ const Documents = () => {
                 Subir Nuevo Documento
               </CardTitle>
               <CardDescription>
-                Los documentos se validan automáticamente con IA
+                Los documentos se validan automáticamente con IA. Puedes subir hasta 20 archivos a la vez.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -288,14 +303,14 @@ const Documents = () => {
                   </div>
                   <div className="flex-1">
                     <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">
-                      ⚠️ IMPORTANTE: Solo Imágenes
+                      ⚠️ IMPORTANTE: Solo Imágenes (Múltiples archivos permitidos)
                     </h4>
                     <p className="text-sm text-amber-700 dark:text-amber-400">
                       Por favor, sube imágenes en formato <strong>JPG, JPEG o PNG</strong>.
                       <br />
                       <strong>Los archivos PDF no son compatibles.</strong>
                       <br />
-                      <span className="text-xs">Si tienes un PDF, conviértelo a imagen primero usando una herramienta en línea o toma una captura de pantalla del documento.</span>
+                      <span className="text-xs">Puedes seleccionar hasta 20 imágenes a la vez. Ideal para documentos de múltiples páginas.</span>
                     </p>
                   </div>
                 </div>
@@ -325,31 +340,54 @@ const Documents = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="file">Archivo (JPG, JPEG o PNG) *</Label>
+                  <Label htmlFor="file">Archivos (JPG, JPEG o PNG) *</Label>
                   <Input
                     id="file"
                     type="file"
                     accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                    multiple
                     onChange={(e) => {
-                      const selectedFile = e.target.files?.[0];
-                      if (selectedFile) {
-                        const error = validateFile(selectedFile);
+                      const selectedFiles = Array.from(e.target.files || []);
+                      if (selectedFiles.length > 20) {
+                        toast.error("Máximo 20 archivos permitidos");
+                        e.target.value = '';
+                        return;
+                      }
+                      
+                      const validFiles: File[] = [];
+                      for (const file of selectedFiles) {
+                        const error = validateFile(file);
                         if (error) {
-                          toast.error(error);
+                          toast.error(`${file.name}: ${error}`);
                           e.target.value = '';
-                          setFile(null);
+                          setFiles([]);
                           return;
                         }
-                        setFile(selectedFile);
+                        validFiles.push(file);
                       }
+                      setFiles(validFiles);
                     }}
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Máximo 10MB. Solo archivos JPG, JPEG o PNG.
+                    Puedes seleccionar hasta 20 archivos. Máximo 10MB por archivo. Solo JPG, JPEG o PNG.
                     <br />
-                    <span className="text-primary">Asegúrate de que la imagen sea clara y legible para mejor extracción de datos.</span>
+                    <span className="text-primary">Asegúrate de que las imágenes sean claras y legibles para mejor extracción de datos.</span>
                   </p>
+                  {files.length > 0 && (
+                    <div className="mt-3 p-3 bg-muted rounded-md">
+                      <p className="text-sm font-medium mb-2">{files.length} archivo(s) seleccionado(s):</p>
+                      <ul className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                        {files.map((file, index) => (
+                          <li key={index} className="flex items-center gap-2">
+                            <CheckCircle className="h-3 w-3 text-success" />
+                            <span className="truncate">{file.name}</span>
+                            <span className="text-muted-foreground">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
