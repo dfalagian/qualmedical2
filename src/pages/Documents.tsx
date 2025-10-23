@@ -232,14 +232,30 @@ const Documents = () => {
                 Subir Nuevo Documento
               </CardTitle>
               <CardDescription>
-                Solo imágenes JPG, JPEG o PNG. Máximo 10MB.
-                <br />
-                <span className="text-primary font-medium">
-                  💡 Los documentos se validan automáticamente con IA
-                </span>
+                Los documentos se validan automáticamente con IA
               </CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-950 border-2 border-amber-500 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <svg className="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">
+                      ⚠️ IMPORTANTE: Solo Imágenes Permitidas
+                    </h4>
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                      Únicamente se aceptan archivos de imagen en formato <strong>JPG, JPEG o PNG</strong>.
+                      <br />
+                      No se permiten PDFs, documentos de Word u otros formatos.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
