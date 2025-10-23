@@ -73,25 +73,28 @@ NO es válido si es:
 
 Analiza cuidadosamente y responde con honestidad.`,
 
-    'aviso_funcionamiento': `Analiza esta imagen y determina si es realmente un AVISO DE FUNCIONAMIENTO mexicano oficial.
+    'aviso_funcionamiento': `Analiza esta imagen y determina si es realmente un AVISO DE FUNCIONAMIENTO mexicano oficial o una página interna del mismo.
 
-Un aviso de funcionamiento válido debe contener:
-- Encabezado de autoridad sanitaria o gobierno local
-- Razón social de la empresa
-- Dirección completa del establecimiento
-- Datos del responsable sanitario (nombre y CURP)
-- Número de registro o folio
-- Sellos oficiales
-- Fecha de expedición
+IMPORTANTE: El Aviso de Funcionamiento suele ser un documento MULTIPÁGINA. 
 
-NO es válido si es:
+Si la imagen muestra:
+- Primera página: Debe contener encabezado de autoridad (COFEPRIS, SSA, etc.), razón social, dirección, número de registro/folio, sellos oficiales, fecha de expedición
+- Página interna (ej: Apartado 5): Puede mostrar secciones específicas del formulario oficial como "Datos del responsable sanitario" con campos numerados y formato oficial, aunque NO tenga encabezados, sellos o número de folio
+
+✅ ES VÁLIDO si:
+- Es la página principal completa con todos los elementos oficiales
+- Es una página interna que claramente muestra apartados/secciones del formulario oficial de aviso de funcionamiento (ej: "Apartado 5: Datos del responsable sanitario")
+- Tiene el formato y estructura de un formulario gubernamental oficial, aunque sea una página sin sellos
+
+❌ NO es válido si es:
 - Un ticket de compra
 - Una foto casual sin relación
-- Un documento diferente (factura, recibo, etc.)
+- Una factura o recibo
 - Una captura de pantalla de baja calidad
 - Un documento extranjero
+- Un formulario que claramente no es gubernamental
 
-Analiza cuidadosamente y responde con honestidad.`,
+Si ves apartados numerados con formato oficial (como "5. Datos del responsable sanitario"), es una página válida del aviso de funcionamiento.`,
 
     'ine': `Analiza esta imagen y determina si es realmente una CREDENCIAL INE (Instituto Nacional Electoral) mexicana oficial.
 
