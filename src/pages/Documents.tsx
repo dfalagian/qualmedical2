@@ -26,8 +26,8 @@ const DOCUMENT_TYPES = [
 
 // Constantes de seguridad
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
-const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png'];
+const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.pdf'];
 
 const Documents = () => {
   const { user, isAdmin } = useAuth();
@@ -46,7 +46,7 @@ const Documents = () => {
 
     // Validar tipo MIME
     if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-      return "Tipo de archivo no permitido. Solo JPG, JPEG o PNG.";
+      return "Tipo de archivo no permitido. Solo se aceptan imágenes (JPG, JPEG, PNG) o PDFs escaneados.";
     }
 
     // Validar extensión
@@ -246,12 +246,14 @@ const Documents = () => {
                   </div>
                   <div className="flex-1">
                     <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">
-                      ⚠️ IMPORTANTE: Solo Imágenes Permitidas
+                      ⚠️ IMPORTANTE: Formatos de Archivo Permitidos
                     </h4>
                     <p className="text-sm text-amber-700 dark:text-amber-400">
-                      Únicamente se aceptan archivos de imagen en formato <strong>JPG, JPEG o PNG</strong>.
+                      Se aceptan archivos de imagen en formato <strong>JPG, JPEG o PNG</strong>.
                       <br />
-                      No se permiten PDFs, documentos de Word u otros formatos.
+                      Los archivos <strong>PDF</strong> están permitidos <strong>únicamente si contienen imágenes escaneadas</strong> del documento original.
+                      <br />
+                      <span className="text-xs">Nota: Muchos documentos escaneados se guardan como PDF. Estos archivos son válidos siempre que contengan la imagen escaneada del documento.</span>
                     </p>
                   </div>
                 </div>
@@ -281,11 +283,11 @@ const Documents = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="file">Imagen (JPG, JPEG o PNG) *</Label>
+                  <Label htmlFor="file">Archivo (JPG, JPEG, PNG o PDF escaneado) *</Label>
                   <Input
                     id="file"
                     type="file"
-                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                    accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
                     onChange={(e) => {
                       const selectedFile = e.target.files?.[0];
                       if (selectedFile) {
