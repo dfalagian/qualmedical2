@@ -75,6 +75,17 @@ serve(async (req) => {
     const { email, password, full_name, role, company_name, rfc, phone } = await req.json();
     console.log("Creating user with email:", email, "role:", role);
 
+    // Validate required fields
+    if (!email || !password || !full_name || !role) {
+      throw new Error("Email, contraseña, nombre completo y rol son obligatorios");
+    }
+
+    // Validate role is valid
+    const validRoles = ['admin', 'proveedor'];
+    if (!validRoles.includes(role)) {
+      throw new Error(`Rol inválido. Debe ser uno de: ${validRoles.join(', ')}`);
+    }
+
     // Create auth user
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
