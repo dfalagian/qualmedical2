@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileText, Upload, CheckCircle, XCircle, Clock, Download } from "lucide-react";
+import { FileText, Upload, CheckCircle, XCircle, Clock, Download, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const DOCUMENT_TYPES = [
@@ -201,6 +201,48 @@ const Documents = () => {
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al actualizar");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Primero obtener el documento para eliminar el archivo del storage
+      const { data: doc, error: fetchError } = await supabase
+        .from("documents")
+        .select("file_url")
+        .eq("id", id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Extraer el path del archivo del URL
+      const filePath = doc.file_url.split('/documents/')[1];
+      
+      // Eliminar el archivo del storage
+      if (filePath) {
+        const { error: storageError } = await supabase.storage
+          .from("documents")
+          .remove([filePath]);
+
+        if (storageError) {
+          console.error("Error eliminando archivo:", storageError);
+        }
+      }
+
+      // Eliminar el registro de la base de datos
+      const { error: deleteError } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", id);
+
+      if (deleteError) throw deleteError;
+    },
+    onSuccess: () => {
+      toast.success("Documento eliminado exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar documento");
     },
   });
 
@@ -435,6 +477,23 @@ const Documents = () => {
                             Rechazar
                           </Button>
                         </>
+                      )}
+
+                      {/* Botón eliminar solo para documentos rechazados */}
+                      {doc.status === "rechazado" && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            if (confirm("¿Estás seguro de que deseas eliminar este documento? Esta acción no se puede deshacer.")) {
+                              deleteMutation.mutate(doc.id);
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Eliminar
+                        </Button>
                       )}
                     </div>
                   </div>
