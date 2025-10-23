@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
+import { getDocument } from "https://esm.sh/pdfjs-dist@3.11.174/legacy/build/pdf.mjs";
+import { createCanvas } from "https://deno.land/x/canvas@v1.4.1/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -185,18 +187,84 @@ serve(async (req) => {
 
     console.log('Archivo descargado, tamaño:', fileData.size);
 
-    // Convertir la imagen a base64
+    // Detectar tipo de archivo y convertir a imagen base64
     const arrayBuffer = await fileData.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     
-    // Convertir a base64 en chunks para evitar stack overflow
-    let binary = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-      binary += String.fromCharCode(...chunk);
+    let base64Image: string;
+    
+    // Detectar si es un PDF por sus bytes mágicos
+    const isPDF = uint8Array[0] === 0x25 && uint8Array[1] === 0x50 && 
+                  uint8Array[2] === 0x44 && uint8Array[3] === 0x46; // %PDF
+    
+    if (isPDF) {
+      console.log('Archivo detectado como PDF, extrayendo primera página...');
+      
+      try {
+        // Cargar el PDF
+        const loadingTask = getDocument({ data: uint8Array });
+        const pdf = await loadingTask.promise;
+        
+        console.log(`PDF cargado, ${pdf.numPages} páginas`);
+        
+        // Obtener la primera página
+        const page = await pdf.getPage(1);
+        
+        // Configurar el viewport para renderizar
+        const viewport = page.getViewport({ scale: 2.0 });
+        
+        // Crear canvas para renderizar
+        const canvas = createCanvas(viewport.width, viewport.height);
+        const context = canvas.getContext('2d');
+        
+        if (!context) {
+          throw new Error('No se pudo crear contexto de canvas');
+        }
+        
+        // Renderizar la página
+        await page.render({
+          canvasContext: context as any,
+          viewport: viewport,
+        }).promise;
+        
+        // Convertir canvas a buffer JPEG
+        const jpegBuffer = canvas.toBuffer('image/jpeg');
+        
+        // Convertir a base64
+        let binary = '';
+        const chunkSize = 8192;
+        for (let i = 0; i < jpegBuffer.length; i += chunkSize) {
+          const chunk = jpegBuffer.subarray(i, Math.min(i + chunkSize, jpegBuffer.length));
+          binary += String.fromCharCode(...chunk);
+        }
+        base64Image = btoa(binary);
+        
+        console.log('Primera página del PDF extraída y convertida a imagen');
+        
+      } catch (pdfError) {
+        console.error('Error procesando PDF:', pdfError);
+        await supabaseClient
+          .from('documents')
+          .update({ 
+            extraction_status: 'failed',
+            validation_errors: ['Error al procesar el archivo PDF. Asegúrate de que sea un PDF válido y no esté dañado.']
+          })
+          .eq('id', documentId);
+        throw new Error('Error procesando PDF');
+      }
+    } else {
+      // Es una imagen, procesarla directamente
+      console.log('Archivo detectado como imagen, procesando...');
+      
+      // Convertir a base64 en chunks para evitar stack overflow
+      let binary = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+        binary += String.fromCharCode(...chunk);
+      }
+      base64Image = btoa(binary);
     }
-    const base64Image = btoa(binary);
 
     console.log('Llamando a Lovable AI para extraer información y validar autenticidad');
     console.log('Tipo de documento:', document.document_type);
@@ -286,7 +354,7 @@ serve(async (req) => {
         .from('documents')
         .update({ 
           extraction_status: 'failed',
-          validation_errors: ['Error procesando el archivo. Asegúrate de subir una imagen clara en formato JPG o PNG. Los archivos PDF no son compatibles actualmente.']
+          validation_errors: ['Error procesando el archivo. Asegúrate de subir una imagen clara en formato JPG/PNG o un PDF válido con imágenes legibles.']
         })
         .eq('id', documentId);
       
@@ -992,7 +1060,7 @@ serve(async (req) => {
           .from('documents')
           .update({ 
             extraction_status: 'failed',
-            validation_errors: ['Error procesando el documento. Por favor intenta nuevamente con una imagen clara en formato JPG o PNG.']
+            validation_errors: ['Error procesando el documento. Por favor intenta nuevamente con una imagen clara (JPG/PNG) o un PDF válido.']
           })
           .eq('id', errorDocId);
       }
