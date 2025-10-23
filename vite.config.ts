@@ -15,25 +15,19 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // Minificar el código en producción
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true, // Eliminar console.log en producción
-        drop_debugger: true, // Eliminar debugger en producción
-      },
-      mangle: true, // Ofuscar nombres de variables
-      format: {
-        comments: false, // Eliminar comentarios
-      },
-    },
-    // Optimizar chunks
-    rollupOptions: {
-      output: {
-        manualChunks: undefined,
-      },
-    },
+    // Minificar el código en producción con esbuild (incluido en Vite)
+    minify: mode === 'production' ? 'esbuild' : false,
+    // Optimizar y proteger el código
+    target: 'esnext',
     // Generar sourcemaps solo para desarrollo
     sourcemap: mode === 'development',
+  },
+  esbuild: {
+    // En producción, eliminar console.log y debugger
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
+    // Minificar nombres en producción
+    minifyIdentifiers: mode === 'production',
+    minifySyntax: mode === 'production',
+    minifyWhitespace: mode === 'production',
   },
 }));
