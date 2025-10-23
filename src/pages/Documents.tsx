@@ -517,8 +517,8 @@ const Documents = () => {
                         </>
                       )}
 
-                      {/* Botón eliminar para documentos rechazados por admin o IA */}
-                      {(doc.status === "rechazado" || doc.extraction_status === "failed") && (
+                      {/* Botón eliminar para que los proveedores puedan eliminar sus propios documentos */}
+                      {!isAdmin && (
                         <Button
                           size="sm"
                           variant="destructive"
