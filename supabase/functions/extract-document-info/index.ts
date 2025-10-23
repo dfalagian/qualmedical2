@@ -185,95 +185,40 @@ serve(async (req) => {
 
     console.log('Archivo descargado, tamaño:', fileData.size);
 
-    // Detectar tipo de archivo y convertir a imagen base64
+    // Detectar tipo de archivo y convertir a base64
     const arrayBuffer = await fileData.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     
-    let base64Image: string;
+    let base64Data: string;
+    let mimeType: string;
     
     // Detectar si es un PDF por sus bytes mágicos
     const isPDF = uint8Array[0] === 0x25 && uint8Array[1] === 0x50 && 
                   uint8Array[2] === 0x44 && uint8Array[3] === 0x46; // %PDF
     
     if (isPDF) {
-      console.log('Archivo detectado como PDF, convirtiendo a imagen...');
-      
-      try {
-        // Crear archivos temporales
-        const tempPdfPath = await Deno.makeTempFile({ suffix: '.pdf' });
-        const tempImagePath = await Deno.makeTempFile({ suffix: '.jpg' });
-        
-        // Escribir el PDF al archivo temporal
-        await Deno.writeFile(tempPdfPath, uint8Array);
-        console.log('PDF escrito en archivo temporal');
-        
-        // Usar ImageMagick para convertir la primera página del PDF a imagen
-        const command = new Deno.Command("convert", {
-          args: [
-            "-density", "300",           // Alta resolución
-            "-quality", "95",            // Alta calidad JPEG
-            `${tempPdfPath}[0]`,        // Solo primera página
-            "-flatten",                  // Aplanar capas
-            tempImagePath
-          ],
-        });
-        
-        const { code, stderr } = await command.output();
-        
-        if (code !== 0) {
-          const errorText = new TextDecoder().decode(stderr);
-          console.error('Error ejecutando ImageMagick:', errorText);
-          throw new Error('Error convirtiendo PDF a imagen');
-        }
-        
-        console.log('PDF convertido a imagen exitosamente');
-        
-        // Leer la imagen generada
-        const imageData = await Deno.readFile(tempImagePath);
-        
-        // Convertir a base64
-        let binary = '';
-        const chunkSize = 8192;
-        for (let i = 0; i < imageData.length; i += chunkSize) {
-          const chunk = imageData.subarray(i, Math.min(i + chunkSize, imageData.length));
-          binary += String.fromCharCode(...chunk);
-        }
-        base64Image = btoa(binary);
-        
-        // Limpiar archivos temporales
-        try {
-          await Deno.remove(tempPdfPath);
-          await Deno.remove(tempImagePath);
-        } catch (cleanupError) {
-          console.warn('Error limpiando archivos temporales:', cleanupError);
-        }
-        
-        console.log('Primera página del PDF extraída y convertida a imagen');
-        
-      } catch (pdfError) {
-        console.error('Error procesando PDF:', pdfError);
-        await supabaseClient
-          .from('documents')
-          .update({ 
-            extraction_status: 'failed',
-            validation_errors: ['Error al procesar el archivo PDF. Asegúrate de que sea un PDF válido y no esté dañado o corrupto.']
-          })
-          .eq('id', documentId);
-        throw new Error('Error procesando PDF');
-      }
+      console.log('Archivo detectado como PDF - enviando directamente a Gemini');
+      mimeType = 'application/pdf';
     } else {
-      // Es una imagen, procesarla directamente
-      console.log('Archivo detectado como imagen, procesando...');
-      
-      // Convertir a base64 en chunks para evitar stack overflow
-      let binary = '';
-      const chunkSize = 8192;
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-        binary += String.fromCharCode(...chunk);
+      console.log('Archivo detectado como imagen');
+      // Detectar tipo de imagen
+      if (uint8Array[0] === 0xFF && uint8Array[1] === 0xD8) {
+        mimeType = 'image/jpeg';
+      } else if (uint8Array[0] === 0x89 && uint8Array[1] === 0x50) {
+        mimeType = 'image/png';
+      } else {
+        mimeType = 'image/jpeg'; // default
       }
-      base64Image = btoa(binary);
     }
+    
+    // Convertir a base64 en chunks para evitar stack overflow
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+      binary += String.fromCharCode(...chunk);
+    }
+    base64Data = btoa(binary);
 
     console.log('Llamando a Lovable AI para extraer información y validar autenticidad');
     console.log('Tipo de documento:', document.document_type);
@@ -311,7 +256,7 @@ serve(async (req) => {
               {
                 type: 'image_url',
                 image_url: { 
-                  url: `data:image/jpeg;base64,${base64Image}` 
+                  url: `data:${mimeType};base64,${base64Data}` 
                 }
               }
             ]
@@ -568,12 +513,12 @@ serve(async (req) => {
                 type: 'text', 
                 text: userPrompt 
               },
-              {
-                type: 'image_url',
-                image_url: { 
-                  url: `data:image/jpeg;base64,${base64Image}` 
-                }
+            {
+              type: 'image_url',
+              image_url: { 
+                url: `data:${mimeType};base64,${base64Data}` 
               }
+            }
             ]
           }
         ],
