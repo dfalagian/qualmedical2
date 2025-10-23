@@ -58,7 +58,7 @@ serve(async (req) => {
         JSON.stringify({
           success: false,
           error: 'Validación de factura fallida',
-          mensaje: `Error en el XML: Cuando la Forma de Pago es 99, el Método de Pago debe ser PPD. Se detectó Método de Pago: ${metodoPago || 'no especificado'}.`
+          mensaje: 'Error en el XML: Cuando la Forma de Pago es 99, el Método de Pago debe ser PPD. Se detectó Método de Pago: ' + (metodoPago || 'no especificado') + '.'
         }),
         { 
           status: 400,
