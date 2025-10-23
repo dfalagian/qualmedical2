@@ -163,6 +163,12 @@ const DocumentsAdmin = () => {
                                       <h4 className="font-semibold text-sm text-muted-foreground">Registro Público</h4>
                                       <p className="text-sm">{selectedDoc.registro_publico || "No extraído"}</p>
                                     </div>
+                                    {selectedDoc.fecha_emision && (
+                                      <div>
+                                        <h4 className="font-semibold text-sm text-muted-foreground">Fecha de Emisión</h4>
+                                        <p>{new Date(selectedDoc.fecha_emision).toLocaleDateString('es-MX')}</p>
+                                      </div>
+                                    )}
                                     <div>
                                       <h4 className="font-semibold text-sm text-muted-foreground">Estado de Extracción</h4>
                                       <div className="mt-1">{getExtractionBadge(selectedDoc.extraction_status)}</div>

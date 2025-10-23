@@ -12,18 +12,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 
-const AvisoFuncionamientoAdmin = () => {
+const IneAdmin = () => {
   const { isAdmin, loading } = useAuth();
   const queryClient = useQueryClient();
   const [selectedDoc, setSelectedDoc] = useState<any>(null);
 
-  const { data: avisosFuncionamiento, isLoading } = useQuery({
-    queryKey: ["avisos-funcionamiento"],
+  const { data: credencialesIne, isLoading } = useQuery({
+    queryKey: ["credenciales-ine"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("documents")
         .select("*, profiles!documents_supplier_id_fkey(full_name, company_name)")
-        .eq("document_type", "aviso_funcionamiento")
+        .eq("document_type", "ine")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -41,10 +41,28 @@ const AvisoFuncionamientoAdmin = () => {
     },
     onSuccess: () => {
       toast.success("Extracción iniciada");
-      queryClient.invalidateQueries({ queryKey: ["avisos-funcionamiento"] });
+      queryClient.invalidateQueries({ queryKey: ["credenciales-ine"] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al extraer información");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const { error } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", documentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Documento eliminado");
+      queryClient.invalidateQueries({ queryKey: ["credenciales-ine"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar documento");
     },
   });
 
@@ -80,9 +98,9 @@ const AvisoFuncionamientoAdmin = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Validación de Avisos de Funcionamiento</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Validación de Credenciales INE</h2>
           <p className="text-muted-foreground">
-            Información extraída automáticamente de los avisos de funcionamiento
+            Información extraída automáticamente de las credenciales de identificación
           </p>
         </div>
 
@@ -90,36 +108,49 @@ const AvisoFuncionamientoAdmin = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Avisos de Funcionamiento Registrados
+              Credenciales INE Registradas
             </CardTitle>
             <CardDescription>
-              Información extraída mediante IA de los documentos PDF
+              Información extraída mediante IA de las imágenes de credenciales
             </CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <p className="text-center py-8 text-muted-foreground">Cargando documentos...</p>
-            ) : avisosFuncionamiento && avisosFuncionamiento.length > 0 ? (
+            ) : credencialesIne && credencialesIne.length > 0 ? (
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Proveedor</TableHead>
-                      <TableHead>Razón Social</TableHead>
-                      <TableHead>Dirección</TableHead>
+                      <TableHead>Nombre Completo</TableHead>
+                      <TableHead>CURP</TableHead>
+                      <TableHead>Archivo</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {avisosFuncionamiento.map((doc: any) => (
+                    {credencialesIne.map((doc: any) => (
                       <TableRow key={doc.id}>
                         <TableCell className="font-medium">
                           {doc.profiles?.company_name || doc.profiles?.full_name || "N/A"}
                         </TableCell>
-                        <TableCell>{doc.razon_social || "-"}</TableCell>
-                        <TableCell className="max-w-xs truncate">{doc.direccion || "-"}</TableCell>
-                        <TableCell>{getExtractionBadge(doc.extraction_status)}</TableCell>
+                        <TableCell>{doc.nombre_completo_ine || "-"}</TableCell>
+                        <TableCell className="font-mono text-sm">{doc.curp || "-"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground truncate max-w-xs">
+                          {doc.file_name}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            {getExtractionBadge(doc.extraction_status)}
+                            {!doc.is_valid && doc.validation_errors && doc.validation_errors.length > 0 && (
+                              <Badge variant="destructive" className="text-xs">
+                                ⚠️ Validación
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Dialog>
@@ -135,7 +166,7 @@ const AvisoFuncionamientoAdmin = () => {
                               </DialogTrigger>
                               <DialogContent className="max-w-2xl">
                                 <DialogHeader>
-                                  <DialogTitle>Detalles del Aviso de Funcionamiento</DialogTitle>
+                                  <DialogTitle>Detalles de la Credencial INE</DialogTitle>
                                 </DialogHeader>
                                 {selectedDoc && (
                                   <div className="space-y-4">
@@ -144,49 +175,36 @@ const AvisoFuncionamientoAdmin = () => {
                                       <p>{selectedDoc.profiles?.company_name || selectedDoc.profiles?.full_name}</p>
                                     </div>
                                     <div>
-                                      <h4 className="font-semibold text-sm text-muted-foreground">Razón Social</h4>
-                                      <p>{selectedDoc.razon_social || "No extraído"}</p>
+                                      <h4 className="font-semibold text-sm text-muted-foreground">Nombre Completo</h4>
+                                      <p className="text-lg">{selectedDoc.nombre_completo_ine || "No extraído"}</p>
                                     </div>
                                     <div>
-                                      <h4 className="font-semibold text-sm text-muted-foreground">Dirección</h4>
-                                      <p className="text-sm">{selectedDoc.direccion || "No extraído"}</p>
+                                      <h4 className="font-semibold text-sm text-muted-foreground">CURP</h4>
+                                      <p className="font-mono text-lg">{selectedDoc.curp || "No extraído"}</p>
                                     </div>
-                                    {selectedDoc.rfc && (
-                                      <div>
-                                        <h4 className="font-semibold text-sm text-muted-foreground">RFC</h4>
-                                        <p className="font-mono text-lg">{selectedDoc.rfc}</p>
-                                      </div>
-                                    )}
-                                    {selectedDoc.actividad_economica && (
-                                      <div>
-                                        <h4 className="font-semibold text-sm text-muted-foreground">Actividad Económica</h4>
-                                        <p className="text-sm">{selectedDoc.actividad_economica}</p>
-                                      </div>
-                                    )}
-                                    {selectedDoc.fecha_emision && (
-                                      <div>
-                                        <h4 className="font-semibold text-sm text-muted-foreground">Fecha de Emisión</h4>
-                                        <p>{new Date(selectedDoc.fecha_emision).toLocaleDateString('es-MX')}</p>
-                                      </div>
-                                    )}
                                     <div>
                                       <h4 className="font-semibold text-sm text-muted-foreground">Nombre del Archivo</h4>
                                       <p className="text-sm">{selectedDoc.file_name}</p>
                                     </div>
                                     <div>
-                                      <h4 className="font-semibold text-sm text-muted-foreground">Fecha de Carga</h4>
-                                      <p>{new Date(selectedDoc.created_at).toLocaleDateString('es-MX', {
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                      })}</p>
-                                    </div>
-                                    <div>
                                       <h4 className="font-semibold text-sm text-muted-foreground">Estado de Extracción</h4>
                                       <div className="mt-1">{getExtractionBadge(selectedDoc.extraction_status)}</div>
                                     </div>
+                                    {selectedDoc.validation_errors && selectedDoc.validation_errors.length > 0 && (
+                                      <div className="border-l-4 border-destructive bg-destructive/10 p-4 rounded">
+                                        <h4 className="font-semibold text-sm text-destructive mb-2">⚠️ Errores de Validación</h4>
+                                        <ul className="list-disc list-inside space-y-1">
+                                          {selectedDoc.validation_errors.map((error: string, idx: number) => (
+                                            <li key={idx} className="text-sm text-destructive">{error}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {selectedDoc.is_valid && selectedDoc.extraction_status === 'completed' && (
+                                      <div className="border-l-4 border-success bg-success/10 p-4 rounded">
+                                        <p className="text-sm text-success font-medium">✓ Credencial válida</p>
+                                      </div>
+                                    )}
                                     {selectedDoc.notes && (
                                       <div>
                                         <h4 className="font-semibold text-sm text-muted-foreground">Notas</h4>
@@ -197,7 +215,7 @@ const AvisoFuncionamientoAdmin = () => {
                                       <Button variant="outline" size="sm" asChild>
                                         <a href={selectedDoc.file_url} target="_blank" rel="noopener noreferrer">
                                           <Download className="h-4 w-4 mr-1" />
-                                          Descargar PDF
+                                          Descargar Imagen
                                         </a>
                                       </Button>
                                       {selectedDoc.extraction_status !== "processing" && (
@@ -232,6 +250,19 @@ const AvisoFuncionamientoAdmin = () => {
                                 <RefreshCw className="h-4 w-4" />
                               </Button>
                             )}
+
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm("¿Estás seguro de eliminar este documento?")) {
+                                  deleteMutation.mutate(doc.id);
+                                }
+                              }}
+                              disabled={deleteMutation.isPending}
+                            >
+                              Eliminar
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -241,7 +272,7 @@ const AvisoFuncionamientoAdmin = () => {
               </div>
             ) : (
               <p className="text-center py-8 text-muted-foreground">
-                No hay avisos de funcionamiento registrados
+                No hay credenciales INE registradas
               </p>
             )}
           </CardContent>
@@ -251,4 +282,4 @@ const AvisoFuncionamientoAdmin = () => {
   );
 };
 
-export default AvisoFuncionamientoAdmin;
+export default IneAdmin;

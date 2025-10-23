@@ -366,6 +366,33 @@ const SupplierDocuments = () => {
                 </div>
               )}
 
+              {selectedDocument.nombre_completo_ine && (
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    Nombre Completo (INE)
+                  </p>
+                  <p className="mt-1">{selectedDocument.nombre_completo_ine}</p>
+                </div>
+              )}
+
+              {selectedDocument.curp && (
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">CURP</p>
+                  <p className="mt-1 font-mono">{selectedDocument.curp}</p>
+                </div>
+              )}
+
+              {selectedDocument.fecha_emision && (
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    Fecha de Emisión
+                  </p>
+                  <p className="mt-1">
+                    {new Date(selectedDocument.fecha_emision).toLocaleDateString('es-MX')}
+                  </p>
+                </div>
+              )}
+
               {selectedDocument.notes && (
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Notas</p>

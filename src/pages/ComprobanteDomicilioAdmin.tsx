@@ -188,6 +188,18 @@ const ComprobanteDomicilioAdmin = () => {
                                       <h4 className="font-semibold text-sm text-muted-foreground">Código Postal</h4>
                                       <p className="font-mono text-lg">{selectedDoc.codigo_postal || "No extraído"}</p>
                                     </div>
+                                    {selectedDoc.direccion && (
+                                      <div>
+                                        <h4 className="font-semibold text-sm text-muted-foreground">Dirección</h4>
+                                        <p className="text-sm">{selectedDoc.direccion}</p>
+                                      </div>
+                                    )}
+                                    {selectedDoc.fecha_emision && (
+                                      <div>
+                                        <h4 className="font-semibold text-sm text-muted-foreground">Fecha de Emisión</h4>
+                                        <p>{new Date(selectedDoc.fecha_emision).toLocaleDateString('es-MX')}</p>
+                                      </div>
+                                    )}
                                     <div>
                                       <h4 className="font-semibold text-sm text-muted-foreground">Nombre del Archivo</h4>
                                       <p className="text-sm">{selectedDoc.file_name}</p>
