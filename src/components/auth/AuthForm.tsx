@@ -13,8 +13,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
-// Schema de validación con reglas de seguridad
-const authSchema = z.object({
+// Schema de validación para login
+const loginSchema = z.object({
   email: z
     .string()
     .trim()
@@ -28,21 +28,59 @@ const authSchema = z.object({
     .max(100, "Contraseña demasiado larga"),
 });
 
-type AuthFormValues = z.infer<typeof authSchema>;
+// Schema de validación para registro
+const signupSchema = loginSchema.extend({
+  full_name: z
+    .string()
+    .trim()
+    .min(1, "El nombre completo es requerido")
+    .max(100, "Nombre demasiado largo"),
+  company_name: z
+    .string()
+    .trim()
+    .max(100, "Nombre de empresa demasiado largo")
+    .optional(),
+  rfc: z
+    .string()
+    .trim()
+    .max(13, "RFC inválido")
+    .optional(),
+  phone: z
+    .string()
+    .trim()
+    .max(20, "Teléfono demasiado largo")
+    .optional(),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+type SignupFormValues = z.infer<typeof signupSchema>;
 
 export const AuthForm = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const navigate = useNavigate();
 
-  const form = useForm<AuthFormValues>({
-    resolver: zodResolver(authSchema),
+  const loginForm = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
       password: "",
     },
   });
 
-  const handleAuth = async (data: AuthFormValues) => {
+  const signupForm = useForm<SignupFormValues>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      full_name: "",
+      company_name: "",
+      rfc: "",
+      phone: "",
+    },
+  });
+
+  const handleLogin = async (data: LoginFormValues) => {
     setIsLoading(true);
 
     try {
@@ -68,6 +106,73 @@ export const AuthForm = () => {
     }
   };
 
+  const handleSignup = async (data: SignupFormValues) => {
+    setIsLoading(true);
+
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      // Crear usuario con Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: data.full_name,
+          }
+        }
+      });
+
+      if (authError) {
+        if (authError.message.includes("already registered")) {
+          throw new Error("Este email ya está registrado");
+        }
+        throw authError;
+      }
+
+      if (!authData.user) {
+        throw new Error("Error al crear la cuenta");
+      }
+
+      // Crear perfil
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert({
+          id: authData.user.id,
+          email: data.email,
+          full_name: data.full_name,
+          company_name: data.company_name || null,
+          rfc: data.rfc || null,
+          phone: data.phone || null,
+        });
+
+      if (profileError) {
+        throw new Error("Error al crear el perfil");
+      }
+
+      // Asignar rol de proveedor
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert({
+          user_id: authData.user.id,
+          role: "proveedor",
+        });
+
+      if (roleError) {
+        throw new Error("Error al asignar rol");
+      }
+
+      toast.success("Cuenta creada correctamente. Puedes iniciar sesión.");
+      setIsSignUp(false);
+      loginForm.reset();
+    } catch (error: any) {
+      toast.error(error.message || "Error al crear la cuenta");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-lg">
@@ -80,65 +185,224 @@ export const AuthForm = () => {
             />
           </div>
           <CardTitle className="text-2xl font-bold">
-            Iniciar Sesión
+            {isSignUp ? "Crear Cuenta" : "Iniciar Sesión"}
           </CardTitle>
           <CardDescription>
-            Ingresa tus credenciales para acceder al sistema
+            {isSignUp 
+              ? "Regístrate como proveedor en el sistema" 
+              : "Ingresa tus credenciales para acceder al sistema"
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleAuth)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Correo Electrónico</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="email"
-                        placeholder="tu@email.com"
-                        autoComplete="email"
-                        disabled={isLoading}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          {!isSignUp ? (
+            <Form {...loginForm}>
+              <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
+                <FormField
+                  control={loginForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Correo Electrónico</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="email"
+                          placeholder="tu@email.com"
+                          autoComplete="email"
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contraseña</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="password"
-                        placeholder="••••••••"
-                        autoComplete="current-password"
-                        disabled={isLoading}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={loginForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contraseña</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="password"
+                          placeholder="••••••••"
+                          autoComplete="current-password"
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <Button 
-                type="submit" 
-                className="w-full"
-                disabled={isLoading}
-              >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Iniciar Sesión
-              </Button>
-            </form>
-          </Form>
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Iniciar Sesión
+                </Button>
+
+                <div className="text-center text-sm text-muted-foreground">
+                  ¿No tienes cuenta?{" "}
+                  <button
+                    type="button"
+                    onClick={() => setIsSignUp(true)}
+                    className="text-primary hover:underline font-medium"
+                    disabled={isLoading}
+                  >
+                    Regístrate aquí
+                  </button>
+                </div>
+              </form>
+            </Form>
+          ) : (
+            <Form {...signupForm}>
+              <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
+                <FormField
+                  control={signupForm.control}
+                  name="full_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre Completo</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="text"
+                          placeholder="Juan Pérez"
+                          autoComplete="name"
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={signupForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Correo Electrónico</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="email"
+                          placeholder="tu@email.com"
+                          autoComplete="email"
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={signupForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contraseña</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="password"
+                          placeholder="••••••••"
+                          autoComplete="new-password"
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={signupForm.control}
+                  name="company_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre de Empresa (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="text"
+                          placeholder="Mi Empresa S.A."
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={signupForm.control}
+                  name="rfc"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>RFC (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="text"
+                          placeholder="XAXX010101000"
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={signupForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Teléfono (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="tel"
+                          placeholder="5512345678"
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Crear Cuenta
+                </Button>
+
+                <div className="text-center text-sm text-muted-foreground">
+                  ¿Ya tienes cuenta?{" "}
+                  <button
+                    type="button"
+                    onClick={() => setIsSignUp(false)}
+                    className="text-primary hover:underline font-medium"
+                    disabled={isLoading}
+                  >
+                    Inicia sesión aquí
+                  </button>
+                </div>
+              </form>
+            </Form>
+          )}
         </CardContent>
       </Card>
     </div>
