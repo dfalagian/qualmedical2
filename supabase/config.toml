@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.count-medicine-boxes]
 verify_jwt = true
+
+[functions.validate-invoice-xml]
+verify_jwt = true

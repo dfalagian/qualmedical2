@@ -81,9 +81,38 @@ const Invoices = () => {
         });
 
       if (insertError) throw insertError;
+
+      // Validar XML para detectar si requiere complemento de pago
+      try {
+        const { data: validationData, error: validationError } = await supabase.functions.invoke(
+          'validate-invoice-xml',
+          {
+            body: { xmlUrl }
+          }
+        );
+
+        if (!validationError && validationData?.requiereComplemento) {
+          return { requiereComplemento: true, mensaje: validationData.mensaje };
+        }
+      } catch (validationError) {
+        console.error('Error al validar XML:', validationError);
+        // No detenemos el flujo si falla la validación
+      }
+
+      return { requiereComplemento: false };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success("Factura subida exitosamente");
+      
+      // Mostrar mensaje de complemento de pago si es necesario
+      if (data?.requiereComplemento) {
+        setTimeout(() => {
+          toast.info(data.mensaje, {
+            duration: 8000,
+          });
+        }, 500);
+      }
+      
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       setPdfFile(null);
       setXmlFile(null);
