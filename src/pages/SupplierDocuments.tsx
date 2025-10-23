@@ -12,6 +12,7 @@ import { Navigate } from "react-router-dom";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ImageViewer } from "@/components/admin/ImageViewer";
 
 const SupplierDocuments = () => {
   const { isAdmin, loading } = useAuth();
@@ -267,11 +268,12 @@ const SupplierDocuments = () => {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button variant="outline" size="sm" asChild>
-                                <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                                  <Eye className="h-4 w-4" />
-                                </a>
-                              </Button>
+                              <ImageViewer 
+                                fileUrl={doc.file_url}
+                                fileName={doc.file_name}
+                                triggerText=""
+                                triggerSize="icon"
+                              />
                               <Button
                                 variant="destructive"
                                 size="sm"
@@ -441,12 +443,11 @@ const SupplierDocuments = () => {
                 )}
 
               <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" size="sm" asChild>
-                  <a href={selectedDocument.file_url} target="_blank" rel="noopener noreferrer">
-                    <Eye className="h-4 w-4 mr-2" />
-                    Ver
-                  </a>
-                </Button>
+                <ImageViewer 
+                  fileUrl={selectedDocument.file_url}
+                  fileName={selectedDocument.file_name}
+                  triggerText="Ver"
+                />
               </div>
             </div>
           )}

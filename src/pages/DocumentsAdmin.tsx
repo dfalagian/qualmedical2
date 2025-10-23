@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
+import { ImageViewer } from "@/components/admin/ImageViewer";
 
 const DocumentsAdmin = () => {
   const { isAdmin, loading } = useAuth();
@@ -192,12 +193,11 @@ const DocumentsAdmin = () => {
                                       <div className="mt-1">{getExtractionBadge(selectedDoc.extraction_status)}</div>
                                     </div>
                                     <div className="flex gap-2 pt-4">
-                                      <Button variant="outline" size="sm" asChild>
-                                        <a href={selectedDoc.file_url} target="_blank" rel="noopener noreferrer">
-                                          <Eye className="h-4 w-4 mr-1" />
-                                          Ver
-                                        </a>
-                                      </Button>
+                                      <ImageViewer 
+                                        fileUrl={selectedDoc.file_url}
+                                        fileName={selectedDoc.file_name}
+                                        triggerText="Ver"
+                                      />
                                       {selectedDoc.extraction_status !== "processing" && (
                                         <Button
                                           size="sm"
@@ -214,11 +214,12 @@ const DocumentsAdmin = () => {
                               </DialogContent>
                             </Dialog>
 
-                            <Button variant="outline" size="sm" asChild>
-                              <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                                <Eye className="h-4 w-4" />
-                              </a>
-                            </Button>
+                            <ImageViewer 
+                              fileUrl={doc.file_url}
+                              fileName={doc.file_name}
+                              triggerText=""
+                              triggerSize="icon"
+                            />
 
                             {doc.extraction_status !== "processing" && (
                               <Button
