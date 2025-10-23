@@ -81,6 +81,15 @@ export const AuthForm = () => {
     },
   });
 
+  // Resetear formularios cuando cambie entre login y registro
+  useEffect(() => {
+    if (isSignUp) {
+      loginForm.reset();
+    } else {
+      signupForm.reset();
+    }
+  }, [isSignUp, loginForm, signupForm]);
+
   const handleLogin = async (data: LoginFormValues) => {
     setIsLoading(true);
 
@@ -197,7 +206,7 @@ export const AuthForm = () => {
         </CardHeader>
         <CardContent>
           {!isSignUp ? (
-            <Form {...loginForm}>
+            <Form {...loginForm} key="login-form">
               <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
                 <FormField
                   control={loginForm.control}
@@ -262,7 +271,7 @@ export const AuthForm = () => {
               </form>
             </Form>
           ) : (
-            <Form {...signupForm}>
+            <Form {...signupForm} key="signup-form">
               <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
                 <FormField
                   control={signupForm.control}
