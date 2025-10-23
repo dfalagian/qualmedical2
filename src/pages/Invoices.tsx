@@ -83,20 +83,27 @@ const Invoices = () => {
       if (insertError) throw insertError;
 
       // Validar XML para detectar si requiere complemento de pago
-      try {
-        const { data: validationData, error: validationError } = await supabase.functions.invoke(
-          'validate-invoice-xml',
-          {
-            body: { xmlPath: xmlFileName }
-          }
-        );
-
-        if (!validationError && validationData?.requiereComplemento) {
-          return { requiereComplemento: true, mensaje: validationData.mensaje };
+      const { data: validationData, error: validationError } = await supabase.functions.invoke(
+        'validate-invoice-xml',
+        {
+          body: { xmlPath: xmlFileName }
         }
-      } catch (validationError) {
+      );
+
+      // Si hay error de validación, lanzar excepción para detener la subida
+      if (validationError) {
         console.error('Error al validar XML:', validationError);
-        // No detenemos el flujo si falla la validación
+        throw new Error('Error al validar el archivo XML');
+      }
+
+      // Si la validación falló (por ejemplo, FormaPago=99 pero MetodoPago!=PPD)
+      if (validationData?.success === false) {
+        throw new Error(validationData.mensaje || 'Error de validación en el XML');
+      }
+
+      // Si todo está bien pero requiere complemento de pago
+      if (validationData?.requiereComplemento) {
+        return { requiereComplemento: true, mensaje: validationData.mensaje };
       }
 
       return { requiereComplemento: false };

@@ -51,6 +51,25 @@ serve(async (req) => {
     console.log('FormaPago extraído:', formaPago);
     console.log('MetodoPago extraído:', metodoPago);
 
+    // VALIDACIÓN CRÍTICA: Si FormaPago = 99, entonces MetodoPago DEBE ser PPD
+    if (formaPago === '99' && metodoPago !== 'PPD') {
+      console.log('ERROR: FormaPago=99 pero MetodoPago no es PPD');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Validación de factura fallida',
+          mensaje: `Error en el XML: Cuando la Forma de Pago es 99, el Método de Pago debe ser PPD. Se detectó Método de Pago: ${metodoPago || 'no especificado'}.`
+        }),
+        { 
+          status: 400,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
+    }
+
     // Verificar si se requiere complemento de pago
     // FormaPago = 99 (Por definir) y MetodoPago = PPD (Pago en parcialidades o diferido)
     const requiereComplemento = formaPago === '99' && metodoPago === 'PPD';
