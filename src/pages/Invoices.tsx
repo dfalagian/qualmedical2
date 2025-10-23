@@ -16,8 +16,6 @@ const Invoices = () => {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [amount, setAmount] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [xmlFile, setXmlFile] = useState<File | null>(null);
 
@@ -36,8 +34,8 @@ const Invoices = () => {
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      if (!pdfFile || !xmlFile || !invoiceNumber || !amount || !user) {
-        throw new Error("Todos los campos son obligatorios");
+      if (!pdfFile || !xmlFile || !user) {
+        throw new Error("Los archivos PDF y XML son obligatorios");
       }
 
       setIsUploading(true);
@@ -77,6 +75,14 @@ const Invoices = () => {
       // Si la validación falló (por ejemplo, FormaPago=99 pero MetodoPago!=PPD)
       if (validationData?.success === false) {
         throw new Error(validationData.mensaje || validationData.error || 'Error de validación en el XML');
+      }
+
+      // Extraer datos del XML validado
+      const invoiceNumber = validationData.invoiceNumber;
+      const amount = validationData.amount;
+
+      if (!invoiceNumber || !amount) {
+        throw new Error('No se pudo extraer el número de factura o el monto del XML');
       }
 
       // Get URLs
@@ -123,8 +129,6 @@ const Invoices = () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       setPdfFile(null);
       setXmlFile(null);
-      setInvoiceNumber("");
-      setAmount("");
       setIsUploading(false);
     },
     onError: (error: any) => {
@@ -193,7 +197,7 @@ const Invoices = () => {
                 <Upload className="h-5 w-5" />
                 Subir Nueva Factura
               </CardTitle>
-              <CardDescription>Archivos PDF y XML obligatorios</CardDescription>
+              <CardDescription>Los datos se extraen automáticamente del XML</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
               <form
@@ -203,32 +207,6 @@ const Invoices = () => {
                 }}
                 className="space-y-4"
               >
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="invoiceNumber">Número de Factura *</Label>
-                    <Input
-                      id="invoiceNumber"
-                      value={invoiceNumber}
-                      onChange={(e) => setInvoiceNumber(e.target.value)}
-                      placeholder="F-12345"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="amount">Monto (MXN) *</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      step="0.01"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="1000.00"
-                      required
-                    />
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="pdfFile">Archivo PDF *</Label>

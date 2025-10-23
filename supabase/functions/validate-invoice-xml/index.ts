@@ -44,12 +44,23 @@ serve(async (req) => {
     
     const formaPagoMatch = xmlText.match(/FormaPago="([^"]+)"/);
     const metodoPagoMatch = xmlText.match(/MetodoPago="([^"]+)"/);
+    const folioMatch = xmlText.match(/Folio="([^"]+)"/);
+    const serieMatch = xmlText.match(/Serie="([^"]+)"/);
+    const totalMatch = xmlText.match(/Total="([0-9.]+)"/);
 
     const formaPago = formaPagoMatch ? formaPagoMatch[1] : null;
     const metodoPago = metodoPagoMatch ? metodoPagoMatch[1] : null;
+    const folio = folioMatch ? folioMatch[1] : null;
+    const serie = serieMatch ? serieMatch[1] : null;
+    const total = totalMatch ? parseFloat(totalMatch[1]) : null;
+    
+    // Construir número de factura (Serie + Folio o solo Folio si no hay Serie)
+    const invoiceNumber = serie ? `${serie}-${folio}` : folio;
 
     console.log('FormaPago extraído:', formaPago);
     console.log('MetodoPago extraído:', metodoPago);
+    console.log('Número de factura extraído:', invoiceNumber);
+    console.log('Total extraído:', total);
 
     // VALIDACIÓN CRÍTICA: Si FormaPago = 99, entonces MetodoPago DEBE ser PPD
     if (formaPago === '99' && metodoPago !== 'PPD') {
@@ -81,10 +92,12 @@ serve(async (req) => {
         success: true,
         formaPago,
         metodoPago,
+        invoiceNumber,
+        amount: total,
         requiereComplemento,
         mensaje: requiereComplemento 
-          ? 'Se le requerirá Complemento de Pago. Luego de recibir su comprobante de pago, deberá adjuntar el Complemento de Pago en la sección Facturas.'
-          : null
+          ? 'Esta factura requiere un complemento de pago. Por favor, súbelo cuando esté disponible.'
+          : 'Factura válida'
       }),
       { 
         headers: { 
