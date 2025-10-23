@@ -1,73 +1,162 @@
-# Welcome to your Lovable project
+# Sistema de Gestión de Proveedores - QualMedical
 
-## Project info
+## Descripción del Proyecto
 
-**URL**: https://lovable.dev/projects/8d308489-b16e-4d8f-a497-9d1278527d56
+Sistema integral para la gestión y control de proveedores de QualMedical Farma. Incluye funcionalidades de autenticación, gestión de documentos, facturas, órdenes de compra y validación automática de documentos con IA.
 
-## How can I edit this code?
+## Tecnologías Utilizadas
 
-There are several ways of editing your application.
+Este proyecto está construido con las siguientes tecnologías:
 
-**Use Lovable**
+- **React** - Biblioteca de JavaScript para construir interfaces de usuario
+- **TypeScript** - Superset tipado de JavaScript
+- **Vite** - Herramienta de construcción y desarrollo rápido
+- **Tailwind CSS** - Framework de CSS basado en utilidades
+- **shadcn/ui** - Componentes de UI reutilizables
+- **Supabase** - Backend como servicio (autenticación, base de datos, almacenamiento)
+- **React Query (TanStack Query)** - Gestión de estado del servidor
+- **React Hook Form** - Gestión de formularios
+- **Zod** - Validación de esquemas TypeScript-first
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/8d308489-b16e-4d8f-a497-9d1278527d56) and start prompting.
+## Características Principales
 
-Changes made via Lovable will be committed automatically to this repo.
+### Para Proveedores
+- Registro y autenticación segura
+- Subida de documentos legales y fiscales
+- Gestión de facturas
+- Mensajería con administradores
+- Vista de órdenes de compra asignadas
 
-**Use your preferred IDE**
+### Para Administradores
+- Dashboard completo de gestión
+- Validación y aprobación de documentos
+- Gestión de proveedores
+- Creación de órdenes de compra
+- Extracción automática de información con IA
+- Sistema de validación cruzada de documentos
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Seguridad
+- Autenticación basada en roles (Admin/Proveedor)
+- Row Level Security (RLS) en base de datos
+- Validación de entrada en cliente y servidor
+- Encriptación de datos sensibles
+- Validación automática de documentos con IA
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Instalación y Configuración
 
-Follow these steps:
+### Requisitos Previos
+- Node.js (versión 18 o superior)
+- npm o yarn
+- Cuenta de Supabase configurada
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Instalación
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+```bash
+# Clonar el repositorio
+git clone <URL_DEL_REPOSITORIO>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Navegar al directorio del proyecto
+cd <NOMBRE_DEL_PROYECTO>
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Instalar dependencias
+npm install
+
+# Iniciar el servidor de desarrollo
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Variables de Entorno
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Crear un archivo `.env` en la raíz del proyecto con las siguientes variables:
 
-**Use GitHub Codespaces**
+```env
+VITE_SUPABASE_URL=tu_url_de_supabase
+VITE_SUPABASE_PUBLISHABLE_KEY=tu_clave_publica_de_supabase
+VITE_SUPABASE_PROJECT_ID=tu_id_de_proyecto
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Estructura del Proyecto
 
-## What technologies are used for this project?
+```
+src/
+├── components/       # Componentes reutilizables
+│   ├── auth/        # Componentes de autenticación
+│   ├── dashboard/   # Componentes del dashboard
+│   └── ui/          # Componentes de UI (shadcn)
+├── hooks/           # Custom hooks de React
+├── integrations/    # Integraciones externas (Supabase)
+├── lib/             # Utilidades y helpers
+├── pages/           # Páginas de la aplicación
+└── main.tsx         # Punto de entrada de la aplicación
 
-This project is built with:
+supabase/
+├── functions/       # Edge Functions de Supabase
+│   ├── create-user/              # Creación de usuarios
+│   ├── delete-user/              # Eliminación de usuarios
+│   ├── extract-document-info/    # Extracción de info con IA
+│   └── count-medicine-boxes/     # Contador de medicamentos
+└── migrations/      # Migraciones de base de datos
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Scripts Disponibles
 
-## How can I deploy this project?
+```bash
+# Desarrollo
+npm run dev          # Inicia el servidor de desarrollo
 
-Simply open [Lovable](https://lovable.dev/projects/8d308489-b16e-4d8f-a497-9d1278527d56) and click on Share -> Publish.
+# Construcción
+npm run build        # Construye la aplicación para producción
 
-## Can I connect a custom domain to my Lovable project?
+# Vista previa
+npm run preview      # Vista previa de la construcción de producción
 
-Yes, you can!
+# Linting
+npm run lint         # Ejecuta el linter
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Despliegue
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### Construcción para Producción
+
+```bash
+npm run build
+```
+
+Los archivos de producción se generarán en la carpeta `dist/` y estarán:
+- Minificados y optimizados
+- Sin console.logs ni debuggers
+- Con nombres de variables ofuscados
+- Sin comentarios en el código
+- Sin sourcemaps (código no visible)
+
+### Configuración de Producción
+
+El proyecto incluye optimizaciones automáticas para producción:
+- Minificación con Terser
+- Eliminación de console.log y debugger
+- Ofuscación de código
+- Sin sourcemaps en producción
+- Optimización de chunks
+
+## Seguridad y Privacidad
+
+Este sistema incluye múltiples capas de seguridad:
+
+1. **Validación de Entrada**: Todos los datos de usuario son validados con Zod
+2. **RLS (Row Level Security)**: Políticas estrictas en la base de datos
+3. **Autenticación JWT**: Tokens seguros para autenticación
+4. **Validación con IA**: Los documentos son validados automáticamente
+5. **Headers de Seguridad**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection
+6. **Código Ofuscado**: El código fuente no es visible en producción
+
+## Soporte y Contacto
+
+Para soporte técnico o consultas, contactar a:
+- Email: soporte@qualmedical.com
+- Equipo de Desarrollo QualMedical
+
+## Licencia
+
+© 2025 QualMedical Farma. Todos los derechos reservados.
+
+Este software es propiedad de QualMedical Farma y está protegido por leyes de derechos de autor.
