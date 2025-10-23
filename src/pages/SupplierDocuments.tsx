@@ -25,7 +25,11 @@ const SupplierDocuments = () => {
     queryFn: async () => {
       let query = supabase
         .from("profiles")
-        .select("*")
+        .select(`
+          *,
+          user_roles!inner(role)
+        `)
+        .eq("user_roles.role", "proveedor")
         .order("full_name");
 
       if (searchTerm) {
