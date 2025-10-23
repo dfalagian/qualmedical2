@@ -116,17 +116,19 @@ serve(async (req) => {
 
     console.log("Auth user created:", authData.user.id);
 
-    // Create profile
-    console.log("Creating profile for user:", authData.user.id);
+    // Create or update profile (using upsert to handle cases where profile already exists from trigger)
+    console.log("Creating/updating profile for user:", authData.user.id);
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
-      .insert({
+      .upsert({
         id: authData.user.id,
         email,
         full_name,
         company_name: company_name || null,
         rfc: rfc || null,
         phone: phone || null,
+      }, {
+        onConflict: 'id'
       });
 
     if (profileError) {
@@ -136,13 +138,15 @@ serve(async (req) => {
 
     console.log("Profile created successfully");
 
-    // Assign role
+    // Assign role (using upsert to handle cases where role already exists)
     console.log("Assigning role:", role);
     const { error: roleInsertError } = await supabaseAdmin
       .from("user_roles")
-      .insert({
+      .upsert({
         user_id: authData.user.id,
         role,
+      }, {
+        onConflict: 'user_id,role'
       });
 
     if (roleInsertError) {
