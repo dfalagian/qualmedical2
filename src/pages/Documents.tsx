@@ -24,9 +24,9 @@ const DOCUMENT_TYPES = [
 ];
 
 // Constantes de seguridad
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
-const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
-const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.pdf'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png'];
 
 const Documents = () => {
   const { user, isAdmin } = useAuth();
@@ -40,12 +40,12 @@ const Documents = () => {
   const validateFile = (file: File): string | null => {
     // Validar tamaño
     if (file.size > MAX_FILE_SIZE) {
-      return "El archivo es demasiado grande. Máximo 20MB.";
+      return "El archivo es demasiado grande. Máximo 10MB.";
     }
 
     // Validar tipo MIME
     if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-      return "Tipo de archivo no permitido. Solo JPG, JPEG, PNG o PDF.";
+      return "Tipo de archivo no permitido. Solo JPG, JPEG o PNG.";
     }
 
     // Validar extensión
@@ -232,7 +232,7 @@ const Documents = () => {
                 Subir Nuevo Documento
               </CardTitle>
               <CardDescription>
-                Formatos aceptados: PDF (recomendado), JPG, JPEG, PNG. Máximo 20MB.
+                Solo imágenes JPG, JPEG o PNG. Máximo 10MB.
                 <br />
                 <span className="text-primary font-medium">
                   💡 Los documentos se validan automáticamente con IA
@@ -264,11 +264,11 @@ const Documents = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="file">Archivo (PDF recomendado, o JPG/JPEG/PNG) *</Label>
+                  <Label htmlFor="file">Imagen (JPG, JPEG o PNG) *</Label>
                   <Input
                     id="file"
                     type="file"
-                    accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                     onChange={(e) => {
                       const selectedFile = e.target.files?.[0];
                       if (selectedFile) {
@@ -285,9 +285,9 @@ const Documents = () => {
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Máximo 20MB. PDF (preferido), JPG, JPEG o PNG. 
+                    Máximo 10MB. Solo archivos JPG, JPEG o PNG.
                     <br />
-                    <span className="text-primary">Los PDFs son más seguros y difíciles de falsificar.</span>
+                    <span className="text-primary">Asegúrate de que la imagen sea clara y legible para mejor extracción de datos.</span>
                   </p>
                 </div>
 
