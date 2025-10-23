@@ -280,6 +280,16 @@ serve(async (req) => {
     if (!validationResponse.ok) {
       const errorText = await validationResponse.text();
       console.error('Error validando documento:', validationResponse.status, errorText);
+      
+      // Marcar documento como failed antes de lanzar error
+      await supabaseClient
+        .from('documents')
+        .update({ 
+          extraction_status: 'failed',
+          validation_errors: ['Error procesando el archivo. Asegúrate de subir una imagen clara en formato JPG o PNG. Los archivos PDF no son compatibles actualmente.']
+        })
+        .eq('id', documentId);
+      
       throw new Error('Error al validar el documento con IA');
     }
 
@@ -968,6 +978,28 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error en extract-document-info:', error);
+    
+    // Asegurarnos de marcar el documento como failed en cualquier error no manejado
+    try {
+      const { documentId: errorDocId } = await req.clone().json();
+      if (errorDocId) {
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        );
+        
+        await supabaseClient
+          .from('documents')
+          .update({ 
+            extraction_status: 'failed',
+            validation_errors: ['Error procesando el documento. Por favor intenta nuevamente con una imagen clara en formato JPG o PNG.']
+          })
+          .eq('id', errorDocId);
+      }
+    } catch (cleanupError) {
+      console.error('Error al actualizar estado del documento:', cleanupError);
+    }
+    
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Error desconocido' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
