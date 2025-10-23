@@ -432,6 +432,13 @@ const Invoices = () => {
                           </Button>
                         </div>
                       )}
+                      {invoice.complemento_pago_url && (
+                        <div className="mt-2">
+                          <Badge variant="outline" className="bg-success/10 text-success border-success/30">
+                            Complemento de Pago Adjuntado
+                          </Badge>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex gap-2">
@@ -476,6 +483,23 @@ const Invoices = () => {
                         <Download className="h-4 w-4 mr-1" />
                         XML
                       </Button>
+                      {invoice.complemento_pago_url && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = invoice.complemento_pago_url;
+                            link.download = `complemento-${invoice.invoice_number}`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Complemento
+                        </Button>
+                      )}
 
                       {isAdmin && invoice.status !== "pagado" && (
                         <Select
