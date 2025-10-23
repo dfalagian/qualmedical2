@@ -21,6 +21,7 @@ const DOCUMENT_TYPES = [
   { value: "acta_constitutiva", label: "Acta Constitutiva" },
   { value: "comprobante_domicilio", label: "Comprobante de Domicilio" },
   { value: "aviso_funcionamiento", label: "Aviso de Funcionamiento" },
+  { value: "ine", label: "INE (Credencial de Identificación)" },
 ];
 
 // Constantes de seguridad
@@ -130,7 +131,7 @@ const Documents = () => {
       if (insertError) throw insertError;
 
       // Si es un documento que requiere extracción automática, procesar
-      if ((selectedType === "acta_constitutiva" || selectedType === "constancia_fiscal" || selectedType === "comprobante_domicilio" || selectedType === "aviso_funcionamiento") && insertedDoc) {
+      if ((selectedType === "acta_constitutiva" || selectedType === "constancia_fiscal" || selectedType === "comprobante_domicilio" || selectedType === "aviso_funcionamiento" || selectedType === "ine") && insertedDoc) {
         toast.info("Procesando documento con IA...");
         
         try {
@@ -364,7 +365,7 @@ const Documents = () => {
                        {doc.notes && (
                         <p className="text-sm mt-1 italic">Notas: {doc.notes}</p>
                        )}
-                       {(doc.document_type === "acta_constitutiva" || doc.document_type === "constancia_fiscal" || doc.document_type === "comprobante_domicilio" || doc.document_type === "aviso_funcionamiento") && doc.extraction_status && (
+                       {(doc.document_type === "acta_constitutiva" || doc.document_type === "constancia_fiscal" || doc.document_type === "comprobante_domicilio" || doc.document_type === "aviso_funcionamiento" || doc.document_type === "ine") && doc.extraction_status && (
                         <div className="mt-2 text-sm space-y-1">
                           {doc.extraction_status === "completed" && (
                             <span className="text-success flex items-center gap-1">

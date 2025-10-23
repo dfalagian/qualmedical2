@@ -60,6 +60,7 @@ export type Database = {
           actividad_economica: string | null
           codigo_postal: string | null
           created_at: string | null
+          curp: string | null
           direccion: string | null
           document_type: Database["public"]["Enums"]["document_type"]
           extracted_at: string | null
@@ -69,6 +70,7 @@ export type Database = {
           file_url: string
           id: string
           is_valid: boolean | null
+          nombre_completo_ine: string | null
           notes: string | null
           objeto_social: string | null
           razon_social: string | null
@@ -88,6 +90,7 @@ export type Database = {
           actividad_economica?: string | null
           codigo_postal?: string | null
           created_at?: string | null
+          curp?: string | null
           direccion?: string | null
           document_type: Database["public"]["Enums"]["document_type"]
           extracted_at?: string | null
@@ -97,6 +100,7 @@ export type Database = {
           file_url: string
           id?: string
           is_valid?: boolean | null
+          nombre_completo_ine?: string | null
           notes?: string | null
           objeto_social?: string | null
           razon_social?: string | null
@@ -116,6 +120,7 @@ export type Database = {
           actividad_economica?: string | null
           codigo_postal?: string | null
           created_at?: string | null
+          curp?: string | null
           direccion?: string | null
           document_type?: Database["public"]["Enums"]["document_type"]
           extracted_at?: string | null
@@ -125,6 +130,7 @@ export type Database = {
           file_url?: string
           id?: string
           is_valid?: boolean | null
+          nombre_completo_ine?: string | null
           notes?: string | null
           objeto_social?: string | null
           razon_social?: string | null
@@ -395,6 +401,7 @@ export type Database = {
         | "acta_constitutiva"
         | "comprobante_domicilio"
         | "aviso_funcionamiento"
+        | "ine"
       payment_status: "pendiente" | "procesando" | "pagado" | "rechazado"
       user_role: "admin" | "proveedor"
     }
@@ -533,6 +540,7 @@ export const Constants = {
         "acta_constitutiva",
         "comprobante_domicilio",
         "aviso_funcionamiento",
+        "ine",
       ],
       payment_status: ["pendiente", "procesando", "pagado", "rechazado"],
       user_role: ["admin", "proveedor"],

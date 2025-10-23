@@ -79,6 +79,7 @@ Un aviso de funcionamiento válido debe contener:
 - Encabezado de autoridad sanitaria o gobierno local
 - Razón social de la empresa
 - Dirección completa del establecimiento
+- Datos del responsable sanitario (nombre y CURP)
 - Número de registro o folio
 - Sellos oficiales
 - Fecha de expedición
@@ -89,6 +90,29 @@ NO es válido si es:
 - Un documento diferente (factura, recibo, etc.)
 - Una captura de pantalla de baja calidad
 - Un documento extranjero
+
+Analiza cuidadosamente y responde con honestidad.`,
+
+    'ine': `Analiza esta imagen y determina si es realmente una CREDENCIAL INE (Instituto Nacional Electoral) mexicana oficial.
+
+Una credencial INE válida debe contener:
+- Logo del INE
+- Fotografía del titular
+- Nombre completo del titular
+- CURP (18 caracteres)
+- Dirección del titular
+- Clave de elector
+- Elementos de seguridad (hologramas, marcas de agua)
+- Vigencia de la credencial
+
+NO es válida si es:
+- Una foto casual sin relación
+- Una identificación extranjera
+- Una licencia de conducir
+- Un pasaporte
+- Una captura de pantalla de baja calidad
+- Una credencial vencida o muy deteriorada
+- Un documento diferente
 
 Analiza cuidadosamente y responde con honestidad.`
   };
@@ -387,7 +411,7 @@ serve(async (req) => {
       };
     } else if (document.document_type === 'aviso_funcionamiento') {
       systemPrompt = 'Eres un asistente especializado en extraer información de avisos de funcionamiento mexicanos. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información del aviso de funcionamiento: Razón Social de la empresa y la Dirección completa del establecimiento. Si algún dato no está disponible, indica "No encontrado".';
+      userPrompt = 'Extrae la siguiente información del aviso de funcionamiento: Razón Social de la empresa, la Dirección completa del establecimiento, y los Datos del Responsable Sanitario (nombre completo y CURP si está disponible). Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
         tools: [
           {
@@ -399,15 +423,41 @@ serve(async (req) => {
                 type: 'object',
                 properties: {
                   razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
-                  direccion: { type: 'string', description: 'Dirección completa del establecimiento' }
+                  direccion: { type: 'string', description: 'Dirección completa del establecimiento' },
+                  responsable_sanitario_nombre: { type: 'string', description: 'Nombre completo del responsable sanitario' },
+                  responsable_sanitario_curp: { type: 'string', description: 'CURP del responsable sanitario (si está disponible)' }
                 },
-                required: ['razon_social', 'direccion'],
+                required: ['razon_social', 'direccion', 'responsable_sanitario_nombre'],
                 additionalProperties: false
               }
             }
           }
         ],
         tool_choice: { type: 'function', function: { name: 'extract_aviso_funcionamiento_info' } }
+      };
+    } else if (document.document_type === 'ine') {
+      systemPrompt = 'Eres un asistente especializado en extraer información de credenciales INE mexicanas. Extrae la información solicitada de forma precisa y estructurada.';
+      userPrompt = 'Extrae la siguiente información de la credencial INE: Nombre completo del titular y CURP. Si algún dato no está disponible, indica "No encontrado".';
+      toolConfig = {
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'extract_ine_info',
+              description: 'Extraer información estructurada de la credencial INE',
+              parameters: {
+                type: 'object',
+                properties: {
+                  nombre_completo: { type: 'string', description: 'Nombre completo del titular de la credencial' },
+                  curp: { type: 'string', description: 'CURP del titular (18 caracteres)' }
+                },
+                required: ['nombre_completo', 'curp'],
+                additionalProperties: false
+              }
+            }
+          }
+        ],
+        tool_choice: { type: 'function', function: { name: 'extract_ine_info' } }
       };
     } else {
       throw new Error(`Tipo de documento no soportado para extracción: ${document.document_type}`);
@@ -565,6 +615,17 @@ serve(async (req) => {
       updateFields = {
         razon_social: extractedInfo.razon_social,
         direccion: extractedInfo.direccion,
+        representante_legal: extractedInfo.responsable_sanitario_nombre,
+        rfc: extractedInfo.responsable_sanitario_curp || null,
+        extraction_status: 'completed',
+        extracted_at: new Date().toISOString(),
+        validation_errors: validationErrors,
+        is_valid: isValid
+      };
+    } else if (document.document_type === 'ine') {
+      updateFields = {
+        nombre_completo_ine: extractedInfo.nombre_completo,
+        curp: extractedInfo.curp,
         extraction_status: 'completed',
         extracted_at: new Date().toISOString(),
         validation_errors: validationErrors,
@@ -776,6 +837,102 @@ serve(async (req) => {
               if (currentDoc && currentDoc.validation_errors) {
                 const filteredErrors = currentDoc.validation_errors.filter(
                   (err: string) => !err.includes('Razón Social no coincide entre documentos. Constancia Fiscal') && !err.includes('Dirección no coincide entre documentos. Constancia Fiscal')
+                );
+                
+                await supabaseClient
+                  .from('documents')
+                  .update({
+                    validation_errors: filteredErrors,
+                    is_valid: filteredErrors.length === 0
+                  })
+                  .eq('id', doc.id);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Realizar validación cruzada entre INE y aviso_funcionamiento (responsable sanitario)
+    if (document.document_type === 'ine' || document.document_type === 'aviso_funcionamiento') {
+      console.log('Iniciando validación cruzada entre INE y aviso de funcionamiento...');
+      
+      // Obtener todos los documentos del proveedor
+      const { data: supplierDocs, error: docsError } = await supabaseClient
+        .from('documents')
+        .select('id, document_type, nombre_completo_ine, curp, representante_legal, rfc, extraction_status')
+        .eq('supplier_id', document.supplier_id)
+        .in('document_type', ['ine', 'aviso_funcionamiento'])
+        .eq('extraction_status', 'completed');
+
+      if (!docsError && supplierDocs) {
+        const ine = supplierDocs.find(d => d.document_type === 'ine');
+        const avisoFuncionamiento = supplierDocs.find(d => d.document_type === 'aviso_funcionamiento');
+
+        if (ine && avisoFuncionamiento) {
+          console.log('Validando Nombre Completo y CURP del Responsable Sanitario:', {
+            ine: { nombre_completo: ine.nombre_completo_ine, curp: ine.curp },
+            aviso: { responsable_sanitario: avisoFuncionamiento.representante_legal, curp: avisoFuncionamiento.rfc }
+          });
+
+          const errors: string[] = [];
+
+          // Validar Nombre Completo (normalizar para comparación)
+          if (ine.nombre_completo_ine && avisoFuncionamiento.representante_legal) {
+            const nombreINE = ine.nombre_completo_ine.trim().toLowerCase();
+            const nombreAviso = avisoFuncionamiento.representante_legal.trim().toLowerCase();
+            
+            if (nombreINE !== nombreAviso) {
+              errors.push(`El Nombre Completo del responsable sanitario no coincide. INE: "${ine.nombre_completo_ine}", Aviso de Funcionamiento: "${avisoFuncionamiento.representante_legal}"`);
+            }
+          }
+
+          // Validar CURP
+          if (ine.curp && avisoFuncionamiento.rfc && ine.curp !== avisoFuncionamiento.rfc) {
+            errors.push(`El CURP del responsable sanitario no coincide. INE: ${ine.curp}, Aviso de Funcionamiento: ${avisoFuncionamiento.rfc}`);
+          }
+
+          if (errors.length > 0) {
+            // Hay errores, actualizar ambos documentos
+            console.log('Errores de validación encontrados:', errors);
+            
+            for (const doc of [ine, avisoFuncionamiento]) {
+              // Obtener errores actuales y combinar
+              const { data: currentDoc } = await supabaseClient
+                .from('documents')
+                .select('validation_errors')
+                .eq('id', doc.id)
+                .single();
+
+              const currentErrors = currentDoc?.validation_errors || [];
+              // Filtrar errores antiguos entre INE y aviso, agregar nuevos
+              const filteredErrors = currentErrors.filter(
+                (err: string) => !err.includes('Nombre Completo del responsable sanitario no coincide') && !err.includes('CURP del responsable sanitario no coincide')
+              );
+              const combinedErrors = [...filteredErrors, ...errors];
+
+              await supabaseClient
+                .from('documents')
+                .update({
+                  validation_errors: combinedErrors,
+                  is_valid: false
+                })
+                .eq('id', doc.id);
+            }
+          } else {
+            // No hay errores, limpiar errores de validación entre INE y aviso
+            console.log('Nombre Completo y CURP del responsable sanitario coinciden correctamente');
+            
+            for (const doc of [ine, avisoFuncionamiento]) {
+              const { data: currentDoc } = await supabaseClient
+                .from('documents')
+                .select('validation_errors')
+                .eq('id', doc.id)
+                .single();
+
+              if (currentDoc && currentDoc.validation_errors) {
+                const filteredErrors = currentDoc.validation_errors.filter(
+                  (err: string) => !err.includes('Nombre Completo del responsable sanitario no coincide') && !err.includes('CURP del responsable sanitario no coincide')
                 );
                 
                 await supabaseClient
