@@ -441,7 +441,7 @@ serve(async (req) => {
       };
     } else if (document.document_type === 'aviso_funcionamiento') {
       systemPrompt = 'Eres un asistente especializado en extraer información de avisos de funcionamiento mexicanos. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información del aviso de funcionamiento: Razón Social de la empresa, la Dirección completa del establecimiento, y los Datos del Responsable Sanitario (nombre completo y CURP si está disponible). Si algún dato no está disponible, indica "No encontrado".';
+      userPrompt = 'Extrae la siguiente información del aviso de funcionamiento: Razón Social de la empresa, la Dirección completa del establecimiento, y los Datos del Responsable Sanitario. IMPORTANTE: El Responsable Sanitario está específicamente en el apartado 5 "Datos del responsable Sanitario (excepto para productos y servicios)", NO confundir con el propietario o representante legal de la empresa. Extrae el nombre completo y CURP del responsable sanitario que aparece en ese apartado. Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
         tools: [
           {
