@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileText, Download, RefreshCw, Eye } from "lucide-react";
+import { FileText, Download, RefreshCw, Eye, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -45,6 +45,24 @@ const AvisoFuncionamientoAdmin = () => {
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al extraer información");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const { error } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", documentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Documento eliminado");
+      queryClient.invalidateQueries({ queryKey: ["avisos-funcionamiento"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar documento");
     },
   });
 
@@ -232,6 +250,15 @@ const AvisoFuncionamientoAdmin = () => {
                                 <RefreshCw className="h-4 w-4" />
                               </Button>
                             )}
+
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteMutation.mutate(doc.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>

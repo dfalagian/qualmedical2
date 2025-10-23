@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, FileText, Download, Eye } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Search, FileText, Download, Eye, Trash2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 const SupplierDocuments = () => {
   const { isAdmin, loading } = useAuth();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
@@ -103,6 +105,24 @@ const SupplierDocuments = () => {
         return <Badge variant="outline">⏸ Pendiente</Badge>;
     }
   };
+
+  const deleteMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const { error } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", documentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Documento eliminado");
+      queryClient.invalidateQueries({ queryKey: ["supplier_documents", selectedSupplier?.id] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar documento");
+    },
+  });
 
   const handleViewDetails = (doc: any) => {
     setSelectedDocument(doc);
@@ -253,6 +273,14 @@ const SupplierDocuments = () => {
                                 onClick={() => window.open(doc.file_url, "_blank")}
                               >
                                 <Download className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => deleteMutation.mutate(doc.id)}
+                                disabled={deleteMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
