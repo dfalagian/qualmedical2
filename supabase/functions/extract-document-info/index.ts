@@ -185,30 +185,28 @@ serve(async (req) => {
 
     console.log('Archivo descargado, tamaño:', fileData.size);
 
-    // Detectar tipo de archivo y convertir a base64
+    // Convertir archivo a base64
     const arrayBuffer = await fileData.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     
-    let base64Data: string;
+    // Detectar tipo de imagen por magic bytes
     let mimeType: string;
-    
-    // Detectar si es un PDF por sus bytes mágicos
-    const isPDF = uint8Array[0] === 0x25 && uint8Array[1] === 0x50 && 
-                  uint8Array[2] === 0x44 && uint8Array[3] === 0x46; // %PDF
-    
-    if (isPDF) {
-      console.log('Archivo detectado como PDF - enviando directamente a Gemini');
-      mimeType = 'application/pdf';
+    if (uint8Array[0] === 0xFF && uint8Array[1] === 0xD8) {
+      mimeType = 'image/jpeg';
+      console.log('Archivo detectado como JPEG');
+    } else if (uint8Array[0] === 0x89 && uint8Array[1] === 0x50) {
+      mimeType = 'image/png';
+      console.log('Archivo detectado como PNG');
     } else {
-      console.log('Archivo detectado como imagen');
-      // Detectar tipo de imagen
-      if (uint8Array[0] === 0xFF && uint8Array[1] === 0xD8) {
-        mimeType = 'image/jpeg';
-      } else if (uint8Array[0] === 0x89 && uint8Array[1] === 0x50) {
-        mimeType = 'image/png';
-      } else {
-        mimeType = 'image/jpeg'; // default
-      }
+      console.error('Tipo de archivo no soportado');
+      await supabaseClient
+        .from('documents')
+        .update({ 
+          extraction_status: 'failed',
+          validation_errors: ['Tipo de archivo no soportado. Solo se aceptan imágenes JPG o PNG.']
+        })
+        .eq('id', documentId);
+      throw new Error('Tipo de archivo no soportado');
     }
     
     // Convertir a base64 en chunks para evitar stack overflow
@@ -218,7 +216,7 @@ serve(async (req) => {
       const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
       binary += String.fromCharCode(...chunk);
     }
-    base64Data = btoa(binary);
+    const base64Data = btoa(binary);
 
     console.log('Llamando a Lovable AI para extraer información y validar autenticidad');
     console.log('Tipo de documento:', document.document_type);
@@ -308,7 +306,7 @@ serve(async (req) => {
         .from('documents')
         .update({ 
           extraction_status: 'failed',
-          validation_errors: ['Error procesando el archivo. Asegúrate de subir una imagen clara en formato JPG/PNG o un PDF válido con imágenes legibles.']
+          validation_errors: ['Error procesando el archivo. Asegúrate de subir una imagen clara en formato JPG o PNG.']
         })
         .eq('id', documentId);
       
@@ -1014,7 +1012,7 @@ serve(async (req) => {
           .from('documents')
           .update({ 
             extraction_status: 'failed',
-            validation_errors: ['Error procesando el documento. Por favor intenta nuevamente con una imagen clara (JPG/PNG) o un PDF válido.']
+            validation_errors: ['Error procesando el documento. Por favor intenta nuevamente con una imagen clara en formato JPG o PNG.']
           })
           .eq('id', errorDocId);
       }
