@@ -1,6 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Eye } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useMemo } from "react";
 
 interface ImageViewerProps {
   fileUrl: string;
@@ -17,6 +19,14 @@ export const ImageViewer = ({
   triggerSize = "sm",
   triggerVariant = "outline"
 }: ImageViewerProps) => {
+  const publicUrl = useMemo(() => {
+    if (fileUrl.startsWith('http')) {
+      return fileUrl;
+    }
+    const { data } = supabase.storage.from('documents').getPublicUrl(fileUrl);
+    return data.publicUrl;
+  }, [fileUrl]);
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -31,7 +41,7 @@ export const ImageViewer = ({
         </DialogHeader>
         <div className="overflow-auto max-h-[calc(90vh-100px)]">
           <img 
-            src={fileUrl} 
+            src={publicUrl} 
             alt={fileName}
             className="w-full h-auto rounded-lg"
           />
