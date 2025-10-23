@@ -216,6 +216,7 @@ export type Database = {
       invoices: {
         Row: {
           amount: number
+          complemento_pago_url: string | null
           created_at: string | null
           currency: string | null
           descuento: number | null
@@ -234,6 +235,7 @@ export type Database = {
           receptor_nombre: string | null
           receptor_rfc: string | null
           receptor_uso_cfdi: string | null
+          requiere_complemento: boolean | null
           status: Database["public"]["Enums"]["payment_status"] | null
           subtotal: number | null
           supplier_id: string
@@ -244,6 +246,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          complemento_pago_url?: string | null
           created_at?: string | null
           currency?: string | null
           descuento?: number | null
@@ -262,6 +265,7 @@ export type Database = {
           receptor_nombre?: string | null
           receptor_rfc?: string | null
           receptor_uso_cfdi?: string | null
+          requiere_complemento?: boolean | null
           status?: Database["public"]["Enums"]["payment_status"] | null
           subtotal?: number | null
           supplier_id: string
@@ -272,6 +276,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          complemento_pago_url?: string | null
           created_at?: string | null
           currency?: string | null
           descuento?: number | null
@@ -290,6 +295,7 @@ export type Database = {
           receptor_nombre?: string | null
           receptor_rfc?: string | null
           receptor_uso_cfdi?: string | null
+          requiere_complemento?: boolean | null
           status?: Database["public"]["Enums"]["payment_status"] | null
           subtotal?: number | null
           supplier_id?: string

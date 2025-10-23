@@ -33,6 +33,9 @@ const Invoices = () => {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
+  const [complementoDialogOpen, setComplementoDialogOpen] = useState(false);
+  const [invoiceForComplemento, setInvoiceForComplemento] = useState<string | null>(null);
+  const [complementoFile, setComplementoFile] = useState<File | null>(null);
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices"],
@@ -151,6 +154,7 @@ const Invoices = () => {
           receptor_nombre: validationData.receptorNombre,
           receptor_rfc: validationData.receptorRfc,
           receptor_uso_cfdi: validationData.receptorUsoCfdi,
+          requiere_complemento: validationData?.requiereComplemento || false,
         })
         .select()
         .single();
@@ -256,6 +260,42 @@ const Invoices = () => {
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al eliminar factura");
+    },
+  });
+
+  const uploadComplementoMutation = useMutation({
+    mutationFn: async ({ invoiceId, file }: { invoiceId: string; file: File }) => {
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user.id}/complementos/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("invoices")
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("invoices")
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from("invoices")
+        .update({ complemento_pago_url: publicUrl })
+        .eq("id", invoiceId);
+
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      toast.success("Complemento de pago adjuntado exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      setComplementoDialogOpen(false);
+      setComplementoFile(null);
+      setInvoiceForComplemento(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al adjuntar complemento de pago");
     },
   });
 
@@ -375,6 +415,23 @@ const Invoices = () => {
                           Proveedor: {invoice.profiles.company_name || invoice.profiles.full_name}
                         </p>
                       )}
+                      {invoice.requiere_complemento && !invoice.complemento_pago_url && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
+                            Requiere Complemento de Pago
+                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setInvoiceForComplemento(invoice.id);
+                              setComplementoDialogOpen(true);
+                            }}
+                          >
+                            Adjuntar
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex gap-2">
@@ -492,6 +549,45 @@ const Invoices = () => {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={complementoDialogOpen} onOpenChange={setComplementoDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Adjuntar Complemento de Pago</AlertDialogTitle>
+            <AlertDialogDescription>
+              Selecciona el archivo del complemento de pago (PDF, JPG o PNG)
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) => setComplementoFile(e.target.files?.[0] || null)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setComplementoFile(null);
+              setInvoiceForComplemento(null);
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (invoiceForComplemento && complementoFile) {
+                  uploadComplementoMutation.mutate({
+                    invoiceId: invoiceForComplemento,
+                    file: complementoFile,
+                  });
+                }
+              }}
+              disabled={!complementoFile}
+            >
+              Adjuntar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
