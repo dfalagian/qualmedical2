@@ -928,10 +928,19 @@ IMPORTANTE:
             if (avisoFuncionamiento.representante_legal.toLowerCase().includes('no encontrado')) {
               errors.push(`⚠️ Los datos del responsable sanitario no se encontraron en la imagen del Aviso de Funcionamiento procesada. Si el documento tiene múltiples páginas, asegúrate de subir la página que contiene el "Apartado 5: Datos del responsable sanitario".`);
             } else {
-              const nombreINE = ine.nombre_completo_ine.trim().toLowerCase();
-              const nombreAviso = avisoFuncionamiento.representante_legal.trim().toLowerCase();
+              // Normalizar: convertir a minúsculas, eliminar espacios extra y ordenar palabras alfabéticamente
+              const normalizarNombre = (nombre: string) => {
+                return nombre.trim().toLowerCase()
+                  .split(/\s+/)  // Dividir por espacios
+                  .filter(palabra => palabra.length > 0)  // Eliminar strings vacíos
+                  .sort()  // Ordenar alfabéticamente
+                  .join(' ');  // Unir con espacio
+              };
               
-              if (nombreINE !== nombreAviso) {
+              const nombreINENormalizado = normalizarNombre(ine.nombre_completo_ine);
+              const nombreAvisoNormalizado = normalizarNombre(avisoFuncionamiento.representante_legal);
+              
+              if (nombreINENormalizado !== nombreAvisoNormalizado) {
                 errors.push(`El Nombre Completo del responsable sanitario no coincide. INE: "${ine.nombre_completo_ine}", Aviso de Funcionamiento: "${avisoFuncionamiento.representante_legal}"`);
               }
             }
@@ -962,7 +971,9 @@ IMPORTANTE:
               const currentErrors = currentDoc?.validation_errors || [];
               // Filtrar errores antiguos entre INE y aviso, agregar nuevos
               const filteredErrors = currentErrors.filter(
-                (err: string) => !err.includes('Nombre Completo del responsable sanitario no coincide') && !err.includes('CURP del responsable sanitario no coincide')
+                (err: string) => !err.includes('Nombre Completo del responsable sanitario no coincide') && 
+                                 !err.includes('CURP del responsable sanitario no coincide') &&
+                                 !err.includes('⚠️ Los datos del responsable sanitario no se encontraron')
               );
               const combinedErrors = [...filteredErrors, ...errors];
 
@@ -987,7 +998,9 @@ IMPORTANTE:
 
               if (currentDoc && currentDoc.validation_errors) {
                 const filteredErrors = currentDoc.validation_errors.filter(
-                  (err: string) => !err.includes('Nombre Completo del responsable sanitario no coincide') && !err.includes('CURP del responsable sanitario no coincide')
+                  (err: string) => !err.includes('Nombre Completo del responsable sanitario no coincide') && 
+                                   !err.includes('CURP del responsable sanitario no coincide') &&
+                                   !err.includes('⚠️ Los datos del responsable sanitario no se encontraron')
                 );
                 
                 await supabaseClient
