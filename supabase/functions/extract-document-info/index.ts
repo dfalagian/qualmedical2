@@ -922,12 +922,25 @@ IMPORTANTE:
 
           const errors: string[] = [];
 
-          // Validar Nombre Completo (normalizar para comparación)
-          if (ine.nombre_completo_ine && avisoFuncionamiento.representante_legal) {
+          // PRIORIDAD 1: Validar CURP (identificador único más confiable)
+          let curpCoincide = false;
+          if (ine.curp && avisoFuncionamiento.rfc) {
             // Verificar si el dato fue encontrado (no es "No encontrado")
-            if (avisoFuncionamiento.representante_legal.toLowerCase().includes('no encontrado')) {
+            if (avisoFuncionamiento.rfc.toLowerCase().includes('no encontrado')) {
               errors.push(`⚠️ Los datos del responsable sanitario no se encontraron en la imagen del Aviso de Funcionamiento procesada. Si el documento tiene múltiples páginas, asegúrate de subir la página que contiene el "Apartado 5: Datos del responsable sanitario".`);
+            } else if (ine.curp.trim().toUpperCase() === avisoFuncionamiento.rfc.trim().toUpperCase()) {
+              // CURP coincide - esto es suficiente para validar
+              curpCoincide = true;
+              console.log('✅ CURP coincide perfectamente:', ine.curp);
             } else {
+              errors.push(`El CURP del responsable sanitario no coincide. INE: ${ine.curp}, Aviso de Funcionamiento: ${avisoFuncionamiento.rfc}`);
+            }
+          }
+
+          // PRIORIDAD 2: Validar Nombre solo si el CURP NO coincide (como validación adicional)
+          if (!curpCoincide && ine.nombre_completo_ine && avisoFuncionamiento.representante_legal) {
+            // Verificar si el dato fue encontrado (no es "No encontrado")
+            if (!avisoFuncionamiento.representante_legal.toLowerCase().includes('no encontrado')) {
               // Normalizar: convertir a minúsculas, eliminar espacios extra y ordenar palabras alfabéticamente
               const normalizarNombre = (nombre: string) => {
                 return nombre.trim().toLowerCase()
@@ -943,16 +956,6 @@ IMPORTANTE:
               if (nombreINENormalizado !== nombreAvisoNormalizado) {
                 errors.push(`El Nombre Completo del responsable sanitario no coincide. INE: "${ine.nombre_completo_ine}", Aviso de Funcionamiento: "${avisoFuncionamiento.representante_legal}"`);
               }
-            }
-          }
-
-          // Validar CURP
-          if (ine.curp && avisoFuncionamiento.rfc) {
-            // Verificar si el dato fue encontrado (no es "No encontrado")
-            if (avisoFuncionamiento.rfc.toLowerCase().includes('no encontrado')) {
-              // Ya se agregó el error arriba, no duplicar
-            } else if (ine.curp !== avisoFuncionamiento.rfc) {
-              errors.push(`El CURP del responsable sanitario no coincide. INE: ${ine.curp}, Aviso de Funcionamiento: ${avisoFuncionamiento.rfc}`);
             }
           }
 
