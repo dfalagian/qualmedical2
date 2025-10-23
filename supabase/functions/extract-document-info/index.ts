@@ -1,7 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
-import { getDocument } from "https://esm.sh/pdfjs-dist@3.11.174/legacy/build/pdf.mjs";
-import { createCanvas } from "https://deno.land/x/canvas@v1.4.1/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -198,46 +196,57 @@ serve(async (req) => {
                   uint8Array[2] === 0x44 && uint8Array[3] === 0x46; // %PDF
     
     if (isPDF) {
-      console.log('Archivo detectado como PDF, extrayendo primera página...');
+      console.log('Archivo detectado como PDF, convirtiendo a imagen...');
       
       try {
-        // Cargar el PDF
-        const loadingTask = getDocument({ data: uint8Array });
-        const pdf = await loadingTask.promise;
+        // Crear archivos temporales
+        const tempPdfPath = await Deno.makeTempFile({ suffix: '.pdf' });
+        const tempImagePath = await Deno.makeTempFile({ suffix: '.jpg' });
         
-        console.log(`PDF cargado, ${pdf.numPages} páginas`);
+        // Escribir el PDF al archivo temporal
+        await Deno.writeFile(tempPdfPath, uint8Array);
+        console.log('PDF escrito en archivo temporal');
         
-        // Obtener la primera página
-        const page = await pdf.getPage(1);
+        // Usar ImageMagick para convertir la primera página del PDF a imagen
+        const command = new Deno.Command("convert", {
+          args: [
+            "-density", "300",           // Alta resolución
+            "-quality", "95",            // Alta calidad JPEG
+            `${tempPdfPath}[0]`,        // Solo primera página
+            "-flatten",                  // Aplanar capas
+            tempImagePath
+          ],
+        });
         
-        // Configurar el viewport para renderizar
-        const viewport = page.getViewport({ scale: 2.0 });
+        const { code, stderr } = await command.output();
         
-        // Crear canvas para renderizar
-        const canvas = createCanvas(viewport.width, viewport.height);
-        const context = canvas.getContext('2d');
-        
-        if (!context) {
-          throw new Error('No se pudo crear contexto de canvas');
+        if (code !== 0) {
+          const errorText = new TextDecoder().decode(stderr);
+          console.error('Error ejecutando ImageMagick:', errorText);
+          throw new Error('Error convirtiendo PDF a imagen');
         }
         
-        // Renderizar la página
-        await page.render({
-          canvasContext: context as any,
-          viewport: viewport,
-        }).promise;
+        console.log('PDF convertido a imagen exitosamente');
         
-        // Convertir canvas a buffer JPEG
-        const jpegBuffer = canvas.toBuffer('image/jpeg');
+        // Leer la imagen generada
+        const imageData = await Deno.readFile(tempImagePath);
         
         // Convertir a base64
         let binary = '';
         const chunkSize = 8192;
-        for (let i = 0; i < jpegBuffer.length; i += chunkSize) {
-          const chunk = jpegBuffer.subarray(i, Math.min(i + chunkSize, jpegBuffer.length));
+        for (let i = 0; i < imageData.length; i += chunkSize) {
+          const chunk = imageData.subarray(i, Math.min(i + chunkSize, imageData.length));
           binary += String.fromCharCode(...chunk);
         }
         base64Image = btoa(binary);
+        
+        // Limpiar archivos temporales
+        try {
+          await Deno.remove(tempPdfPath);
+          await Deno.remove(tempImagePath);
+        } catch (cleanupError) {
+          console.warn('Error limpiando archivos temporales:', cleanupError);
+        }
         
         console.log('Primera página del PDF extraída y convertida a imagen');
         
@@ -247,7 +256,7 @@ serve(async (req) => {
           .from('documents')
           .update({ 
             extraction_status: 'failed',
-            validation_errors: ['Error al procesar el archivo PDF. Asegúrate de que sea un PDF válido y no esté dañado.']
+            validation_errors: ['Error al procesar el archivo PDF. Asegúrate de que sea un PDF válido y no esté dañado o corrupto.']
           })
           .eq('id', documentId);
         throw new Error('Error procesando PDF');
