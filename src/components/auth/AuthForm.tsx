@@ -81,12 +81,6 @@ export const AuthForm = () => {
     },
   });
 
-  // Resetear formularios cuando cambie entre login y registro
-  useEffect(() => {
-    loginForm.reset();
-    signupForm.reset();
-  }, [isSignUp]);
-
   const handleLogin = async (data: LoginFormValues) => {
     setIsLoading(true);
 
@@ -278,11 +272,11 @@ export const AuthForm = () => {
                       <FormLabel>Nombre Completo *</FormLabel>
                       <FormControl>
                         <Input
-                          {...field}
                           type="text"
                           placeholder="Juan Pérez"
                           disabled={isLoading}
                           required
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -298,11 +292,11 @@ export const AuthForm = () => {
                       <FormLabel>Correo Electrónico *</FormLabel>
                       <FormControl>
                         <Input
-                          {...field}
                           type="email"
                           placeholder="tu@email.com"
                           disabled={isLoading}
                           required
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
