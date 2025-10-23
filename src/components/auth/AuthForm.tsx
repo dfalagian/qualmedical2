@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -80,6 +80,12 @@ export const AuthForm = () => {
       phone: "",
     },
   });
+
+  // Resetear formularios cuando cambie entre login y registro
+  useEffect(() => {
+    loginForm.reset();
+    signupForm.reset();
+  }, [isSignUp]);
 
   const handleLogin = async (data: LoginFormValues) => {
     setIsLoading(true);
@@ -269,14 +275,14 @@ export const AuthForm = () => {
                   name="full_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nombre Completo</FormLabel>
+                      <FormLabel>Nombre Completo *</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           type="text"
                           placeholder="Juan Pérez"
-                          autoComplete="name"
                           disabled={isLoading}
+                          required
                         />
                       </FormControl>
                       <FormMessage />
@@ -289,14 +295,14 @@ export const AuthForm = () => {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Correo Electrónico</FormLabel>
+                      <FormLabel>Correo Electrónico *</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           type="email"
                           placeholder="tu@email.com"
-                          autoComplete="email"
                           disabled={isLoading}
+                          required
                         />
                       </FormControl>
                       <FormMessage />
