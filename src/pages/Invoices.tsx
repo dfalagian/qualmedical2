@@ -60,6 +60,25 @@ const Invoices = () => {
 
       if (xmlError) throw xmlError;
 
+      // Validar XML ANTES de insertar en la base de datos
+      const { data: validationData, error: validationError } = await supabase.functions.invoke(
+        'validate-invoice-xml',
+        {
+          body: { xmlPath: xmlFileName }
+        }
+      );
+
+      // Si hay error de validación, lanzar excepción para detener la subida
+      if (validationError) {
+        console.error('Error al validar XML:', validationError);
+        throw new Error('Error al validar el archivo XML: ' + (validationError.message || 'Error desconocido'));
+      }
+
+      // Si la validación falló (por ejemplo, FormaPago=99 pero MetodoPago!=PPD)
+      if (validationData?.success === false) {
+        throw new Error(validationData.mensaje || validationData.error || 'Error de validación en el XML');
+      }
+
       // Get URLs
       const { data: { publicUrl: pdfUrl } } = supabase.storage
         .from("invoices")
@@ -69,7 +88,7 @@ const Invoices = () => {
         .from("invoices")
         .getPublicUrl(xmlFileName);
 
-      // Insert invoice
+      // Insert invoice solo si la validación fue exitosa
       const { error: insertError } = await supabase
         .from("invoices")
         .insert({
@@ -81,25 +100,6 @@ const Invoices = () => {
         });
 
       if (insertError) throw insertError;
-
-      // Validar XML para detectar si requiere complemento de pago
-      const { data: validationData, error: validationError } = await supabase.functions.invoke(
-        'validate-invoice-xml',
-        {
-          body: { xmlPath: xmlFileName }
-        }
-      );
-
-      // Si hay error de validación, lanzar excepción para detener la subida
-      if (validationError) {
-        console.error('Error al validar XML:', validationError);
-        throw new Error('Error al validar el archivo XML');
-      }
-
-      // Si la validación falló (por ejemplo, FormaPago=99 pero MetodoPago!=PPD)
-      if (validationData?.success === false) {
-        throw new Error(validationData.mensaje || 'Error de validación en el XML');
-      }
 
       // Si todo está bien pero requiere complemento de pago
       if (validationData?.requiereComplemento) {
