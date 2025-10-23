@@ -38,13 +38,14 @@ const signupSchema = loginSchema.extend({
   company_name: z
     .string()
     .trim()
-    .max(100, "Nombre de empresa demasiado largo")
-    .optional(),
+    .min(1, "El nombre de empresa es requerido")
+    .max(100, "Nombre de empresa demasiado largo"),
   rfc: z
     .string()
     .trim()
+    .min(12, "El RFC debe tener al menos 12 caracteres")
     .max(13, "RFC inválido")
-    .optional(),
+    .regex(/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/, "Formato de RFC inválido"),
   phone: z
     .string()
     .trim()
@@ -142,8 +143,8 @@ export const AuthForm = () => {
           id: authData.user.id,
           email: data.email,
           full_name: data.full_name,
-          company_name: data.company_name || null,
-          rfc: data.rfc || null,
+          company_name: data.company_name,
+          rfc: data.rfc,
           phone: data.phone || null,
         });
 
@@ -328,13 +329,14 @@ export const AuthForm = () => {
                   name="company_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nombre de Empresa (Opcional)</FormLabel>
+                      <FormLabel>Nombre de Empresa *</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           type="text"
                           placeholder="Mi Empresa S.A."
                           disabled={isLoading}
+                          required
                         />
                       </FormControl>
                       <FormMessage />
@@ -347,13 +349,17 @@ export const AuthForm = () => {
                   name="rfc"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>RFC (Opcional)</FormLabel>
+                      <FormLabel>RFC *</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           type="text"
                           placeholder="XAXX010101000"
                           disabled={isLoading}
+                          required
+                          maxLength={13}
+                          style={{ textTransform: 'uppercase' }}
+                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                         />
                       </FormControl>
                       <FormMessage />
