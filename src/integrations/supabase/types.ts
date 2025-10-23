@@ -163,47 +163,139 @@ export type Database = {
           },
         ]
       }
+      invoice_items: {
+        Row: {
+          cantidad: number
+          clave_prod_serv: string | null
+          clave_unidad: string | null
+          created_at: string | null
+          descripcion: string
+          descuento: number | null
+          id: string
+          importe: number
+          invoice_id: string
+          unidad: string | null
+          valor_unitario: number
+        }
+        Insert: {
+          cantidad: number
+          clave_prod_serv?: string | null
+          clave_unidad?: string | null
+          created_at?: string | null
+          descripcion: string
+          descuento?: number | null
+          id?: string
+          importe: number
+          invoice_id: string
+          unidad?: string | null
+          valor_unitario: number
+        }
+        Update: {
+          cantidad?: number
+          clave_prod_serv?: string | null
+          clave_unidad?: string | null
+          created_at?: string | null
+          descripcion?: string
+          descuento?: number | null
+          id?: string
+          importe?: number
+          invoice_id?: string
+          unidad?: string | null
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount: number
           created_at: string | null
           currency: string | null
+          descuento: number | null
+          emisor_nombre: string | null
+          emisor_regimen_fiscal: string | null
+          emisor_rfc: string | null
+          fecha_emision: string | null
+          forma_pago: string | null
           id: string
           invoice_number: string
+          lugar_expedicion: string | null
+          metodo_pago: string | null
           notes: string | null
           payment_date: string | null
           pdf_url: string
+          receptor_nombre: string | null
+          receptor_rfc: string | null
+          receptor_uso_cfdi: string | null
           status: Database["public"]["Enums"]["payment_status"] | null
+          subtotal: number | null
           supplier_id: string
+          total_impuestos: number | null
           updated_at: string | null
+          uuid: string | null
           xml_url: string
         }
         Insert: {
           amount: number
           created_at?: string | null
           currency?: string | null
+          descuento?: number | null
+          emisor_nombre?: string | null
+          emisor_regimen_fiscal?: string | null
+          emisor_rfc?: string | null
+          fecha_emision?: string | null
+          forma_pago?: string | null
           id?: string
           invoice_number: string
+          lugar_expedicion?: string | null
+          metodo_pago?: string | null
           notes?: string | null
           payment_date?: string | null
           pdf_url: string
+          receptor_nombre?: string | null
+          receptor_rfc?: string | null
+          receptor_uso_cfdi?: string | null
           status?: Database["public"]["Enums"]["payment_status"] | null
+          subtotal?: number | null
           supplier_id: string
+          total_impuestos?: number | null
           updated_at?: string | null
+          uuid?: string | null
           xml_url: string
         }
         Update: {
           amount?: number
           created_at?: string | null
           currency?: string | null
+          descuento?: number | null
+          emisor_nombre?: string | null
+          emisor_regimen_fiscal?: string | null
+          emisor_rfc?: string | null
+          fecha_emision?: string | null
+          forma_pago?: string | null
           id?: string
           invoice_number?: string
+          lugar_expedicion?: string | null
+          metodo_pago?: string | null
           notes?: string | null
           payment_date?: string | null
           pdf_url?: string
+          receptor_nombre?: string | null
+          receptor_rfc?: string | null
+          receptor_uso_cfdi?: string | null
           status?: Database["public"]["Enums"]["payment_status"] | null
+          subtotal?: number | null
           supplier_id?: string
+          total_impuestos?: number | null
           updated_at?: string | null
+          uuid?: string | null
           xml_url?: string
         }
         Relationships: [

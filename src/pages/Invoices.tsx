@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Receipt, Upload, FileText, Download, DollarSign } from "lucide-react";
+import { Receipt, Upload, FileText, Download, DollarSign, Eye } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { InvoiceDetailsDialog } from "@/components/invoices/InvoiceDetailsDialog";
 
 const Invoices = () => {
   const { user, isAdmin } = useAuth();
@@ -18,6 +19,8 @@ const Invoices = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [xmlFile, setXmlFile] = useState<File | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices"],
@@ -30,6 +33,23 @@ const Invoices = () => {
       if (error) throw error;
       return data;
     },
+  });
+
+  const { data: invoiceItems } = useQuery({
+    queryKey: ["invoice-items", selectedInvoice?.id],
+    queryFn: async () => {
+      if (!selectedInvoice?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("invoice_items")
+        .select("*")
+        .eq("invoice_id", selectedInvoice.id)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedInvoice?.id,
   });
 
   const uploadMutation = useMutation({
@@ -85,6 +105,8 @@ const Invoices = () => {
         throw new Error('No se pudo extraer el número de factura o el monto del XML');
       }
 
+      console.log('Datos extraídos del XML:', validationData);
+
       // Get URLs
       const { data: { publicUrl: pdfUrl } } = supabase.storage
         .from("invoices")
@@ -95,17 +117,57 @@ const Invoices = () => {
         .getPublicUrl(xmlFileName);
 
       // Insert invoice solo si la validación fue exitosa
-      const { error: insertError } = await supabase
+      const { data: invoiceData, error: insertError } = await supabase
         .from("invoices")
         .insert({
           supplier_id: user.id,
           invoice_number: invoiceNumber,
           amount: parseFloat(amount),
+          subtotal: validationData.subtotal,
+          descuento: validationData.descuento || 0,
+          total_impuestos: validationData.totalImpuestos || 0,
           pdf_url: pdfUrl,
           xml_url: xmlUrl,
-        });
+          uuid: validationData.uuid,
+          fecha_emision: validationData.fecha,
+          lugar_expedicion: validationData.lugarExpedicion,
+          forma_pago: validationData.formaPago,
+          metodo_pago: validationData.metodoPago,
+          emisor_nombre: validationData.emisorNombre,
+          emisor_rfc: validationData.emisorRfc,
+          emisor_regimen_fiscal: validationData.emisorRegimenFiscal,
+          receptor_nombre: validationData.receptorNombre,
+          receptor_rfc: validationData.receptorRfc,
+          receptor_uso_cfdi: validationData.receptorUsoCfdi,
+        })
+        .select()
+        .single();
 
       if (insertError) throw insertError;
+
+      // Insertar conceptos/artículos si existen
+      if (validationData.conceptos && validationData.conceptos.length > 0) {
+        const itemsToInsert = validationData.conceptos.map((concepto: any) => ({
+          invoice_id: invoiceData.id,
+          clave_prod_serv: concepto.claveProdServ,
+          clave_unidad: concepto.claveUnidad,
+          unidad: concepto.unidad,
+          descripcion: concepto.descripcion,
+          cantidad: concepto.cantidad,
+          valor_unitario: concepto.valorUnitario,
+          importe: concepto.importe,
+          descuento: concepto.descuento || 0,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from("invoice_items")
+          .insert(itemsToInsert);
+
+        if (itemsError) {
+          console.error('Error al insertar conceptos:', itemsError);
+          // No lanzamos error aquí para no bloquear la creación de la factura
+        }
+      }
 
       // Si todo está bien pero requiere complemento de pago
       if (validationData?.requiereComplemento) {
@@ -290,6 +352,17 @@ const Invoices = () => {
                         variant="outline" 
                         size="sm"
                         onClick={() => {
+                          setSelectedInvoice(invoice);
+                          setShowDetailsDialog(true);
+                        }}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Ver
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
                           const link = document.createElement('a');
                           link.href = invoice.pdf_url;
                           link.download = `factura-${invoice.invoice_number}.pdf`;
@@ -347,6 +420,13 @@ const Invoices = () => {
           </CardContent>
         </Card>
       </div>
+
+      <InvoiceDetailsDialog
+        open={showDetailsDialog}
+        onOpenChange={setShowDetailsDialog}
+        invoice={selectedInvoice}
+        items={invoiceItems}
+      />
     </DashboardLayout>
   );
 };

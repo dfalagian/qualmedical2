@@ -42,25 +42,82 @@ serve(async (req) => {
     // FormaPago es un atributo del elemento Comprobante
     // MetodoPago también es un atributo del elemento Comprobante
     
+    // Extraer información del comprobante
     const formaPagoMatch = xmlText.match(/FormaPago="([^"]+)"/);
     const metodoPagoMatch = xmlText.match(/MetodoPago="([^"]+)"/);
     const folioMatch = xmlText.match(/Folio="([^"]+)"/);
     const serieMatch = xmlText.match(/Serie="([^"]+)"/);
     const totalMatch = xmlText.match(/Total="([0-9.]+)"/);
+    const subtotalMatch = xmlText.match(/SubTotal="([0-9.]+)"/);
+    const descuentoMatch = xmlText.match(/Descuento="([0-9.]+)"/);
+    const fechaMatch = xmlText.match(/Fecha="([^"]+)"/);
+    const lugarExpedicionMatch = xmlText.match(/LugarExpedicion="([^"]+)"/);
+
+    // Extraer UUID (TimbreFiscalDigital)
+    const uuidMatch = xmlText.match(/UUID="([^"]+)"/);
+    
+    // Extraer información del emisor
+    const emisorNombreMatch = xmlText.match(/cfdi:Emisor[^>]*Nombre="([^"]+)"/);
+    const emisorRfcMatch = xmlText.match(/cfdi:Emisor[^>]*Rfc="([^"]+)"/);
+    const emisorRegimenMatch = xmlText.match(/RegimenFiscal="([^"]+)"/);
+    
+    // Extraer información del receptor
+    const receptorNombreMatch = xmlText.match(/cfdi:Receptor[^>]*Nombre="([^"]+)"/);
+    const receptorRfcMatch = xmlText.match(/cfdi:Receptor[^>]*Rfc="([^"]+)"/);
+    const receptorUsoCfdiMatch = xmlText.match(/UsoCFDI="([^"]+)"/);
+
+    // Extraer impuestos totales
+    const totalImpuestosMatch = xmlText.match(/TotalImpuestosTrasladados="([0-9.]+)"/);
+
+    // Extraer conceptos/artículos
+    const conceptosRegex = /<cfdi:Concepto([^>]*)>/g;
+    const conceptos = [];
+    let conceptoMatch;
+    
+    while ((conceptoMatch = conceptosRegex.exec(xmlText)) !== null) {
+      const conceptoText = conceptoMatch[1];
+      const claveProdServMatch = conceptoText.match(/ClaveProdServ="([^"]+)"/);
+      const claveUnidadMatch = conceptoText.match(/ClaveUnidad="([^"]+)"/);
+      const unidadMatch = conceptoText.match(/Unidad="([^"]+)"/);
+      const descripcionMatch = conceptoText.match(/Descripcion="([^"]+)"/);
+      const cantidadMatch = conceptoText.match(/Cantidad="([0-9.]+)"/);
+      const valorUnitarioMatch = conceptoText.match(/ValorUnitario="([0-9.]+)"/);
+      const importeMatch = conceptoText.match(/Importe="([0-9.]+)"/);
+      const descuentoConceptoMatch = conceptoText.match(/Descuento="([0-9.]+)"/);
+
+      conceptos.push({
+        claveProdServ: claveProdServMatch ? claveProdServMatch[1] : '',
+        claveUnidad: claveUnidadMatch ? claveUnidadMatch[1] : '',
+        unidad: unidadMatch ? unidadMatch[1] : '',
+        descripcion: descripcionMatch ? descripcionMatch[1] : '',
+        cantidad: cantidadMatch ? parseFloat(cantidadMatch[1]) : 0,
+        valorUnitario: valorUnitarioMatch ? parseFloat(valorUnitarioMatch[1]) : 0,
+        importe: importeMatch ? parseFloat(importeMatch[1]) : 0,
+        descuento: descuentoConceptoMatch ? parseFloat(descuentoConceptoMatch[1]) : 0
+      });
+    }
 
     const formaPago = formaPagoMatch ? formaPagoMatch[1] : null;
     const metodoPago = metodoPagoMatch ? metodoPagoMatch[1] : null;
     const folio = folioMatch ? folioMatch[1] : null;
     const serie = serieMatch ? serieMatch[1] : null;
     const total = totalMatch ? parseFloat(totalMatch[1]) : null;
+    const subtotal = subtotalMatch ? parseFloat(subtotalMatch[1]) : null;
+    const descuento = descuentoMatch ? parseFloat(descuentoMatch[1]) : 0;
+    const totalImpuestos = totalImpuestosMatch ? parseFloat(totalImpuestosMatch[1]) : 0;
+    const fecha = fechaMatch ? fechaMatch[1] : null;
+    const lugarExpedicion = lugarExpedicionMatch ? lugarExpedicionMatch[1] : null;
+    const uuid = uuidMatch ? uuidMatch[1] : null;
     
     // Construir número de factura (Serie + Folio o solo Folio si no hay Serie)
     const invoiceNumber = serie ? `${serie}-${folio}` : folio;
 
-    console.log('FormaPago extraído:', formaPago);
-    console.log('MetodoPago extraído:', metodoPago);
-    console.log('Número de factura extraído:', invoiceNumber);
-    console.log('Total extraído:', total);
+    console.log('Información extraída del XML:');
+    console.log('- Número de factura:', invoiceNumber);
+    console.log('- Total:', total);
+    console.log('- UUID:', uuid);
+    console.log('- Emisor:', emisorNombreMatch?.[1]);
+    console.log('- Conceptos encontrados:', conceptos.length);
 
     // VALIDACIÓN CRÍTICA: Si FormaPago = 99, entonces MetodoPago DEBE ser PPD
     if (formaPago === '99' && metodoPago !== 'PPD') {
@@ -94,6 +151,19 @@ serve(async (req) => {
         metodoPago,
         invoiceNumber,
         amount: total,
+        subtotal,
+        descuento,
+        totalImpuestos,
+        fecha,
+        lugarExpedicion,
+        uuid,
+        emisorNombre: emisorNombreMatch?.[1] || null,
+        emisorRfc: emisorRfcMatch?.[1] || null,
+        emisorRegimenFiscal: emisorRegimenMatch?.[1] || null,
+        receptorNombre: receptorNombreMatch?.[1] || null,
+        receptorRfc: receptorRfcMatch?.[1] || null,
+        receptorUsoCfdi: receptorUsoCfdiMatch?.[1] || null,
+        conceptos,
         requiereComplemento,
         mensaje: requiereComplemento 
           ? 'Esta factura requiere un complemento de pago. Por favor, súbelo cuando esté disponible.'
