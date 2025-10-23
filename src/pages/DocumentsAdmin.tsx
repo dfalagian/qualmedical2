@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileText, Download, RefreshCw, Eye, Trash2 } from "lucide-react";
+import { FileText, RefreshCw, Eye, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -194,8 +194,8 @@ const DocumentsAdmin = () => {
                                     <div className="flex gap-2 pt-4">
                                       <Button variant="outline" size="sm" asChild>
                                         <a href={selectedDoc.file_url} target="_blank" rel="noopener noreferrer">
-                                          <Download className="h-4 w-4 mr-1" />
-                                          Descargar PDF
+                                          <Eye className="h-4 w-4 mr-1" />
+                                          Ver
                                         </a>
                                       </Button>
                                       {selectedDoc.extraction_status !== "processing" && (
@@ -216,7 +216,7 @@ const DocumentsAdmin = () => {
 
                             <Button variant="outline" size="sm" asChild>
                               <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                                <Download className="h-4 w-4" />
+                                <Eye className="h-4 w-4" />
                               </a>
                             </Button>
 

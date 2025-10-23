@@ -225,8 +225,8 @@ const ConstanciaFiscalAdmin = () => {
                                     <div className="flex gap-2 pt-4">
                                       <Button variant="outline" size="sm" asChild>
                                         <a href={selectedDoc.file_url} target="_blank" rel="noopener noreferrer">
-                                          <Download className="h-4 w-4 mr-1" />
-                                          Descargar PDF
+                                          <Eye className="h-4 w-4 mr-1" />
+                                          Ver
                                         </a>
                                       </Button>
                                       {selectedDoc.extraction_status !== "processing" && (
@@ -247,7 +247,7 @@ const ConstanciaFiscalAdmin = () => {
 
                             <Button variant="outline" size="sm" asChild>
                               <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                                <Download className="h-4 w-4" />
+                                <Eye className="h-4 w-4" />
                               </a>
                             </Button>
 

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, FileText, Download, Eye, Trash2 } from "lucide-react";
+import { Search, FileText, Eye, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
@@ -267,12 +267,10 @@ const SupplierDocuments = () => {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.open(doc.file_url, "_blank")}
-                              >
-                                <Download className="h-4 w-4" />
+                              <Button variant="outline" size="sm" asChild>
+                                <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                                  <Eye className="h-4 w-4" />
+                                </a>
                               </Button>
                               <Button
                                 variant="destructive"
@@ -443,12 +441,11 @@ const SupplierDocuments = () => {
                 )}
 
               <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => window.open(selectedDocument.file_url, "_blank")}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Descargar PDF
+                <Button variant="outline" size="sm" asChild>
+                  <a href={selectedDocument.file_url} target="_blank" rel="noopener noreferrer">
+                    <Eye className="h-4 w-4 mr-2" />
+                    Ver
+                  </a>
                 </Button>
               </div>
             </div>
