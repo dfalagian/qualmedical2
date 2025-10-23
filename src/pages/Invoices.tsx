@@ -286,17 +286,35 @@ const Invoices = () => {
                     </div>
 
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={invoice.pdf_url} target="_blank" rel="noopener noreferrer">
-                          <FileText className="h-4 w-4 mr-1" />
-                          PDF
-                        </a>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = invoice.pdf_url;
+                          link.download = `factura-${invoice.invoice_number}.pdf`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        PDF
                       </Button>
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={invoice.xml_url} target="_blank" rel="noopener noreferrer">
-                          <Download className="h-4 w-4 mr-1" />
-                          XML
-                        </a>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = invoice.xml_url;
+                          link.download = `factura-${invoice.invoice_number}.xml`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        XML
                       </Button>
 
                       {isAdmin && invoice.status !== "pagado" && (
