@@ -23,24 +23,33 @@ const SupplierDocuments = () => {
     queryKey: ["suppliers", searchTerm],
     enabled: isAdmin,
     queryFn: async () => {
-      let query = supabase
+      // First get all profiles
+      let profilesQuery = supabase
         .from("profiles")
-        .select(`
-          *,
-          user_roles!inner(role)
-        `)
-        .eq("user_roles.role", "proveedor")
+        .select("*")
         .order("full_name");
 
       if (searchTerm) {
-        query = query.or(
+        profilesQuery = profilesQuery.or(
           `full_name.ilike.%${searchTerm}%,company_name.ilike.%${searchTerm}%,rfc.ilike.%${searchTerm}%`
         );
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
+      const { data: profiles, error: profilesError } = await profilesQuery;
+      if (profilesError) throw profilesError;
+
+      // Get all admin user IDs
+      const { data: adminRoles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin");
+
+      if (rolesError) throw rolesError;
+
+      const adminIds = new Set(adminRoles?.map(r => r.user_id) || []);
+      
+      // Filter out admins
+      return profiles?.filter(p => !adminIds.has(p.id)) || [];
     },
   });
 
