@@ -87,7 +87,7 @@ const Invoices = () => {
         const { data: validationData, error: validationError } = await supabase.functions.invoke(
           'validate-invoice-xml',
           {
-            body: { xmlUrl }
+            body: { xmlPath: xmlFileName }
           }
         );
 

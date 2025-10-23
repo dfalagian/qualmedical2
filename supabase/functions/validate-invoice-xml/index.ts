@@ -12,22 +12,31 @@ serve(async (req) => {
   }
 
   try {
-    const { xmlUrl } = await req.json();
+    const { xmlPath } = await req.json();
 
-    if (!xmlUrl) {
-      throw new Error('xmlUrl es requerido');
+    if (!xmlPath) {
+      throw new Error('xmlPath es requerido');
     }
 
-    console.log('Descargando XML desde:', xmlUrl);
+    console.log('Descargando XML desde storage:', xmlPath);
 
-    // Descargar el archivo XML
-    const xmlResponse = await fetch(xmlUrl);
-    if (!xmlResponse.ok) {
-      throw new Error('Error al descargar el archivo XML');
+    // Crear cliente de Supabase con service role para acceder a archivos privados
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Descargar el archivo XML desde el storage privado
+    const { data: xmlData, error: downloadError } = await supabase.storage
+      .from('invoices')
+      .download(xmlPath);
+
+    if (downloadError) {
+      console.error('Error al descargar XML:', downloadError);
+      throw new Error('Error al descargar el archivo XML del storage');
     }
 
-    const xmlText = await xmlResponse.text();
-    console.log('XML descargado, tamaño:', xmlText.length);
+    const xmlText = await xmlData.text();
+    console.log('XML descargado exitosamente, tamaño:', xmlText.length);
 
     // Extraer FormaPago y MetodoPago usando regex
     // FormaPago es un atributo del elemento Comprobante
