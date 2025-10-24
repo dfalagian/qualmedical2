@@ -26,10 +26,19 @@ export const ImageViewer = ({
   const images = useMemo(() => {
     const urls = imageUrls && imageUrls.length > 0 ? imageUrls : fileUrl ? [fileUrl] : [];
     return urls.map(url => {
+      // Si ya es una URL completa, retornarla directamente
       if (url.startsWith('http')) {
         return url;
       }
-      const { data } = supabase.storage.from('documents').getPublicUrl(url);
+      
+      // Extraer el path relativo si viene de un URL completo
+      let relativePath = url;
+      if (url.includes('/documents/')) {
+        relativePath = url.split('/documents/')[1];
+      }
+      
+      // Obtener URL pública usando el path relativo
+      const { data } = supabase.storage.from('documents').getPublicUrl(relativePath);
       return data.publicUrl;
     });
   }, [fileUrl, imageUrls]);
