@@ -932,8 +932,9 @@ IMPORTANTE:
               // CURP coincide - esto es suficiente para validar
               curpCoincide = true;
               console.log('✅ CURP del responsable sanitario coincide perfectamente:', ine.curp);
+              errors.push(`✅ El CURP del responsable sanitario coincide entre el INE y el Aviso de Funcionamiento: ${ine.curp}`);
             } else {
-              errors.push(`El CURP del responsable sanitario no coincide. INE: ${ine.curp}, Aviso de Funcionamiento: ${avisoFuncionamiento.curp}`);
+              errors.push(`❌ El CURP del responsable sanitario no coincide. INE: ${ine.curp}, Aviso de Funcionamiento: ${avisoFuncionamiento.curp}`);
             }
           }
 
