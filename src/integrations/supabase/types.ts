@@ -69,6 +69,7 @@ export type Database = {
           file_name: string
           file_url: string
           id: string
+          image_urls: string[] | null
           is_valid: boolean | null
           nombre_completo_ine: string | null
           notes: string | null
@@ -99,6 +100,7 @@ export type Database = {
           file_name: string
           file_url: string
           id?: string
+          image_urls?: string[] | null
           is_valid?: boolean | null
           nombre_completo_ine?: string | null
           notes?: string | null
@@ -129,6 +131,7 @@ export type Database = {
           file_name?: string
           file_url?: string
           id?: string
+          image_urls?: string[] | null
           is_valid?: boolean | null
           nombre_completo_ine?: string | null
           notes?: string | null

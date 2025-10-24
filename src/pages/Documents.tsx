@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { FileText, Upload, CheckCircle, XCircle, Clock, Download, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePDFUpload } from "@/hooks/usePDFUpload";
+import { Progress } from "@/components/ui/progress";
 
 const DOCUMENT_TYPES = [
   { value: "factura", label: "Factura" },
@@ -26,12 +28,13 @@ const DOCUMENT_TYPES = [
 
 // Constantes de seguridad
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
-const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png'];
+const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.pdf'];
 
 const Documents = () => {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
+  const { progress, uploadPDFAsImages } = usePDFUpload();
   const [isUploading, setIsUploading] = useState(false);
   const [selectedType, setSelectedType] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -46,7 +49,7 @@ const Documents = () => {
 
     // Validar tipo MIME
     if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-      return "Tipo de archivo no permitido. Solo se aceptan imágenes JPG, JPEG o PNG.";
+      return "Tipo de archivo no permitido. Solo se aceptan imágenes JPG, JPEG, PNG o PDF.";
     }
 
     // Validar extensión
@@ -110,39 +113,92 @@ const Documents = () => {
         
         // Sanitizar nombre de archivo
         const fileExt = file.name.split(".").pop()?.toLowerCase();
-        const sanitizedFileName = `${user.id}/${Date.now()}_${i}.${fileExt}`;
+        const basePath = `${user.id}/${Date.now()}_${i}`;
+        const sanitizedFileName = `${basePath}.${fileExt}`;
         
-        const { error: uploadError } = await supabase.storage
-          .from("documents")
-          .upload(sanitizedFileName, file);
+        // Verificar si es PDF
+        const isPDF = file.type === 'application/pdf' || fileExt === 'pdf';
+        
+        if (isPDF) {
+          // Convertir PDF a imágenes
+          toast.info(`Convirtiendo ${file.name} a imágenes...`);
+          
+          // Primero subir el PDF temporalmente
+          const { error: uploadError } = await supabase.storage
+            .from("documents")
+            .upload(sanitizedFileName, file);
 
-        if (uploadError) throw uploadError;
+          if (uploadError) throw uploadError;
 
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from("documents")
-          .getPublicUrl(sanitizedFileName);
+          // Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from("documents")
+            .getPublicUrl(sanitizedFileName);
 
-        // Sanitizar datos antes de insertar
-        const sanitizedNotes = notes.trim().substring(0, 1000);
-        const sanitizedFileName2 = file.name.substring(0, 255); // Limitar longitud
+          // Sanitizar datos antes de insertar
+          const sanitizedNotes = notes.trim().substring(0, 1000);
+          const sanitizedFileName2 = file.name.substring(0, 255);
 
-        // Insert document record
-        const { data: insertedDoc, error: insertError } = await supabase
-          .from("documents")
-          .insert([{
-            supplier_id: user.id,
-            document_type: selectedType as any,
-            file_url: publicUrl,
-            file_name: sanitizedFileName2,
-            notes: sanitizedNotes || null,
-          }])
-          .select()
-          .single();
+          // Insert document record primero
+          const { data: insertedDoc, error: insertError } = await supabase
+            .from("documents")
+            .insert([{
+              supplier_id: user.id,
+              document_type: selectedType as any,
+              file_url: publicUrl,
+              file_name: sanitizedFileName2,
+              notes: sanitizedNotes || null,
+            }])
+            .select()
+            .single();
 
-        if (insertError) throw insertError;
+          if (insertError) throw insertError;
 
-        uploadedDocs.push(insertedDoc);
+          // Convertir PDF a imágenes y actualizar el documento
+          try {
+            await uploadPDFAsImages(file, insertedDoc.id, basePath);
+            toast.success(`✓ ${file.name} convertido y subido`);
+          } catch (error) {
+            console.error("Error convirtiendo PDF:", error);
+            toast.error(`Error convirtiendo ${file.name}`);
+          }
+
+          uploadedDocs.push(insertedDoc);
+          
+        } else {
+          // Subir imagen normalmente
+          const { error: uploadError } = await supabase.storage
+            .from("documents")
+            .upload(sanitizedFileName, file);
+
+          if (uploadError) throw uploadError;
+
+          // Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from("documents")
+            .getPublicUrl(sanitizedFileName);
+
+          // Sanitizar datos antes de insertar
+          const sanitizedNotes = notes.trim().substring(0, 1000);
+          const sanitizedFileName2 = file.name.substring(0, 255);
+
+          // Insert document record
+          const { data: insertedDoc, error: insertError } = await supabase
+            .from("documents")
+            .insert([{
+              supplier_id: user.id,
+              document_type: selectedType as any,
+              file_url: publicUrl,
+              file_name: sanitizedFileName2,
+              notes: sanitizedNotes || null,
+            }])
+            .select()
+            .single();
+
+          if (insertError) throw insertError;
+
+          uploadedDocs.push(insertedDoc);
+        }
       }
 
       // Si es un documento que requiere extracción automática, procesar todos
@@ -294,23 +350,23 @@ const Documents = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-950 border-2 border-amber-500 rounded-lg">
+              <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-950 border-2 border-blue-500 rounded-lg">
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-0.5">
-                    <svg className="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    <svg className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">
-                      ⚠️ IMPORTANTE: Solo Imágenes (Múltiples archivos permitidos)
+                    <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1">
+                      📄 Conversión Automática de PDFs
                     </h4>
-                    <p className="text-sm text-amber-700 dark:text-amber-400">
-                      Por favor, sube imágenes en formato <strong>JPG, JPEG o PNG</strong>.
+                    <p className="text-sm text-blue-700 dark:text-blue-400">
+                      Sube imágenes en formato <strong>JPG, JPEG, PNG o PDF</strong>.
                       <br />
-                      <strong>Los archivos PDF no son compatibles.</strong>
+                      <strong>Los archivos PDF se convertirán automáticamente a imágenes</strong> (máximo 20 páginas).
                       <br />
-                      <span className="text-xs">Puedes seleccionar hasta 20 imágenes a la vez. Ideal para documentos de múltiples páginas.</span>
+                      <span className="text-xs">Puedes seleccionar hasta 20 archivos a la vez. Los PDFs escaneados se procesarán página por página.</span>
                     </p>
                   </div>
                 </div>
@@ -340,11 +396,11 @@ const Documents = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="file">Archivos (JPG, JPEG o PNG) *</Label>
+                  <Label htmlFor="file">Archivos (JPG, JPEG, PNG o PDF) *</Label>
                   <Input
                     id="file"
                     type="file"
-                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                    accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
                     multiple
                     onChange={(e) => {
                       const selectedFiles = Array.from(e.target.files || []);
@@ -370,9 +426,9 @@ const Documents = () => {
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Puedes seleccionar hasta 20 archivos. Máximo 10MB por archivo. Solo JPG, JPEG o PNG.
+                    Puedes seleccionar hasta 20 archivos. Máximo 10MB por archivo. JPG, JPEG, PNG o PDF.
                     <br />
-                    <span className="text-primary">Asegúrate de que las imágenes sean claras y legibles para mejor extracción de datos.</span>
+                    <span className="text-primary">Los PDFs se convertirán automáticamente a imágenes (máx. 20 páginas).</span>
                   </p>
                   {files.length > 0 && (
                     <div className="mt-3 p-3 bg-muted rounded-md">
@@ -383,9 +439,27 @@ const Documents = () => {
                             <CheckCircle className="h-3 w-3 text-success" />
                             <span className="truncate">{file.name}</span>
                             <span className="text-muted-foreground">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                            {file.type === 'application/pdf' && (
+                              <Badge variant="secondary" className="text-xs">PDF → Imágenes</Badge>
+                            )}
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+                  
+                  {/* Progress indicator for PDF conversion */}
+                  {progress.status !== 'idle' && progress.status !== 'complete' && (
+                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                        {progress.message}
+                      </p>
+                      {progress.totalPages && progress.currentPage && (
+                        <Progress 
+                          value={(progress.currentPage / progress.totalPages) * 100} 
+                          className="h-2"
+                        />
+                      )}
                     </div>
                   )}
                 </div>
