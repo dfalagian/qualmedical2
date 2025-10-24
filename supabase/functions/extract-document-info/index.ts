@@ -166,13 +166,19 @@ serve(async (req) => {
       .update({ extraction_status: 'processing' })
       .eq('id', documentId);
 
-    console.log('Descargando imagen desde:', document.file_url);
+    // Si el documento tiene image_urls (PDF convertido), usar la primera imagen
+    // Si no, usar el file_url directamente (imagen subida directamente)
+    const imageToProcess = document.image_urls && document.image_urls.length > 0 
+      ? document.image_urls[0] 
+      : document.file_url.split('/documents/')[1];
+
+    console.log('Descargando imagen desde:', imageToProcess);
 
     // Descargar la imagen desde storage
     const { data: fileData, error: downloadError } = await supabaseClient
       .storage
       .from('documents')
-      .download(document.file_url.split('/documents/')[1]);
+      .download(imageToProcess);
 
     if (downloadError || !fileData) {
       console.error('Error descargando archivo:', downloadError);
