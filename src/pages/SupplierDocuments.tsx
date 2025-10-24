@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, FileText, Eye, Trash2 } from "lucide-react";
+import { Search, FileText, Eye, Trash2, CheckCircle2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
@@ -70,6 +70,20 @@ const SupplierDocuments = () => {
       return data;
     },
   });
+
+  const hasCoincidencias = (validationErrors: any) => {
+    if (!validationErrors || !Array.isArray(validationErrors)) return false;
+    return validationErrors.some((error: string) => 
+      error.includes('✅ Coincidencia confirmada')
+    );
+  };
+
+  const getCoincidencias = (validationErrors: any) => {
+    if (!validationErrors || !Array.isArray(validationErrors)) return [];
+    return validationErrors.filter((error: string) => 
+      error.includes('✅ Coincidencia confirmada')
+    );
+  };
 
   const getDocumentTypeName = (type: string) => {
     const types: Record<string, string> = {
@@ -243,23 +257,38 @@ const SupplierDocuments = () => {
                         <TableHead>Nombre del Archivo</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Extracción</TableHead>
+                        <TableHead>Validación Cruzada</TableHead>
                         <TableHead>Fecha de Subida</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {documents.map((doc) => (
-                        <TableRow key={doc.id}>
-                          <TableCell className="font-medium">
-                            {getDocumentTypeName(doc.document_type)}
-                          </TableCell>
-                          <TableCell className="max-w-xs truncate">{doc.file_name}</TableCell>
-                          <TableCell>{getStatusBadge(doc.status)}</TableCell>
-                          <TableCell>{getExtractionBadge(doc.extraction_status)}</TableCell>
-                          <TableCell>
-                            {new Date(doc.created_at).toLocaleDateString("es-MX")}
-                          </TableCell>
-                          <TableCell className="text-right">
+                      {documents.map((doc) => {
+                        const tieneCoincidencias = hasCoincidencias(doc.validation_errors);
+                        return (
+                          <TableRow key={doc.id} className={tieneCoincidencias ? "bg-success/10" : ""}>
+                            <TableCell className="font-medium">
+                              {getDocumentTypeName(doc.document_type)}
+                            </TableCell>
+                            <TableCell className="max-w-xs truncate">{doc.file_name}</TableCell>
+                            <TableCell>{getStatusBadge(doc.status)}</TableCell>
+                            <TableCell>{getExtractionBadge(doc.extraction_status)}</TableCell>
+                            <TableCell>
+                              {tieneCoincidencias ? (
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle2 className="h-4 w-4 text-success" />
+                                  <span className="text-success text-sm font-medium">
+                                    {getCoincidencias(doc.validation_errors).length} coincidencia(s)
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">Sin validar</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {new Date(doc.created_at).toLocaleDateString("es-MX")}
+                            </TableCell>
+                            <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button
                                 variant="outline"
@@ -285,7 +314,8 @@ const SupplierDocuments = () => {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -428,8 +458,25 @@ const SupplierDocuments = () => {
                 </div>
               )}
 
+              {hasCoincidencias(selectedDocument.validation_errors) && (
+                <div className="border-l-4 border-success bg-success/10 p-4 rounded">
+                  <h4 className="font-semibold text-sm text-success flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Validaciones Cruzadas Confirmadas
+                  </h4>
+                  <ul className="space-y-1 text-sm">
+                    {getCoincidencias(selectedDocument.validation_errors).map((msg: string, idx: number) => (
+                      <li key={idx} className="text-foreground/80">
+                        {msg.replace('✅ ', '')}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {selectedDocument.validation_errors &&
-                selectedDocument.validation_errors.length > 0 && (
+                selectedDocument.validation_errors.length > 0 && 
+                !hasCoincidencias(selectedDocument.validation_errors) && (
                   <div>
                     <p className="text-sm font-semibold text-destructive">
                       Errores de Validación
