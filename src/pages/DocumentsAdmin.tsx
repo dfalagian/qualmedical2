@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileText, RefreshCw, Eye, Trash2 } from "lucide-react";
+import { FileText, RefreshCw, Eye, Trash2, CheckCircle2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -31,6 +31,20 @@ const DocumentsAdmin = () => {
       return data;
     },
   });
+
+  const hasCoincidencias = (validationErrors: any) => {
+    if (!validationErrors || !Array.isArray(validationErrors)) return false;
+    return validationErrors.some((error: string) => 
+      error.includes('✅ Coincidencia confirmada')
+    );
+  };
+
+  const getCoincidencias = (validationErrors: any) => {
+    if (!validationErrors || !Array.isArray(validationErrors)) return [];
+    return validationErrors.filter((error: string) => 
+      error.includes('✅ Coincidencia confirmada')
+    );
+  };
 
   const extractMutation = useMutation({
     mutationFn: async (documentId: string) => {
@@ -127,23 +141,38 @@ const DocumentsAdmin = () => {
                       <TableHead>Razón Social</TableHead>
                       <TableHead>Representante Legal</TableHead>
                       <TableHead>Registro Público</TableHead>
+                      <TableHead>Validación Cruzada</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {actasConstitutivas.map((doc: any) => (
-                      <TableRow key={doc.id}>
-                        <TableCell className="font-medium">
-                          {doc.profiles?.company_name || doc.profiles?.full_name || "N/A"}
-                        </TableCell>
-                        <TableCell>{doc.razon_social || "-"}</TableCell>
-                        <TableCell>{doc.representante_legal || "-"}</TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {doc.registro_publico || "-"}
-                        </TableCell>
-                        <TableCell>{getExtractionBadge(doc.extraction_status)}</TableCell>
-                        <TableCell>
+                    {actasConstitutivas.map((doc: any) => {
+                      const tieneCoincidencias = hasCoincidencias(doc.validation_errors);
+                      return (
+                        <TableRow key={doc.id} className={tieneCoincidencias ? "bg-success/10" : ""}>
+                          <TableCell className="font-medium">
+                            {doc.profiles?.company_name || doc.profiles?.full_name || "N/A"}
+                          </TableCell>
+                          <TableCell>{doc.razon_social || "-"}</TableCell>
+                          <TableCell>{doc.representante_legal || "-"}</TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {doc.registro_publico || "-"}
+                          </TableCell>
+                          <TableCell>
+                            {tieneCoincidencias ? (
+                              <div className="flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4 text-success" />
+                                <span className="text-success text-sm font-medium">
+                                  {getCoincidencias(doc.validation_errors).length} coincidencia(s)
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">Sin validar</span>
+                            )}
+                          </TableCell>
+                          <TableCell>{getExtractionBadge(doc.extraction_status)}</TableCell>
+                          <TableCell>
                           <div className="flex gap-2">
                             <Dialog>
                               <DialogTrigger asChild>
@@ -192,6 +221,21 @@ const DocumentsAdmin = () => {
                                       <h4 className="font-semibold text-sm text-muted-foreground">Estado de Extracción</h4>
                                       <div className="mt-1">{getExtractionBadge(selectedDoc.extraction_status)}</div>
                                     </div>
+                                    {hasCoincidencias(selectedDoc.validation_errors) && (
+                                      <div className="border-l-4 border-success bg-success/10 p-4 rounded">
+                                        <h4 className="font-semibold text-sm text-success flex items-center gap-2 mb-2">
+                                          <CheckCircle2 className="h-4 w-4" />
+                                          Validaciones Cruzadas Confirmadas
+                                        </h4>
+                                        <ul className="space-y-1 text-sm">
+                                          {getCoincidencias(selectedDoc.validation_errors).map((msg: string, idx: number) => (
+                                            <li key={idx} className="text-foreground/80">
+                                              {msg.replace('✅ ', '')}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
                                     <div className="flex gap-2 pt-4">
                                       <ImageViewer 
                                         fileUrl={selectedDoc.file_url}
@@ -243,7 +287,8 @@ const DocumentsAdmin = () => {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    );
+                    })}
                   </TableBody>
                 </Table>
               </div>
