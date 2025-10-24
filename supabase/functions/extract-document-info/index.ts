@@ -823,21 +823,39 @@ IMPORTANTE:
 
           // Validar Razón Social (normalizar para comparación)
           if (constanciaFiscal.razon_social && avisoFuncionamiento.razon_social) {
-            const razonSocialConstancia = constanciaFiscal.razon_social.trim().toLowerCase();
-            const razonSocialAviso = avisoFuncionamiento.razon_social.trim().toLowerCase();
+            const normalize = (str: string) => str.trim().toLowerCase()
+              .replace(/\s+/g, ' ')
+              .replace(/\./g, '')
+              .replace(/,/g, '');
             
-            if (razonSocialConstancia !== razonSocialAviso) {
-              errors.push(`La Razón Social no coincide entre documentos. Constancia Fiscal: "${constanciaFiscal.razon_social}", Aviso de Funcionamiento: "${avisoFuncionamiento.razon_social}"`);
+            const razonSocialConstancia = normalize(constanciaFiscal.razon_social);
+            const razonSocialAviso = normalize(avisoFuncionamiento.razon_social);
+            
+            if (razonSocialConstancia === razonSocialAviso) {
+              errors.push(`✅ Coincidencia confirmada: Razón Social en Constancia Fiscal (${constanciaFiscal.razon_social}) coincide con Aviso de Funcionamiento (${avisoFuncionamiento.razon_social})`);
+            } else if (razonSocialConstancia.includes(razonSocialAviso) || razonSocialAviso.includes(razonSocialConstancia)) {
+              errors.push(`✅ Coincidencia confirmada: Razón Social similar - Constancia Fiscal: ${constanciaFiscal.razon_social}, Aviso de Funcionamiento: ${avisoFuncionamiento.razon_social}`);
+            } else {
+              errors.push(`❌ La Razón Social no coincide entre documentos. Constancia Fiscal: "${constanciaFiscal.razon_social}", Aviso de Funcionamiento: "${avisoFuncionamiento.razon_social}"`);
             }
           }
 
           // Validar Dirección (normalizar para comparación)
           if (constanciaFiscal.direccion && avisoFuncionamiento.direccion) {
-            const direccionConstancia = constanciaFiscal.direccion.trim().toLowerCase();
-            const direccionAviso = avisoFuncionamiento.direccion.trim().toLowerCase();
+            const normalize = (str: string) => str.trim().toLowerCase()
+              .replace(/\s+/g, ' ')
+              .replace(/,/g, '')
+              .replace(/\./g, '');
             
-            if (direccionConstancia !== direccionAviso) {
-              errors.push(`La Dirección no coincide entre documentos. Constancia Fiscal: "${constanciaFiscal.direccion}", Aviso de Funcionamiento: "${avisoFuncionamiento.direccion}"`);
+            const direccionConstancia = normalize(constanciaFiscal.direccion);
+            const direccionAviso = normalize(avisoFuncionamiento.direccion);
+            
+            if (direccionConstancia === direccionAviso) {
+              errors.push(`✅ Coincidencia confirmada: Dirección en Constancia Fiscal (${constanciaFiscal.direccion}) coincide con Aviso de Funcionamiento (${avisoFuncionamiento.direccion})`);
+            } else if (direccionConstancia.includes(direccionAviso) || direccionAviso.includes(direccionConstancia)) {
+              errors.push(`✅ Coincidencia confirmada: Dirección similar - Constancia Fiscal: ${constanciaFiscal.direccion}, Aviso de Funcionamiento: ${avisoFuncionamiento.direccion}`);
+            } else {
+              errors.push(`❌ La Dirección no coincide entre documentos. Constancia Fiscal: "${constanciaFiscal.direccion}", Aviso de Funcionamiento: "${avisoFuncionamiento.direccion}"`);
             }
           }
 
@@ -856,7 +874,9 @@ IMPORTANTE:
               const currentErrors = currentDoc?.validation_errors || [];
               // Filtrar errores antiguos entre aviso y constancia, agregar nuevos
               const filteredErrors = currentErrors.filter(
-                (err: string) => !err.includes('Razón Social no coincide entre documentos. Constancia Fiscal') && !err.includes('Dirección no coincide entre documentos. Constancia Fiscal')
+                (err: string) => !err.includes('Razón Social') && 
+                                 !err.includes('Dirección') &&
+                                 !err.includes('Coincidencia confirmada')
               );
               const combinedErrors = [...filteredErrors, ...errors];
 
@@ -881,7 +901,9 @@ IMPORTANTE:
 
               if (currentDoc && currentDoc.validation_errors) {
                 const filteredErrors = currentDoc.validation_errors.filter(
-                  (err: string) => !err.includes('Razón Social no coincide entre documentos. Constancia Fiscal') && !err.includes('Dirección no coincide entre documentos. Constancia Fiscal')
+                  (err: string) => !err.includes('Razón Social') && 
+                                   !err.includes('Dirección') &&
+                                   !err.includes('Coincidencia confirmada')
                 );
                 
                 await supabaseClient
@@ -932,7 +954,7 @@ IMPORTANTE:
               // CURP coincide - esto es suficiente para validar
               curpCoincide = true;
               console.log('✅ CURP del responsable sanitario coincide perfectamente:', ine.curp);
-              errors.push(`✅ El CURP del responsable sanitario coincide entre el INE y el Aviso de Funcionamiento: ${ine.curp}`);
+              errors.push(`✅ Coincidencia confirmada: CURP del responsable sanitario en INE (${ine.curp}) coincide con Aviso de Funcionamiento (${avisoFuncionamiento.curp})`);
             } else {
               errors.push(`❌ El CURP del responsable sanitario no coincide. INE: ${ine.curp}, Aviso de Funcionamiento: ${avisoFuncionamiento.curp}`);
             }
@@ -975,9 +997,10 @@ IMPORTANTE:
               const currentErrors = currentDoc?.validation_errors || [];
               // Filtrar errores antiguos entre INE y aviso, agregar nuevos
               const filteredErrors = currentErrors.filter(
-                (err: string) => !err.includes('Nombre Completo del responsable sanitario no coincide') && 
-                                 !err.includes('CURP del responsable sanitario no coincide') &&
-                                 !err.includes('⚠️ Los datos del responsable sanitario no se encontraron')
+                (err: string) => !err.includes('Nombre Completo del responsable sanitario') && 
+                                 !err.includes('CURP del responsable sanitario') &&
+                                 !err.includes('⚠️ Los datos del responsable sanitario') &&
+                                 !err.includes('Coincidencia confirmada')
               );
               const combinedErrors = [...filteredErrors, ...errors];
 
@@ -1002,9 +1025,10 @@ IMPORTANTE:
 
               if (currentDoc && currentDoc.validation_errors) {
                 const filteredErrors = currentDoc.validation_errors.filter(
-                  (err: string) => !err.includes('Nombre Completo del responsable sanitario no coincide') && 
-                                   !err.includes('CURP del responsable sanitario no coincide') &&
-                                   !err.includes('⚠️ Los datos del responsable sanitario no se encontraron')
+                  (err: string) => !err.includes('Nombre Completo del responsable sanitario') && 
+                                   !err.includes('CURP del responsable sanitario') &&
+                                   !err.includes('⚠️ Los datos del responsable sanitario') &&
+                                   !err.includes('Coincidencia confirmada')
                 );
                 
                 await supabaseClient
