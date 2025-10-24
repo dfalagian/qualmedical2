@@ -226,6 +226,7 @@ const ConstanciaFiscalAdmin = () => {
                                     <div className="flex gap-2 pt-4">
                                       <ImageViewer 
                                         fileUrl={selectedDoc.file_url}
+                                        imageUrls={selectedDoc.image_urls}
                                         fileName={selectedDoc.file_name}
                                         triggerText="Ver"
                                       />
@@ -247,6 +248,7 @@ const ConstanciaFiscalAdmin = () => {
 
                             <ImageViewer 
                               fileUrl={doc.file_url}
+                              imageUrls={doc.image_urls}
                               fileName={doc.file_name}
                               triggerText=""
                               triggerSize="icon"
