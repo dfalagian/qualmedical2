@@ -493,6 +493,7 @@ const SupplierDocuments = () => {
               <div className="flex justify-end gap-2 pt-4">
                 <ImageViewer 
                   fileUrl={selectedDocument.file_url}
+                  imageUrls={selectedDocument.image_urls}
                   fileName={selectedDocument.file_name}
                   triggerText="Ver"
                 />
