@@ -927,10 +927,12 @@ IMPORTANTE:
       // Obtener todos los documentos del proveedor
       const { data: supplierDocs, error: docsError } = await supabaseClient
         .from('documents')
-        .select('id, document_type, nombre_completo_ine, curp, representante_legal, extraction_status')
+        .select('id, document_type, nombre_completo_ine, curp, representante_legal, extraction_status, validation_errors')
         .eq('supplier_id', document.supplier_id)
         .in('document_type', ['ine', 'aviso_funcionamiento'])
         .eq('extraction_status', 'completed');
+      
+      console.log('Documentos encontrados para validación INE-Aviso:', supplierDocs);
 
       if (!docsError && supplierDocs) {
         const ine = supplierDocs.find(d => d.document_type === 'ine');
