@@ -259,14 +259,6 @@ const DocumentsAdmin = () => {
                               </DialogContent>
                             </Dialog>
 
-                            <ImageViewer 
-                              fileUrl={doc.file_url}
-                              imageUrls={doc.image_urls}
-                              fileName={doc.file_name}
-                              triggerText=""
-                              triggerSize="icon"
-                            />
-
                             {doc.extraction_status !== "processing" && (
                               <Button
                                 variant="outline"
