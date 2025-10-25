@@ -559,15 +559,6 @@ const Documents = () => {
                     </div>
 
                     <div className="flex gap-2">
-                      {isAdmin && (
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4 mr-1" />
-                            Ver
-                          </a>
-                        </Button>
-                      )}
-
                       {isAdmin && doc.status === "pendiente" && (
                         <>
                           <Button
