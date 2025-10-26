@@ -16,7 +16,8 @@ export function usePDFUpload() {
   const uploadPDFAsImages = async (
     file: File,
     documentId: string,
-    basePath: string
+    basePath: string,
+    maxPages: number = 20
   ): Promise<string[]> => {
     try {
       // Check if file is PDF
@@ -27,7 +28,7 @@ export function usePDFUpload() {
       setProgress({ status: 'converting', message: 'Convirtiendo PDF a imágenes...' });
       
       // Convert PDF to images
-      const { images, totalPages } = await convertPDFToImages(file);
+      const { images, totalPages } = await convertPDFToImages(file, maxPages);
       
       setProgress({
         status: 'uploading',

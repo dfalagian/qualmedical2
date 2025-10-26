@@ -28,6 +28,7 @@ const DOCUMENT_TYPES = [
 
 // Constantes de seguridad
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE_ACTA = 20 * 1024 * 1024; // 20MB para Acta Constitutiva
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
 const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.pdf'];
 
@@ -41,10 +42,13 @@ const Documents = () => {
   const [notes, setNotes] = useState("");
 
   // Validación de archivo
-  const validateFile = (file: File): string | null => {
-    // Validar tamaño
-    if (file.size > MAX_FILE_SIZE) {
-      return "El archivo es demasiado grande. Máximo 10MB.";
+  const validateFile = (file: File, documentType: string): string | null => {
+    // Validar tamaño según tipo de documento
+    const maxSize = documentType === "acta_constitutiva" ? MAX_FILE_SIZE_ACTA : MAX_FILE_SIZE;
+    const maxSizeLabel = documentType === "acta_constitutiva" ? "20MB" : "10MB";
+    
+    if (file.size > maxSize) {
+      return `El archivo es demasiado grande. Máximo ${maxSizeLabel}.`;
     }
 
     // Validar tipo MIME
@@ -92,7 +96,7 @@ const Documents = () => {
 
       // Validar todos los archivos antes de subir
       for (const file of files) {
-        const validationError = validateFile(file);
+        const validationError = validateFile(file, selectedType);
         if (validationError) {
           throw new Error(`${file.name}: ${validationError}`);
         }
@@ -156,7 +160,9 @@ const Documents = () => {
 
           // Convertir PDF a imágenes y actualizar el documento
           try {
-            await uploadPDFAsImages(file, insertedDoc.id, basePath);
+            // Usar 30 páginas para Acta Constitutiva, 20 para otros
+            const maxPages = selectedType === "acta_constitutiva" ? 30 : 20;
+            await uploadPDFAsImages(file, insertedDoc.id, basePath, maxPages);
             toast.success(`✓ ${file.name} convertido y subido`);
           } catch (error) {
             console.error("Error convirtiendo PDF:", error);
@@ -412,7 +418,7 @@ const Documents = () => {
                       
                       const validFiles: File[] = [];
                       for (const file of selectedFiles) {
-                        const error = validateFile(file);
+                        const error = validateFile(file, selectedType);
                         if (error) {
                           toast.error(`${file.name}: ${error}`);
                           e.target.value = '';
