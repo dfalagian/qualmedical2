@@ -16,6 +16,8 @@ export async function convertPDFToImages(
   maxPages: number = 20
 ): Promise<PDFToImagesResult> {
   try {
+    console.log(`[PDF Converter] Iniciando conversión - maxPages permitido: ${maxPages}`);
+    
     // Read PDF file as ArrayBuffer
     const arrayBuffer = await pdfFile.arrayBuffer();
     
@@ -24,10 +26,12 @@ export async function convertPDFToImages(
     const pdfDocument = await loadingTask.promise;
     
     const totalPages = Math.min(pdfDocument.numPages, maxPages);
+    console.log(`[PDF Converter] PDF tiene ${pdfDocument.numPages} páginas. Procesaremos ${totalPages} páginas`);
     const images: Blob[] = [];
     
     // Process each page
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      console.log(`[PDF Converter] Procesando página ${pageNum} de ${totalPages}`);
       const page = await pdfDocument.getPage(pageNum);
       
       // Set scale for better quality (2x)
@@ -67,12 +71,14 @@ export async function convertPDFToImages(
       images.push(blob);
     }
     
+    console.log(`[PDF Converter] Conversión completada. Total de imágenes generadas: ${images.length}`);
+    
     return {
       images,
       totalPages,
     };
   } catch (error) {
-    console.error('Error converting PDF to images:', error);
+    console.error('[PDF Converter] Error converting PDF to images:', error);
     throw error;
   }
 }

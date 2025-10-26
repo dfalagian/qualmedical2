@@ -20,6 +20,8 @@ export function usePDFUpload() {
     maxPages: number = 20
   ): Promise<string[]> => {
     try {
+      console.log(`[PDF Upload] Iniciando carga - maxPages recibido: ${maxPages}`);
+      
       // Check if file is PDF
       if (!file.type.includes('pdf')) {
         throw new Error('El archivo debe ser un PDF');
@@ -29,6 +31,7 @@ export function usePDFUpload() {
       
       // Convert PDF to images
       const { images, totalPages } = await convertPDFToImages(file, maxPages);
+      console.log(`[PDF Upload] Conversión completada: ${images.length} imágenes de ${totalPages} páginas`);
       
       setProgress({
         status: 'uploading',
