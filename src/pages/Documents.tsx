@@ -160,8 +160,8 @@ const Documents = () => {
 
           // Convertir PDF a imágenes y actualizar el documento
           try {
-            // Usar 30 páginas para Acta Constitutiva, 20 para otros
-            const maxPages = selectedType === "acta_constitutiva" ? 30 : 20;
+            // Usar 50 páginas para Acta Constitutiva, 20 para otros
+            const maxPages = selectedType === "acta_constitutiva" ? 50 : 20;
             await uploadPDFAsImages(file, insertedDoc.id, basePath, maxPages);
             toast.success(`✓ ${file.name} convertido y subido`);
           } catch (error) {
@@ -439,7 +439,7 @@ const Documents = () => {
                     <br />
                     <span className="text-primary">
                       {selectedType === "acta_constitutiva"
-                        ? "Los PDFs se convertirán automáticamente a imágenes (máx. 30 páginas)."
+                        ? "Los PDFs se convertirán automáticamente a imágenes (máx. 50 páginas)."
                         : "Los PDFs se convertirán automáticamente a imágenes (máx. 20 páginas)."}
                     </span>
                   </p>
