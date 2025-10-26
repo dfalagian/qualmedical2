@@ -27,95 +27,80 @@ IMPORTANTE: Puede ser una página parcial o fragmento del acta. Solo necesitamos
 
 Sé flexible: el documento puede estar incompleto, ser una página interna, o no tener todos los elementos formales (sellos, firmas). Lo importante es que contenga datos del acta constitutiva.`,
 
-    'constancia_fiscal': `Analiza esta imagen y determina si es realmente una CONSTANCIA DE SITUACIÓN FISCAL mexicana del SAT.
+    'constancia_fiscal': `Analiza esta imagen y determina si contiene información de una CONSTANCIA DE SITUACIÓN FISCAL del SAT.
 
-Una constancia fiscal válida debe contener:
-- Logo del SAT (Servicio de Administración Tributaria)
+Solo necesitamos verificar que contenga ALGUNOS de estos datos:
 - RFC del contribuyente
 - Razón social o nombre
 - Régimen fiscal
 - Actividades económicas
-- Domicilio fiscal registrado
+- Domicilio fiscal
 - Código postal
 - Fecha de emisión
-- Código de barras o QR del SAT
 
-NO es válida si es:
-- Un ticket de compra
-- Una foto casual sin relación
-- Un recibo de servicios
-- Una identificación
-- Una captura de pantalla de baja calidad
-- Un documento que no es del SAT
+✅ ES VÁLIDA si la imagen contiene información fiscal del SAT y al menos 3 de los datos anteriores.
 
-Analiza cuidadosamente y responde con honestidad.`,
+❌ NO es válida SOLO si es:
+- Un ticket de compra común
+- Una foto casual sin documentos
+- Una identificación personal (INE)
+- Un recibo de servicios básicos
 
-    'comprobante_domicilio': `Analiza esta imagen y determina si es realmente un COMPROBANTE DE DOMICILIO válido (recibo de luz, agua, teléfono, predial, etc.).
+No importa si falta el logo, código de barras, o si la calidad no es perfecta. Lo importante es que contenga datos fiscales.`,
 
-Un comprobante de domicilio válido debe contener:
-- Logo de la empresa de servicios (CFE, Telmex, gobierno local, etc.)
-- Nombre del titular del servicio
-- Dirección completa y clara
+    'comprobante_domicilio': `Analiza esta imagen y determina si contiene información de un COMPROBANTE DE DOMICILIO (recibo de luz, agua, teléfono, predial, etc.).
+
+Solo necesitamos verificar que contenga estos datos básicos:
+- Nombre del titular o razón social
+- Dirección
 - Código postal
-- Fecha de emisión (no mayor a 3 meses)
-- Monto a pagar o pagado
-- Número de cuenta o servicio
+- Fecha de emisión
 
-NO es válido si es:
-- Un ticket de compra
-- Una foto casual sin relación
-- Una identificación
-- Una captura de pantalla de baja calidad
-- Un documento muy antiguo (más de 3 meses)
-- Un documento extranjero
+✅ ES VÁLIDO si la imagen contiene información de un recibo de servicios (CFE, agua, teléfono, predial, etc.) con los datos anteriores.
 
-Analiza cuidadosamente y responde con honestidad.`,
+❌ NO es válido SOLO si es:
+- Un ticket de compra en tienda
+- Una foto casual sin documentos
+- Una identificación personal
 
-    'aviso_funcionamiento': `Analiza esta imagen y determina si es realmente un AVISO DE FUNCIONAMIENTO mexicano oficial o una página interna del mismo.
+IMPORTANTE: Ignora completamente advertencias como "ESTE DOCUMENTO NO ES UN COMPROBANTE FISCAL" - eso NO importa. Solo nos interesa que contenga los datos de domicilio necesarios. La fecha puede ser de cualquier momento, no hay límite de 3 meses.`,
 
-IMPORTANTE: El Aviso de Funcionamiento suele ser un documento MULTIPÁGINA. 
+    'aviso_funcionamiento': `Analiza esta imagen y determina si contiene información de un AVISO DE FUNCIONAMIENTO mexicano.
 
-Si la imagen muestra:
-- Primera página: Debe contener encabezado de autoridad (COFEPRIS, SSA, etc.), razón social, dirección, número de registro/folio, sellos oficiales, fecha de expedición
-- Página interna (ej: Apartado 5): Puede mostrar secciones específicas del formulario oficial como "Datos del responsable sanitario" con campos numerados y formato oficial, aunque NO tenga encabezados, sellos o número de folio
+Solo necesitamos verificar que contenga ALGUNOS de estos datos:
+- Razón social de la empresa
+- Domicilio del establecimiento
+- Actividad económica
+- Fecha de emisión
 
-✅ ES VÁLIDO si:
-- Es la página principal completa con todos los elementos oficiales
-- Es una página interna que claramente muestra apartados/secciones del formulario oficial de aviso de funcionamiento (ej: "Apartado 5: Datos del responsable sanitario")
-- Tiene el formato y estructura de un formulario gubernamental oficial, aunque sea una página sin sellos
+✅ ES VÁLIDO si la imagen contiene información relacionada con aviso de funcionamiento sanitario y al menos 2 de los datos anteriores. Puede ser una página completa o un fragmento, con o sin sellos oficiales.
 
-❌ NO es válido si es:
-- Un ticket de compra
-- Una foto casual sin relación
-- Una factura o recibo
-- Una captura de pantalla de baja calidad
-- Un documento extranjero
-- Un formulario que claramente no es gubernamental
+❌ NO es válido SOLO si es:
+- Un ticket de compra común
+- Una foto casual sin documentos
+- Una factura o recibo de servicios
+- Una identificación personal
 
-Si ves apartados numerados con formato oficial (como "5. Datos del responsable sanitario"), es una página válida del aviso de funcionamiento.`,
+No importa si es página principal o interna, con o sin sellos. Lo importante es que contenga datos del aviso de funcionamiento.`,
 
-    'ine': `Analiza esta imagen y determina si es realmente una CREDENCIAL INE (Instituto Nacional Electoral) mexicana oficial.
+    'ine': `Analiza esta imagen y determina si contiene información de una CREDENCIAL INE mexicana.
 
-Una credencial INE válida debe contener:
-- Logo del INE
+Solo necesitamos verificar que contenga ALGUNOS de estos datos:
 - Fotografía del titular
 - Nombre completo del titular
 - CURP (18 caracteres)
-- Dirección del titular
 - Clave de elector
-- Elementos de seguridad (hologramas, marcas de agua)
-- Vigencia de la credencial
 
-NO es válida si es:
-- Una foto casual sin relación
+✅ ES VÁLIDA si la imagen muestra una credencial del INE (frente o reverso) con al menos 2 de los datos anteriores.
+
+❌ NO es válida SOLO si es:
+- Una foto casual sin documentos
 - Una identificación extranjera
 - Una licencia de conducir
 - Un pasaporte
-- Una captura de pantalla de baja calidad
-- Una credencial vencida o muy deteriorada
-- Un documento diferente
+- Otro tipo de documento
 
-Analiza cuidadosamente y responde con honestidad.`
+No importa si está vencida, deteriorada, o sin hologramas visibles. Lo importante es que sea una credencial INE con los datos necesarios.`
   };
 
   return prompts[documentType] || 'Analiza si este documento es válido y del tipo correcto.';
@@ -331,8 +316,8 @@ serve(async (req) => {
     console.log('Resultado de validación:', validationResult);
 
     // Si el documento no es válido, marcarlo y no continuar con la extracción
-    // Para acta_constitutiva somos más permisivos (umbral de 30), para otros documentos mantenemos 50
-    const confidenceThreshold = document.document_type === 'acta_constitutiva' ? 30 : 50;
+    // Somos permisivos con todos los documentos (umbral de 30)
+    const confidenceThreshold = 30;
     
     if (!validationResult.is_valid_type || validationResult.confidence_score < confidenceThreshold) {
       console.log('Documento rechazado por IA - no es del tipo correcto o confianza baja');
