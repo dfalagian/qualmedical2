@@ -6,8 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, Camera, Loader2, X } from "lucide-react";
+import { Upload, Camera, Loader2, X, Save, History } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/useAuth";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const MedicineCounter = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -16,9 +20,113 @@ const MedicineCounter = () => {
   const [result, setResult] = useState<{ count: number | null; analysis: string } | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<string>("");
+  const [notes, setNotes] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Fetch suppliers (proveedores)
+  const { data: suppliers } = useQuery({
+    queryKey: ["suppliers"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, company_name")
+        .order("full_name");
+      
+      if (error) throw error;
+      
+      // Filter out admins
+      const { data: nonAdmins } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .neq("role", "admin");
+      
+      const nonAdminIds = nonAdmins?.map(r => r.user_id) || [];
+      return data?.filter(p => nonAdminIds.includes(p.id)) || [];
+    },
+  });
+
+  // Fetch medicine count history
+  const { data: countHistory } = useQuery({
+    queryKey: ["medicine_counts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("medicine_counts")
+        .select(`
+          *,
+          supplier:profiles!medicine_counts_supplier_id_fkey(full_name, company_name)
+        `)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!result || !preview || !selectedSupplier) {
+        throw new Error("Faltan datos requeridos");
+      }
+
+      // Upload image to storage
+      const fileName = `${selectedSupplier}_${Date.now()}.jpg`;
+      const base64Data = preview.split(',')[1];
+      const blob = await fetch(preview).then(r => r.blob());
+      
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(`medicine-counts/${fileName}`, blob);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("documents")
+        .getPublicUrl(`medicine-counts/${fileName}`);
+
+      // Save record
+      const { error: insertError } = await supabase
+        .from("medicine_counts")
+        .insert({
+          supplier_id: selectedSupplier,
+          count: result.count || 0,
+          analysis: result.analysis,
+          image_url: publicUrl,
+          notes: notes || null,
+          created_by: (await supabase.auth.getUser()).data.user?.id
+        });
+
+      if (insertError) throw insertError;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Registro guardado",
+        description: "El conteo se guardó correctamente",
+      });
+      queryClient.invalidateQueries({ queryKey: ["medicine_counts"] });
+      
+      // Reset form
+      setPreview(null);
+      setResult(null);
+      setSelectedSupplier("");
+      setNotes("");
+      setSelectedFile(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo guardar el registro",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -180,10 +288,28 @@ const MedicineCounter = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {isAdmin && (
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-select">Proveedor</Label>
+                  <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
+                    <SelectTrigger id="supplier-select">
+                      <SelectValue placeholder="Selecciona un proveedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliers?.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id}>
+                          {supplier.company_name || supplier.full_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Button
                   onClick={openCamera}
-                  disabled={isAnalyzing}
+                  disabled={isAnalyzing || (isAdmin && !selectedSupplier)}
                   variant="outline"
                   className="w-full h-20 sm:h-24 flex flex-col items-center justify-center gap-2"
                 >
@@ -203,8 +329,9 @@ const MedicineCounter = () => {
                     id="image-upload"
                     type="file"
                     accept="image/*"
+                    capture="environment"
                     onChange={handleFileSelect}
-                    disabled={isAnalyzing}
+                    disabled={isAnalyzing || (isAdmin && !selectedSupplier)}
                     className="hidden"
                   />
                 </Label>
@@ -263,6 +390,92 @@ const MedicineCounter = () => {
                   <div className="p-3 sm:p-4 rounded-lg bg-muted whitespace-pre-wrap text-xs sm:text-sm">
                     {result.analysis}
                   </div>
+                </div>
+
+                {isAdmin && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="notes">Notas Adicionales (Opcional)</Label>
+                      <Textarea
+                        id="notes"
+                        placeholder="Agrega cualquier observación adicional..."
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+
+                    <Button
+                      onClick={() => saveMutation.mutate()}
+                      disabled={saveMutation.isPending || !selectedSupplier}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {saveMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Guardando...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Guardar Registro
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {isAdmin && countHistory && countHistory.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <History className="h-5 w-5" />
+                  Historial de Conteos
+                </CardTitle>
+                <CardDescription>Últimos 10 registros</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {countHistory.map((record: any) => (
+                    <div
+                      key={record.id}
+                      className="flex items-start justify-between p-3 sm:p-4 border rounded-lg hover:bg-accent/5 transition-colors"
+                    >
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm sm:text-base">
+                            {record.supplier?.company_name || record.supplier?.full_name}
+                          </span>
+                          <span className="text-xs sm:text-sm text-muted-foreground">
+                            {new Date(record.created_at).toLocaleDateString('es-MX', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                          Cajas contadas: <span className="font-semibold text-primary">{record.count}</span>
+                        </p>
+                        {record.notes && (
+                          <p className="text-xs text-muted-foreground italic">{record.notes}</p>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.open(record.image_url, '_blank')}
+                      >
+                        Ver imagen
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>

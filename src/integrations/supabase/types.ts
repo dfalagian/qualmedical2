@@ -317,6 +317,39 @@ export type Database = {
           },
         ]
       }
+      medicine_counts: {
+        Row: {
+          analysis: string | null
+          count: number
+          created_at: string
+          created_by: string
+          id: string
+          image_url: string
+          notes: string | null
+          supplier_id: string
+        }
+        Insert: {
+          analysis?: string | null
+          count: number
+          created_at?: string
+          created_by: string
+          id?: string
+          image_url: string
+          notes?: string | null
+          supplier_id: string
+        }
+        Update: {
+          analysis?: string | null
+          count?: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          image_url?: string
+          notes?: string | null
+          supplier_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           created_at: string | null
