@@ -138,23 +138,46 @@ serve(async (req) => {
 
     console.log("Profile created successfully");
 
-    // Assign role (using upsert to handle cases where role already exists)
-    console.log("Assigning role:", role);
-    const { error: roleInsertError } = await supabaseAdmin
+    // Assign role - CRITICAL: This must succeed or the user won't have proper access
+    console.log("Assigning role:", role, "to user:", authData.user.id);
+    
+    // First, try to insert the role
+    const { data: insertedRole, error: roleInsertError } = await supabaseAdmin
       .from("user_roles")
-      .upsert({
+      .insert({
         user_id: authData.user.id,
         role,
-      }, {
-        onConflict: 'user_id,role'
-      });
+      })
+      .select()
+      .single();
 
     if (roleInsertError) {
       console.error("Role insert error:", roleInsertError);
-      throw new Error("Error al asignar rol: " + roleInsertError.message);
+      console.error("Error details:", JSON.stringify(roleInsertError, null, 2));
+      
+      // If it's a duplicate error, check if role already exists
+      if (roleInsertError.code === '23505') {
+        console.log("Role already exists, checking if it's correct");
+        const { data: existingRole, error: checkError } = await supabaseAdmin
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", authData.user.id)
+          .eq("role", role)
+          .single();
+        
+        if (checkError || !existingRole) {
+          console.error("Role check error or role doesn't match:", checkError);
+          throw new Error("Error al verificar rol del usuario: " + (checkError?.message || "Rol no coincide"));
+        }
+        console.log("Existing role is correct:", existingRole.role);
+      } else {
+        throw new Error("Error al asignar rol: " + roleInsertError.message);
+      }
+    } else {
+      console.log("Role assigned successfully:", insertedRole);
     }
 
-    console.log("User created successfully:", authData.user.id);
+    console.log("User created successfully with role:", authData.user.id);
 
     return new Response(
       JSON.stringify({ success: true, user: authData.user }),
