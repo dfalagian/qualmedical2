@@ -160,44 +160,44 @@ const MedicineCounter = () => {
 
   return (
     <DashboardLayout>
-      <div className="container mx-auto py-8 px-4 max-w-4xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Contador de Cajas de Medicamentos</h1>
-          <p className="text-muted-foreground">
-            Sube una imagen de una pila de medicamentos para contar automáticamente las cajas
+      <div className="w-full py-4 px-2 sm:py-8 sm:px-4 max-w-4xl mx-auto">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2">Contador de Cajas de Medicamentos</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Toma una foto o sube una imagen para contar automáticamente las cajas
           </p>
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid gap-4 sm:gap-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                 <Camera className="h-5 w-5" />
                 Cargar Imagen
               </CardTitle>
-              <CardDescription>
-                Selecciona una foto de la pila de medicamentos que deseas analizar
+              <CardDescription className="text-sm">
+                Selecciona una opción para comenzar
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Button
                   onClick={openCamera}
                   disabled={isAnalyzing}
                   variant="outline"
-                  className="w-full h-24 flex flex-col items-center justify-center gap-2"
+                  className="w-full h-20 sm:h-24 flex flex-col items-center justify-center gap-2"
                 >
-                  <Camera className="h-8 w-8" />
-                  <span>Tomar Foto</span>
+                  <Camera className="h-6 w-6 sm:h-8 sm:w-8" />
+                  <span className="text-sm sm:text-base">Tomar Foto</span>
                 </Button>
                 
                 <Label
                   htmlFor="image-upload"
                   className="cursor-pointer"
                 >
-                  <div className="w-full h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
-                    <Upload className="h-8 w-8" />
-                    <span>Subir Imagen</span>
+                  <div className="w-full h-20 sm:h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
+                    <Upload className="h-6 w-6 sm:h-8 sm:w-8" />
+                    <span className="text-sm sm:text-base">Subir Imagen</span>
                   </div>
                   <Input
                     id="image-upload"
@@ -216,7 +216,7 @@ const MedicineCounter = () => {
                     <img
                       src={preview}
                       alt="Vista previa"
-                      className="w-full h-auto max-h-96 object-contain"
+                      className="w-full h-auto max-h-[300px] sm:max-h-96 object-contain"
                     />
                   </div>
 
@@ -246,21 +246,21 @@ const MedicineCounter = () => {
           {result && (
             <Card>
               <CardHeader>
-                <CardTitle>Resultados del Análisis</CardTitle>
+                <CardTitle className="text-lg sm:text-xl">Resultados del Análisis</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {result.count !== null && (
-                  <div className="p-6 rounded-lg bg-primary/10 border-2 border-primary">
+                  <div className="p-4 sm:p-6 rounded-lg bg-primary/10 border-2 border-primary">
                     <div className="text-center">
-                      <p className="text-sm text-muted-foreground mb-2">Total de Cajas Detectadas</p>
-                      <p className="text-5xl font-bold text-primary">{result.count}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-2">Total de Cajas Detectadas</p>
+                      <p className="text-4xl sm:text-5xl font-bold text-primary">{result.count}</p>
                     </div>
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <Label>Análisis Detallado</Label>
-                  <div className="p-4 rounded-lg bg-muted whitespace-pre-wrap">
+                  <Label className="text-sm sm:text-base">Análisis Detallado</Label>
+                  <div className="p-3 sm:p-4 rounded-lg bg-muted whitespace-pre-wrap text-xs sm:text-sm">
                     {result.analysis}
                   </div>
                 </div>
@@ -270,26 +270,27 @@ const MedicineCounter = () => {
         </div>
 
         <Dialog open={showCamera} onOpenChange={(open) => !open && closeCamera()}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-[95vw] sm:max-w-3xl p-4 sm:p-6">
             <DialogHeader>
-              <DialogTitle className="flex items-center justify-between">
+              <DialogTitle className="flex items-center justify-between text-base sm:text-lg">
                 <span>Capturar Foto</span>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={closeCamera}
+                  className="h-8 w-8"
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="relative rounded-lg overflow-hidden bg-black">
+              <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
                 <video
                   ref={videoRef}
                   autoPlay
                   playsInline
-                  className="w-full h-auto"
+                  className="w-full h-full object-cover"
                 />
               </div>
               <Button
