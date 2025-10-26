@@ -16,14 +16,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 const MedicineCounter = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [deliveryDocFile, setDeliveryDocFile] = useState<File | null>(null);
+  const [deliveryDocPreview, setDeliveryDocPreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<{ count: number | null; analysis: string } | null>(null);
   const [showCamera, setShowCamera] = useState(false);
+  const [showDeliveryCamera, setShowDeliveryCamera] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement>(null);
+  const deliveryVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const deliveryCanvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
@@ -76,9 +81,8 @@ const MedicineCounter = () => {
         throw new Error("Faltan datos requeridos");
       }
 
-      // Upload image to storage
+      // Upload medicine count image to storage
       const fileName = `${selectedSupplier}_${Date.now()}.jpg`;
-      const base64Data = preview.split(',')[1];
       const blob = await fetch(preview).then(r => r.blob());
       
       const { error: uploadError } = await supabase.storage
@@ -91,6 +95,25 @@ const MedicineCounter = () => {
         .from("documents")
         .getPublicUrl(`medicine-counts/${fileName}`);
 
+      // Upload delivery document if provided
+      let deliveryDocUrl = null;
+      if (deliveryDocPreview) {
+        const deliveryFileName = `${selectedSupplier}_delivery_${Date.now()}.jpg`;
+        const deliveryBlob = await fetch(deliveryDocPreview).then(r => r.blob());
+        
+        const { error: deliveryUploadError } = await supabase.storage
+          .from("documents")
+          .upload(`medicine-counts/${deliveryFileName}`, deliveryBlob);
+
+        if (deliveryUploadError) throw deliveryUploadError;
+
+        const { data: { publicUrl: deliveryPublicUrl } } = supabase.storage
+          .from("documents")
+          .getPublicUrl(`medicine-counts/${deliveryFileName}`);
+        
+        deliveryDocUrl = deliveryPublicUrl;
+      }
+
       // Save record
       const { error: insertError } = await supabase
         .from("medicine_counts")
@@ -99,6 +122,7 @@ const MedicineCounter = () => {
           count: result.count || 0,
           analysis: result.analysis,
           image_url: publicUrl,
+          delivery_document_url: deliveryDocUrl,
           notes: notes || null,
           created_by: (await supabase.auth.getUser()).data.user?.id
         });
@@ -114,10 +138,12 @@ const MedicineCounter = () => {
       
       // Reset form
       setPreview(null);
+      setDeliveryDocPreview(null);
       setResult(null);
       setSelectedSupplier("");
       setNotes("");
       setSelectedFile(null);
+      setDeliveryDocFile(null);
     },
     onError: (error: any) => {
       toast({
@@ -146,6 +172,28 @@ const MedicineCounter = () => {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDeliveryDocSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Error",
+          description: "Por favor selecciona una imagen válida",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setDeliveryDocFile(file);
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setDeliveryDocPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -230,6 +278,40 @@ const MedicineCounter = () => {
     setShowCamera(false);
   };
 
+  const openDeliveryCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false
+      });
+      
+      setStream(mediaStream);
+      setShowDeliveryCamera(true);
+      
+      // Wait for video element to be available
+      setTimeout(() => {
+        if (deliveryVideoRef.current) {
+          deliveryVideoRef.current.srcObject = mediaStream;
+        }
+      }, 100);
+    } catch (error) {
+      console.error("Error accessing camera:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo acceder a la cámara. Verifica los permisos.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const closeDeliveryCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setShowDeliveryCamera(false);
+  };
+
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current) return;
 
@@ -262,6 +344,41 @@ const MedicineCounter = () => {
       toast({
         title: "Foto capturada",
         description: "Ahora puedes analizar la imagen",
+      });
+    }, 'image/jpeg', 0.95);
+  };
+
+  const captureDeliveryDoc = () => {
+    if (!deliveryVideoRef.current || !deliveryCanvasRef.current) return;
+
+    const video = deliveryVideoRef.current;
+    const canvas = deliveryCanvasRef.current;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0);
+    
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      
+      const file = new File([blob], 'delivery-document.jpg', { type: 'image/jpeg' });
+      setDeliveryDocFile(file);
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setDeliveryDocPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      
+      closeDeliveryCamera();
+      
+      toast({
+        title: "Documento capturado",
+        description: "Documento de entrega guardado",
       });
     }, 'image/jpeg', 0.95);
   };
@@ -394,6 +511,60 @@ const MedicineCounter = () => {
 
                 {isAdmin && (
                   <>
+                    <div className="space-y-4 border-t pt-4">
+                      <Label className="text-base font-semibold">Documento de Entrega</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Captura la hoja firmada de quien recibe el medicamento
+                      </p>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Button
+                          onClick={openDeliveryCamera}
+                          variant="outline"
+                          className="w-full h-20 flex flex-col items-center justify-center gap-2"
+                        >
+                          <Camera className="h-6 w-6" />
+                          <span className="text-sm">Tomar Foto del Documento</span>
+                        </Button>
+                        
+                        <Label htmlFor="delivery-doc-upload" className="cursor-pointer">
+                          <div className="w-full h-20 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
+                            <Upload className="h-6 w-6" />
+                            <span className="text-sm">Subir Documento</span>
+                          </div>
+                          <Input
+                            id="delivery-doc-upload"
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleDeliveryDocSelect}
+                            className="hidden"
+                          />
+                        </Label>
+                      </div>
+
+                      {deliveryDocPreview && (
+                        <div className="relative rounded-lg overflow-hidden border bg-muted">
+                          <img
+                            src={deliveryDocPreview}
+                            alt="Documento de entrega"
+                            className="w-full h-auto max-h-[300px] object-contain"
+                          />
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-2 right-2"
+                            onClick={() => {
+                              setDeliveryDocPreview(null);
+                              setDeliveryDocFile(null);
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="notes">Notas Adicionales (Opcional)</Label>
                       <Textarea
@@ -467,13 +638,24 @@ const MedicineCounter = () => {
                           <p className="text-xs text-muted-foreground italic">{record.notes}</p>
                         )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.open(record.image_url, '_blank')}
-                      >
-                        Ver imagen
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(record.image_url, '_blank')}
+                        >
+                          Ver cajas
+                        </Button>
+                        {record.delivery_document_url && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(record.delivery_document_url, '_blank')}
+                          >
+                            Ver documento
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -486,7 +668,7 @@ const MedicineCounter = () => {
           <DialogContent className="max-w-[95vw] sm:max-w-3xl p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle className="flex items-center justify-between text-base sm:text-lg">
-                <span>Capturar Foto</span>
+                <span>Capturar Foto de Cajas</span>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -516,6 +698,43 @@ const MedicineCounter = () => {
               </Button>
             </div>
             <canvas ref={canvasRef} className="hidden" />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showDeliveryCamera} onOpenChange={(open) => !open && closeDeliveryCamera()}>
+          <DialogContent className="max-w-[95vw] sm:max-w-3xl p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between text-base sm:text-lg">
+                <span>Capturar Documento de Entrega</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={closeDeliveryCamera}
+                  className="h-8 w-8"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
+                <video
+                  ref={deliveryVideoRef}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <Button
+                onClick={captureDeliveryDoc}
+                className="w-full"
+                size="lg"
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                Capturar Documento
+              </Button>
+            </div>
+            <canvas ref={deliveryCanvasRef} className="hidden" />
           </DialogContent>
         </Dialog>
       </div>

@@ -323,6 +323,7 @@ export type Database = {
           count: number
           created_at: string
           created_by: string
+          delivery_document_url: string | null
           id: string
           image_url: string
           notes: string | null
@@ -333,6 +334,7 @@ export type Database = {
           count: number
           created_at?: string
           created_by: string
+          delivery_document_url?: string | null
           id?: string
           image_url: string
           notes?: string | null
@@ -343,6 +345,7 @@ export type Database = {
           count?: number
           created_at?: string
           created_by?: string
+          delivery_document_url?: string | null
           id?: string
           image_url?: string
           notes?: string | null
