@@ -370,7 +370,7 @@ const Documents = () => {
                     <p className="text-sm text-blue-700 dark:text-blue-400">
                       Sube imágenes en formato <strong>JPG, JPEG, PNG o PDF</strong>.
                       <br />
-                      <strong>Los archivos PDF se convertirán automáticamente a imágenes</strong> (máximo 20 páginas).
+                      <strong>Los archivos PDF se convertirán automáticamente a imágenes</strong>.
                       <br />
                       <span className="text-xs">Puedes seleccionar hasta 20 archivos a la vez. Los PDFs escaneados se procesarán página por página.</span>
                     </p>
@@ -432,9 +432,16 @@ const Documents = () => {
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Puedes seleccionar hasta 20 archivos. Máximo 10MB por archivo. JPG, JPEG, PNG o PDF.
+                    Puedes seleccionar hasta 20 archivos. 
+                    {selectedType === "acta_constitutiva" 
+                      ? "Máximo 20MB por archivo (Acta Constitutiva). JPG, JPEG, PNG o PDF."
+                      : "Máximo 10MB por archivo. JPG, JPEG, PNG o PDF."}
                     <br />
-                    <span className="text-primary">Los PDFs se convertirán automáticamente a imágenes (máx. 20 páginas).</span>
+                    <span className="text-primary">
+                      {selectedType === "acta_constitutiva"
+                        ? "Los PDFs se convertirán automáticamente a imágenes (máx. 30 páginas)."
+                        : "Los PDFs se convertirán automáticamente a imágenes (máx. 20 páginas)."}
+                    </span>
                   </p>
                   {files.length > 0 && (
                     <div className="mt-3 p-3 bg-muted rounded-md">
