@@ -9,25 +9,23 @@ const corsHeaders = {
 // Función auxiliar para generar prompts de validación
 function getValidationPrompt(documentType: string): string {
   const prompts: Record<string, string> = {
-    'acta_constitutiva': `Analiza esta imagen y determina si es realmente un ACTA CONSTITUTIVA mexicana oficial.
+    'acta_constitutiva': `Analiza esta imagen y determina si contiene información de un ACTA CONSTITUTIVA mexicana.
 
-Un acta constitutiva válida debe contener:
-- Encabezado de notaría pública
-- Datos del notario público
+IMPORTANTE: Puede ser una página parcial o fragmento del acta. Solo necesitamos verificar que contenga AL MENOS UNO de estos datos:
 - Razón social de la empresa
-- Nombre(s) del representante legal
-- Objeto social de la empresa
+- Nombre del representante legal
+- Objeto social (actividades de la empresa)
 - Información del registro público
-- Sellos y firmas oficiales
 
-NO es válida si es:
-- Un ticket de compra
-- Una foto casual sin relación
-- Un documento diferente (factura, recibo, identificación, etc.)
-- Una captura de pantalla o imagen de baja calidad
-- Un documento extranjero o no mexicano
+✅ ES VÁLIDA si la imagen contiene texto relacionado con constitución de sociedad y al menos uno de los datos anteriores.
 
-Analiza cuidadosamente y responde con honestidad.`,
+❌ NO es válida SOLO si es:
+- Un ticket de compra o recibo común
+- Una foto casual sin relación con documentos legales
+- Una identificación personal (INE, pasaporte)
+- Una factura o comprobante fiscal
+
+Sé flexible: el documento puede estar incompleto, ser una página interna, o no tener todos los elementos formales (sellos, firmas). Lo importante es que contenga datos del acta constitutiva.`,
 
     'constancia_fiscal': `Analiza esta imagen y determina si es realmente una CONSTANCIA DE SITUACIÓN FISCAL mexicana del SAT.
 
@@ -333,11 +331,14 @@ serve(async (req) => {
     console.log('Resultado de validación:', validationResult);
 
     // Si el documento no es válido, marcarlo y no continuar con la extracción
-    if (!validationResult.is_valid_type || validationResult.confidence_score < 50) {
+    // Para acta_constitutiva somos más permisivos (umbral de 30), para otros documentos mantenemos 50
+    const confidenceThreshold = document.document_type === 'acta_constitutiva' ? 30 : 50;
+    
+    if (!validationResult.is_valid_type || validationResult.confidence_score < confidenceThreshold) {
       console.log('Documento rechazado por IA - no es del tipo correcto o confianza baja');
       
       const invalidationErrors = [
-        `⚠️ DOCUMENTO SOSPECHOSO: ${validationResult.validation_notes}`,
+        `⚠️ DOCUMENTO NO VÁLIDO: ${validationResult.validation_notes}`,
         ...validationResult.detected_issues.map((issue: string) => `• ${issue}`)
       ];
 
