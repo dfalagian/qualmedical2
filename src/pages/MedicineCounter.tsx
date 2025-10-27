@@ -81,6 +81,17 @@ const MedicineCounter = () => {
         throw new Error("Faltan datos requeridos");
       }
 
+      // Verify user is authenticated and is admin
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        throw new Error("Debes iniciar sesión para guardar registros");
+      }
+
+      if (!isAdmin) {
+        throw new Error("Solo los administradores pueden guardar registros");
+      }
+
       // Upload medicine count image to storage
       const fileName = `${selectedSupplier}_${Date.now()}.jpg`;
       const blob = await fetch(preview).then(r => r.blob());
@@ -124,10 +135,13 @@ const MedicineCounter = () => {
           image_url: publicUrl,
           delivery_document_url: deliveryDocUrl,
           notes: notes || null,
-          created_by: (await supabase.auth.getUser()).data.user?.id
+          created_by: user.id
         });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error("Insert error:", insertError);
+        throw new Error(`Error al guardar: ${insertError.message}`);
+      }
     },
     onSuccess: () => {
       toast({
