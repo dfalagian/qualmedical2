@@ -347,14 +347,24 @@ const Messages = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isAdmin && (
+            {isAdmin && suppliers && suppliers.length > 0 && (
               <div className="mb-4">
-                <Input
-                  placeholder="Buscar por proveedor..."
-                  value={supplierFilter}
-                  onChange={(e) => setSupplierFilter(e.target.value)}
-                  className="max-w-md"
-                />
+                <Label htmlFor="supplier-filter" className="mb-2 block">
+                  Filtrar por proveedor
+                </Label>
+                <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                  <SelectTrigger className="max-w-md">
+                    <SelectValue placeholder="Todos los proveedores" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todos los proveedores</SelectItem>
+                    {suppliers.map((supplier: any) => (
+                      <SelectItem key={supplier.id} value={supplier.id}>
+                        {supplier.company_name || supplier.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             {messagesLoading ? (
@@ -364,15 +374,7 @@ const Messages = () => {
                 {messages
                   .filter((msg: any) => {
                     if (!isAdmin || !supplierFilter) return true;
-                    const searchLower = supplierFilter.toLowerCase();
-                    const fromCompany = msg.from_profile?.company_name?.toLowerCase() || "";
-                    const fromName = msg.from_profile?.full_name?.toLowerCase() || "";
-                    const toCompany = msg.to_profile?.company_name?.toLowerCase() || "";
-                    const toName = msg.to_profile?.full_name?.toLowerCase() || "";
-                    return fromCompany.includes(searchLower) || 
-                           fromName.includes(searchLower) ||
-                           toCompany.includes(searchLower) ||
-                           toName.includes(searchLower);
+                    return msg.from_user_id === supplierFilter || msg.to_user_id === supplierFilter;
                   })
                   .map((msg: any) => {
                   const isReceived = msg.to_user_id === user?.id;
