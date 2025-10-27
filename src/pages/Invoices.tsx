@@ -36,6 +36,7 @@ const Invoices = () => {
   const [complementoDialogOpen, setComplementoDialogOpen] = useState(false);
   const [invoiceForComplemento, setInvoiceForComplemento] = useState<string | null>(null);
   const [complementoFile, setComplementoFile] = useState<File | null>(null);
+  const [supplierFilter, setSupplierFilter] = useState("all");
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices"],
@@ -65,6 +66,21 @@ const Invoices = () => {
       return data || [];
     },
     enabled: !!selectedInvoice?.id,
+  });
+
+  // Obtener lista de proveedores para el filtro
+  const { data: suppliers } = useQuery({
+    queryKey: ["suppliers"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, company_name, email")
+        .neq("id", user?.id);
+
+      if (error) throw error;
+      return data;
+    },
   });
 
   const uploadMutation = useMutation({
@@ -379,11 +395,36 @@ const Invoices = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {isAdmin && suppliers && suppliers.length > 0 && (
+              <div className="mb-4">
+                <Label htmlFor="supplier-filter" className="mb-2 block">
+                  Filtrar por proveedor
+                </Label>
+                <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                  <SelectTrigger className="max-w-md">
+                    <SelectValue placeholder="Todos los proveedores" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los proveedores</SelectItem>
+                    {suppliers.map((supplier: any) => (
+                      <SelectItem key={supplier.id} value={supplier.id}>
+                        {supplier.company_name || supplier.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {isLoading ? (
               <p className="text-center py-8 text-muted-foreground">Cargando facturas...</p>
             ) : invoices && invoices.length > 0 ? (
               <div className="space-y-4">
-                {invoices.map((invoice: any) => (
+                {invoices
+                  .filter((invoice: any) => {
+                    if (!isAdmin || !supplierFilter || supplierFilter === "all") return true;
+                    return invoice.supplier_id === supplierFilter;
+                  })
+                  .map((invoice: any) => (
                   <div
                     key={invoice.id}
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/5 transition-colors"
