@@ -64,7 +64,7 @@ const MedicineCounter = () => {
         .from("medicine_counts")
         .select(`
           *,
-          supplier:profiles!medicine_counts_supplier_id_fkey(full_name, company_name)
+          supplier:profiles(full_name, company_name)
         `)
         .order("created_at", { ascending: false })
         .limit(10);
