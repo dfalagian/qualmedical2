@@ -29,6 +29,7 @@ const Messages = () => {
   const [replyToMessage, setReplyToMessage] = useState<any>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+  const [supplierFilter, setSupplierFilter] = useState("");
 
   const { data: messages, isLoading: messagesLoading } = useQuery({
     queryKey: ["messages"],
@@ -346,11 +347,34 @@ const Messages = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {isAdmin && (
+              <div className="mb-4">
+                <Input
+                  placeholder="Buscar por proveedor..."
+                  value={supplierFilter}
+                  onChange={(e) => setSupplierFilter(e.target.value)}
+                  className="max-w-md"
+                />
+              </div>
+            )}
             {messagesLoading ? (
               <p className="text-center py-8 text-muted-foreground">Cargando mensajes...</p>
             ) : messages && messages.length > 0 ? (
               <div className="space-y-4">
-                {messages.map((msg: any) => {
+                {messages
+                  .filter((msg: any) => {
+                    if (!isAdmin || !supplierFilter) return true;
+                    const searchLower = supplierFilter.toLowerCase();
+                    const fromCompany = msg.from_profile?.company_name?.toLowerCase() || "";
+                    const fromName = msg.from_profile?.full_name?.toLowerCase() || "";
+                    const toCompany = msg.to_profile?.company_name?.toLowerCase() || "";
+                    const toName = msg.to_profile?.full_name?.toLowerCase() || "";
+                    return fromCompany.includes(searchLower) || 
+                           fromName.includes(searchLower) ||
+                           toCompany.includes(searchLower) ||
+                           toName.includes(searchLower);
+                  })
+                  .map((msg: any) => {
                   const isReceived = msg.to_user_id === user?.id;
                   const otherParty = isReceived ? msg.from_profile : msg.to_profile;
                   const isSent = msg.from_user_id === user?.id;
