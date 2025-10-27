@@ -351,7 +351,15 @@ export type Database = {
           notes?: string | null
           supplier_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "medicine_counts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messages: {
         Row: {
