@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, Camera, Loader2, X, Save, History } from "lucide-react";
+import { Upload, Camera, Loader2, X, Save, History, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +26,7 @@ const MedicineCounter = () => {
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [viewerImage, setViewerImage] = useState<{ url: string; title: string } | null>(null);
+  const [supplierFilter, setSupplierFilter] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement>(null);
   const deliveryVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -58,7 +59,7 @@ const MedicineCounter = () => {
   });
 
   // Fetch medicine count history
-  const { data: countHistory } = useQuery({
+  const { data: allCountHistory } = useQuery({
     queryKey: ["medicine_counts"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -67,12 +68,20 @@ const MedicineCounter = () => {
           *,
           supplier:profiles(full_name, company_name)
         `)
-        .order("created_at", { ascending: false })
-        .limit(10);
+        .order("created_at", { ascending: false });
       
       if (error) throw error;
       return data;
     },
+  });
+
+  // Filter history on client side
+  const countHistory = allCountHistory?.filter((record: any) => {
+    if (!supplierFilter) return true;
+    const searchLower = supplierFilter.toLowerCase();
+    const companyName = record.supplier?.company_name?.toLowerCase() || "";
+    const fullName = record.supplier?.full_name?.toLowerCase() || "";
+    return companyName.includes(searchLower) || fullName.includes(searchLower);
   });
 
   // Save mutation
@@ -183,6 +192,32 @@ const MedicineCounter = () => {
       toast({
         title: "Error",
         description: error.message || "No se pudo guardar el registro",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (recordId: string) => {
+      const { error } = await supabase
+        .from("medicine_counts")
+        .delete()
+        .eq("id", recordId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Registro eliminado",
+        description: "El conteo se eliminó correctamente",
+      });
+      queryClient.invalidateQueries({ queryKey: ["medicine_counts"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo eliminar el registro",
         variant: "destructive",
       });
     },
@@ -641,9 +676,17 @@ const MedicineCounter = () => {
                   <History className="h-5 w-5" />
                   Historial de Conteos
                 </CardTitle>
-                <CardDescription>Últimos 10 registros</CardDescription>
+                <CardDescription>Todos los registros guardados</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="mb-4">
+                  <Input
+                    placeholder="Buscar por proveedor..."
+                    value={supplierFilter}
+                    onChange={(e) => setSupplierFilter(e.target.value)}
+                    className="max-w-md"
+                  />
+                </div>
                 <div className="space-y-3">
                   {countHistory.map((record: any) => (
                     <div
@@ -695,6 +738,18 @@ const MedicineCounter = () => {
                             Ver documento
                           </Button>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (confirm('¿Estás seguro de eliminar este registro?')) {
+                              deleteMutation.mutate(record.id);
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     </div>
                   ))}
