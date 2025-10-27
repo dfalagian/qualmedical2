@@ -29,7 +29,7 @@ const Messages = () => {
   const [replyToMessage, setReplyToMessage] = useState<any>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
-  const [supplierFilter, setSupplierFilter] = useState("");
+  const [supplierFilter, setSupplierFilter] = useState("all");
 
   const { data: messages, isLoading: messagesLoading } = useQuery({
     queryKey: ["messages"],
@@ -357,7 +357,7 @@ const Messages = () => {
                     <SelectValue placeholder="Todos los proveedores" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos los proveedores</SelectItem>
+                    <SelectItem value="all">Todos los proveedores</SelectItem>
                     {suppliers.map((supplier: any) => (
                       <SelectItem key={supplier.id} value={supplier.id}>
                         {supplier.company_name || supplier.full_name}
@@ -373,7 +373,7 @@ const Messages = () => {
               <div className="space-y-4">
                 {messages
                   .filter((msg: any) => {
-                    if (!isAdmin || !supplierFilter) return true;
+                    if (!isAdmin || !supplierFilter || supplierFilter === "all") return true;
                     return msg.from_user_id === supplierFilter || msg.to_user_id === supplierFilter;
                   })
                   .map((msg: any) => {
