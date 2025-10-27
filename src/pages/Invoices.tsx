@@ -456,13 +456,28 @@ const Invoices = () => {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = invoice.pdf_url;
-                          link.download = `factura-${invoice.invoice_number}.pdf`;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
+                        onClick={async () => {
+                          try {
+                            const urlPath = new URL(invoice.pdf_url).pathname;
+                            const filePath = urlPath.split('/').slice(-3).join('/');
+                            
+                            const { data, error } = await supabase.storage
+                              .from('invoices')
+                              .download(filePath);
+                            
+                            if (error) throw error;
+                            
+                            const url = URL.createObjectURL(data);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `factura-${invoice.invoice_number}.pdf`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                          } catch (error) {
+                            toast.error('Error al descargar el PDF');
+                          }
                         }}
                       >
                         <FileText className="h-4 w-4 mr-1" />
@@ -471,13 +486,28 @@ const Invoices = () => {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = invoice.xml_url;
-                          link.download = `factura-${invoice.invoice_number}.xml`;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
+                        onClick={async () => {
+                          try {
+                            const urlPath = new URL(invoice.xml_url).pathname;
+                            const filePath = urlPath.split('/').slice(-3).join('/');
+                            
+                            const { data, error } = await supabase.storage
+                              .from('invoices')
+                              .download(filePath);
+                            
+                            if (error) throw error;
+                            
+                            const url = URL.createObjectURL(data);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `factura-${invoice.invoice_number}.xml`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                          } catch (error) {
+                            toast.error('Error al descargar el XML');
+                          }
                         }}
                       >
                         <Download className="h-4 w-4 mr-1" />
@@ -487,13 +517,28 @@ const Invoices = () => {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = invoice.complemento_pago_url;
-                            link.download = `complemento-${invoice.invoice_number}`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
+                          onClick={async () => {
+                            try {
+                              const urlPath = new URL(invoice.complemento_pago_url).pathname;
+                              const filePath = urlPath.split('/').slice(-3).join('/');
+                              
+                              const { data, error } = await supabase.storage
+                                .from('invoices')
+                                .download(filePath);
+                              
+                              if (error) throw error;
+                              
+                              const url = URL.createObjectURL(data);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `complemento-${invoice.invoice_number}`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                              URL.revokeObjectURL(url);
+                            } catch (error) {
+                              toast.error('Error al descargar el complemento');
+                            }
                           }}
                         >
                           <Download className="h-4 w-4 mr-1" />
