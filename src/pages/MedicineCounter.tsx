@@ -81,14 +81,33 @@ const MedicineCounter = () => {
         throw new Error("Faltan datos requeridos");
       }
 
+      // Verify session is active and refresh if needed
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        throw new Error("Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.");
+      }
+
       // Verify user is authenticated and is admin
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
-        throw new Error("Debes iniciar sesión para guardar registros");
+        throw new Error("No se pudo verificar tu identidad. Intenta cerrar sesión y volver a entrar.");
       }
 
-      if (!isAdmin) {
+      // Double check admin status from database
+      const { data: roleData, error: roleError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (roleError) {
+        console.error("Role check error:", roleError);
+        throw new Error("Error al verificar permisos: " + roleError.message);
+      }
+
+      if (!roleData || roleData.role !== 'admin') {
         throw new Error("Solo los administradores pueden guardar registros");
       }
 
