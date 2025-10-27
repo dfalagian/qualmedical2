@@ -146,6 +146,7 @@ export const AuthForm = () => {
       }
 
       // Actualizar perfil (el trigger ya lo creó, solo actualizamos los datos adicionales)
+      // El rol de proveedor se asigna automáticamente mediante trigger
       const { error: profileError } = await supabase
         .from("profiles")
         .upsert({
@@ -161,18 +162,6 @@ export const AuthForm = () => {
 
       if (profileError) {
         throw new Error("Error al actualizar el perfil");
-      }
-
-      // Asignar rol de proveedor
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({
-          user_id: authData.user.id,
-          role: "proveedor",
-        });
-
-      if (roleError) {
-        throw new Error("Error al asignar rol");
       }
 
       toast.success("Cuenta creada correctamente. Puedes iniciar sesión.");
