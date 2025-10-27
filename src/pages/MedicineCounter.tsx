@@ -25,6 +25,7 @@ const MedicineCounter = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  const [viewerImage, setViewerImage] = useState<{ url: string; title: string } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const deliveryVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -675,7 +676,10 @@ const MedicineCounter = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => window.open(record.image_url, '_blank')}
+                          onClick={() => setViewerImage({ 
+                            url: record.image_url, 
+                            title: 'Foto de cajas - ' + (record.supplier?.company_name || record.supplier?.full_name) 
+                          })}
                         >
                           Ver cajas
                         </Button>
@@ -683,7 +687,10 @@ const MedicineCounter = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(record.delivery_document_url, '_blank')}
+                            onClick={() => setViewerImage({ 
+                              url: record.delivery_document_url, 
+                              title: 'Documento de entrega - ' + (record.supplier?.company_name || record.supplier?.full_name) 
+                            })}
                           >
                             Ver documento
                           </Button>
@@ -768,6 +775,33 @@ const MedicineCounter = () => {
               </Button>
             </div>
             <canvas ref={deliveryCanvasRef} className="hidden" />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!viewerImage} onOpenChange={(open) => !open && setViewerImage(null)}>
+          <DialogContent className="max-w-[95vw] sm:max-w-5xl p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between text-base sm:text-lg">
+                <span>{viewerImage?.title}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setViewerImage(null)}
+                  className="h-8 w-8"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            {viewerImage && (
+              <div className="relative rounded-lg overflow-hidden bg-muted">
+                <img
+                  src={viewerImage.url}
+                  alt={viewerImage.title}
+                  className="w-full h-auto max-h-[80vh] object-contain"
+                />
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
