@@ -145,20 +145,22 @@ export const AuthForm = () => {
         throw new Error("Error al crear la cuenta");
       }
 
-      // Crear perfil
+      // Actualizar perfil (el trigger ya lo creó, solo actualizamos los datos adicionales)
       const { error: profileError } = await supabase
         .from("profiles")
-        .insert({
+        .upsert({
           id: authData.user.id,
           email: data.email,
           full_name: data.full_name,
           company_name: data.company_name,
           rfc: data.rfc,
           phone: data.phone || null,
+        }, {
+          onConflict: 'id'
         });
 
       if (profileError) {
-        throw new Error("Error al crear el perfil");
+        throw new Error("Error al actualizar el perfil");
       }
 
       // Asignar rol de proveedor
