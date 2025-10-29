@@ -301,12 +301,12 @@ const Documents = () => {
 
       // Si se aprueba un documento de datos_bancarios, crear registros de pago
       if (status === "aprobado" && document.document_type === "datos_bancarios") {
-        // Buscar facturas pagadas del proveedor
+        // Buscar todas las facturas pendientes del proveedor (que están listas para pago)
         const { data: invoices, error: invoicesError } = await supabase
           .from("invoices")
           .select("id, amount")
           .eq("supplier_id", document.supplier_id)
-          .eq("status", "pagado");
+          .eq("status", "pendiente");
 
         if (invoicesError) throw invoicesError;
 
