@@ -29,6 +29,10 @@ const DatabaseBackup = () => {
     }
   }, [user, isAdmin, navigate]);
 
+  if (!user || !isAdmin) {
+    return null;
+  }
+
   const handleExportSchema = async () => {
     setIsExporting(true);
     setError(null);
