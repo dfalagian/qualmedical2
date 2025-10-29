@@ -30,17 +30,17 @@ const Payments = () => {
         .from("pagos")
         .select(`
           *,
-          profiles:supplier_id (
+          profiles!pagos_supplier_id_fkey (
             full_name,
             company_name,
             rfc
           ),
-          datos_bancarios:datos_bancarios_id (
+          datos_bancarios:documents!pagos_datos_bancarios_id_fkey (
             nombre_cliente,
             numero_cuenta,
             numero_cuenta_clabe
           ),
-          invoices:invoice_id (
+          invoices!pagos_invoice_id_fkey (
             invoice_number,
             amount,
             fecha_emision
