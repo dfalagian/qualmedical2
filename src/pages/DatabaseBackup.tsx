@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -23,10 +23,11 @@ const DatabaseBackup = () => {
   const [stats, setStats] = useState<BackupStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (!user || !isAdmin) {
-    navigate("/");
-    return null;
-  }
+  useEffect(() => {
+    if (!user || !isAdmin) {
+      navigate("/");
+    }
+  }, [user, isAdmin, navigate]);
 
   const handleExportSchema = async () => {
     setIsExporting(true);
