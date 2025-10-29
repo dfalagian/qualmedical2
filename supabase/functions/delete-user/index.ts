@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+
+// Schema de validación para eliminar usuario
+const DeleteUserSchema = z.object({
+  userId: z.string().uuid()
+});
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,12 +55,18 @@ serve(async (req) => {
       throw new Error('No tienes permisos de administrador');
     }
 
-    // Get user ID from request body
-    const { userId } = await req.json();
-
-    if (!userId) {
-      throw new Error('Se requiere el ID del usuario');
+    // Parse and validate request body
+    const body = await req.json();
+    
+    let validatedData;
+    try {
+      validatedData = DeleteUserSchema.parse(body);
+    } catch (error) {
+      console.error('Validation error:', error);
+      throw new Error('userId debe ser un UUID válido');
     }
+
+    const { userId } = validatedData;
 
     console.log('Deleting user:', userId);
 

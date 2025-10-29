@@ -1,5 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+
+// Schema de validación para crear usuario
+const CreateUserSchema = z.object({
+  email: z.string().email().max(255),
+  password: z.string().min(6).max(100),
+  full_name: z.string().min(1).max(100),
+  role: z.enum(['admin', 'proveedor']),
+  company_name: z.string().max(100).optional(),
+  rfc: z.string().regex(/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/).optional(),
+  phone: z.string().max(20).optional()
+});
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -72,19 +84,21 @@ serve(async (req) => {
 
     console.log("Admin verified, proceeding with user creation");
 
-    const { email, password, full_name, role, company_name, rfc, phone } = await req.json();
+    // Parse and validate request body
+    const body = await req.json();
+    
+    let validatedData;
+    try {
+      validatedData = CreateUserSchema.parse(body);
+    } catch (error) {
+      console.error('Validation error:', error);
+      throw new Error(error instanceof z.ZodError 
+        ? `Datos inválidos: ${error.errors.map(e => e.message).join(', ')}`
+        : 'Formato de datos incorrecto');
+    }
+
+    const { email, password, full_name, role, company_name, rfc, phone } = validatedData;
     console.log("Creating user with email:", email, "role:", role);
-
-    // Validate required fields
-    if (!email || !password || !full_name || !role) {
-      throw new Error("Email, contraseña, nombre completo y rol son obligatorios");
-    }
-
-    // Validate role is valid
-    const validRoles = ['admin', 'proveedor'];
-    if (!validRoles.includes(role)) {
-      throw new Error(`Rol inválido. Debe ser uno de: ${validRoles.join(', ')}`);
-    }
 
     // Create auth user
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({

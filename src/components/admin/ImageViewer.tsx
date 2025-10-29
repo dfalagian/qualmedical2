@@ -1,8 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Eye, ChevronLeft, ChevronRight } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { getSignedUrls } from "@/lib/storage";
 
 interface ImageViewerProps {
   fileUrl?: string;
@@ -22,28 +22,41 @@ export const ImageViewer = ({
   triggerVariant = "outline"
 }: ImageViewerProps) => {
   const [currentPage, setCurrentPage] = useState(0);
+  const [signedUrls, setSignedUrls] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
-  const images = useMemo(() => {
-    const urls = imageUrls && imageUrls.length > 0 ? imageUrls : fileUrl ? [fileUrl] : [];
-    return urls.map(url => {
-      // Si ya es una URL completa, retornarla directamente
-      if (url.startsWith('http')) {
-        return url;
-      }
-      
-      // Extraer el path relativo si viene de un URL completo
-      let relativePath = url;
-      if (url.includes('/documents/')) {
-        relativePath = url.split('/documents/')[1];
-      }
-      
-      // Obtener URL pública usando el path relativo
-      const { data } = supabase.storage.from('documents').getPublicUrl(relativePath);
-      return data.publicUrl;
-    });
+  const rawPaths = useMemo(() => {
+    return imageUrls && imageUrls.length > 0 ? imageUrls : fileUrl ? [fileUrl] : [];
   }, [fileUrl, imageUrls]);
 
-  const totalPages = images.length;
+  useEffect(() => {
+    const loadSignedUrls = async () => {
+      setIsLoading(true);
+      
+      const paths = rawPaths.map(url => {
+        // Si ya es una URL completa, extraer el path
+        if (url.startsWith('http')) {
+          const match = url.match(/\/documents\/(.+)$/);
+          return match ? match[1] : url;
+        }
+        
+        // Ya es un path relativo
+        return url.includes('/documents/') 
+          ? url.split('/documents/')[1] 
+          : url;
+      });
+
+      const urls = await getSignedUrls('documents', paths, 3600); // 1 hora de expiración
+      setSignedUrls(urls.filter((url): url is string => url !== null));
+      setIsLoading(false);
+    };
+
+    if (rawPaths.length > 0) {
+      loadSignedUrls();
+    }
+  }, [rawPaths]);
+
+  const totalPages = signedUrls.length;
   const hasMultiplePages = totalPages > 1;
 
   const goToNextPage = () => {
@@ -70,11 +83,21 @@ export const ImageViewer = ({
           </DialogTitle>
         </DialogHeader>
         <div className="relative overflow-auto max-h-[calc(90vh-100px)]">
-          <img 
-            src={images[currentPage]} 
-            alt={`${fileName} - Página ${currentPage + 1}`}
-            className="w-full h-auto rounded-lg"
-          />
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-muted-foreground">Cargando imagen...</p>
+            </div>
+          ) : signedUrls.length > 0 ? (
+            <img 
+              src={signedUrls[currentPage]} 
+              alt={`${fileName} - Página ${currentPage + 1}`}
+              className="w-full h-auto rounded-lg"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-destructive">Error al cargar imagen</p>
+            </div>
+          )}
           
           {hasMultiplePages && (
             <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-4 pointer-events-none">
@@ -102,7 +125,7 @@ export const ImageViewer = ({
         
         {hasMultiplePages && (
           <div className="flex justify-center gap-2 mt-2">
-            {images.map((_, index) => (
+            {signedUrls.map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentPage(index)}
