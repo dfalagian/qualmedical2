@@ -58,6 +58,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       { name: "Validación Constancias", href: "/dashboard/constancia-fiscal-admin", icon: FileText },
       { name: "Validación Domicilios", href: "/dashboard/comprobante-domicilio-admin", icon: FileText },
       { name: "Validación Avisos", href: "/dashboard/aviso-funcionamiento-admin", icon: FileText },
+      { name: "Validación Datos Bancarios", href: "/dashboard/datos-bancarios-admin", icon: FileText },
       { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
       { name: "Administración", href: "/dashboard/admin", icon: Settings },
       { name: "Backup BD", href: "/dashboard/database-backup", icon: Database },

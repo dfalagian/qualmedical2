@@ -24,6 +24,7 @@ const DOCUMENT_TYPES = [
   { value: "comprobante_domicilio", label: "Comprobante de Domicilio" },
   { value: "aviso_funcionamiento", label: "Aviso de Funcionamiento" },
   { value: "ine", label: "INE (Credencial de Identificación)" },
+  { value: "datos_bancarios", label: "Datos Bancarios" },
 ];
 
 // Constantes de seguridad

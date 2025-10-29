@@ -1,0 +1,270 @@
+import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { useAuth } from "@/hooks/useAuth";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { FileText, RefreshCw, Eye, Trash2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useState } from "react";
+import { Navigate } from "react-router-dom";
+import { ImageViewer } from "@/components/admin/ImageViewer";
+
+const DatosBancariosAdmin = () => {
+  const { isAdmin, loading } = useAuth();
+  const queryClient = useQueryClient();
+  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+
+  const { data: datosBancarios, isLoading } = useQuery({
+    queryKey: ["datos-bancarios"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("documents")
+        .select("*, profiles!documents_supplier_id_fkey(full_name, company_name)")
+        .eq("document_type", "datos_bancarios")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const extractMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const { error } = await supabase.functions.invoke('extract-document-info', {
+        body: { documentId }
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Extracción iniciada");
+      queryClient.invalidateQueries({ queryKey: ["datos-bancarios"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al extraer información");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const { error } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", documentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Documento eliminado");
+      queryClient.invalidateQueries({ queryKey: ["datos-bancarios"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar documento");
+    },
+  });
+
+  const getExtractionBadge = (status: string | null) => {
+    switch (status) {
+      case "completed":
+        return <Badge className="bg-success">Completado</Badge>;
+      case "processing":
+        return <Badge variant="secondary">Procesando</Badge>;
+      case "failed":
+        return <Badge variant="destructive">Fallido</Badge>;
+      default:
+        return <Badge variant="outline">Pendiente</Badge>;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Validación de Datos Bancarios</h2>
+          <p className="text-muted-foreground">
+            Información bancaria extraída automáticamente de estados de cuenta
+          </p>
+        </div>
+
+        <Card className="shadow-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Estados de Cuenta Bancarios
+            </CardTitle>
+            <CardDescription>
+              Información extraída mediante IA de las imágenes de estados de cuenta
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <p className="text-center py-8 text-muted-foreground">Cargando documentos...</p>
+            ) : datosBancarios && datosBancarios.length > 0 ? (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Proveedor</TableHead>
+                      <TableHead>Nombre Cliente</TableHead>
+                      <TableHead>No. Cuenta</TableHead>
+                      <TableHead>CLABE</TableHead>
+                      <TableHead>Archivo</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {datosBancarios.map((doc: any) => (
+                      <TableRow key={doc.id}>
+                        <TableCell className="font-medium">
+                          {doc.profiles?.company_name || doc.profiles?.full_name || "N/A"}
+                        </TableCell>
+                        <TableCell>{doc.nombre_cliente || "-"}</TableCell>
+                        <TableCell className="font-mono text-sm">{doc.numero_cuenta || "-"}</TableCell>
+                        <TableCell className="font-mono text-sm">{doc.numero_cuenta_clabe || "-"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground truncate max-w-xs">
+                          {doc.file_name}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            {getExtractionBadge(doc.extraction_status)}
+                            {!doc.is_valid && doc.validation_errors && doc.validation_errors.length > 0 && (
+                              <Badge variant="destructive" className="text-xs">
+                                ⚠️ Validación
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedDoc(doc)}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  Ver Detalles
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                  <DialogTitle>Detalles del Estado de Cuenta Bancario</DialogTitle>
+                                </DialogHeader>
+                                {selectedDoc && (
+                                  <div className="space-y-4">
+                                    <div>
+                                      <h4 className="font-semibold text-sm text-muted-foreground">Proveedor</h4>
+                                      <p>{selectedDoc.profiles?.company_name || selectedDoc.profiles?.full_name}</p>
+                                    </div>
+                                    <div>
+                                      <h4 className="font-semibold text-sm text-muted-foreground">Nombre del Cliente</h4>
+                                      <p className="text-lg">{selectedDoc.nombre_cliente || "No extraído"}</p>
+                                    </div>
+                                    <div>
+                                      <h4 className="font-semibold text-sm text-muted-foreground">Número de Cuenta</h4>
+                                      <p className="font-mono text-lg">{selectedDoc.numero_cuenta || "No extraído"}</p>
+                                    </div>
+                                    <div>
+                                      <h4 className="font-semibold text-sm text-muted-foreground">Número de Cuenta CLABE</h4>
+                                      <p className="font-mono text-lg">{selectedDoc.numero_cuenta_clabe || "No extraído"}</p>
+                                    </div>
+                                    <div>
+                                      <h4 className="font-semibold text-sm text-muted-foreground">Nombre del Archivo</h4>
+                                      <p className="text-sm">{selectedDoc.file_name}</p>
+                                    </div>
+                                    <div>
+                                      <h4 className="font-semibold text-sm text-muted-foreground">Estado de Extracción</h4>
+                                      <div className="mt-1">{getExtractionBadge(selectedDoc.extraction_status)}</div>
+                                    </div>
+                                    {selectedDoc.validation_errors && selectedDoc.validation_errors.length > 0 && (
+                                      <div className="border-l-4 border-destructive bg-destructive/10 p-4 rounded">
+                                        <h4 className="font-semibold text-sm text-destructive mb-2">⚠️ Errores de Validación</h4>
+                                        <ul className="list-disc list-inside space-y-1">
+                                          {selectedDoc.validation_errors.map((error: string, idx: number) => (
+                                            <li key={idx} className="text-sm text-destructive">{error}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {selectedDoc.notes && (
+                                      <div>
+                                        <h4 className="font-semibold text-sm text-muted-foreground">Notas</h4>
+                                        <p className="text-sm">{selectedDoc.notes}</p>
+                                      </div>
+                                    )}
+                                    <div className="flex justify-end gap-2 pt-4">
+                                      <ImageViewer 
+                                        fileUrl={selectedDoc.file_url}
+                                        imageUrls={selectedDoc.image_urls}
+                                        fileName={selectedDoc.file_name}
+                                        triggerText="Ver Documento"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </DialogContent>
+                            </Dialog>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => extractMutation.mutate(doc.id)}
+                              disabled={extractMutation.isPending}
+                            >
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Re-extraer
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm("¿Estás seguro de eliminar este documento?")) {
+                                  deleteMutation.mutate(doc.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  No hay estados de cuenta bancarios registrados aún
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </DashboardLayout>
+  );
+};
+
+export default DatosBancariosAdmin;

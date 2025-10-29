@@ -100,7 +100,28 @@ Solo necesitamos verificar que contenga ALGUNOS de estos datos:
 - Un pasaporte
 - Otro tipo de documento
 
-No importa si está vencida, deteriorada, o sin hologramas visibles. Lo importante es que sea una credencial INE con los datos necesarios.`
+No importa si está vencida, deteriorada, o sin hologramas visibles. Lo importante es que sea una credencial INE con los datos necesarios.`,
+
+    'datos_bancarios': `Analiza esta imagen y determina si contiene información de un ESTADO DE CUENTA BANCARIO mexicano.
+
+Solo necesitamos verificar que contenga ALGUNOS de estos datos:
+- Nombre del banco (BBVA, Santander, Banamex, etc.)
+- Número de cuenta
+- Número de cuenta CLABE (18 dígitos)
+- Nombre del titular o cliente
+- R.F.C del titular
+- Información financiera (saldos, movimientos)
+
+✅ ES VÁLIDO si la imagen muestra un estado de cuenta bancario con al menos 3 de los datos anteriores.
+
+❌ NO es válido SOLO si es:
+- Un ticket de compra común
+- Una foto casual sin documentos
+- Una identificación personal
+- Un recibo de servicios
+- Una factura común
+
+No importa si es parcial, sin logo del banco, o si la calidad no es perfecta. Lo importante es que contenga datos bancarios del titular.`
   };
 
   return prompts[documentType] || 'Analiza si este documento es válido y del tipo correcto.';
@@ -496,6 +517,31 @@ IMPORTANTE:
         ],
         tool_choice: { type: 'function', function: { name: 'extract_ine_info' } }
       };
+    } else if (document.document_type === 'datos_bancarios') {
+      systemPrompt = 'Eres un asistente especializado en extraer información de estados de cuenta bancarios mexicanos. Extrae la información solicitada de forma precisa y estructurada.';
+      userPrompt = 'Extrae la siguiente información del estado de cuenta bancario: Número de Cuenta, Número de Cuenta CLABE (18 dígitos), y Nombre del Cliente/Titular. Si algún dato no está disponible, indica "No encontrado".';
+      toolConfig = {
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'extract_datos_bancarios_info',
+              description: 'Extraer información estructurada del estado de cuenta bancario',
+              parameters: {
+                type: 'object',
+                properties: {
+                  numero_cuenta: { type: 'string', description: 'Número de cuenta bancaria' },
+                  numero_cuenta_clabe: { type: 'string', description: 'Número de cuenta CLABE (18 dígitos)' },
+                  nombre_cliente: { type: 'string', description: 'Nombre completo del titular o cliente de la cuenta' }
+                },
+                required: ['numero_cuenta', 'numero_cuenta_clabe', 'nombre_cliente'],
+                additionalProperties: false
+              }
+            }
+          }
+        ],
+        tool_choice: { type: 'function', function: { name: 'extract_datos_bancarios_info' } }
+      };
     } else {
       throw new Error(`Tipo de documento no soportado para extracción: ${document.document_type}`);
     }
@@ -663,6 +709,16 @@ IMPORTANTE:
       updateFields = {
         nombre_completo_ine: extractedInfo.nombre_completo,
         curp: extractedInfo.curp,
+        extraction_status: 'completed',
+        extracted_at: new Date().toISOString(),
+        validation_errors: validationErrors,
+        is_valid: isValid
+      };
+    } else if (document.document_type === 'datos_bancarios') {
+      updateFields = {
+        numero_cuenta: extractedInfo.numero_cuenta,
+        numero_cuenta_clabe: extractedInfo.numero_cuenta_clabe,
+        nombre_cliente: extractedInfo.nombre_cliente,
         extraction_status: 'completed',
         extracted_at: new Date().toISOString(),
         validation_errors: validationErrors,

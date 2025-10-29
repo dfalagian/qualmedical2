@@ -11,6 +11,7 @@ import DocumentsAdmin from "./pages/DocumentsAdmin";
 import ConstanciaFiscalAdmin from "./pages/ConstanciaFiscalAdmin";
 import ComprobanteDomicilioAdmin from "./pages/ComprobanteDomicilioAdmin";
 import AvisoFuncionamientoAdmin from "./pages/AvisoFuncionamientoAdmin";
+import DatosBancariosAdmin from "./pages/DatosBancariosAdmin";
 import Invoices from "./pages/Invoices";
 import Messages from "./pages/Messages";
 import PurchaseOrders from "./pages/PurchaseOrders";
@@ -37,6 +38,7 @@ const App = () => (
           <Route path="/dashboard/constancia-fiscal-admin" element={<ConstanciaFiscalAdmin />} />
           <Route path="/dashboard/comprobante-domicilio-admin" element={<ComprobanteDomicilioAdmin />} />
           <Route path="/dashboard/aviso-funcionamiento-admin" element={<AvisoFuncionamientoAdmin />} />
+          <Route path="/dashboard/datos-bancarios-admin" element={<DatosBancariosAdmin />} />
           <Route path="/dashboard/invoices" element={<Invoices />} />
           <Route path="/dashboard/messages" element={<Messages />} />
           <Route path="/dashboard/orders" element={<PurchaseOrders />} />

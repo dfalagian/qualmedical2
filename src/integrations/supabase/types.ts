@@ -71,8 +71,11 @@ export type Database = {
           id: string
           image_urls: string[] | null
           is_valid: boolean | null
+          nombre_cliente: string | null
           nombre_completo_ine: string | null
           notes: string | null
+          numero_cuenta: string | null
+          numero_cuenta_clabe: string | null
           objeto_social: string | null
           razon_social: string | null
           regimen_tributario: string | null
@@ -102,8 +105,11 @@ export type Database = {
           id?: string
           image_urls?: string[] | null
           is_valid?: boolean | null
+          nombre_cliente?: string | null
           nombre_completo_ine?: string | null
           notes?: string | null
+          numero_cuenta?: string | null
+          numero_cuenta_clabe?: string | null
           objeto_social?: string | null
           razon_social?: string | null
           regimen_tributario?: string | null
@@ -133,8 +139,11 @@ export type Database = {
           id?: string
           image_urls?: string[] | null
           is_valid?: boolean | null
+          nombre_cliente?: string | null
           nombre_completo_ine?: string | null
           notes?: string | null
+          numero_cuenta?: string | null
+          numero_cuenta_clabe?: string | null
           objeto_social?: string | null
           razon_social?: string | null
           regimen_tributario?: string | null
@@ -547,6 +556,7 @@ export type Database = {
         | "comprobante_domicilio"
         | "aviso_funcionamiento"
         | "ine"
+        | "datos_bancarios"
       payment_status: "pendiente" | "procesando" | "pagado" | "rechazado"
       user_role: "admin" | "proveedor"
     }
@@ -686,6 +696,7 @@ export const Constants = {
         "comprobante_domicilio",
         "aviso_funcionamiento",
         "ine",
+        "datos_bancarios",
       ],
       payment_status: ["pendiente", "procesando", "pagado", "rechazado"],
       user_role: ["admin", "proveedor"],

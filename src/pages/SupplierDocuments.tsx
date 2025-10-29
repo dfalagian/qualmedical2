@@ -91,6 +91,8 @@ const SupplierDocuments = () => {
       constancia_fiscal: "Constancia Fiscal",
       comprobante_domicilio: "Comprobante de Domicilio",
       aviso_funcionamiento: "Aviso de Funcionamiento",
+      ine: "INE (Credencial)",
+      datos_bancarios: "Datos Bancarios",
     };
     return types[type] || type;
   };
@@ -438,6 +440,33 @@ const SupplierDocuments = () => {
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">CURP</p>
                   <p className="mt-1 font-mono">{selectedDocument.curp}</p>
+                </div>
+              )}
+
+              {selectedDocument.numero_cuenta && (
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    Número de Cuenta
+                  </p>
+                  <p className="mt-1 font-mono">{selectedDocument.numero_cuenta}</p>
+                </div>
+              )}
+
+              {selectedDocument.numero_cuenta_clabe && (
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    Número de Cuenta CLABE
+                  </p>
+                  <p className="mt-1 font-mono">{selectedDocument.numero_cuenta_clabe}</p>
+                </div>
+              )}
+
+              {selectedDocument.nombre_cliente && (
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    Nombre del Cliente
+                  </p>
+                  <p className="mt-1">{selectedDocument.nombre_cliente}</p>
                 </div>
               )}
 
