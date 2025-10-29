@@ -333,6 +333,25 @@ const Documents = () => {
           }
         }
       }
+
+      // Si se aprueba una constancia fiscal, actualizar el perfil con RFC y razón social
+      if (status === "aprobado" && document.document_type === "constancia_fiscal") {
+        const { data: fiscalDoc, error: fiscalError } = await supabase
+          .from("documents")
+          .select("rfc, razon_social")
+          .eq("id", id)
+          .single();
+
+        if (!fiscalError && fiscalDoc?.rfc) {
+          await supabase
+            .from("profiles")
+            .update({
+              rfc: fiscalDoc.rfc,
+              company_name: fiscalDoc.razon_social,
+            })
+            .eq("id", document.supplier_id);
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Estado actualizado");
