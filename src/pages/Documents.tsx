@@ -576,7 +576,7 @@ const Documents = () => {
                        {doc.notes && (
                         <p className="text-sm mt-1 italic">Notas: {doc.notes}</p>
                        )}
-                       {(doc.document_type === "acta_constitutiva" || doc.document_type === "constancia_fiscal" || doc.document_type === "comprobante_domicilio" || doc.document_type === "aviso_funcionamiento" || doc.document_type === "ine") && doc.extraction_status && (
+                       {(doc.document_type === "acta_constitutiva" || doc.document_type === "constancia_fiscal" || doc.document_type === "comprobante_domicilio" || doc.document_type === "aviso_funcionamiento" || doc.document_type === "ine" || doc.document_type === "datos_bancarios") && doc.extraction_status && (
                         <div className="mt-2 text-sm space-y-1">
                           {doc.extraction_status === "completed" && (
                             <span className="text-success flex items-center gap-1">
