@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
@@ -15,12 +15,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, RefreshCw } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
 const Payments = () => {
-  const { loading, isAdmin } = useAuth();
+  const { loading, isAdmin, user } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: pagos, isLoading } = useQuery({
     queryKey: ["pagos"],
@@ -49,6 +50,71 @@ const Payments = () => {
 
       if (error) throw error;
       return data;
+    },
+  });
+
+  const generatePaymentsMutation = useMutation({
+    mutationFn: async () => {
+      // Buscar todos los proveedores con datos bancarios aprobados
+      const { data: approvedBankDocs, error: bankError } = await supabase
+        .from("documents")
+        .select("id, supplier_id")
+        .eq("document_type", "datos_bancarios")
+        .eq("status", "aprobado");
+
+      if (bankError) throw bankError;
+
+      if (!approvedBankDocs || approvedBankDocs.length === 0) {
+        throw new Error("No hay datos bancarios aprobados");
+      }
+
+      let totalCreated = 0;
+
+      // Para cada documento bancario aprobado, buscar facturas pendientes
+      for (const bankDoc of approvedBankDocs) {
+        const { data: invoices, error: invoicesError } = await supabase
+          .from("invoices")
+          .select("id, amount")
+          .eq("supplier_id", bankDoc.supplier_id)
+          .eq("status", "pendiente");
+
+        if (invoicesError) throw invoicesError;
+
+        if (invoices && invoices.length > 0) {
+          // Crear registros de pago para facturas que no tengan pago aún
+          const pagos = invoices.map(invoice => ({
+            supplier_id: bankDoc.supplier_id,
+            datos_bancarios_id: bankDoc.id,
+            invoice_id: invoice.id,
+            amount: invoice.amount,
+            status: "pendiente",
+            created_by: user?.id,
+          }));
+
+          const { error: pagosError } = await supabase
+            .from("pagos")
+            .upsert(pagos, { onConflict: 'invoice_id', ignoreDuplicates: true });
+
+          if (pagosError && !pagosError.message.includes("duplicate")) {
+            console.error("Error creando pagos:", pagosError);
+          } else {
+            totalCreated += invoices.length;
+          }
+        }
+      }
+
+      return totalCreated;
+    },
+    onSuccess: (count) => {
+      if (count > 0) {
+        toast.success(`Se generaron ${count} registros de pago`);
+      } else {
+        toast.info("No hay nuevos pagos para generar");
+      }
+      queryClient.invalidateQueries({ queryKey: ["pagos"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al generar pagos");
     },
   });
 
@@ -118,10 +184,20 @@ const Payments = () => {
               Gestión de pagos generados por la aprobación de datos bancarios y facturas
             </p>
           </div>
-          <Button onClick={handleExportExcel} disabled={!pagos || pagos.length === 0}>
-            <Download className="h-4 w-4 mr-2" />
-            Exportar a Excel
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => generatePaymentsMutation.mutate()} 
+              disabled={generatePaymentsMutation.isPending}
+              variant="outline"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${generatePaymentsMutation.isPending ? 'animate-spin' : ''}`} />
+              Sincronizar Pagos
+            </Button>
+            <Button onClick={handleExportExcel} disabled={!pagos || pagos.length === 0}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar a Excel
+            </Button>
+          </div>
         </div>
 
         <Card>
