@@ -17,17 +17,30 @@ interface BackupStats {
 }
 
 const DatabaseBackup = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
   const [isExporting, setIsExporting] = useState(false);
   const [stats, setStats] = useState<BackupStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || !isAdmin) {
+    if (!loading && (!user || !isAdmin)) {
       navigate("/");
     }
-  }, [user, isAdmin, navigate]);
+  }, [user, isAdmin, loading, navigate]);
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Cargando...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   if (!user || !isAdmin) {
     return null;
