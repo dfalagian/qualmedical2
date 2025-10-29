@@ -11,7 +11,8 @@ import {
   Camera,
   Search,
   Menu,
-  X
+  X,
+  Database
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "react-router-dom";
@@ -59,6 +60,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       { name: "Validación Avisos", href: "/dashboard/aviso-funcionamiento-admin", icon: FileText },
       { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
       { name: "Administración", href: "/dashboard/admin", icon: Settings },
+      { name: "Backup BD", href: "/dashboard/database-backup", icon: Database },
     ] : []),
   ];
 
