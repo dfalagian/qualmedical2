@@ -968,6 +968,112 @@ IMPORTANTE:
       }
     }
 
+    // Realizar validación cruzada entre datos_bancarios y constancia_fiscal
+    if (document.document_type === 'datos_bancarios' || document.document_type === 'constancia_fiscal') {
+      console.log('Iniciando validación cruzada entre datos bancarios y constancia fiscal...');
+      
+      // Obtener todos los documentos del proveedor
+      const { data: supplierDocs, error: docsError } = await supabaseClient
+        .from('documents')
+        .select('id, document_type, nombre_cliente, razon_social, extraction_status, validation_errors')
+        .eq('supplier_id', document.supplier_id)
+        .in('document_type', ['datos_bancarios', 'constancia_fiscal'])
+        .eq('extraction_status', 'completed');
+      
+      console.log('Documentos encontrados para validación Datos Bancarios-Constancia:', supplierDocs);
+
+      if (!docsError && supplierDocs) {
+        const datosBancarios = supplierDocs.find(d => d.document_type === 'datos_bancarios');
+        const constanciaFiscal = supplierDocs.find(d => d.document_type === 'constancia_fiscal');
+
+        if (datosBancarios && constanciaFiscal) {
+          console.log('Validando Nombre de Cliente con Razón Social:', {
+            datos_bancarios: { nombre_cliente: datosBancarios.nombre_cliente },
+            constancia_fiscal: { razon_social: constanciaFiscal.razon_social }
+          });
+
+          const errors: string[] = [];
+
+          // Validar que el nombre del cliente coincida con la razón social
+          if (datosBancarios.nombre_cliente && constanciaFiscal.razon_social) {
+            // Normalizar: convertir a mayúsculas y eliminar espacios extra
+            const normalizarTexto = (texto: string) => {
+              return texto.trim().toUpperCase().replace(/\s+/g, ' ');
+            };
+            
+            const nombreClienteNorm = normalizarTexto(datosBancarios.nombre_cliente);
+            const razonSocialNorm = normalizarTexto(constanciaFiscal.razon_social);
+            
+            if (nombreClienteNorm === razonSocialNorm) {
+              errors.push(`✅ Coincidencia confirmada: Nombre del cliente en Datos Bancarios (${datosBancarios.nombre_cliente}) coincide con Razón Social en Constancia Fiscal (${constanciaFiscal.razon_social})`);
+            } else if (nombreClienteNorm.includes(razonSocialNorm) || razonSocialNorm.includes(nombreClienteNorm)) {
+              errors.push(`✅ Coincidencia confirmada: Nombre similar - Datos Bancarios: ${datosBancarios.nombre_cliente}, Constancia Fiscal: ${constanciaFiscal.razon_social}`);
+            } else {
+              errors.push(`❌ El Nombre del Cliente en Datos Bancarios no coincide con la Razón Social en Constancia Fiscal. Datos Bancarios: "${datosBancarios.nombre_cliente}", Constancia Fiscal: "${constanciaFiscal.razon_social}"`);
+            }
+          }
+
+          if (errors.length > 0) {
+            // Hay errores, actualizar ambos documentos
+            console.log('Errores de validación encontrados:', errors);
+            
+            for (const doc of [datosBancarios, constanciaFiscal]) {
+              // Obtener errores actuales y combinar
+              const { data: currentDoc } = await supabaseClient
+                .from('documents')
+                .select('validation_errors')
+                .eq('id', doc.id)
+                .single();
+
+              const currentErrors = currentDoc?.validation_errors || [];
+              // Filtrar errores antiguos entre datos bancarios y constancia, agregar nuevos
+              const filteredErrors = currentErrors.filter(
+                (err: string) => !err.includes('Nombre del Cliente en Datos Bancarios') && 
+                                 !err.includes('Coincidencia confirmada: Nombre del cliente') &&
+                                 !err.includes('Coincidencia confirmada: Nombre similar')
+              );
+              const combinedErrors = [...filteredErrors, ...errors];
+
+              await supabaseClient
+                .from('documents')
+                .update({
+                  validation_errors: combinedErrors,
+                  is_valid: !combinedErrors.some((err: string) => err.startsWith('❌'))
+                })
+                .eq('id', doc.id);
+            }
+          } else {
+            // No hay errores, limpiar errores de validación entre datos bancarios y constancia
+            console.log('Nombre del Cliente coincide correctamente con Razón Social');
+            
+            for (const doc of [datosBancarios, constanciaFiscal]) {
+              const { data: currentDoc } = await supabaseClient
+                .from('documents')
+                .select('validation_errors')
+                .eq('id', doc.id)
+                .single();
+
+              if (currentDoc && currentDoc.validation_errors) {
+                const filteredErrors = currentDoc.validation_errors.filter(
+                  (err: string) => !err.includes('Nombre del Cliente en Datos Bancarios') && 
+                                   !err.includes('Coincidencia confirmada: Nombre del cliente') &&
+                                   !err.includes('Coincidencia confirmada: Nombre similar')
+                );
+                
+                await supabaseClient
+                  .from('documents')
+                  .update({
+                    validation_errors: filteredErrors,
+                    is_valid: filteredErrors.length === 0 || !filteredErrors.some((err: string) => err.startsWith('❌'))
+                  })
+                  .eq('id', doc.id);
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Realizar validación cruzada entre INE y aviso_funcionamiento (responsable sanitario)
     if (document.document_type === 'ine' || document.document_type === 'aviso_funcionamiento') {
       console.log('Iniciando validación cruzada entre INE y aviso de funcionamiento...');
