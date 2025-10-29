@@ -35,6 +35,7 @@ Este documento describe las medidas de seguridad implementadas en el sistema de 
 
 #### Perfiles (`profiles`)
 - ✅ Usuarios pueden ver y actualizar su propio perfil
+- ✅ Solo usuarios autenticados pueden ver perfiles de admin
 - ✅ Admins pueden ver, actualizar y eliminar cualquier perfil
 - ✅ Trigger previene cambio de email por usuarios no-admin
 
@@ -72,6 +73,15 @@ Este documento describe las medidas de seguridad implementadas en el sistema de 
 - ✅ No se exponen detalles técnicos al usuario
 
 ## 3. Validación de Inputs
+
+### Edge Functions
+```typescript
+// Validación con zod en create-user y delete-user
+- ✅ CreateUserSchema: email, password, name, role, company_name, rfc, phone
+- ✅ DeleteUserSchema: userId (UUID validado)
+- ✅ Validación antes de cualquier operación
+- ✅ Mensajes de error claros para inputs inválidos
+```
 
 ### Formulario de Autenticación
 ```typescript
@@ -115,11 +125,25 @@ Validaciones con zod:
 ## 4. Almacenamiento de Archivos
 
 ### Buckets de Supabase Storage
-- ✅ Bucket `documents`: PRIVADO
+- ✅ Bucket `documents`: PRIVADO (actualizado en migración)
 - ✅ Bucket `invoices`: PRIVADO
 - ✅ Nombres de archivo con UUID de usuario
 - ✅ Timestamps para prevenir colisiones
-- ✅ Acceso controlado por RLS
+- ✅ Acceso controlado por RLS con políticas específicas
+
+### Políticas RLS de Storage
+```sql
+- ✅ SELECT: Usuarios ven sus propios documentos, admins ven todo
+- ✅ INSERT: Usuarios solo suben a su propia carpeta (userId/)
+- ✅ UPDATE: Usuarios actualizan sus archivos, admins actualizan todo
+- ✅ DELETE: Solo admins pueden eliminar documentos
+```
+
+### Signed URLs
+- ✅ Utilidad `getSignedUrl()` en `src/lib/storage.ts`
+- ✅ URLs temporales con expiración (default: 1 hora)
+- ✅ Soporte para múltiples URLs con `getSignedUrls()`
+- ✅ Implementado en `ImageViewer.tsx` para documentos privados
 
 ## 5. Prevención de Ataques Comunes
 
@@ -221,8 +245,26 @@ Si se detecta una vulnerabilidad:
 3. Proporcionar detalles técnicos
 4. Esperar confirmación antes de divulgar
 
+## 10. Registro de Cambios
+
+### 2025-10-29 - Migración de Seguridad Crítica
+**Vulnerabilidades Corregidas:**
+1. ✅ **medicine_counts**: Política INSERT ahora requiere autenticación como admin
+2. ✅ **profiles**: Acceso a perfiles de admin restringido solo a usuarios autenticados
+3. ✅ **Storage documents**: Bucket ahora es privado con políticas RLS completas
+4. ✅ **Edge functions**: Validación Zod agregada a create-user y delete-user
+
+**Archivos Modificados:**
+- `supabase/functions/create-user/index.ts` - Validación con CreateUserSchema
+- `supabase/functions/delete-user/index.ts` - Validación con DeleteUserSchema
+- `src/lib/storage.ts` - Nueva utilidad para signed URLs
+- `src/components/admin/ImageViewer.tsx` - Uso de signed URLs
+- Migración SQL: `20251029141457_7394800a-9b37-4fa3-b8d7-f2a0fe9fce17.sql`
+
+**Impacto:** Cero interrupciones en producción. Sistema funcionando normalmente.
+
 ---
 
-**Última actualización**: 2025-10-22
-**Versión**: 1.0
-**Estado**: ✅ Implementado y activo
+**Última actualización**: 2025-10-29
+**Versión**: 1.1
+**Estado**: ✅ Implementado, activo y securizado
