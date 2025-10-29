@@ -415,6 +415,57 @@ export type Database = {
           },
         ]
       }
+      pagos: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          datos_bancarios_id: string
+          id: string
+          invoice_id: string
+          status: string
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          datos_bancarios_id: string
+          id?: string
+          invoice_id: string
+          status?: string
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          datos_bancarios_id?: string
+          id?: string
+          invoice_id?: string
+          status?: string
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagos_datos_bancarios_id_fkey"
+            columns: ["datos_bancarios_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagos_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: true
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_name: string | null

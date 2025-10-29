@@ -277,6 +277,16 @@ const Documents = () => {
       status: "pendiente" | "aprobado" | "rechazado"; 
       notes?: string 
     }) => {
+      // Primero obtener el documento para verificar su tipo
+      const { data: document, error: docError } = await supabase
+        .from("documents")
+        .select("document_type, supplier_id")
+        .eq("id", id)
+        .single();
+
+      if (docError) throw docError;
+
+      // Actualizar el estado del documento
       const { error } = await supabase
         .from("documents")
         .update({
@@ -288,6 +298,41 @@ const Documents = () => {
         .eq("id", id);
 
       if (error) throw error;
+
+      // Si se aprueba un documento de datos_bancarios, crear registros de pago
+      if (status === "aprobado" && document.document_type === "datos_bancarios") {
+        // Buscar facturas pagadas del proveedor
+        const { data: invoices, error: invoicesError } = await supabase
+          .from("invoices")
+          .select("id, amount")
+          .eq("supplier_id", document.supplier_id)
+          .eq("status", "pagado");
+
+        if (invoicesError) throw invoicesError;
+
+        // Crear registros de pago para cada factura
+        if (invoices && invoices.length > 0) {
+          const pagos = invoices.map(invoice => ({
+            supplier_id: document.supplier_id,
+            datos_bancarios_id: id,
+            invoice_id: invoice.id,
+            amount: invoice.amount,
+            status: "pendiente",
+            created_by: user?.id,
+          }));
+
+          const { error: pagosError } = await supabase
+            .from("pagos")
+            .insert(pagos);
+
+          if (pagosError) {
+            // Si hay error por duplicado, ignorarlo
+            if (!pagosError.message.includes("duplicate")) {
+              throw pagosError;
+            }
+          }
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Estado actualizado");
