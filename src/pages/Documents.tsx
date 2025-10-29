@@ -225,7 +225,7 @@ const Documents = () => {
       }
 
       // Si es un documento que requiere extracción automática, procesar todos
-      if (selectedType === "acta_constitutiva" || selectedType === "constancia_fiscal" || selectedType === "comprobante_domicilio" || selectedType === "aviso_funcionamiento" || selectedType === "ine") {
+      if (selectedType === "acta_constitutiva" || selectedType === "constancia_fiscal" || selectedType === "comprobante_domicilio" || selectedType === "aviso_funcionamiento" || selectedType === "ine" || selectedType === "datos_bancarios") {
         toast.info(`Procesando ${uploadedDocs.length} documento(s) con IA...`);
         
         for (const doc of uploadedDocs) {
