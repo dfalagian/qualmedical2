@@ -23,33 +23,52 @@ const Payments = () => {
   const { loading, isAdmin, user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: pagos, isLoading } = useQuery({
+  const { data: pagos, isLoading, error: pagosError } = useQuery({
     queryKey: ["pagos"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Primero obtener los pagos básicos
+      const { data: pagosData, error: pagosErr } = await supabase
         .from("pagos")
-        .select(`
-          *,
-          profiles!pagos_supplier_id_fkey (
-            full_name,
-            company_name,
-            rfc
-          ),
-          datos_bancarios:documents!pagos_datos_bancarios_id_fkey (
-            nombre_cliente,
-            numero_cuenta,
-            numero_cuenta_clabe
-          ),
-          invoices!pagos_invoice_id_fkey (
-            invoice_number,
-            amount,
-            fecha_emision
-          )
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      return data;
+      if (pagosErr) throw pagosErr;
+      if (!pagosData) return [];
+
+      // Enriquecer con datos relacionados
+      const enrichedPagos = await Promise.all(
+        pagosData.map(async (pago: any) => {
+          // Obtener profile
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name, company_name, rfc")
+            .eq("id", pago.supplier_id)
+            .single();
+
+          // Obtener datos bancarios
+          const { data: bankData } = await supabase
+            .from("documents")
+            .select("nombre_cliente, numero_cuenta, numero_cuenta_clabe")
+            .eq("id", pago.datos_bancarios_id)
+            .single();
+
+          // Obtener factura
+          const { data: invoice } = await supabase
+            .from("invoices")
+            .select("invoice_number, amount, fecha_emision")
+            .eq("id", pago.invoice_id)
+            .single();
+
+          return {
+            ...pago,
+            profiles: profile,
+            datos_bancarios: bankData,
+            invoices: invoice,
+          };
+        })
+      );
+
+      return enrichedPagos;
     },
   });
 
