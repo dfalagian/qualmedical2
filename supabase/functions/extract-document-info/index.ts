@@ -7,6 +7,30 @@ const corsHeaders = {
 };
 
 // Función auxiliar para generar prompts de validación
+// Helper function to retry API calls with exponential backoff
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 2,
+  initialDelay: number = 1000
+): Promise<T> {
+  let lastError: Error | null = null;
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      if (i < maxRetries - 1) {
+        const delay = initialDelay * Math.pow(2, i);
+        console.log(`Intento ${i + 1} falló, reintentando en ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
 function getValidationPrompt(documentType: string): string {
   const prompts: Record<string, string> = {
     'acta_constitutiva': `Analiza esta imagen y determina si contiene información de un ACTA CONSTITUTIVA mexicana.
@@ -197,6 +221,11 @@ serve(async (req) => {
     }
 
     console.log('Archivo descargado, tamaño:', fileData.size);
+    
+    // Si la imagen es muy grande (>500KB), puede causar timeouts
+    if (fileData.size > 500000) {
+      console.log('⚠️ ADVERTENCIA: Imagen grande detectada. Tamaño:', fileData.size, 'bytes. Esto puede causar timeouts.');
+    }
 
     // Convertir archivo a base64
     const arrayBuffer = await fileData.arrayBuffer();
@@ -244,86 +273,98 @@ serve(async (req) => {
     console.log('Validando autenticidad del documento con IA...');
     const validationPrompt = getValidationPrompt(document.document_type);
     
-    const validationResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'Eres un experto en validación de documentos legales y fiscales mexicanos. Tu trabajo es determinar si una imagen contiene el tipo de documento esperado o si es una imagen falsa/irrelevante.' 
+    let validationResponse;
+    try {
+      validationResponse = await retryWithBackoff(async () => {
+        const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
           },
-          {
-            role: 'user',
-            content: [
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-pro',
+            messages: [
               { 
-                type: 'text', 
-                text: validationPrompt
+                role: 'system', 
+                content: 'Eres un experto en validación de documentos legales y fiscales mexicanos. Tu trabajo es determinar si una imagen contiene el tipo de documento esperado o si es una imagen falsa/irrelevante.' 
               },
               {
-                type: 'image_url',
-                image_url: { 
-                  url: `data:${mimeType};base64,${base64Data}` 
+                role: 'user',
+                content: [
+                  { 
+                    type: 'text', 
+                    text: validationPrompt
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: { 
+                      url: `data:${mimeType};base64,${base64Data}` 
+                    }
+                  }
+                ]
+              }
+            ],
+            tools: [
+              {
+                type: 'function',
+                function: {
+                  name: 'validate_document',
+                  description: 'Validar si el documento es auténtico y del tipo correcto',
+                  parameters: {
+                    type: 'object',
+                    properties: {
+                      is_valid_type: { 
+                        type: 'boolean', 
+                        description: 'true si el documento es del tipo esperado, false si es una foto random, ticket, o documento no relacionado' 
+                      },
+                      confidence_score: { 
+                        type: 'number', 
+                        description: 'Puntuación de confianza de 0 a 100 sobre la autenticidad del documento' 
+                      },
+                      validation_notes: { 
+                        type: 'string', 
+                        description: 'Notas sobre por qué el documento es válido o no. Si es inválido, explicar qué se detectó en la imagen.' 
+                      },
+                      detected_issues: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Lista de problemas específicos detectados (baja calidad, texto ilegible, no es el documento correcto, etc.)'
+                      }
+                    },
+                    required: ['is_valid_type', 'confidence_score', 'validation_notes', 'detected_issues'],
+                    additionalProperties: false
+                  }
                 }
               }
-            ]
-          }
-        ],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'validate_document',
-              description: 'Validar si el documento es auténtico y del tipo correcto',
-              parameters: {
-                type: 'object',
-                properties: {
-                  is_valid_type: { 
-                    type: 'boolean', 
-                    description: 'true si el documento es del tipo esperado, false si es una foto random, ticket, o documento no relacionado' 
-                  },
-                  confidence_score: { 
-                    type: 'number', 
-                    description: 'Puntuación de confianza de 0 a 100 sobre la autenticidad del documento' 
-                  },
-                  validation_notes: { 
-                    type: 'string', 
-                    description: 'Notas sobre por qué el documento es válido o no. Si es inválido, explicar qué se detectó en la imagen.' 
-                  },
-                  detected_issues: {
-                    type: 'array',
-                    items: { type: 'string' },
-                    description: 'Lista de problemas específicos detectados (baja calidad, texto ilegible, no es el documento correcto, etc.)'
-                  }
-                },
-                required: ['is_valid_type', 'confidence_score', 'validation_notes', 'detected_issues'],
-                additionalProperties: false
-              }
-            }
-          }
-        ],
-        tool_choice: { type: 'function', function: { name: 'validate_document' } }
-      }),
-    });
-
-    if (!validationResponse.ok) {
-      const errorText = await validationResponse.text();
-      console.error('Error validando documento:', validationResponse.status, errorText);
+            ],
+            tool_choice: { type: 'function', function: { name: 'validate_document' } }
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+        
+        return response;
+      }, 2, 2000); // 2 reintentos con delay inicial de 2 segundos
+    } catch (retryError) {
+      console.error('Error después de múltiples reintentos:', retryError);
       
-      // Marcar documento como failed antes de lanzar error
       await supabaseClient
         .from('documents')
         .update({ 
           extraction_status: 'failed',
-          validation_errors: ['Error procesando el archivo. Asegúrate de subir una imagen clara en formato JPG o PNG.']
+          validation_errors: ['El servicio de procesamiento está temporalmente saturado. Por favor intenta de nuevo en unos minutos.']
         })
         .eq('id', documentId);
       
-      throw new Error('Error al validar el documento con IA');
+      return new Response(
+        JSON.stringify({ 
+          error: 'El servicio de IA está temporalmente no disponible. Por favor intenta más tarde.' 
+        }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const validationData = await validationResponse.json();
