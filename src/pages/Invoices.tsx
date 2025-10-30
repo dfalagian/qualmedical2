@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2 } from "lucide-react";
+import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage } from "lucide-react";
+import { ImageViewer } from "@/components/admin/ImageViewer";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InvoiceDetailsDialog } from "@/components/invoices/InvoiceDetailsDialog";
@@ -41,13 +42,31 @@ const Invoices = () => {
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: invoicesData, error: invoicesError } = await supabase
         .from("invoices")
         .select("*, profiles(full_name, company_name)")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      return data;
+      if (invoicesError) throw invoicesError;
+
+      // Obtener comprobantes de pago para cada factura
+      const { data: pagosData, error: pagosError } = await supabase
+        .from("pagos")
+        .select("invoice_id, comprobante_pago_url")
+        .not("comprobante_pago_url", "is", null);
+
+      if (pagosError) console.error("Error fetching pagos:", pagosError);
+
+      // Combinar datos
+      const invoicesWithComprobantes = invoicesData?.map(invoice => {
+        const pago = pagosData?.find(p => p.invoice_id === invoice.id);
+        return {
+          ...invoice,
+          comprobante_pago_url: pago?.comprobante_pago_url || null
+        };
+      });
+
+      return invoicesWithComprobantes;
     },
   });
 
@@ -585,6 +604,16 @@ const Invoices = () => {
                           <Download className="h-4 w-4 mr-1" />
                           Complemento
                         </Button>
+                      )}
+                      
+                      {invoice.comprobante_pago_url && (
+                        <ImageViewer
+                          fileUrl={invoice.comprobante_pago_url}
+                          fileName={`Comprobante-${invoice.invoice_number}`}
+                          triggerText="Comprobante"
+                          triggerSize="sm"
+                          triggerVariant="outline"
+                        />
                       )}
 
                       {isAdmin && invoice.status !== "pagado" && (
