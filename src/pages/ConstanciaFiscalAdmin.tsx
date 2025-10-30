@@ -49,6 +49,36 @@ const ConstanciaFiscalAdmin = () => {
     },
   });
 
+  const reprocessAllMutation = useMutation({
+    mutationFn: async () => {
+      if (!constanciasFiscales || constanciasFiscales.length === 0) {
+        throw new Error("No hay constancias fiscales para reprocesar");
+      }
+
+      const results = await Promise.allSettled(
+        constanciasFiscales.map(async (doc: any) => {
+          const { error } = await supabase.functions.invoke('extract-document-info', {
+            body: { documentId: doc.id }
+          });
+          if (error) throw error;
+          return doc.id;
+        })
+      );
+
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      return { successful, failed, total: constanciasFiscales.length };
+    },
+    onSuccess: (data) => {
+      toast.success(`Reprocesamiento completado: ${data.successful} exitosos, ${data.failed} fallidos`);
+      queryClient.invalidateQueries({ queryKey: ["constancias-fiscales"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al reprocesar constancias");
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (documentId: string) => {
       const { error } = await supabase
@@ -116,13 +146,34 @@ const ConstanciaFiscalAdmin = () => {
 
         <Card className="shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Constancias de Situación Fiscal Registradas
-            </CardTitle>
-            <CardDescription>
-              Información extraída mediante IA de los documentos PDF
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Constancias de Situación Fiscal Registradas
+                </CardTitle>
+                <CardDescription>
+                  Información extraída mediante IA de los documentos PDF
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => reprocessAllMutation.mutate()}
+                disabled={reprocessAllMutation.isPending || !constanciasFiscales || constanciasFiscales.length === 0}
+              >
+                {reprocessAllMutation.isPending ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Reprocesando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Reprocesar Todas
+                  </>
+                )}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -136,6 +187,7 @@ const ConstanciaFiscalAdmin = () => {
                       <TableHead>Razón Social</TableHead>
                       <TableHead>RFC</TableHead>
                       <TableHead>Régimen Tributario</TableHead>
+                      <TableHead>Régimen Fiscal</TableHead>
                       <TableHead>Fecha Emisión</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Acciones</TableHead>
@@ -150,6 +202,9 @@ const ConstanciaFiscalAdmin = () => {
                         <TableCell>{doc.razon_social || "-"}</TableCell>
                         <TableCell className="font-mono text-sm">{doc.rfc || "-"}</TableCell>
                         <TableCell className="max-w-xs truncate">{doc.regimen_tributario || "-"}</TableCell>
+                        <TableCell className="max-w-xs truncate">
+                          {doc.regimen_fiscal || <span className="text-muted-foreground">No extraído</span>}
+                        </TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(doc.fecha_emision)}</TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
@@ -199,6 +254,10 @@ const ConstanciaFiscalAdmin = () => {
                                     <div>
                                       <h4 className="font-semibold text-sm text-muted-foreground">Régimen Tributario</h4>
                                       <p className="text-sm">{selectedDoc.regimen_tributario || "No extraído"}</p>
+                                    </div>
+                                    <div>
+                                      <h4 className="font-semibold text-sm text-muted-foreground">Régimen Fiscal</h4>
+                                      <p className="text-sm">{selectedDoc.regimen_fiscal || "No extraído"}</p>
                                     </div>
                                     <div>
                                       <h4 className="font-semibold text-sm text-muted-foreground">Fecha de Emisión</h4>
