@@ -445,33 +445,38 @@ serve(async (req) => {
       systemPrompt = 'Eres un experto en documentos fiscales del SAT mexicano. Tu trabajo es extraer SOLO la información exacta que se te solicita, sin confundir conceptos.';
       userPrompt = `Lee esta constancia de situación fiscal del SAT.
 
-**PASO 1 - BUSCA EL RÉGIMEN FISCAL:**
+**PASO 1 - BUSCA EL RÉGIMEN FISCAL (MUY IMPORTANTE - LEE CON ATENCIÓN):**
 
-BUSCA una sección llamada "Regímenes" o "Régimen Fiscal" en el documento.
+BUSCA específicamente una TABLA o SECCIÓN llamada "Regímenes" (en PLURAL). 
+⚠️ NO confundas con "Régimen Capital" que es diferente.
 
-El régimen fiscal PUEDE aparecer en DOS formatos diferentes:
+Dónde buscar:
+- Busca una tabla con el encabezado "Regímenes" (usualmente en la segunda página)
+- Puede estar en una tabla con columnas como: Régimen | Fecha Inicio | Fecha Fin
+- O en una lista bajo el título "Regímenes"
+
+El régimen fiscal PUEDE aparecer en DOS formatos:
 
 FORMATO 1 (PREFERIDO) - Con código numérico del SAT:
 ✅ "601 - General de Ley Personas Morales"
 ✅ "626 - Régimen Simplificado de Confianza"
 ✅ "612 - Personas Físicas con Actividades Empresariales y Profesionales"
-✅ "622 - Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras"
 
-FORMATO 2 (TAMBIÉN VÁLIDO) - Solo nombre del régimen (sin código):
+FORMATO 2 (TAMBIÉN VÁLIDO) - Solo nombre (sin código):
+✅ "Régimen General de Ley Personas Morales"
 ✅ "Régimen Simplificado de Confianza"
-✅ "General de Ley Personas Morales"
 ✅ "Personas Físicas con Actividades Empresariales y Profesionales"
 
-Lo que NO ES régimen fiscal (NUNCA extraer estos):
-❌ "SOCIEDAD ANONIMA DE CAPITAL VARIABLE" (esto es tipo de constitución)
-❌ "S.A. DE C.V." (esto es tipo de sociedad)
-❌ "PERSONA MORAL" (esto es tipo de persona)
-❌ "PERSONA FÍSICA" (esto es tipo de persona)
+⚠️ IMPORTANTE - Lo que NO ES régimen fiscal (IGNORA ESTOS CAMPOS):
+❌ Campo "Régimen Capital: SOCIEDAD ANONIMA DE CAPITAL VARIABLE" - NO es régimen fiscal
+❌ "S.A. DE C.V." - es tipo de sociedad, NO régimen fiscal
+❌ "PERSONA MORAL" o "PERSONA FÍSICA" - es tipo de persona, NO régimen fiscal
 
-REGLA: 
-1. Primero busca el formato con código (601, 626, 612, etc.)
-2. Si no encuentras el código, busca solo el nombre del régimen fiscal
-3. Solo escribe "No encontrado" si NO hay ninguna mención del régimen fiscal
+REGLA FINAL:
+1. Busca la tabla/sección "Regímenes" (plural)
+2. Ignora completamente el campo "Régimen Capital"
+3. Extrae el régimen con o sin código
+4. Solo escribe "No encontrado" si no existe la sección "Regímenes"
 
 **PASO 2 - EXTRAE LOS DEMÁS CAMPOS:**
 - Razón Social: Nombre legal de la persona o empresa
