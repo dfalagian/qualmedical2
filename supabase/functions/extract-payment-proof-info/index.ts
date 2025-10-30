@@ -36,7 +36,18 @@ serve(async (req) => {
     }
     
     const imageBuffer = await imageData.arrayBuffer();
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+    
+    // Convertir a base64 en chunks para evitar stack overflow
+    const uint8Array = new Uint8Array(imageBuffer);
+    let binaryString = '';
+    const chunkSize = 8192;
+    
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+      binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    
+    const base64Image = btoa(binaryString);
     const imageDataUrl = `data:image/jpeg;base64,${base64Image}`;
 
     console.log('Imagen descargada, tamaño:', imageBuffer.byteLength);
