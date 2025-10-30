@@ -60,11 +60,23 @@ const Payments = () => {
             .eq("id", pago.invoice_id)
             .single();
 
+          // Obtener régimen fiscal de la constancia fiscal del proveedor
+          const { data: constanciaFiscal } = await supabase
+            .from("documents")
+            .select("regimen_fiscal")
+            .eq("supplier_id", pago.supplier_id)
+            .eq("document_type", "constancia_fiscal")
+            .eq("status", "aprobado")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
           return {
             ...pago,
             profiles: profile,
             datos_bancarios: bankData,
             invoices: invoice,
+            regimen_fiscal: constanciaFiscal?.regimen_fiscal || null,
           };
         })
       );
@@ -148,6 +160,7 @@ const Payments = () => {
     const excelData = pagos.map((pago: any) => ({
       "Proveedor": pago.profiles?.full_name || pago.profiles?.company_name || "N/A",
       "RFC": pago.profiles?.rfc || "N/A",
+      "Régimen Fiscal": pago.regimen_fiscal || "N/A",
       "Nombre Banco": pago.datos_bancarios?.nombre_banco || pago.nombre_banco || "N/A",
       "Cliente Bancario": pago.datos_bancarios?.nombre_cliente || "N/A",
       "Número de Cuenta": pago.datos_bancarios?.numero_cuenta || "N/A",
@@ -172,6 +185,7 @@ const Payments = () => {
     const columnWidths = [
       { wch: 30 }, // Proveedor
       { wch: 15 }, // RFC
+      { wch: 25 }, // Régimen Fiscal
       { wch: 20 }, // Nombre Banco
       { wch: 30 }, // Cliente Bancario
       { wch: 20 }, // Número de Cuenta
@@ -232,6 +246,7 @@ const Payments = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Proveedor</TableHead>
+                <TableHead>Régimen Fiscal</TableHead>
                 <TableHead>Banco</TableHead>
                 <TableHead>Cliente Bancario</TableHead>
                 <TableHead>Cuenta</TableHead>
@@ -246,7 +261,7 @@ const Payments = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center">
+                  <TableCell colSpan={11} className="text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
@@ -260,6 +275,9 @@ const Payments = () => {
                       <div className="text-sm text-muted-foreground">
                         {pago.profiles?.rfc || "Sin RFC"}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {pago.regimen_fiscal || "N/A"}
                     </TableCell>
                     <TableCell>
                       {pago.datos_bancarios?.nombre_banco || pago.nombre_banco || "N/A"}
@@ -301,7 +319,7 @@ const Payments = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center text-muted-foreground">
                     No hay pagos registrados
                   </TableCell>
                 </TableRow>
