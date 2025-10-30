@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,17 +38,8 @@ serve(async (req) => {
     
     const imageBuffer = await imageData.arrayBuffer();
     
-    // Convertir a base64 en chunks para evitar stack overflow
-    const uint8Array = new Uint8Array(imageBuffer);
-    let binaryString = '';
-    const chunkSize = 8192;
-    
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-      binaryString += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    
-    const base64Image = btoa(binaryString);
+    // Usar la API nativa de Deno para base64 (maneja archivos grandes sin stack overflow)
+    const base64Image = base64Encode(imageBuffer);
     const imageDataUrl = `data:image/jpeg;base64,${base64Image}`;
 
     console.log('Imagen descargada, tamaño:', imageBuffer.byteLength);
