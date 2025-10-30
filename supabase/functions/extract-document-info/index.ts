@@ -401,8 +401,26 @@ serve(async (req) => {
         tool_choice: { type: 'function', function: { name: 'extract_acta_info' } }
       };
     } else if (document.document_type === 'constancia_fiscal') {
-      systemPrompt = 'Eres un asistente especializado en extraer información de constancias de situación fiscal mexicanas. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información de la constancia de situación fiscal: Razón Social, RFC, Actividad Económica, Régimen Tributario, Régimen Fiscal (lista de regímenes con fechas si está disponible), Dirección del domicilio fiscal, Código Postal, y Fecha de Emisión. Si algún dato no está disponible, indica "No encontrado".';
+      systemPrompt = 'Eres un asistente especializado en extraer información de constancias de situación fiscal mexicanas. Lee CUIDADOSAMENTE todo el documento para identificar cada campo solicitado.';
+      userPrompt = `Analiza esta constancia de situación fiscal del SAT y extrae la siguiente información con mucha precisión:
+
+**RÉGIMEN FISCAL - MUY IMPORTANTE:**
+Busca en TODA la constancia cualquiera de estos campos o secciones:
+- "Régimen de Constitución" o "Tipo de Persona" (puede decir: "PERSONA MORAL", "PERSONA FÍSICA", "SOCIEDAD ANÓNIMA", "SOCIEDAD CIVIL", etc.)
+- Si encuentras una sección llamada "Regímenes" con fechas, extrae SOLO el régimen más reciente o vigente
+- Puede aparecer como: "Régimen General de Ley Personas Morales", "Régimen Simplificado de Confianza", "Persona Física con Actividad Empresarial", etc.
+- Busca en la parte superior, media e inferior del documento
+
+**OTROS CAMPOS:**
+- Razón Social (nombre completo de la persona o empresa)
+- RFC (13 caracteres para personas físicas, 12 para morales)
+- Actividad Económica (descripción de la actividad principal)
+- Régimen Tributario (puede aparecer como lista de regímenes con claves y fechas)
+- Dirección del domicilio fiscal (completa con calle, número, colonia, municipio, estado)
+- Código Postal (5 dígitos)
+- Fecha de Emisión (día en que se generó la constancia)
+
+Si después de leer TODO el documento no encuentras algún dato, entonces indica "No encontrado".`;
       toolConfig = {
         tools: [
           {
@@ -417,7 +435,7 @@ serve(async (req) => {
                   rfc: { type: 'string', description: 'RFC del contribuyente' },
                   actividad_economica: { type: 'string', description: 'Actividad económica principal' },
                   regimen_tributario: { type: 'string', description: 'Régimen tributario del contribuyente' },
-                  regimen_fiscal: { type: 'string', description: 'Régimen fiscal actual del contribuyente (por ejemplo: "Régimen General de Ley Personas Morales"). Si hay múltiples regímenes listados, incluir el régimen vigente o el más reciente.' },
+                  regimen_fiscal: { type: 'string', description: 'Régimen fiscal o tipo de persona/constitución. Puede ser: PERSONA MORAL, PERSONA FÍSICA, SOCIEDAD ANÓNIMA, SOCIEDAD ANÓNIMA DE CAPITAL VARIABLE, SOCIEDAD CIVIL, PERSONA FÍSICA CON ACTIVIDAD EMPRESARIAL, etc. Busca en secciones como "Régimen de Constitución", "Tipo de Persona", o en la lista de regímenes fiscales (usar solo el más reciente si hay múltiples)' },
                   direccion: { type: 'string', description: 'Dirección completa del domicilio fiscal' },
                   codigo_postal: { type: 'string', description: 'Código postal del domicilio fiscal (5 dígitos)' },
                   fecha_emision: { type: 'string', description: 'Fecha de emisión de la constancia en formato YYYY-MM-DD' }
