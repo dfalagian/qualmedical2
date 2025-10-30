@@ -79,6 +79,7 @@ export type Database = {
           numero_cuenta_clabe: string | null
           objeto_social: string | null
           razon_social: string | null
+          regimen_fiscal: string | null
           regimen_tributario: string | null
           registro_publico: string | null
           representante_legal: string | null
@@ -114,6 +115,7 @@ export type Database = {
           numero_cuenta_clabe?: string | null
           objeto_social?: string | null
           razon_social?: string | null
+          regimen_fiscal?: string | null
           regimen_tributario?: string | null
           registro_publico?: string | null
           representante_legal?: string | null
@@ -149,6 +151,7 @@ export type Database = {
           numero_cuenta_clabe?: string | null
           objeto_social?: string | null
           razon_social?: string | null
+          regimen_fiscal?: string | null
           regimen_tributario?: string | null
           registro_publico?: string | null
           representante_legal?: string | null

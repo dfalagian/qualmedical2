@@ -402,7 +402,7 @@ serve(async (req) => {
       };
     } else if (document.document_type === 'constancia_fiscal') {
       systemPrompt = 'Eres un asistente especializado en extraer información de constancias de situación fiscal mexicanas. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información de la constancia de situación fiscal: Razón Social, RFC, Actividad Económica, Régimen Tributario, Dirección del domicilio fiscal, Código Postal, y Fecha de Emisión. Si algún dato no está disponible, indica "No encontrado".';
+      userPrompt = 'Extrae la siguiente información de la constancia de situación fiscal: Razón Social, RFC, Actividad Económica, Régimen Tributario, Régimen Fiscal (lista de regímenes con fechas si está disponible), Dirección del domicilio fiscal, Código Postal, y Fecha de Emisión. Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
         tools: [
           {
@@ -417,11 +417,12 @@ serve(async (req) => {
                   rfc: { type: 'string', description: 'RFC del contribuyente' },
                   actividad_economica: { type: 'string', description: 'Actividad económica principal' },
                   regimen_tributario: { type: 'string', description: 'Régimen tributario del contribuyente' },
+                  regimen_fiscal: { type: 'string', description: 'Régimen fiscal actual del contribuyente (por ejemplo: "Régimen General de Ley Personas Morales"). Si hay múltiples regímenes listados, incluir el régimen vigente o el más reciente.' },
                   direccion: { type: 'string', description: 'Dirección completa del domicilio fiscal' },
                   codigo_postal: { type: 'string', description: 'Código postal del domicilio fiscal (5 dígitos)' },
                   fecha_emision: { type: 'string', description: 'Fecha de emisión de la constancia en formato YYYY-MM-DD' }
                 },
-                required: ['razon_social', 'rfc', 'actividad_economica', 'regimen_tributario', 'direccion', 'codigo_postal', 'fecha_emision'],
+                required: ['razon_social', 'rfc', 'actividad_economica', 'regimen_tributario', 'regimen_fiscal', 'direccion', 'codigo_postal', 'fecha_emision'],
                 additionalProperties: false
               }
             }
@@ -702,6 +703,7 @@ Extrae:
         rfc: extractedInfo.rfc,
         actividad_economica: extractedInfo.actividad_economica,
         regimen_tributario: extractedInfo.regimen_tributario,
+        regimen_fiscal: extractedInfo.regimen_fiscal,
         direccion: extractedInfo.direccion,
         codigo_postal: extractedInfo.codigo_postal,
         fecha_emision: extractedInfo.fecha_emision,
