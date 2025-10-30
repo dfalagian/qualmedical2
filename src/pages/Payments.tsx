@@ -66,7 +66,8 @@ const Payments = () => {
             .select("regimen_fiscal")
             .eq("supplier_id", pago.supplier_id)
             .eq("document_type", "constancia_fiscal")
-            .eq("status", "aprobado")
+            .not("regimen_fiscal", "is", null)
+            .not("regimen_fiscal", "eq", "No encontrado")
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
