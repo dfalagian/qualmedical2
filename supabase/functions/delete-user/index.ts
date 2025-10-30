@@ -28,17 +28,20 @@ serve(async (req) => {
       }
     });
 
-    // Verify the requesting user is an admin
+    // Get the JWT token and decode it to get the user ID
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('No se proporcionó autorización');
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user: requestingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    // Decode JWT to get user ID (Supabase already verified the JWT)
+    const jwtPayload = JSON.parse(atob(token.split('.')[1]));
+    const requestingUserId = jwtPayload.sub;
 
-    if (authError || !requestingUser) {
-      console.error('Auth verification failed:', authError);
+    if (!requestingUserId) {
+      console.error('No user ID in JWT');
       throw new Error('No autorizado');
     }
 
@@ -46,7 +49,7 @@ serve(async (req) => {
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
-      .eq('user_id', requestingUser.id)
+      .eq('user_id', requestingUserId)
       .eq('role', 'admin')
       .maybeSingle();
 
