@@ -456,19 +456,32 @@ serve(async (req) => {
         tool_choice: { type: 'function', function: { name: 'extract_comprobante_domicilio_info' } }
       };
     } else if (document.document_type === 'aviso_funcionamiento') {
-      systemPrompt = 'Eres un asistente especializado en extraer información de avisos de funcionamiento mexicanos. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = `Extrae la siguiente información del aviso de funcionamiento: 
+      systemPrompt = 'Eres un asistente especializado en extraer información de avisos de funcionamiento mexicanos emitidos por COFEPRIS. Analiza cuidadosamente toda la imagen y extrae la información solicitada de forma precisa.';
+      userPrompt = `Analiza esta imagen del Aviso de Funcionamiento y extrae la siguiente información:
 
-1. Razón Social de la empresa
-2. Dirección completa del establecimiento
-3. Datos del Responsable Sanitario (nombre completo y CURP)
+1. **Razón Social**: Nombre legal completo de la empresa (puede estar en la parte superior o en sección de "Datos del establecimiento")
 
-IMPORTANTE: 
-- El Responsable Sanitario está específicamente en el apartado "5. Datos del responsable sanitario (excepto para productos y servicios)"
-- NO confundir con el propietario o representante legal de la empresa
-- El CURP del responsable sanitario es un código de 18 caracteres que aparece en el apartado 5
-- Si esta imagen NO contiene el apartado 5 con los datos del responsable sanitario, indica "No encontrado" para esos campos
-- Si algún otro dato no está visible en ESTA imagen, indica "No encontrado"`;
+2. **Dirección**: Dirección completa del establecimiento incluyendo calle, número, colonia, código postal, municipio y estado
+
+3. **Responsable Sanitario**: Busca en TODA la imagen cualquier mención de:
+   - "Responsable Sanitario"
+   - "Responsable sanitario del establecimiento"
+   - "Apartado 5: Datos del responsable sanitario"
+   - Cualquier sección que indique datos de un profesionista responsable
+   - Puede aparecer en cualquier parte del documento
+   
+   Extrae:
+   - **Nombre completo** del responsable sanitario
+   - **CURP** del responsable sanitario (código alfanumérico de 18 caracteres)
+
+**INSTRUCCIONES IMPORTANTES**:
+- Lee TODO el texto visible en la imagen, no solo las secciones principales
+- El responsable sanitario es una PERSONA FÍSICA diferente al representante legal de la empresa
+- Si encuentras nombres de personas con títulos profesionales (Médico, QFB, etc.), probablemente sea el responsable sanitario
+- Si hay un CURP en el documento que NO corresponde a la empresa, probablemente sea del responsable sanitario
+- NO confundas al representante legal de la empresa con el responsable sanitario
+- Si NO encuentras los datos del responsable sanitario después de revisar toda la imagen, indica "No encontrado" para esos campos específicos
+- Si la información existe pero no está clara, indica el valor que mejor represente lo que ves`;
 
       toolConfig = {
         tools: [
