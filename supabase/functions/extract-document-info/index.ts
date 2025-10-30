@@ -456,32 +456,40 @@ serve(async (req) => {
         tool_choice: { type: 'function', function: { name: 'extract_comprobante_domicilio_info' } }
       };
     } else if (document.document_type === 'aviso_funcionamiento') {
-      systemPrompt = 'Eres un asistente especializado en extraer información de avisos de funcionamiento mexicanos emitidos por COFEPRIS. Analiza cuidadosamente toda la imagen y extrae la información solicitada de forma precisa.';
-      userPrompt = `Analiza esta imagen del Aviso de Funcionamiento y extrae la siguiente información:
+      systemPrompt = 'Eres un asistente experto en extraer información de Avisos de Funcionamiento emitidos por COFEPRIS en México. Analiza TODA la imagen con atención al detalle.';
+      userPrompt = `Lee CUIDADOSAMENTE toda esta imagen de un Aviso de Funcionamiento de COFEPRIS.
 
-1. **Razón Social**: Nombre legal completo de la empresa (puede estar en la parte superior o en sección de "Datos del establecimiento")
+**PASO 1 - Localiza estos elementos básicos:**
+- Razón Social de la empresa (busca en la parte superior del documento)
+- Dirección completa del establecimiento (calle, número, colonia, CP, municipio, estado)
 
-2. **Dirección**: Dirección completa del establecimiento incluyendo calle, número, colonia, código postal, municipio y estado
+**PASO 2 - BUSCA ESPECÍFICAMENTE esta sección:**
+"5. Datos del responsable sanitario (excepto para productos y servicios)"
 
-3. **Responsable Sanitario**: Busca en TODA la imagen cualquier mención de:
-   - "Responsable Sanitario"
-   - "Responsable sanitario del establecimiento"
-   - "Apartado 5: Datos del responsable sanitario"
-   - Cualquier sección que indique datos de un profesionista responsable
-   - Puede aparecer en cualquier parte del documento
-   
-   Extrae:
-   - **Nombre completo** del responsable sanitario
-   - **CURP** del responsable sanitario (código alfanumérico de 18 caracteres)
+Esta sección puede aparecer:
+- En la parte media o inferior del documento
+- Con o sin el número "5."
+- Puede decir solo "Datos del responsable sanitario"
+- Puede aparecer en cualquier formato o tamaño de letra
 
-**INSTRUCCIONES IMPORTANTES**:
-- Lee TODO el texto visible en la imagen, no solo las secciones principales
-- El responsable sanitario es una PERSONA FÍSICA diferente al representante legal de la empresa
-- Si encuentras nombres de personas con títulos profesionales (Médico, QFB, etc.), probablemente sea el responsable sanitario
-- Si hay un CURP en el documento que NO corresponde a la empresa, probablemente sea del responsable sanitario
-- NO confundas al representante legal de la empresa con el responsable sanitario
-- Si NO encuentras los datos del responsable sanitario después de revisar toda la imagen, indica "No encontrado" para esos campos específicos
-- Si la información existe pero no está clara, indica el valor que mejor represente lo que ves`;
+**DENTRO de esta sección del responsable sanitario, busca:**
+- Nombre completo de una PERSONA (no de la empresa)
+- CURP de esa persona (18 caracteres alfanuméricos)
+- Puede tener títulos profesionales como: Médico, QFB, Dr., Dra., Químico, Farmacéutico
+
+**IMPORTANTE:**
+1. El responsable sanitario es UNA PERSONA FÍSICA, NO es la empresa
+2. Es DIFERENTE al representante legal
+3. Su CURP es diferente al RFC de la empresa
+4. Lee TODO el texto de la imagen, línea por línea
+5. Si ves el texto "5. Datos del responsable sanitario" en CUALQUIER parte, examina el área debajo de ese texto
+6. Solo indica "No encontrado" si después de leer TODA la imagen no encuentras esta sección específica
+
+Extrae:
+- razon_social: Nombre de la empresa
+- direccion: Dirección completa del establecimiento  
+- responsable_sanitario_nombre: Nombre completo de la persona responsable sanitario
+- responsable_sanitario_curp: CURP del responsable sanitario`;
 
       toolConfig = {
         tools: [
@@ -560,6 +568,11 @@ serve(async (req) => {
     }
 
     // Llamar a Lovable AI para extraer información de la imagen
+    // Usar modelo más potente para avisos de funcionamiento por su complejidad
+    const modelToUse = document.document_type === 'aviso_funcionamiento' 
+      ? 'google/gemini-2.5-pro' 
+      : 'google/gemini-2.5-flash';
+    
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -567,7 +580,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: modelToUse,
         messages: [
           { role: 'system', content: systemPrompt },
           {
