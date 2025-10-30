@@ -447,24 +447,31 @@ serve(async (req) => {
 
 **PASO 1 - BUSCA EL RÉGIMEN FISCAL:**
 
-BUSCA una sección llamada "Regímenes" o "Régimen Fiscal" que tenga esta estructura:
-- Un NÚMERO de 3 dígitos (601, 626, 612, 622, etc.)
-- Seguido de un GUIÓN (-)
-- Seguido de una DESCRIPCIÓN
+BUSCA una sección llamada "Regímenes" o "Régimen Fiscal" en el documento.
 
-Ejemplos CORRECTOS de lo que debes extraer:
+El régimen fiscal PUEDE aparecer en DOS formatos diferentes:
+
+FORMATO 1 (PREFERIDO) - Con código numérico del SAT:
 ✅ "601 - General de Ley Personas Morales"
 ✅ "626 - Régimen Simplificado de Confianza"
 ✅ "612 - Personas Físicas con Actividades Empresariales y Profesionales"
 ✅ "622 - Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras"
 
-Ejemplos de lo que NO ES régimen fiscal:
+FORMATO 2 (TAMBIÉN VÁLIDO) - Solo nombre del régimen (sin código):
+✅ "Régimen Simplificado de Confianza"
+✅ "General de Ley Personas Morales"
+✅ "Personas Físicas con Actividades Empresariales y Profesionales"
+
+Lo que NO ES régimen fiscal (NUNCA extraer estos):
 ❌ "SOCIEDAD ANONIMA DE CAPITAL VARIABLE" (esto es tipo de constitución)
 ❌ "S.A. DE C.V." (esto es tipo de sociedad)
 ❌ "PERSONA MORAL" (esto es tipo de persona)
 ❌ "PERSONA FÍSICA" (esto es tipo de persona)
 
-REGLA CLAVE: Si NO encuentras un número de 3 dígitos seguido de guión y descripción, entonces escribe "No encontrado".
+REGLA: 
+1. Primero busca el formato con código (601, 626, 612, etc.)
+2. Si no encuentras el código, busca solo el nombre del régimen fiscal
+3. Solo escribe "No encontrado" si NO hay ninguna mención del régimen fiscal
 
 **PASO 2 - EXTRAE LOS DEMÁS CAMPOS:**
 - Razón Social: Nombre legal de la persona o empresa
@@ -490,7 +497,7 @@ Si NO encuentras algún dato, escribe "No encontrado".`;
                   rfc: { type: 'string', description: 'RFC del contribuyente' },
                   actividad_economica: { type: 'string', description: 'Actividad económica principal' },
                   regimen_tributario: { type: 'string', description: 'Tipo de constitución legal (ej: SOCIEDAD ANONIMA DE CAPITAL VARIABLE, PERSONA FÍSICA, etc.)' },
-                  regimen_fiscal: { type: 'string', description: 'DEBE ser un código de 3 dígitos seguido de guión y descripción. Ejemplos VÁLIDOS: "601 - General de Ley Personas Morales", "626 - Régimen Simplificado de Confianza". NUNCA extraer tipos de constitución como "SOCIEDAD ANONIMA" o "S.A. DE C.V." - esos NO son regímenes fiscales. Si no encuentras un código numérico del SAT, devuelve "No encontrado".' },
+                  regimen_fiscal: { type: 'string', description: 'Régimen fiscal del SAT. PUEDE tener dos formatos: 1) Código de 3 dígitos + guión + descripción (ej: "601 - General de Ley Personas Morales", "626 - Régimen Simplificado de Confianza"), 2) Solo nombre del régimen sin código (ej: "Régimen Simplificado de Confianza", "General de Ley Personas Morales"). NUNCA extraer tipos de constitución como "SOCIEDAD ANONIMA" o "S.A. DE C.V." - esos NO son regímenes fiscales. Si no encuentras ninguna mención del régimen fiscal en el documento, devuelve "No encontrado".' },
                   direccion: { type: 'string', description: 'Dirección completa del domicilio fiscal' },
                   codigo_postal: { type: 'string', description: 'Código postal del domicilio fiscal (5 dígitos)' },
                   fecha_emision: { type: 'string', description: 'Fecha de emisión de la constancia en formato YYYY-MM-DD' }
