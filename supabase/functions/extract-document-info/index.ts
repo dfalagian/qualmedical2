@@ -401,15 +401,25 @@ serve(async (req) => {
         tool_choice: { type: 'function', function: { name: 'extract_acta_info' } }
       };
     } else if (document.document_type === 'constancia_fiscal') {
-      systemPrompt = 'Eres un asistente especializado en extraer información de constancias de situación fiscal mexicanas. Lee CUIDADOSAMENTE todo el documento para identificar cada campo solicitado.';
-      userPrompt = `Analiza esta constancia de situación fiscal del SAT y extrae la siguiente información con mucha precisión:
+      systemPrompt = 'Eres un asistente especializado en extraer información de constancias de situación fiscal mexicanas del SAT. Debes distinguir claramente entre el tipo de constitución y el régimen fiscal.';
+      userPrompt = `Analiza esta constancia de situación fiscal del SAT y extrae la siguiente información con MÁXIMA precisión:
 
-**RÉGIMEN FISCAL - MUY IMPORTANTE:**
-Busca en TODA la constancia cualquiera de estos campos o secciones:
-- "Régimen de Constitución" o "Tipo de Persona" (puede decir: "PERSONA MORAL", "PERSONA FÍSICA", "SOCIEDAD ANÓNIMA", "SOCIEDAD CIVIL", etc.)
-- Si encuentras una sección llamada "Regímenes" con fechas, extrae SOLO el régimen más reciente o vigente
-- Puede aparecer como: "Régimen General de Ley Personas Morales", "Régimen Simplificado de Confianza", "Persona Física con Actividad Empresarial", etc.
-- Busca en la parte superior, media e inferior del documento
+**RÉGIMEN FISCAL - CRÍTICO:**
+Busca ESPECÍFICAMENTE la sección que dice "Regímenes" o "Régimen Fiscal".
+Esta sección tiene un CÓDIGO numérico (ej: 601, 626, 612) y una DESCRIPCIÓN.
+
+Ejemplos de regímenes fiscales CORRECTOS del SAT:
+- "601 - General de Ley Personas Morales"
+- "626 - Régimen Simplificado de Confianza"
+- "612 - Personas Físicas con Actividades Empresariales y Profesionales"
+- "622 - Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras"
+
+**NO CONFUNDIR CON:**
+- Tipo de constitución (SOCIEDAD ANÓNIMA, S.A. DE C.V., etc.) ← ESTO NO ES EL RÉGIMEN FISCAL
+- Tipo de persona (PERSONA MORAL, PERSONA FÍSICA) ← ESTO TAMPOCO ES EL RÉGIMEN FISCAL
+
+Si encuentras múltiples regímenes con fechas, extrae SOLO el que esté vigente o más reciente.
+Si NO encuentras una sección de "Regímenes" con códigos del SAT, indica "No encontrado".
 
 **OTROS CAMPOS:**
 - Razón Social (nombre completo de la persona o empresa)
@@ -420,7 +430,7 @@ Busca en TODA la constancia cualquiera de estos campos o secciones:
 - Código Postal (5 dígitos)
 - Fecha de Emisión (día en que se generó la constancia)
 
-Si después de leer TODO el documento no encuentras algún dato, entonces indica "No encontrado".`;
+Si después de leer TODO el documento no encuentras algún dato específico, indica "No encontrado".`;
       toolConfig = {
         tools: [
           {
@@ -435,7 +445,7 @@ Si después de leer TODO el documento no encuentras algún dato, entonces indica
                   rfc: { type: 'string', description: 'RFC del contribuyente' },
                   actividad_economica: { type: 'string', description: 'Actividad económica principal' },
                   regimen_tributario: { type: 'string', description: 'Régimen tributario del contribuyente' },
-                  regimen_fiscal: { type: 'string', description: 'Régimen fiscal o tipo de persona/constitución. Puede ser: PERSONA MORAL, PERSONA FÍSICA, SOCIEDAD ANÓNIMA, SOCIEDAD ANÓNIMA DE CAPITAL VARIABLE, SOCIEDAD CIVIL, PERSONA FÍSICA CON ACTIVIDAD EMPRESARIAL, etc. Busca en secciones como "Régimen de Constitución", "Tipo de Persona", o en la lista de regímenes fiscales (usar solo el más reciente si hay múltiples)' },
+                  regimen_fiscal: { type: 'string', description: 'Régimen fiscal del SAT con código y descripción. Ejemplos: "601 - General de Ley Personas Morales", "626 - Régimen Simplificado de Confianza", "612 - Personas Físicas con Actividades Empresariales". Busca en la sección "Regímenes" del documento. NO extraer el tipo de constitución (S.A., S.A. DE C.V., etc.) ni el tipo de persona. Solo extraer el régimen fiscal oficial del SAT con su código numérico.' },
                   direccion: { type: 'string', description: 'Dirección completa del domicilio fiscal' },
                   codigo_postal: { type: 'string', description: 'Código postal del domicilio fiscal (5 dígitos)' },
                   fecha_emision: { type: 'string', description: 'Fecha de emisión de la constancia en formato YYYY-MM-DD' }
