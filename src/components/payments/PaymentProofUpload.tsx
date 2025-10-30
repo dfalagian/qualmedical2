@@ -49,17 +49,14 @@ export function PaymentProofUpload({ pagoId, supplierId, hasProof }: PaymentProo
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
-
       // 3. Llamar edge function para extraer fecha de pago
+      // Enviamos el path del archivo en lugar de la URL pública
       const { data: extractionData, error: extractionError } = await supabase.functions.invoke(
         'extract-payment-proof-info',
         {
           body: { 
             pagoId,
-            imageUrl: publicUrl 
+            filePath: fileName 
           }
         }
       );

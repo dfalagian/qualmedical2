@@ -13,11 +13,11 @@ serve(async (req) => {
   }
 
   try {
-    const { pagoId, imageUrl } = await req.json();
-    console.log('Procesando comprobante de pago:', { pagoId, imageUrl });
+    const { pagoId, filePath } = await req.json();
+    console.log('Procesando comprobante de pago:', { pagoId, filePath });
 
-    if (!pagoId || !imageUrl) {
-      throw new Error('pagoId e imageUrl son requeridos');
+    if (!pagoId || !filePath) {
+      throw new Error('pagoId y filePath son requeridos');
     }
 
     // Inicializar Supabase Admin Client
@@ -25,19 +25,26 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Descargar la imagen
-    console.log('Descargando imagen desde:', imageUrl);
-    const imageResponse = await fetch(imageUrl);
+    // Descargar la imagen desde Storage privado usando admin client
+    console.log('Descargando imagen desde storage:', filePath);
+    const { data: imageData, error: downloadError } = await supabaseAdmin.storage
+      .from('documents')
+      .download(filePath);
     
-    if (!imageResponse.ok) {
-      throw new Error(`Error descargando imagen: ${imageResponse.statusText}`);
+    if (downloadError || !imageData) {
+      throw new Error(`Error descargando imagen: ${downloadError?.message || 'No data'}`);
     }
     
-    const imageBuffer = await imageResponse.arrayBuffer();
+    const imageBuffer = await imageData.arrayBuffer();
     const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
     const imageDataUrl = `data:image/jpeg;base64,${base64Image}`;
 
     console.log('Imagen descargada, tamaño:', imageBuffer.byteLength);
+    
+    // Obtener la URL pública para guardarla en la base de datos
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from('documents')
+      .getPublicUrl(filePath);
 
     // Llamar a Lovable AI para extraer la fecha de pago
     console.log('Llamando a Lovable AI para extraer fecha de pago...');
@@ -122,7 +129,7 @@ Por favor, extrae la información solicitada del comprobante de pago.`
 
     // Actualizar el registro de pago
     const updateData: any = {
-      comprobante_pago_url: imageUrl,
+      comprobante_pago_url: publicUrl,
       status: 'pagado',
     };
 
