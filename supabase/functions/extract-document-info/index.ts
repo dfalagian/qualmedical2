@@ -236,44 +236,71 @@ serve(async (req) => {
       'ine': 2,                    // Frente y reverso
       'datos_bancarios': 3,        // Primeras páginas tienen la info clave
       'aviso_funcionamiento': 5,   // Info clave en primeras páginas
-      'acta_constitutiva': 5       // Datos principales en primeras páginas
+      'acta_constitutiva': 5       // Procesar en bloques de 5 páginas (implementación especial más adelante)
     };
 
-    const maxPages = pageLimit[document.document_type] || 3; // Default: 3 páginas
-
-    // Procesar imágenes del documento (limitadas según tipo)
+    // Obtener todas las imágenes disponibles
     const allImages = document.image_urls && document.image_urls.length > 0 
       ? document.image_urls 
       : [document.file_url.split('/documents/')[1]];
 
-    const imagesToProcess = allImages.slice(0, maxPages);
+    console.log(`Documento tiene ${allImages.length} página(s) totales, tipo: "${document.document_type}"`);
 
-    console.log(`Documento tiene ${allImages.length} página(s), procesando las primeras ${imagesToProcess.length} según tipo "${document.document_type}"`);
-
-    // Convertir todas las imágenes a base64
-    const imageDataArray: Array<{ base64: string; mimeType: string; size: number }> = [];
+    // Para ACTA CONSTITUTIVA: procesamiento especial por bloques
+    let imageDataArray: Array<{ base64: string; mimeType: string; size: number }> = [];
     let totalSize = 0;
-    
-    for (const imagePath of imagesToProcess) {
-      try {
-        const imageData = await imageToBase64(imagePath);
-        imageDataArray.push(imageData);
-        totalSize += imageData.size;
-        console.log(`Página procesada - Tamaño: ${imageData.size} bytes, Tipo: ${imageData.mimeType}`);
-      } catch (error) {
-        console.error('Error procesando imagen:', error);
-        await supabaseClient
-          .from('documents')
-          .update({ extraction_status: 'failed' })
-          .eq('id', documentId);
-        return new Response(
-          JSON.stringify({ error: 'Error procesando las imágenes del documento' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+
+    if (document.document_type === 'acta_constitutiva' && allImages.length > 5) {
+      // Procesamiento por bloques para actas largas
+      const BLOCK_SIZE = 5;
+      const MAX_BLOCKS = 4; // Máximo 20 páginas (4 bloques)
+      const totalBlocks = Math.min(Math.ceil(allImages.length / BLOCK_SIZE), MAX_BLOCKS);
+      
+      console.log(`⚙️ Acta Constitutiva con ${allImages.length} páginas - procesando en ${totalBlocks} bloques de ${BLOCK_SIZE} páginas`);
+      
+      // Procesar primer bloque para la validación
+      const firstBlockImages = allImages.slice(0, BLOCK_SIZE);
+      for (const imagePath of firstBlockImages) {
+        try {
+          const imageData = await imageToBase64(imagePath);
+          imageDataArray.push(imageData);
+          totalSize += imageData.size;
+        } catch (error) {
+          console.error('Error procesando imagen del primer bloque:', error);
+          throw error;
+        }
+      }
+      
+      console.log(`✅ Primer bloque cargado (${firstBlockImages.length} páginas) - Tamaño: ${totalSize} bytes`);
+      
+    } else {
+      // Procesamiento normal para otros documentos o actas cortas
+      const maxPages = pageLimit[document.document_type] || 3;
+      const imagesToProcess = allImages.slice(0, maxPages);
+      
+      console.log(`Procesando las primeras ${imagesToProcess.length} páginas`);
+      
+      for (const imagePath of imagesToProcess) {
+        try {
+          const imageData = await imageToBase64(imagePath);
+          imageDataArray.push(imageData);
+          totalSize += imageData.size;
+          console.log(`Página procesada - Tamaño: ${imageData.size} bytes, Tipo: ${imageData.mimeType}`);
+        } catch (error) {
+          console.error('Error procesando imagen:', error);
+          await supabaseClient
+            .from('documents')
+            .update({ extraction_status: 'failed' })
+            .eq('id', documentId);
+          return new Response(
+            JSON.stringify({ error: 'Error procesando las imágenes del documento' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
     }
 
-    console.log(`Total de páginas procesadas: ${imageDataArray.length}, Tamaño total: ${totalSize} bytes`);
+    console.log(`Total de páginas cargadas inicialmente: ${imageDataArray.length}, Tamaño total: ${totalSize} bytes`);
     
     if (totalSize > 2000000) {
       console.log('⚠️ ADVERTENCIA: Documento muy grande detectado. Esto puede causar timeouts.');
@@ -674,8 +701,10 @@ Extrae:
     }
 
     // Llamar a Lovable AI para extraer información de la imagen
-    // Usar modelo más potente para documentos fiscales complejos
-    const modelToUse = (document.document_type === 'aviso_funcionamiento' || document.document_type === 'constancia_fiscal')
+    // Usar modelo más potente para documentos fiscales complejos y actas constitutivas
+    const modelToUse = (document.document_type === 'aviso_funcionamiento' || 
+                         document.document_type === 'constancia_fiscal' ||
+                         document.document_type === 'acta_constitutiva')
       ? 'google/gemini-2.5-pro' 
       : 'google/gemini-2.5-flash';
     
@@ -755,8 +784,138 @@ Extrae:
       );
     }
 
-    const extractedInfo = JSON.parse(toolCall.function.arguments);
-    console.log('Información extraída:', extractedInfo);
+    let extractedInfo = JSON.parse(toolCall.function.arguments);
+    console.log('Información extraída del primer bloque:', extractedInfo);
+
+    // PROCESAMIENTO ADICIONAL PARA ACTA CONSTITUTIVA CON BLOQUES MÚLTIPLES
+    if (document.document_type === 'acta_constitutiva' && allImages.length > 5) {
+      const BLOCK_SIZE = 5;
+      const MAX_BLOCKS = 4;
+      let currentBlock = 1; // Ya procesamos el bloque 0
+      
+      // Función para verificar si falta información crítica
+      const isMissingCriticalInfo = (info: any) => {
+        return (
+          !info.razon_social || info.razon_social === 'No encontrado' ||
+          !info.representante_legal || info.representante_legal === 'No encontrado' ||
+          !info.objeto_social || info.objeto_social === 'No encontrado' ||
+          !info.registro_publico || info.registro_publico === 'No encontrado'
+        );
+      };
+      
+      // Función para consolidar información (priorizar datos completos)
+      const consolidateInfo = (current: any, newInfo: any) => {
+        return {
+          razon_social: (newInfo.razon_social && newInfo.razon_social !== 'No encontrado') 
+            ? newInfo.razon_social 
+            : current.razon_social,
+          representante_legal: (newInfo.representante_legal && newInfo.representante_legal !== 'No encontrado') 
+            ? newInfo.representante_legal 
+            : current.representante_legal,
+          objeto_social: (newInfo.objeto_social && newInfo.objeto_social !== 'No encontrado') 
+            ? newInfo.objeto_social 
+            : current.objeto_social,
+          registro_publico: (newInfo.registro_publico && newInfo.registro_publico !== 'No encontrado') 
+            ? newInfo.registro_publico 
+            : current.registro_publico
+        };
+      };
+      
+      // Procesar bloques adicionales si falta información
+      while (isMissingCriticalInfo(extractedInfo) && currentBlock < MAX_BLOCKS && (currentBlock * BLOCK_SIZE) < allImages.length) {
+        const startPage = currentBlock * BLOCK_SIZE;
+        const endPage = Math.min(startPage + BLOCK_SIZE, allImages.length);
+        const blockImages = allImages.slice(startPage, endPage);
+        
+        console.log(`📄 Procesando bloque ${currentBlock + 1}: páginas ${startPage + 1}-${endPage} (faltan datos en bloque anterior)`);
+        
+        // Cargar imágenes del siguiente bloque
+        const blockImageData: Array<{ base64: string; mimeType: string; size: number }> = [];
+        for (const imagePath of blockImages) {
+          try {
+            const imageData = await imageToBase64(imagePath);
+            blockImageData.push(imageData);
+          } catch (error) {
+            console.error('Error cargando bloque adicional:', error);
+            break;
+          }
+        }
+        
+        if (blockImageData.length === 0) {
+          console.log('⚠️ No se pudieron cargar más páginas, deteniendo procesamiento por bloques');
+          break;
+        }
+        
+        // Procesar este bloque con IA
+        try {
+          const blockResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash', // Usar modelo más rápido para bloques adicionales
+              messages: [
+                { role: 'system', content: systemPrompt },
+                {
+                  role: 'user',
+                  content: [
+                    { 
+                      type: 'text', 
+                      text: `${userPrompt}\n\nNOTA: Estás analizando las páginas ${startPage + 1}-${endPage} de un acta. Extrae SOLO la información que encuentres en estas páginas.`
+                    },
+                    ...blockImageData.map(imgData => ({
+                      type: 'image_url' as const,
+                      image_url: { 
+                        url: `data:${imgData.mimeType};base64,${imgData.base64}` 
+                      }
+                    }))
+                  ]
+                }
+              ],
+              ...toolConfig
+            }),
+          });
+          
+          if (blockResponse.ok) {
+            const blockData = await blockResponse.json();
+            const blockToolCall = blockData.choices[0]?.message?.tool_calls?.[0];
+            
+            if (blockToolCall) {
+              const blockInfo = JSON.parse(blockToolCall.function.arguments);
+              console.log(`✅ Información adicional extraída del bloque ${currentBlock + 1}:`, blockInfo);
+              
+              // Consolidar información
+              extractedInfo = consolidateInfo(extractedInfo, blockInfo);
+              console.log('📊 Información consolidada:', extractedInfo);
+            }
+          } else {
+            console.log(`⚠️ Error procesando bloque ${currentBlock + 1}, continuando con información actual`);
+          }
+        } catch (blockError) {
+          console.error(`Error en bloque ${currentBlock + 1}:`, blockError);
+          // Continuar con la información que tenemos
+        }
+        
+        currentBlock++;
+      }
+      
+      // Resumen final
+      const missingFields = [];
+      if (!extractedInfo.razon_social || extractedInfo.razon_social === 'No encontrado') missingFields.push('Razón Social');
+      if (!extractedInfo.representante_legal || extractedInfo.representante_legal === 'No encontrado') missingFields.push('Representante Legal');
+      if (!extractedInfo.objeto_social || extractedInfo.objeto_social === 'No encontrado') missingFields.push('Objeto Social');
+      if (!extractedInfo.registro_publico || extractedInfo.registro_publico === 'No encontrado') missingFields.push('Registro Público');
+      
+      if (missingFields.length > 0) {
+        console.log(`⚠️ Campos no encontrados después de procesar ${currentBlock} bloques: ${missingFields.join(', ')}`);
+      } else {
+        console.log(`✅ Información completa obtenida después de procesar ${currentBlock} bloque(s)`);
+      }
+    }
+
+    console.log('✨ Información final extraída:', extractedInfo);
 
     // Validar información extraída
     const validationErrors: string[] = [];
