@@ -251,7 +251,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro',
         messages: [
           { 
             role: 'system', 
@@ -598,8 +598,8 @@ Extrae:
     }
 
     // Llamar a Lovable AI para extraer información de la imagen
-    // Usar modelo más potente para avisos de funcionamiento por su complejidad
-    const modelToUse = document.document_type === 'aviso_funcionamiento' 
+    // Usar modelo más potente para documentos fiscales complejos
+    const modelToUse = (document.document_type === 'aviso_funcionamiento' || document.document_type === 'constancia_fiscal')
       ? 'google/gemini-2.5-pro' 
       : 'google/gemini-2.5-flash';
     
