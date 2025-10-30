@@ -229,12 +229,26 @@ serve(async (req) => {
       return { base64: btoa(binary), mimeType, size: fileData.size };
     };
 
-    // Procesar TODAS las imágenes del documento (todas las páginas del PDF)
-    const imagesToProcess = document.image_urls && document.image_urls.length > 0 
+    // Determinar cuántas páginas procesar según el tipo de documento
+    const pageLimit: Record<string, number> = {
+      'constancia_fiscal': 2,      // Primera página: datos básicos, Segunda: regímenes
+      'comprobante_domicilio': 1,  // Siempre es una página
+      'ine': 2,                    // Frente y reverso
+      'datos_bancarios': 3,        // Primeras páginas tienen la info clave
+      'aviso_funcionamiento': 5,   // Info clave en primeras páginas
+      'acta_constitutiva': 5       // Datos principales en primeras páginas
+    };
+
+    const maxPages = pageLimit[document.document_type] || 3; // Default: 3 páginas
+
+    // Procesar imágenes del documento (limitadas según tipo)
+    const allImages = document.image_urls && document.image_urls.length > 0 
       ? document.image_urls 
       : [document.file_url.split('/documents/')[1]];
 
-    console.log(`Procesando ${imagesToProcess.length} página(s) del documento`);
+    const imagesToProcess = allImages.slice(0, maxPages);
+
+    console.log(`Documento tiene ${allImages.length} página(s), procesando las primeras ${imagesToProcess.length} según tipo "${document.document_type}"`);
 
     // Convertir todas las imágenes a base64
     const imageDataArray: Array<{ base64: string; mimeType: string; size: number }> = [];
