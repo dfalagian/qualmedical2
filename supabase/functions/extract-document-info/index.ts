@@ -540,7 +540,7 @@ Extrae:
       };
     } else if (document.document_type === 'datos_bancarios') {
       systemPrompt = 'Eres un asistente especializado en extraer información de estados de cuenta bancarios mexicanos. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información del estado de cuenta bancario: Número de Cuenta, Número de Cuenta CLABE (18 dígitos), y Nombre del Cliente/Titular. Si algún dato no está disponible, indica "No encontrado".';
+      userPrompt = 'Extrae la siguiente información del estado de cuenta bancario: Nombre del Banco (usualmente aparece en la parte superior izquierda o encabezado), Número de Cuenta, Número de Cuenta CLABE (18 dígitos), y Nombre del Cliente/Titular. Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
         tools: [
           {
@@ -551,11 +551,12 @@ Extrae:
               parameters: {
                 type: 'object',
                 properties: {
+                  nombre_banco: { type: 'string', description: 'Nombre del banco (ej: BBVA, Santander, Banamex). Usualmente aparece en la parte superior o encabezado del documento' },
                   numero_cuenta: { type: 'string', description: 'Número de cuenta bancaria' },
                   numero_cuenta_clabe: { type: 'string', description: 'Número de cuenta CLABE (18 dígitos)' },
                   nombre_cliente: { type: 'string', description: 'Nombre completo del titular o cliente de la cuenta' }
                 },
-                required: ['numero_cuenta', 'numero_cuenta_clabe', 'nombre_cliente'],
+                required: ['nombre_banco', 'numero_cuenta', 'numero_cuenta_clabe', 'nombre_cliente'],
                 additionalProperties: false
               }
             }

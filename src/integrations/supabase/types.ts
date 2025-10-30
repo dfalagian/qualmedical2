@@ -71,6 +71,7 @@ export type Database = {
           id: string
           image_urls: string[] | null
           is_valid: boolean | null
+          nombre_banco: string | null
           nombre_cliente: string | null
           nombre_completo_ine: string | null
           notes: string | null
@@ -105,6 +106,7 @@ export type Database = {
           id?: string
           image_urls?: string[] | null
           is_valid?: boolean | null
+          nombre_banco?: string | null
           nombre_cliente?: string | null
           nombre_completo_ine?: string | null
           notes?: string | null
@@ -139,6 +141,7 @@ export type Database = {
           id?: string
           image_urls?: string[] | null
           is_valid?: boolean | null
+          nombre_banco?: string | null
           nombre_cliente?: string | null
           nombre_completo_ine?: string | null
           notes?: string | null
@@ -418,33 +421,42 @@ export type Database = {
       pagos: {
         Row: {
           amount: number
+          comprobante_pago_url: string | null
           created_at: string
           created_by: string | null
           datos_bancarios_id: string
+          fecha_pago: string | null
           id: string
           invoice_id: string
+          nombre_banco: string | null
           status: string
           supplier_id: string
           updated_at: string
         }
         Insert: {
           amount: number
+          comprobante_pago_url?: string | null
           created_at?: string
           created_by?: string | null
           datos_bancarios_id: string
+          fecha_pago?: string | null
           id?: string
           invoice_id: string
+          nombre_banco?: string | null
           status?: string
           supplier_id: string
           updated_at?: string
         }
         Update: {
           amount?: number
+          comprobante_pago_url?: string | null
           created_at?: string
           created_by?: string | null
           datos_bancarios_id?: string
+          fecha_pago?: string | null
           id?: string
           invoice_id?: string
+          nombre_banco?: string | null
           status?: string
           supplier_id?: string
           updated_at?: string

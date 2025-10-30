@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Download, Loader2, RefreshCw } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import { PaymentProofUpload } from "@/components/payments/PaymentProofUpload";
 
 const Payments = () => {
   const { loading, isAdmin, user } = useAuth();
@@ -45,10 +46,10 @@ const Payments = () => {
             .eq("id", pago.supplier_id)
             .single();
 
-          // Obtener datos bancarios
+          // Obtener datos bancarios con nombre del banco
           const { data: bankData } = await supabase
             .from("documents")
-            .select("nombre_cliente, numero_cuenta, numero_cuenta_clabe")
+            .select("nombre_cliente, numero_cuenta, numero_cuenta_clabe, nombre_banco, image_urls")
             .eq("id", pago.datos_bancarios_id)
             .single();
 
@@ -77,7 +78,7 @@ const Payments = () => {
       // Buscar todos los proveedores con datos bancarios aprobados
       const { data: approvedBankDocs, error: bankError } = await supabase
         .from("documents")
-        .select("id, supplier_id")
+        .select("id, supplier_id, nombre_banco")
         .eq("document_type", "datos_bancarios")
         .eq("status", "aprobado");
 
@@ -107,6 +108,7 @@ const Payments = () => {
             invoice_id: invoice.id,
             amount: invoice.amount,
             status: "pendiente",
+            nombre_banco: bankDoc.nombre_banco || null,
             created_by: user?.id,
           }));
 
@@ -146,6 +148,7 @@ const Payments = () => {
     const excelData = pagos.map((pago: any) => ({
       "Proveedor": pago.profiles?.full_name || pago.profiles?.company_name || "N/A",
       "RFC": pago.profiles?.rfc || "N/A",
+      "Nombre Banco": pago.datos_bancarios?.nombre_banco || pago.nombre_banco || "N/A",
       "Cliente Bancario": pago.datos_bancarios?.nombre_cliente || "N/A",
       "Número de Cuenta": pago.datos_bancarios?.numero_cuenta || "N/A",
       "CLABE": pago.datos_bancarios?.numero_cuenta_clabe || "N/A",
@@ -155,6 +158,9 @@ const Payments = () => {
         ? new Date(pago.invoices.fecha_emision).toLocaleDateString() 
         : "N/A",
       "Estado Pago": pago.status,
+      "Fecha Pago": pago.fecha_pago 
+        ? new Date(pago.fecha_pago).toLocaleDateString() 
+        : "N/A",
       "Fecha Creación": new Date(pago.created_at).toLocaleDateString(),
     }));
 
@@ -166,6 +172,7 @@ const Payments = () => {
     const columnWidths = [
       { wch: 30 }, // Proveedor
       { wch: 15 }, // RFC
+      { wch: 20 }, // Nombre Banco
       { wch: 30 }, // Cliente Bancario
       { wch: 20 }, // Número de Cuenta
       { wch: 20 }, // CLABE
@@ -173,6 +180,7 @@ const Payments = () => {
       { wch: 15 }, // Importe
       { wch: 15 }, // Fecha Emisión
       { wch: 15 }, // Estado
+      { wch: 15 }, // Fecha Pago
       { wch: 15 }, // Fecha Creación
     ];
     worksheet["!cols"] = columnWidths;
@@ -224,19 +232,21 @@ const Payments = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Proveedor</TableHead>
+                <TableHead>Banco</TableHead>
                 <TableHead>Cliente Bancario</TableHead>
                 <TableHead>Cuenta</TableHead>
                 <TableHead>CLABE</TableHead>
                 <TableHead>Factura</TableHead>
                 <TableHead>Importe</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Fecha</TableHead>
+                <TableHead>Fecha Pago</TableHead>
+                <TableHead>Comprobante</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center">
+                  <TableCell colSpan={10} className="text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
@@ -251,6 +261,9 @@ const Payments = () => {
                         {pago.profiles?.rfc || "Sin RFC"}
                       </div>
                     </TableCell>
+                    <TableCell>
+                      {pago.datos_bancarios?.nombre_banco || pago.nombre_banco || "N/A"}
+                    </TableCell>
                     <TableCell>{pago.datos_bancarios?.nombre_cliente || "N/A"}</TableCell>
                     <TableCell className="font-mono text-sm">
                       {pago.datos_bancarios?.numero_cuenta || "N/A"}
@@ -263,18 +276,31 @@ const Payments = () => {
                       ${parseFloat(pago.amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={pago.status === "procesado" ? "default" : "secondary"}>
+                      <Badge 
+                        variant={pago.status === "pagado" ? "default" : "secondary"}
+                        className={pago.status === "pagado" ? "bg-green-600 hover:bg-green-700" : ""}
+                      >
                         {pago.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(pago.created_at).toLocaleDateString('es-MX')}
+                    <TableCell className="text-sm">
+                      {pago.fecha_pago 
+                        ? new Date(pago.fecha_pago).toLocaleDateString('es-MX')
+                        : "-"
+                      }
+                    </TableCell>
+                    <TableCell>
+                      <PaymentProofUpload 
+                        pagoId={pago.id}
+                        supplierId={pago.supplier_id}
+                        hasProof={!!pago.comprobante_pago_url}
+                      />
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground">
                     No hay pagos registrados
                   </TableCell>
                 </TableRow>
