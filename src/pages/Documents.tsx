@@ -181,12 +181,22 @@ const Documents = () => {
             const maxPages = selectedType === "acta_constitutiva" ? 50 : 20;
             await uploadPDFAsImages(file, insertedDoc.id, basePath, maxPages);
             toast.success(`✓ ${file.name} convertido y subido`);
+            // Solo agregar a uploadedDocs si la conversión fue exitosa
+            uploadedDocs.push(insertedDoc);
           } catch (error) {
             console.error("Error convirtiendo PDF:", error);
-            toast.error(`Error convirtiendo ${file.name}`);
+            const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+            toast.error(`Error convirtiendo ${file.name}: ${errorMessage}`);
+            
+            // Marcar el documento como fallido en la base de datos
+            await supabase
+              .from("documents")
+              .update({ 
+                extraction_status: 'failed',
+                validation_errors: [`Error en conversión: ${errorMessage}`]
+              })
+              .eq("id", insertedDoc.id);
           }
-
-          uploadedDocs.push(insertedDoc);
           
         } else {
           // Subir imagen normalmente
