@@ -194,71 +194,76 @@ serve(async (req) => {
       .update({ extraction_status: 'processing' })
       .eq('id', documentId);
 
-    // Si el documento tiene image_urls (PDF convertido), usar la primera imagen
-    // Si no, usar el file_url directamente (imagen subida directamente)
-    const imageToProcess = document.image_urls && document.image_urls.length > 0 
-      ? document.image_urls[0] 
-      : document.file_url.split('/documents/')[1];
-
-    console.log('Descargando imagen desde:', imageToProcess);
-
-    // Descargar la imagen desde storage
-    const { data: fileData, error: downloadError } = await supabaseClient
-      .storage
-      .from('documents')
-      .download(imageToProcess);
-
-    if (downloadError || !fileData) {
-      console.error('Error descargando archivo:', downloadError);
-      await supabaseClient
+    // Función auxiliar para convertir imagen a base64
+    const imageToBase64 = async (imagePath: string) => {
+      const { data: fileData, error: downloadError } = await supabaseClient
+        .storage
         .from('documents')
-        .update({ extraction_status: 'failed' })
-        .eq('id', documentId);
-      return new Response(
-        JSON.stringify({ error: 'Error descargando el archivo' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+        .download(imagePath);
+
+      if (downloadError || !fileData) {
+        throw new Error(`Error descargando imagen: ${downloadError?.message}`);
+      }
+
+      const arrayBuffer = await fileData.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      // Detectar tipo de imagen
+      let mimeType: string;
+      if (uint8Array[0] === 0xFF && uint8Array[1] === 0xD8) {
+        mimeType = 'image/jpeg';
+      } else if (uint8Array[0] === 0x89 && uint8Array[1] === 0x50) {
+        mimeType = 'image/png';
+      } else {
+        throw new Error('Tipo de archivo no soportado');
+      }
+      
+      // Convertir a base64
+      let binary = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+        binary += String.fromCharCode(...chunk);
+      }
+      
+      return { base64: btoa(binary), mimeType, size: fileData.size };
+    };
+
+    // Procesar TODAS las imágenes del documento (todas las páginas del PDF)
+    const imagesToProcess = document.image_urls && document.image_urls.length > 0 
+      ? document.image_urls 
+      : [document.file_url.split('/documents/')[1]];
+
+    console.log(`Procesando ${imagesToProcess.length} página(s) del documento`);
+
+    // Convertir todas las imágenes a base64
+    const imageDataArray: Array<{ base64: string; mimeType: string; size: number }> = [];
+    let totalSize = 0;
+    
+    for (const imagePath of imagesToProcess) {
+      try {
+        const imageData = await imageToBase64(imagePath);
+        imageDataArray.push(imageData);
+        totalSize += imageData.size;
+        console.log(`Página procesada - Tamaño: ${imageData.size} bytes, Tipo: ${imageData.mimeType}`);
+      } catch (error) {
+        console.error('Error procesando imagen:', error);
+        await supabaseClient
+          .from('documents')
+          .update({ extraction_status: 'failed' })
+          .eq('id', documentId);
+        return new Response(
+          JSON.stringify({ error: 'Error procesando las imágenes del documento' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
-    console.log('Archivo descargado, tamaño:', fileData.size);
+    console.log(`Total de páginas procesadas: ${imageDataArray.length}, Tamaño total: ${totalSize} bytes`);
     
-    // Si la imagen es muy grande (>500KB), puede causar timeouts
-    if (fileData.size > 500000) {
-      console.log('⚠️ ADVERTENCIA: Imagen grande detectada. Tamaño:', fileData.size, 'bytes. Esto puede causar timeouts.');
+    if (totalSize > 2000000) {
+      console.log('⚠️ ADVERTENCIA: Documento muy grande detectado. Esto puede causar timeouts.');
     }
-
-    // Convertir archivo a base64
-    const arrayBuffer = await fileData.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    
-    // Detectar tipo de imagen por magic bytes
-    let mimeType: string;
-    if (uint8Array[0] === 0xFF && uint8Array[1] === 0xD8) {
-      mimeType = 'image/jpeg';
-      console.log('Archivo detectado como JPEG');
-    } else if (uint8Array[0] === 0x89 && uint8Array[1] === 0x50) {
-      mimeType = 'image/png';
-      console.log('Archivo detectado como PNG');
-    } else {
-      console.error('Tipo de archivo no soportado');
-      await supabaseClient
-        .from('documents')
-        .update({ 
-          extraction_status: 'failed',
-          validation_errors: ['Tipo de archivo no soportado. Solo se aceptan imágenes JPG o PNG.']
-        })
-        .eq('id', documentId);
-      throw new Error('Tipo de archivo no soportado');
-    }
-    
-    // Convertir a base64 en chunks para evitar stack overflow
-    let binary = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-      binary += String.fromCharCode(...chunk);
-    }
-    const base64Data = btoa(binary);
 
     console.log('Llamando a Lovable AI para extraer información y validar autenticidad');
     console.log('Tipo de documento:', document.document_type);
@@ -296,12 +301,12 @@ serve(async (req) => {
                     type: 'text', 
                     text: validationPrompt
                   },
-                  {
-                    type: 'image_url',
+                  ...imageDataArray.map(imgData => ({
+                    type: 'image_url' as const,
                     image_url: { 
-                      url: `data:${mimeType};base64,${base64Data}` 
+                      url: `data:${imgData.mimeType};base64,${imgData.base64}` 
                     }
-                  }
+                  }))
                 ]
               }
             ],
@@ -677,12 +682,12 @@ Extrae:
                 type: 'text', 
                 text: userPrompt 
               },
-            {
-              type: 'image_url',
-              image_url: { 
-                url: `data:${mimeType};base64,${base64Data}` 
-              }
-            }
+              ...imageDataArray.map(imgData => ({
+                type: 'image_url' as const,
+                image_url: { 
+                  url: `data:${imgData.mimeType};base64,${imgData.base64}` 
+                }
+              }))
             ]
           }
         ],
