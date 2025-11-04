@@ -113,13 +113,22 @@ const Documents = () => {
         throw new Error("Usuario no autenticado");
       }
 
-      // Obtener archivos directamente del input en lugar del estado
-      const currentFiles = fileInputRef.current?.files;
-      if (!currentFiles || currentFiles.length === 0) {
+      // Intentar obtener archivos del estado o del input directamente
+      let filesArray: File[] = [];
+      
+      // Primero intentar con el estado
+      if (files.length > 0) {
+        filesArray = files;
+      } 
+      // Si el estado está vacío, intentar con el input directamente
+      else if (fileInputRef.current?.files && fileInputRef.current.files.length > 0) {
+        filesArray = Array.from(fileInputRef.current.files);
+      }
+      
+      // Si no hay archivos en ningún lado, mostrar error
+      if (filesArray.length === 0) {
         throw new Error("Por favor selecciona uno o más archivos");
       }
-
-      const filesArray = Array.from(currentFiles);
 
       if (filesArray.length > 20) {
         throw new Error("Máximo 20 archivos permitidos");
@@ -521,6 +530,7 @@ const Documents = () => {
                       if (selectedFiles.length > 20) {
                         toast.error("Máximo 20 archivos permitidos");
                         e.target.value = '';
+                        setFiles([]);
                         return;
                       }
                       
@@ -531,13 +541,14 @@ const Documents = () => {
                         if (file.size > MAX_FILE_SIZE_ACTA) {
                           toast.error(`${file.name}: archivo demasiado grande (máximo 20MB)`);
                           e.target.value = '';
+                          setFiles([]);
                           return;
                         }
                         validFiles.push(file);
                       }
                       setFiles(validFiles);
+                      console.log('Archivos seleccionados:', validFiles.length);
                     }}
-                    required
                   />
                   <p className="text-xs text-muted-foreground">
                     Puedes seleccionar hasta 20 archivos. 
