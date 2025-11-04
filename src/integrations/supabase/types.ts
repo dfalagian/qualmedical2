@@ -237,6 +237,7 @@ export type Database = {
           complemento_pago_url: string | null
           created_at: string | null
           currency: string | null
+          delivery_evidence_url: string | null
           descuento: number | null
           emisor_nombre: string | null
           emisor_regimen_fiscal: string | null
@@ -267,6 +268,7 @@ export type Database = {
           complemento_pago_url?: string | null
           created_at?: string | null
           currency?: string | null
+          delivery_evidence_url?: string | null
           descuento?: number | null
           emisor_nombre?: string | null
           emisor_regimen_fiscal?: string | null
@@ -297,6 +299,7 @@ export type Database = {
           complemento_pago_url?: string | null
           created_at?: string | null
           currency?: string | null
+          delivery_evidence_url?: string | null
           descuento?: number | null
           emisor_nombre?: string | null
           emisor_regimen_fiscal?: string | null

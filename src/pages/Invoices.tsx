@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage } from "lucide-react";
+import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck } from "lucide-react";
 import { ImageViewer } from "@/components/admin/ImageViewer";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InvoiceDetailsDialog } from "@/components/invoices/InvoiceDetailsDialog";
@@ -38,6 +39,8 @@ const Invoices = () => {
   const [invoiceForComplemento, setInvoiceForComplemento] = useState<string | null>(null);
   const [complementoFile, setComplementoFile] = useState<File | null>(null);
   const [supplierFilter, setSupplierFilter] = useState("all");
+  const [uploadingEvidence, setUploadingEvidence] = useState<string | null>(null);
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices"],
@@ -334,6 +337,52 @@ const Invoices = () => {
     },
   });
 
+  const uploadEvidenceMutation = useMutation({
+    mutationFn: async ({ invoiceId, file }: { invoiceId: string; file: File }) => {
+      if (!user) throw new Error("Usuario no autenticado");
+      
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/evidence/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('invoices')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('invoices')
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from('invoices')
+        .update({ delivery_evidence_url: publicUrl })
+        .eq('id', invoiceId);
+
+      if (updateError) throw updateError;
+
+      return publicUrl;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      toast.success("Evidencia de entrega subida exitosamente");
+      setUploadingEvidence(null);
+      setEvidenceFile(null);
+    },
+    onError: (error: any) => {
+      console.error("Error uploading evidence:", error);
+      toast.error(error.message || "Error al subir la evidencia de entrega");
+    },
+  });
+
+  const handleEvidenceUpload = async (invoiceId: string) => {
+    if (!evidenceFile) {
+      toast.error("Por favor selecciona una imagen");
+      return;
+    }
+    uploadEvidenceMutation.mutate({ invoiceId, file: evidenceFile });
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pagado":
@@ -614,6 +663,74 @@ const Invoices = () => {
                           triggerSize="sm"
                           triggerVariant="outline"
                         />
+                      )}
+
+                      {!isAdmin && (
+                        <Dialog 
+                          open={uploadingEvidence === invoice.id} 
+                          onOpenChange={(open) => {
+                            setUploadingEvidence(open ? invoice.id : null);
+                            if (!open) setEvidenceFile(null);
+                          }}
+                        >
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="gap-2"
+                            >
+                              <Truck className="h-4 w-4" />
+                              {invoice.delivery_evidence_url ? "Ver Evidencia" : "Evidencia de Entrega"}
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Evidencia de Entrega</DialogTitle>
+                              <DialogDescription>
+                                {invoice.delivery_evidence_url 
+                                  ? "Visualiza o actualiza la evidencia de entrega"
+                                  : "Sube una imagen como evidencia de entrega para esta factura"
+                                }
+                              </DialogDescription>
+                            </DialogHeader>
+                            
+                            {invoice.delivery_evidence_url && (
+                              <div className="mb-4">
+                                <img 
+                                  src={invoice.delivery_evidence_url} 
+                                  alt="Evidencia de entrega"
+                                  className="w-full h-auto rounded-lg border"
+                                />
+                              </div>
+                            )}
+
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="evidence-file">
+                                  {invoice.delivery_evidence_url ? "Actualizar imagen" : "Seleccionar imagen"}
+                                </Label>
+                                <Input
+                                  id="evidence-file"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) setEvidenceFile(file);
+                                  }}
+                                  className="mt-2"
+                                />
+                              </div>
+                              
+                              <Button
+                                onClick={() => handleEvidenceUpload(invoice.id)}
+                                disabled={!evidenceFile || uploadEvidenceMutation.isPending}
+                                className="w-full"
+                              >
+                                {uploadEvidenceMutation.isPending ? "Subiendo..." : "Subir Evidencia"}
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
                       )}
 
                       {isAdmin && invoice.status !== "pagado" && (
