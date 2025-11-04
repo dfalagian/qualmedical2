@@ -665,6 +665,16 @@ const Invoices = () => {
                         />
                       )}
 
+                      {invoice.delivery_evidence_url && isAdmin && (
+                        <ImageViewer
+                          fileUrl={invoice.delivery_evidence_url}
+                          fileName={`Evidencia-${invoice.invoice_number}`}
+                          triggerText="Ver Evidencia"
+                          triggerSize="sm"
+                          triggerVariant="outline"
+                        />
+                      )}
+
                       {!isAdmin && (
                         <Dialog 
                           open={uploadingEvidence === invoice.id} 
