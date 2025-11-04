@@ -11,6 +11,7 @@ interface ImageViewerProps {
   triggerText?: string;
   triggerSize?: "sm" | "default" | "lg" | "icon";
   triggerVariant?: "default" | "outline" | "ghost" | "destructive";
+  bucket?: string;
 }
 
 export const ImageViewer = ({ 
@@ -19,7 +20,8 @@ export const ImageViewer = ({
   fileName, 
   triggerText = "Ver",
   triggerSize = "sm",
-  triggerVariant = "outline"
+  triggerVariant = "outline",
+  bucket = "documents"
 }: ImageViewerProps) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [signedUrls, setSignedUrls] = useState<string[]>([]);
@@ -36,17 +38,18 @@ export const ImageViewer = ({
       const paths = rawPaths.map(url => {
         // Si ya es una URL completa, extraer el path
         if (url.startsWith('http')) {
-          const match = url.match(/\/documents\/(.+)$/);
+          const bucketPattern = new RegExp(`\\/${bucket}\\/(.+)$`);
+          const match = url.match(bucketPattern);
           return match ? match[1] : url;
         }
         
         // Ya es un path relativo
-        return url.includes('/documents/') 
-          ? url.split('/documents/')[1] 
+        return url.includes(`/${bucket}/`) 
+          ? url.split(`/${bucket}/`)[1] 
           : url;
       });
 
-      const urls = await getSignedUrls('documents', paths, 3600); // 1 hora de expiración
+      const urls = await getSignedUrls(bucket, paths, 3600); // 1 hora de expiración
       setSignedUrls(urls.filter((url): url is string => url !== null));
       setIsLoading(false);
     };
@@ -54,7 +57,7 @@ export const ImageViewer = ({
     if (rawPaths.length > 0) {
       loadSignedUrls();
     }
-  }, [rawPaths]);
+  }, [rawPaths, bucket]);
 
   const totalPages = signedUrls.length;
   const hasMultiplePages = totalPages > 1;

@@ -350,18 +350,15 @@ const Invoices = () => {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('invoices')
-        .getPublicUrl(fileName);
-
+      // Guardar solo el path relativo, no la URL pública
       const { error: updateError } = await supabase
         .from('invoices')
-        .update({ delivery_evidence_url: publicUrl })
+        .update({ delivery_evidence_url: fileName })
         .eq('id', invoiceId);
 
       if (updateError) throw updateError;
 
-      return publicUrl;
+      return fileName;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
@@ -672,6 +669,7 @@ const Invoices = () => {
                           triggerText="Ver Evidencia"
                           triggerSize="sm"
                           triggerVariant="outline"
+                          bucket="invoices"
                         />
                       )}
 
