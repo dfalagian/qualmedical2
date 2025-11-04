@@ -688,7 +688,7 @@ const Invoices = () => {
                               className="gap-2"
                             >
                               <Truck className="h-4 w-4" />
-                              {invoice.delivery_evidence_url ? "Ver Evidencia" : "Evidencia de Entrega"}
+                              {invoice.delivery_evidence_url ? "Actualizar Evidencia" : "Subir Evidencia"}
                             </Button>
                           </DialogTrigger>
                           <DialogContent>
@@ -696,7 +696,7 @@ const Invoices = () => {
                               <DialogTitle>Evidencia de Entrega</DialogTitle>
                               <DialogDescription>
                                 {invoice.delivery_evidence_url 
-                                  ? "Visualiza o actualiza la evidencia de entrega"
+                                  ? "Actualiza la evidencia de entrega"
                                   : "Sube una imagen como evidencia de entrega para esta factura"
                                 }
                               </DialogDescription>
@@ -704,10 +704,11 @@ const Invoices = () => {
                             
                             {invoice.delivery_evidence_url && (
                               <div className="mb-4">
+                                <p className="text-sm text-muted-foreground mb-2">Evidencia actual:</p>
                                 <img 
                                   src={invoice.delivery_evidence_url} 
                                   alt="Evidencia de entrega"
-                                  className="w-full h-auto rounded-lg border"
+                                  className="w-full h-auto rounded-lg border max-h-48 object-contain"
                                 />
                               </div>
                             )}
@@ -715,7 +716,7 @@ const Invoices = () => {
                             <div className="space-y-4">
                               <div>
                                 <Label htmlFor="evidence-file">
-                                  {invoice.delivery_evidence_url ? "Actualizar imagen" : "Seleccionar imagen"}
+                                  {invoice.delivery_evidence_url ? "Nueva imagen" : "Seleccionar imagen"}
                                 </Label>
                                 <Input
                                   id="evidence-file"
@@ -734,7 +735,7 @@ const Invoices = () => {
                                 disabled={!evidenceFile || uploadEvidenceMutation.isPending}
                                 className="w-full"
                               >
-                                {uploadEvidenceMutation.isPending ? "Subiendo..." : "Subir Evidencia"}
+                                {uploadEvidenceMutation.isPending ? "Subiendo..." : invoice.delivery_evidence_url ? "Actualizar Evidencia" : "Subir Evidencia"}
                               </Button>
                             </div>
                           </DialogContent>
