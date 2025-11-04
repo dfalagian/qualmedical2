@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ const Documents = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [notes, setNotes] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Validación de archivo
   const validateFile = (file: File, documentType: string): string | null => {
@@ -112,16 +113,20 @@ const Documents = () => {
         throw new Error("Usuario no autenticado");
       }
 
-      if (files.length === 0) {
+      // Obtener archivos directamente del input en lugar del estado
+      const currentFiles = fileInputRef.current?.files;
+      if (!currentFiles || currentFiles.length === 0) {
         throw new Error("Por favor selecciona uno o más archivos");
       }
 
-      if (files.length > 20) {
+      const filesArray = Array.from(currentFiles);
+
+      if (filesArray.length > 20) {
         throw new Error("Máximo 20 archivos permitidos");
       }
 
       // Validar todos los archivos antes de subir
-      for (const file of files) {
+      for (const file of filesArray) {
         const validationError = validateFile(file, selectedType);
         if (validationError) {
           throw new Error(`${file.name}: ${validationError}`);
@@ -138,8 +143,8 @@ const Documents = () => {
       const uploadedDocs = [];
 
       // Subir cada archivo
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      for (let i = 0; i < filesArray.length; i++) {
+        const file = filesArray[i];
         
         // Sanitizar nombre de archivo
         const fileExt = file.name.split(".").pop()?.toLowerCase();
@@ -273,9 +278,11 @@ const Documents = () => {
       }
     },
     onSuccess: () => {
-      toast.success(`${files.length} documento(s) subido(s) exitosamente`);
+      const uploadedCount = fileInputRef.current?.files?.length || 0;
+      toast.success(`${uploadedCount} documento(s) subido(s) exitosamente`);
       queryClient.invalidateQueries({ queryKey: ["documents"] });
       setFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setSelectedType("");
       setNotes("");
       setIsUploading(false);
@@ -504,6 +511,7 @@ const Documents = () => {
                 <div className="space-y-2">
                   <Label htmlFor="file">Archivos (JPG, JPEG, PNG o PDF) *</Label>
                   <Input
+                    ref={fileInputRef}
                     id="file"
                     type="file"
                     accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
