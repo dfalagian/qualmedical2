@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InvoiceDetailsDialog } from "@/components/invoices/InvoiceDetailsDialog";
+import { getSignedUrl } from "@/lib/storage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +42,7 @@ const Invoices = () => {
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [uploadingEvidence, setUploadingEvidence] = useState<string | null>(null);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [currentEvidenceUrl, setCurrentEvidenceUrl] = useState<string | null>(null);
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices"],
@@ -380,6 +382,23 @@ const Invoices = () => {
     uploadEvidenceMutation.mutate({ invoiceId, file: evidenceFile });
   };
 
+  // Cargar la URL firmada de la evidencia cuando se abre el diálogo
+  useEffect(() => {
+    const loadEvidenceUrl = async () => {
+      if (uploadingEvidence) {
+        const invoice = invoices?.find(inv => inv.id === uploadingEvidence);
+        if (invoice?.delivery_evidence_url) {
+          const signedUrl = await getSignedUrl('invoices', invoice.delivery_evidence_url, 3600);
+          setCurrentEvidenceUrl(signedUrl);
+        } else {
+          setCurrentEvidenceUrl(null);
+        }
+      }
+    };
+
+    loadEvidenceUrl();
+  }, [uploadingEvidence, invoices]);
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pagado":
@@ -705,11 +724,17 @@ const Invoices = () => {
                             {invoice.delivery_evidence_url && (
                               <div className="mb-4">
                                 <p className="text-sm text-muted-foreground mb-2">Evidencia actual:</p>
-                                <img 
-                                  src={invoice.delivery_evidence_url} 
-                                  alt="Evidencia de entrega"
-                                  className="w-full h-auto rounded-lg border max-h-48 object-contain"
-                                />
+                                {currentEvidenceUrl ? (
+                                  <img 
+                                    src={currentEvidenceUrl} 
+                                    alt="Evidencia de entrega"
+                                    className="w-full h-auto rounded-lg border max-h-48 object-contain"
+                                  />
+                                ) : (
+                                  <div className="w-full h-48 rounded-lg border flex items-center justify-center">
+                                    <p className="text-sm text-muted-foreground">Cargando imagen...</p>
+                                  </div>
+                                )}
                               </div>
                             )}
 
