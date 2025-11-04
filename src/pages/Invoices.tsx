@@ -665,7 +665,7 @@ const Invoices = () => {
                         />
                       )}
 
-                      {invoice.delivery_evidence_url && isAdmin && (
+                      {invoice.delivery_evidence_url && (
                         <ImageViewer
                           fileUrl={invoice.delivery_evidence_url}
                           fileName={`Evidencia-${invoice.invoice_number}`}
