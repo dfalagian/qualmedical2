@@ -103,8 +103,17 @@ const Documents = () => {
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      if (files.length === 0 || !selectedType || !user) {
-        throw new Error("Faltan datos requeridos");
+      // Validaciones más específicas
+      if (!selectedType) {
+        throw new Error("Por favor selecciona un tipo de documento");
+      }
+
+      if (!user) {
+        throw new Error("Usuario no autenticado");
+      }
+
+      if (files.length === 0) {
+        throw new Error("Por favor selecciona uno o más archivos");
       }
 
       if (files.length > 20) {
@@ -507,13 +516,13 @@ const Documents = () => {
                         return;
                       }
                       
+                      // Solo validar tamaño básico aquí, validación completa en submit
                       const validFiles: File[] = [];
                       for (const file of selectedFiles) {
-                        const error = validateFile(file, selectedType);
-                        if (error) {
-                          toast.error(`${file.name}: ${error}`);
+                        // Validar solo tamaño máximo genérico
+                        if (file.size > MAX_FILE_SIZE_ACTA) {
+                          toast.error(`${file.name}: archivo demasiado grande (máximo 20MB)`);
                           e.target.value = '';
-                          setFiles([]);
                           return;
                         }
                         validFiles.push(file);
