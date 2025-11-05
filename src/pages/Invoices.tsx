@@ -269,6 +269,9 @@ const Invoices = () => {
       
       if (status === "pagado") {
         updates.payment_date = new Date().toISOString().split('T')[0];
+      } else {
+        // Limpiar payment_date si se cambia de "pagado" a otro estado
+        updates.payment_date = null;
       }
 
       const { error } = await supabase
@@ -861,7 +864,7 @@ const Invoices = () => {
                         </Dialog>
                       )}
 
-                      {isAdmin && invoice.status !== "pagado" && (
+                      {isAdmin && (
                         <Select
                           value={invoice.status}
                           onValueChange={(value: any) =>
