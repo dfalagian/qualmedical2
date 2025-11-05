@@ -558,7 +558,7 @@ const Invoices = () => {
                           Proveedor: {invoice.profiles.company_name || invoice.profiles.full_name}
                         </p>
                       )}
-                      {invoice.requiere_complemento && !invoice.complemento_pago_url && (
+                      {!isAdmin && invoice.requiere_complemento && !invoice.complemento_pago_url && (
                         <div className="mt-2 flex items-center gap-2">
                           <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
                             Requiere Complemento de Pago
