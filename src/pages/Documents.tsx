@@ -16,7 +16,6 @@ import { usePDFUpload } from "@/hooks/usePDFUpload";
 import { Progress } from "@/components/ui/progress";
 
 const DOCUMENT_TYPES = [
-  { value: "factura", label: "Factura" },
   { value: "contrato", label: "Contrato" },
   { value: "certificado", label: "Certificado" },
   { value: "constancia_fiscal", label: "Constancia de Situación Fiscal" },
