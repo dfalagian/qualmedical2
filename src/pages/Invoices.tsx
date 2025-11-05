@@ -701,30 +701,23 @@ const Invoices = () => {
                                     const urlPath = new URL(invoice.complemento_pago_url).pathname;
                                     const filePath = urlPath.split('/').slice(-3).join('/');
                                     
-                                    const { data, error } = await supabase.storage
-                                      .from('invoices')
-                                      .download(filePath);
+                                    const signedUrl = await getSignedUrl('invoices', filePath, 3600);
                                     
-                                    if (error) throw error;
+                                    if (!signedUrl) {
+                                      throw new Error('No se pudo obtener la URL del complemento');
+                                    }
                                     
-                                    const url = URL.createObjectURL(data);
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.download = `complemento-${invoice.invoice_number}`;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    URL.revokeObjectURL(url);
+                                    window.open(signedUrl, '_blank');
                                   } catch (error) {
-                                    toast.error('Error al descargar el complemento');
+                                    toast.error('Error al abrir el complemento');
                                   }
                                 }}
                               >
-                                <Download className="h-3.5 w-3.5" />
+                                <Eye className="h-3.5 w-3.5" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>Descargar complemento de pago</p>
+                              <p>Ver complemento de pago</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
