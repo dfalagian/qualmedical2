@@ -99,50 +99,38 @@ export const useAuth = () => {
     try {
       console.log('Starting sign out...');
       
-      // Call Supabase signOut first
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error("SignOut error:", error);
-        // Ignore session not found errors - they mean we're already logged out
-        const ignorableErrors = [
-          "Auth session missing",
-          "session_not_found",
-          "Session from session_id claim in JWT does not exist"
-        ];
-        
-        if (!ignorableErrors.some(msg => error.message?.includes(msg))) {
-          throw error;
-        }
-      }
-      
-      // Clear local state
+      // Clear local state immediately
       setUser(null);
       setSession(null);
       setUserRole(null);
+      
+      // Clear Supabase storage manually to ensure cleanup
+      localStorage.removeItem('sb-cjhmbqmhfbspgirnkjkm-auth-token');
+      
+      // Try to sign out from server (might fail if session expired)
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (signOutError) {
+        console.log('Server signout failed (expected if session expired):', signOutError);
+      }
       
       toast.success("Sesión cerrada correctamente");
       
       console.log('Sign out complete, redirecting...');
       
-      // Small delay before redirect to ensure state is cleared
-      setTimeout(() => {
-        window.location.href = "/auth";
-      }, 100);
+      // Force hard reload to clear all state
+      window.location.href = "/auth";
     } catch (error: any) {
       console.error("Error al cerrar sesión:", error);
       
-      // Clear state anyway
+      // Clear everything anyway
       setUser(null);
       setSession(null);
       setUserRole(null);
-      
-      toast.error("Error al cerrar sesión: " + (error.message || "Error desconocido"));
+      localStorage.removeItem('sb-cjhmbqmhfbspgirnkjkm-auth-token');
       
       // Force navigation anyway
-      setTimeout(() => {
-        window.location.href = "/auth";
-      }, 100);
+      window.location.href = "/auth";
     }
   };
 
