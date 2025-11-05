@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InvoiceDetailsDialog } from "@/components/invoices/InvoiceDetailsDialog";
+import { InvoicePaymentProofUpload } from "@/components/invoices/InvoicePaymentProofUpload";
 import { getSignedUrl } from "@/lib/storage";
 import {
   AlertDialog,
@@ -689,15 +690,12 @@ const Invoices = () => {
                         </Button>
                       )}
                       
-                      {invoice.comprobante_pago_url && (
-                        <ImageViewer
-                          fileUrl={invoice.comprobante_pago_url}
-                          fileName={`Comprobante-${invoice.invoice_number}`}
-                          triggerText="Comprobante"
-                          triggerSize="sm"
-                          triggerVariant="outline"
-                        />
-                      )}
+                      <InvoicePaymentProofUpload
+                        invoiceId={invoice.id}
+                        supplierId={invoice.supplier_id}
+                        hasProof={!!invoice.comprobante_pago_url}
+                        proofUrl={invoice.comprobante_pago_url}
+                      />
 
                       {invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 && (
                         <ImageViewer
