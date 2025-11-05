@@ -150,11 +150,11 @@ export function InvoicePaymentProofUpload({
       <DialogTrigger asChild>
         <Button 
           variant={hasProof ? "outline" : "default"} 
-          size="sm"
-          className="gap-2"
+          size="icon"
+          className="h-8 w-8"
+          title={hasProof ? "Ver Comprobante" : "Subir Comprobante"}
         >
-          <FileCheck className="h-4 w-4" />
-          {hasProof ? "Ver Comprobante" : "Subir Comprobante"}
+          <FileCheck className="h-3.5 w-3.5" />
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">

@@ -585,21 +585,22 @@ const Invoices = () => {
                       )}
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <Button 
                         variant="outline" 
-                        size="sm"
+                        size="icon"
+                        className="h-8 w-8"
                         onClick={() => {
                           setSelectedInvoice(invoice);
                           setShowDetailsDialog(true);
                         }}
                       >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Ver
+                        <Eye className="h-3.5 w-3.5" />
                       </Button>
                       <Button 
                         variant="outline" 
-                        size="sm"
+                        size="icon"
+                        className="h-8 w-8"
                         onClick={async () => {
                           try {
                             const urlPath = new URL(invoice.pdf_url).pathname;
@@ -624,12 +625,12 @@ const Invoices = () => {
                           }
                         }}
                       >
-                        <FileText className="h-4 w-4 mr-1" />
-                        PDF
+                        <FileText className="h-3.5 w-3.5" />
                       </Button>
                       <Button 
                         variant="outline" 
-                        size="sm"
+                        size="icon"
+                        className="h-8 w-8"
                         onClick={async () => {
                           try {
                             const urlPath = new URL(invoice.xml_url).pathname;
@@ -654,13 +655,13 @@ const Invoices = () => {
                           }
                         }}
                       >
-                        <Download className="h-4 w-4 mr-1" />
-                        XML
+                        <Download className="h-3.5 w-3.5" />
                       </Button>
                       {invoice.complemento_pago_url && (
                         <Button 
                           variant="outline" 
-                          size="sm"
+                          size="icon"
+                          className="h-8 w-8"
                           onClick={async () => {
                             try {
                               const urlPath = new URL(invoice.complemento_pago_url).pathname;
@@ -684,9 +685,9 @@ const Invoices = () => {
                               toast.error('Error al descargar el complemento');
                             }
                           }}
+                          title="Descargar Complemento"
                         >
-                          <Download className="h-4 w-4 mr-1" />
-                          Complemento
+                          <Download className="h-3.5 w-3.5" />
                         </Button>
                       )}
                       
@@ -701,8 +702,8 @@ const Invoices = () => {
                         <ImageViewer
                           imageUrls={invoice.delivery_evidence_url}
                           fileName={`Evidencia-${invoice.invoice_number}`}
-                          triggerText={`Ver Evidencia (${invoice.delivery_evidence_url.length})`}
-                          triggerSize="sm"
+                          triggerText="Evidencia"
+                          triggerSize="icon"
                           triggerVariant="outline"
                           bucket="invoices"
                         />
@@ -719,13 +720,13 @@ const Invoices = () => {
                           <DialogTrigger asChild>
                             <Button 
                               variant="outline" 
-                              size="sm"
-                              className="gap-2"
-                            >
-                              <Truck className="h-4 w-4" />
-                              {invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 
+                              size="icon"
+                              className="h-8 w-8"
+                              title={invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 
                                 ? `Actualizar Evidencia (${invoice.delivery_evidence_url.length}/4)` 
                                 : "Subir Evidencia"}
+                            >
+                              <Truck className="h-3.5 w-3.5" />
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -832,14 +833,15 @@ const Invoices = () => {
                       
                       {isAdmin && (
                         <Button
-                          variant="destructive"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                           onClick={() => {
                             setInvoiceToDelete(invoice.id);
                             setDeleteDialogOpen(true);
                           }}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}
                     </div>

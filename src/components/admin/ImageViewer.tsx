@@ -73,9 +73,9 @@ export const ImageViewer = ({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant={triggerVariant} size={triggerSize}>
-          <Eye className="h-4 w-4 mr-1" />
-          {triggerText}
+        <Button variant={triggerVariant} size={triggerSize} className={triggerSize === "icon" ? "h-8 w-8" : ""}>
+          <Eye className={triggerSize === "icon" ? "h-3.5 w-3.5" : "h-4 w-4 mr-1"} />
+          {triggerSize !== "icon" && triggerText}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh]">
