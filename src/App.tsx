@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -33,21 +34,21 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Auth />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/dashboard/documents" element={<Documents />} />
-          <Route path="/dashboard/documents-admin" element={<DocumentsAdmin />} />
-          <Route path="/dashboard/constancia-fiscal-admin" element={<ConstanciaFiscalAdmin />} />
-          <Route path="/dashboard/comprobante-domicilio-admin" element={<ComprobanteDomicilioAdmin />} />
-          <Route path="/dashboard/aviso-funcionamiento-admin" element={<AvisoFuncionamientoAdmin />} />
-          <Route path="/dashboard/datos-bancarios-admin" element={<DatosBancariosAdmin />} />
-          <Route path="/dashboard/invoices" element={<Invoices />} />
-          <Route path="/dashboard/messages" element={<Messages />} />
-          <Route path="/dashboard/orders" element={<PurchaseOrders />} />
-          <Route path="/dashboard/admin" element={<Admin />} />
-          <Route path="/dashboard/medicine-counter" element={<MedicineCounter />} />
-          <Route path="/dashboard/supplier-documents" element={<SupplierDocuments />} />
-          <Route path="/dashboard/database-backup" element={<DatabaseBackup />} />
-          <Route path="/dashboard/payments" element={<Payments />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/dashboard/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
+          <Route path="/dashboard/documents-admin" element={<ProtectedRoute><DocumentsAdmin /></ProtectedRoute>} />
+          <Route path="/dashboard/constancia-fiscal-admin" element={<ProtectedRoute><ConstanciaFiscalAdmin /></ProtectedRoute>} />
+          <Route path="/dashboard/comprobante-domicilio-admin" element={<ProtectedRoute><ComprobanteDomicilioAdmin /></ProtectedRoute>} />
+          <Route path="/dashboard/aviso-funcionamiento-admin" element={<ProtectedRoute><AvisoFuncionamientoAdmin /></ProtectedRoute>} />
+          <Route path="/dashboard/datos-bancarios-admin" element={<ProtectedRoute><DatosBancariosAdmin /></ProtectedRoute>} />
+          <Route path="/dashboard/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
+          <Route path="/dashboard/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+          <Route path="/dashboard/orders" element={<ProtectedRoute><PurchaseOrders /></ProtectedRoute>} />
+          <Route path="/dashboard/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+          <Route path="/dashboard/medicine-counter" element={<ProtectedRoute><MedicineCounter /></ProtectedRoute>} />
+          <Route path="/dashboard/supplier-documents" element={<ProtectedRoute><SupplierDocuments /></ProtectedRoute>} />
+          <Route path="/dashboard/database-backup" element={<ProtectedRoute><DatabaseBackup /></ProtectedRoute>} />
+          <Route path="/dashboard/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
