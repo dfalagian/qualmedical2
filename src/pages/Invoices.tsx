@@ -701,24 +701,30 @@ const Invoices = () => {
                                     const urlPath = new URL(invoice.complemento_pago_url).pathname;
                                     const filePath = urlPath.split('/').slice(-3).join('/');
                                     
-                                    const signedUrl = await getSignedUrl('invoices', filePath, 3600);
+                                    const { data, error } = await supabase.storage
+                                      .from('invoices')
+                                      .download(filePath);
                                     
-                                    if (!signedUrl) {
-                                      throw new Error('No se pudo obtener la URL del complemento');
-                                    }
+                                    if (error) throw error;
                                     
-                                    // Abrir PDF en nueva pestaña
-                                    window.open(signedUrl, '_blank');
+                                    const url = URL.createObjectURL(data);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = `complemento-${invoice.invoice_number}.pdf`;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    URL.revokeObjectURL(url);
                                   } catch (error) {
-                                    toast.error('Error al abrir el complemento');
+                                    toast.error('Error al descargar el complemento');
                                   }
                                 }}
                               >
-                                <FileText className="h-3.5 w-3.5" />
+                                <Download className="h-3.5 w-3.5" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>Ver complemento de pago (PDF)</p>
+                              <p>Descargar complemento de pago (PDF)</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
