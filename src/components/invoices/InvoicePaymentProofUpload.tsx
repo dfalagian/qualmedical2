@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Loader2, FileCheck } from "lucide-react";
 import { getSignedUrl } from "@/lib/storage";
@@ -147,16 +148,24 @@ export function InvoicePaymentProofUpload({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button 
-          variant={hasProof ? "outline" : "default"} 
-          size="icon"
-          className="h-8 w-8"
-          title={hasProof ? "Ver Comprobante" : "Subir Comprobante"}
-        >
-          <FileCheck className="h-3.5 w-3.5" />
-        </Button>
-      </DialogTrigger>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DialogTrigger asChild>
+              <Button 
+                variant={hasProof ? "outline" : "default"} 
+                size="icon"
+                className="h-8 w-8"
+              >
+                <FileCheck className="h-3.5 w-3.5" />
+              </Button>
+            </DialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{hasProof ? "Ver comprobante de pago" : "Subir comprobante de pago"}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>

@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { InvoiceDetailsDialog } from "@/components/invoices/InvoiceDetailsDialog";
 import { InvoicePaymentProofUpload } from "@/components/invoices/InvoicePaymentProofUpload";
 import { getSignedUrl } from "@/lib/storage";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -586,109 +587,147 @@ const Invoices = () => {
                     </div>
 
                     <div className="flex gap-1">
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => {
-                          setSelectedInvoice(invoice);
-                          setShowDetailsDialog(true);
-                        }}
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={async () => {
-                          try {
-                            const urlPath = new URL(invoice.pdf_url).pathname;
-                            const filePath = urlPath.split('/').slice(-3).join('/');
-                            
-                            const { data, error } = await supabase.storage
-                              .from('invoices')
-                              .download(filePath);
-                            
-                            if (error) throw error;
-                            
-                            const url = URL.createObjectURL(data);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `factura-${invoice.invoice_number}.pdf`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
-                          } catch (error) {
-                            toast.error('Error al descargar el PDF');
-                          }
-                        }}
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={async () => {
-                          try {
-                            const urlPath = new URL(invoice.xml_url).pathname;
-                            const filePath = urlPath.split('/').slice(-3).join('/');
-                            
-                            const { data, error } = await supabase.storage
-                              .from('invoices')
-                              .download(filePath);
-                            
-                            if (error) throw error;
-                            
-                            const url = URL.createObjectURL(data);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `factura-${invoice.invoice_number}.xml`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
-                          } catch (error) {
-                            toast.error('Error al descargar el XML');
-                          }
-                        }}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => {
+                                setSelectedInvoice(invoice);
+                                setShowDetailsDialog(true);
+                              }}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Ver detalles de la factura</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={async () => {
+                                try {
+                                  const urlPath = new URL(invoice.pdf_url).pathname;
+                                  const filePath = urlPath.split('/').slice(-3).join('/');
+                                  
+                                  const { data, error } = await supabase.storage
+                                    .from('invoices')
+                                    .download(filePath);
+                                  
+                                  if (error) throw error;
+                                  
+                                  const url = URL.createObjectURL(data);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = `factura-${invoice.invoice_number}.pdf`;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  URL.revokeObjectURL(url);
+                                } catch (error) {
+                                  toast.error('Error al descargar el PDF');
+                                }
+                              }}
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Descargar PDF de la factura</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={async () => {
+                                try {
+                                  const urlPath = new URL(invoice.xml_url).pathname;
+                                  const filePath = urlPath.split('/').slice(-3).join('/');
+                                  
+                                  const { data, error } = await supabase.storage
+                                    .from('invoices')
+                                    .download(filePath);
+                                  
+                                  if (error) throw error;
+                                  
+                                  const url = URL.createObjectURL(data);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = `factura-${invoice.invoice_number}.xml`;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  URL.revokeObjectURL(url);
+                                } catch (error) {
+                                  toast.error('Error al descargar el XML');
+                                }
+                              }}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Descargar XML de la factura</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
                       {invoice.complemento_pago_url && (
-                        <Button 
-                          variant="outline" 
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={async () => {
-                            try {
-                              const urlPath = new URL(invoice.complemento_pago_url).pathname;
-                              const filePath = urlPath.split('/').slice(-3).join('/');
-                              
-                              const { data, error } = await supabase.storage
-                                .from('invoices')
-                                .download(filePath);
-                              
-                              if (error) throw error;
-                              
-                              const url = URL.createObjectURL(data);
-                              const link = document.createElement('a');
-                              link.href = url;
-                              link.download = `complemento-${invoice.invoice_number}`;
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                              URL.revokeObjectURL(url);
-                            } catch (error) {
-                              toast.error('Error al descargar el complemento');
-                            }
-                          }}
-                          title="Descargar Complemento"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                        </Button>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={async () => {
+                                  try {
+                                    const urlPath = new URL(invoice.complemento_pago_url).pathname;
+                                    const filePath = urlPath.split('/').slice(-3).join('/');
+                                    
+                                    const { data, error } = await supabase.storage
+                                      .from('invoices')
+                                      .download(filePath);
+                                    
+                                    if (error) throw error;
+                                    
+                                    const url = URL.createObjectURL(data);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = `complemento-${invoice.invoice_number}`;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    URL.revokeObjectURL(url);
+                                  } catch (error) {
+                                    toast.error('Error al descargar el complemento');
+                                  }
+                                }}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Descargar complemento de pago</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                       
                       <InvoicePaymentProofUpload
@@ -717,18 +756,28 @@ const Invoices = () => {
                             if (!open) setEvidenceFiles([]);
                           }}
                         >
-                          <DialogTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              size="icon"
-                              className="h-8 w-8"
-                              title={invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 
-                                ? `Actualizar Evidencia (${invoice.delivery_evidence_url.length}/4)` 
-                                : "Subir Evidencia"}
-                            >
-                              <Truck className="h-3.5 w-3.5" />
-                            </Button>
-                          </DialogTrigger>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <DialogTrigger asChild>
+                                  <Button 
+                                    variant="outline" 
+                                    size="icon"
+                                    className="h-8 w-8"
+                                  >
+                                    <Truck className="h-3.5 w-3.5" />
+                                  </Button>
+                                </DialogTrigger>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>
+                                  {invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 
+                                    ? `Actualizar evidencia de entrega (${invoice.delivery_evidence_url.length}/4)` 
+                                    : "Subir evidencia de entrega"}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                             <DialogHeader>
                               <DialogTitle>Evidencia de Entrega</DialogTitle>
@@ -832,17 +881,26 @@ const Invoices = () => {
                       )}
                       
                       {isAdmin && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => {
-                            setInvoiceToDelete(invoice.id);
-                            setDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => {
+                                  setInvoiceToDelete(invoice.id);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Eliminar factura</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                     </div>
                   </div>
