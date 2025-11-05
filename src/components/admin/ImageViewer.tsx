@@ -35,12 +35,36 @@ export const ImageViewer = ({
     const loadSignedUrls = async () => {
       setIsLoading(true);
       
+      console.log('ImageViewer - rawPaths:', rawPaths);
+      console.log('ImageViewer - bucket:', bucket);
+      
       const paths = rawPaths.map(url => {
         // Si ya es una URL completa, extraer el path
         if (url.startsWith('http')) {
+          const urlObj = new URL(url);
+          const pathname = urlObj.pathname;
+          console.log('ImageViewer - pathname:', pathname);
+          
+          // Extraer la ruta después de /object/public/{bucket}/ o /object/sign/{bucket}/
+          const objectPattern = /\/object\/(public|sign)\/([^/]+)\/(.+)$/;
+          const match = pathname.match(objectPattern);
+          
+          if (match) {
+            const extractedPath = match[3];
+            console.log('ImageViewer - extracted path:', extractedPath);
+            return extractedPath;
+          }
+          
+          // Fallback: buscar solo el bucket
           const bucketPattern = new RegExp(`\\/${bucket}\\/(.+)$`);
-          const match = url.match(bucketPattern);
-          return match ? match[1] : url;
+          const bucketMatch = pathname.match(bucketPattern);
+          if (bucketMatch) {
+            console.log('ImageViewer - bucket match path:', bucketMatch[1]);
+            return bucketMatch[1];
+          }
+          
+          console.warn('ImageViewer - No se pudo extraer path de:', url);
+          return url;
         }
         
         // Ya es un path relativo
@@ -49,7 +73,9 @@ export const ImageViewer = ({
           : url;
       });
 
+      console.log('ImageViewer - processed paths:', paths);
       const urls = await getSignedUrls(bucket, paths, 3600); // 1 hora de expiración
+      console.log('ImageViewer - signed URLs:', urls);
       setSignedUrls(urls.filter((url): url is string => url !== null));
       setIsLoading(false);
     };
