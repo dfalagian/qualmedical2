@@ -37,17 +37,27 @@ export const useAuth = () => {
   };
 
   useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
+      async (event, currentSession) => {
+        if (!mounted) return;
+        
+        console.log('Auth state changed:', event, currentSession?.user?.id);
+        
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        if (currentSession?.user) {
+        if (event === 'SIGNED_OUT') {
+          setUserRole(null);
+          setRoleLoading(false);
+        } else if (currentSession?.user) {
           setRoleLoading(true);
-          // Defer Supabase calls with setTimeout to avoid blocking
           setTimeout(() => {
-            fetchUserRole(currentSession.user.id);
+            if (mounted) {
+              fetchUserRole(currentSession.user.id);
+            }
           }, 0);
         } else {
           setUserRole(null);
@@ -60,14 +70,17 @@ export const useAuth = () => {
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      if (!mounted) return;
+      
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
         setRoleLoading(true);
-        // Defer Supabase calls with setTimeout
         setTimeout(() => {
-          fetchUserRole(currentSession.user.id);
+          if (mounted) {
+            fetchUserRole(currentSession.user.id);
+          }
         }, 0);
       } else {
         setRoleLoading(false);
@@ -76,38 +89,60 @@ export const useAuth = () => {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
     try {
-      // Clear local state first
+      console.log('Starting sign out...');
+      
+      // Call Supabase signOut first
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error("SignOut error:", error);
+        // Ignore session not found errors - they mean we're already logged out
+        const ignorableErrors = [
+          "Auth session missing",
+          "session_not_found",
+          "Session from session_id claim in JWT does not exist"
+        ];
+        
+        if (!ignorableErrors.some(msg => error.message?.includes(msg))) {
+          throw error;
+        }
+      }
+      
+      // Clear local state
       setUser(null);
       setSession(null);
       setUserRole(null);
       
-      const { error } = await supabase.auth.signOut();
-      
-      // Common "already logged out" errors that we can safely ignore
-      const ignorableErrors = [
-        "Auth session missing",
-        "session_not_found",
-        "Session from session_id claim in JWT does not exist"
-      ];
-      
-      if (error && !ignorableErrors.some(msg => error.message?.includes(msg))) {
-        console.error("SignOut error:", error);
-      }
-      
       toast.success("Sesión cerrada correctamente");
       
-      // Force a hard navigation to clear all state
-      window.location.href = "/auth";
+      console.log('Sign out complete, redirecting...');
+      
+      // Small delay before redirect to ensure state is cleared
+      setTimeout(() => {
+        window.location.href = "/auth";
+      }, 100);
     } catch (error: any) {
       console.error("Error al cerrar sesión:", error);
+      
+      // Clear state anyway
+      setUser(null);
+      setSession(null);
+      setUserRole(null);
+      
       toast.error("Error al cerrar sesión: " + (error.message || "Error desconocido"));
-      // Force navigation anyway to clear the UI
-      window.location.href = "/auth";
+      
+      // Force navigation anyway
+      setTimeout(() => {
+        window.location.href = "/auth";
+      }, 100);
     }
   };
 
