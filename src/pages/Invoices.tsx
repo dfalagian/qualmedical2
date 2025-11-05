@@ -41,8 +41,8 @@ const Invoices = () => {
   const [complementoFile, setComplementoFile] = useState<File | null>(null);
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [uploadingEvidence, setUploadingEvidence] = useState<string | null>(null);
-  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
-  const [currentEvidenceUrl, setCurrentEvidenceUrl] = useState<string | null>(null);
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
+  const [currentEvidenceUrls, setCurrentEvidenceUrls] = useState<string[]>([]);
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices"],
@@ -340,33 +340,42 @@ const Invoices = () => {
   });
 
   const uploadEvidenceMutation = useMutation({
-    mutationFn: async ({ invoiceId, file }: { invoiceId: string; file: File }) => {
+    mutationFn: async ({ invoiceId, files, existingUrls }: { invoiceId: string; files: File[]; existingUrls: string[] }) => {
       if (!user) throw new Error("Usuario no autenticado");
       
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/evidence/${Date.now()}.${fileExt}`;
+      const uploadedPaths: string[] = [];
       
-      const { error: uploadError } = await supabase.storage
-        .from('invoices')
-        .upload(fileName, file);
+      // Subir cada archivo
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/evidence/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('invoices')
+          .upload(fileName, file);
 
-      if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
+        uploadedPaths.push(fileName);
+      }
 
-      // Guardar solo el path relativo, no la URL pública
+      // Combinar URLs existentes con las nuevas (máximo 4)
+      const allUrls = [...existingUrls, ...uploadedPaths].slice(0, 4);
+
+      // Actualizar la factura con todas las URLs
       const { error: updateError } = await supabase
         .from('invoices')
-        .update({ delivery_evidence_url: fileName })
+        .update({ delivery_evidence_url: allUrls })
         .eq('id', invoiceId);
 
       if (updateError) throw updateError;
 
-      return fileName;
+      return allUrls;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("Evidencia de entrega subida exitosamente");
       setUploadingEvidence(null);
-      setEvidenceFile(null);
+      setEvidenceFiles([]);
     },
     onError: (error: any) => {
       console.error("Error uploading evidence:", error);
@@ -374,29 +383,38 @@ const Invoices = () => {
     },
   });
 
-  const handleEvidenceUpload = async (invoiceId: string) => {
-    if (!evidenceFile) {
-      toast.error("Por favor selecciona una imagen");
+  const handleEvidenceUpload = async (invoiceId: string, existingUrls: string[]) => {
+    if (evidenceFiles.length === 0) {
+      toast.error("Por favor selecciona al menos una imagen");
       return;
     }
-    uploadEvidenceMutation.mutate({ invoiceId, file: evidenceFile });
+    
+    const totalImages = existingUrls.length + evidenceFiles.length;
+    if (totalImages > 4) {
+      toast.error(`Solo puedes tener un máximo de 4 imágenes. Actualmente tienes ${existingUrls.length} y estás intentando subir ${evidenceFiles.length}.`);
+      return;
+    }
+    
+    uploadEvidenceMutation.mutate({ invoiceId, files: evidenceFiles, existingUrls });
   };
 
-  // Cargar la URL firmada de la evidencia cuando se abre el diálogo
+  // Cargar las URLs firmadas de las evidencias cuando se abre el diálogo
   useEffect(() => {
-    const loadEvidenceUrl = async () => {
+    const loadEvidenceUrls = async () => {
       if (uploadingEvidence) {
         const invoice = invoices?.find(inv => inv.id === uploadingEvidence);
-        if (invoice?.delivery_evidence_url) {
-          const signedUrl = await getSignedUrl('invoices', invoice.delivery_evidence_url, 3600);
-          setCurrentEvidenceUrl(signedUrl);
+        if (invoice?.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url)) {
+          const signedUrls = await Promise.all(
+            invoice.delivery_evidence_url.map(url => getSignedUrl('invoices', url, 3600))
+          );
+          setCurrentEvidenceUrls(signedUrls.filter((url): url is string => url !== null));
         } else {
-          setCurrentEvidenceUrl(null);
+          setCurrentEvidenceUrls([]);
         }
       }
     };
 
-    loadEvidenceUrl();
+    loadEvidenceUrls();
   }, [uploadingEvidence, invoices]);
 
   const getStatusBadge = (status: string) => {
@@ -681,11 +699,11 @@ const Invoices = () => {
                         />
                       )}
 
-                      {invoice.delivery_evidence_url && (
+                      {invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 && (
                         <ImageViewer
-                          fileUrl={invoice.delivery_evidence_url}
+                          imageUrls={invoice.delivery_evidence_url}
                           fileName={`Evidencia-${invoice.invoice_number}`}
-                          triggerText="Ver Evidencia"
+                          triggerText={`Ver Evidencia (${invoice.delivery_evidence_url.length})`}
                           triggerSize="sm"
                           triggerVariant="outline"
                           bucket="invoices"
@@ -697,7 +715,7 @@ const Invoices = () => {
                           open={uploadingEvidence === invoice.id} 
                           onOpenChange={(open) => {
                             setUploadingEvidence(open ? invoice.id : null);
-                            if (!open) setEvidenceFile(null);
+                            if (!open) setEvidenceFiles([]);
                           }}
                         >
                           <DialogTrigger asChild>
@@ -707,60 +725,88 @@ const Invoices = () => {
                               className="gap-2"
                             >
                               <Truck className="h-4 w-4" />
-                              {invoice.delivery_evidence_url ? "Actualizar Evidencia" : "Subir Evidencia"}
+                              {invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 
+                                ? `Actualizar Evidencia (${invoice.delivery_evidence_url.length}/4)` 
+                                : "Subir Evidencia"}
                             </Button>
                           </DialogTrigger>
-                          <DialogContent>
+                          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                             <DialogHeader>
                               <DialogTitle>Evidencia de Entrega</DialogTitle>
                               <DialogDescription>
-                                {invoice.delivery_evidence_url 
-                                  ? "Actualiza la evidencia de entrega"
-                                  : "Sube una imagen como evidencia de entrega para esta factura"
+                                {invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0
+                                  ? `Puedes subir hasta ${4 - invoice.delivery_evidence_url.length} imagen(es) más (máximo 4 en total)`
+                                  : "Sube hasta 4 imágenes como evidencia de entrega para esta factura"
                                 }
                               </DialogDescription>
                             </DialogHeader>
                             
-                            {invoice.delivery_evidence_url && (
+                            {currentEvidenceUrls.length > 0 && (
                               <div className="mb-4">
-                                <p className="text-sm text-muted-foreground mb-2">Evidencia actual:</p>
-                                {currentEvidenceUrl ? (
-                                  <img 
-                                    src={currentEvidenceUrl} 
-                                    alt="Evidencia de entrega"
-                                    className="w-full h-auto rounded-lg border max-h-48 object-contain"
-                                  />
-                                ) : (
-                                  <div className="w-full h-48 rounded-lg border flex items-center justify-center">
-                                    <p className="text-sm text-muted-foreground">Cargando imagen...</p>
-                                  </div>
-                                )}
+                                <p className="text-sm text-muted-foreground mb-2">
+                                  Evidencias actuales ({currentEvidenceUrls.length}):
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {currentEvidenceUrls.map((url, index) => (
+                                    <img 
+                                      key={index}
+                                      src={url} 
+                                      alt={`Evidencia de entrega ${index + 1}`}
+                                      className="w-full h-auto rounded-lg border max-h-32 object-contain"
+                                    />
+                                  ))}
+                                </div>
                               </div>
                             )}
 
                             <div className="space-y-4">
                               <div>
-                                <Label htmlFor="evidence-file">
-                                  {invoice.delivery_evidence_url ? "Nueva imagen" : "Seleccionar imagen"}
+                                <Label htmlFor="evidence-files">
+                                  Seleccionar imágenes (hasta {4 - (invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) ? invoice.delivery_evidence_url.length : 0)})
                                 </Label>
                                 <Input
-                                  id="evidence-file"
+                                  id="evidence-files"
                                   type="file"
                                   accept="image/*"
+                                  multiple
                                   onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) setEvidenceFile(file);
+                                    const files = Array.from(e.target.files || []);
+                                    const currentCount = invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) 
+                                      ? invoice.delivery_evidence_url.length 
+                                      : 0;
+                                    const maxAllowed = 4 - currentCount;
+                                    
+                                    if (files.length > maxAllowed) {
+                                      toast.error(`Solo puedes subir ${maxAllowed} imagen(es) más`);
+                                      e.target.value = '';
+                                      return;
+                                    }
+                                    
+                                    setEvidenceFiles(files);
                                   }}
                                   className="mt-2"
                                 />
+                                {evidenceFiles.length > 0 && (
+                                  <p className="text-sm text-muted-foreground mt-1">
+                                    {evidenceFiles.length} archivo(s) seleccionado(s)
+                                  </p>
+                                )}
                               </div>
                               
                               <Button
-                                onClick={() => handleEvidenceUpload(invoice.id)}
-                                disabled={!evidenceFile || uploadEvidenceMutation.isPending}
+                                onClick={() => handleEvidenceUpload(
+                                  invoice.id, 
+                                  invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) 
+                                    ? invoice.delivery_evidence_url 
+                                    : []
+                                )}
+                                disabled={evidenceFiles.length === 0 || uploadEvidenceMutation.isPending}
                                 className="w-full"
                               >
-                                {uploadEvidenceMutation.isPending ? "Subiendo..." : invoice.delivery_evidence_url ? "Actualizar Evidencia" : "Subir Evidencia"}
+                                {uploadEvidenceMutation.isPending 
+                                  ? "Subiendo..." 
+                                  : `Subir ${evidenceFiles.length} Imagen(es)`
+                                }
                               </Button>
                             </div>
                           </DialogContent>
