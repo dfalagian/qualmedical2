@@ -88,19 +88,26 @@ export const useAuth = () => {
       
       const { error } = await supabase.auth.signOut();
       
-      // "Auth session missing" is not really an error - it means we're already logged out
-      if (error && !error.message.includes("Auth session missing")) {
+      // Common "already logged out" errors that we can safely ignore
+      const ignorableErrors = [
+        "Auth session missing",
+        "session_not_found",
+        "Session from session_id claim in JWT does not exist"
+      ];
+      
+      if (error && !ignorableErrors.some(msg => error.message?.includes(msg))) {
         console.error("SignOut error:", error);
-        throw error;
       }
       
       toast.success("Sesión cerrada correctamente");
-      navigate("/auth");
+      
+      // Force a hard navigation to clear all state
+      window.location.href = "/auth";
     } catch (error: any) {
       console.error("Error al cerrar sesión:", error);
       toast.error("Error al cerrar sesión: " + (error.message || "Error desconocido"));
-      // Navigate anyway to clear the UI
-      navigate("/auth");
+      // Force navigation anyway to clear the UI
+      window.location.href = "/auth";
     }
   };
 
