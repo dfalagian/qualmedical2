@@ -689,38 +689,14 @@ const Invoices = () => {
                       </TooltipProvider>
 
                       {invoice.complemento_pago_url && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={async () => {
-                                  try {
-                                    const urlPath = new URL(invoice.complemento_pago_url).pathname;
-                                    const filePath = urlPath.split('/').slice(-3).join('/');
-                                    
-                                    const signedUrl = await getSignedUrl('invoices', filePath, 3600);
-                                    
-                                    if (!signedUrl) {
-                                      throw new Error('No se pudo obtener la URL del complemento');
-                                    }
-                                    
-                                    window.open(signedUrl, '_blank');
-                                  } catch (error) {
-                                    toast.error('Error al abrir el complemento');
-                                  }
-                                }}
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Ver complemento de pago</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <ImageViewer
+                          fileUrl={invoice.complemento_pago_url}
+                          fileName={`Complemento-${invoice.invoice_number}`}
+                          triggerText="Complemento"
+                          triggerSize="icon"
+                          triggerVariant="outline"
+                          bucket="invoices"
+                        />
                       )}
                       
                       <InvoicePaymentProofUpload
