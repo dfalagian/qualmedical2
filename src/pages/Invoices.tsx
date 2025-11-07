@@ -143,13 +143,13 @@ const Invoices = () => {
         }
       );
 
-      // Si hay error de validación, lanzar excepción para detener la subida
+      // Si hay error de conexión/red con el edge function
       if (validationError) {
-        console.error('Error al validar XML:', validationError);
-        throw new Error('Error al validar el archivo XML: ' + (validationError.message || 'Error desconocido'));
+        console.error('Error al conectar con la función de validación:', validationError);
+        throw new Error('Error al validar el archivo XML: ' + (validationError.message || 'Error de conexión'));
       }
 
-      // Si la validación falló (por ejemplo, FormaPago=99 pero MetodoPago!=PPD)
+      // Si la validación falló (RFC incorrecto, FormaPago=99 pero MetodoPago!=PPD, etc.)
       if (validationData?.success === false) {
         throw new Error(validationData.mensaje || validationData.error || 'Error de validación en el XML');
       }

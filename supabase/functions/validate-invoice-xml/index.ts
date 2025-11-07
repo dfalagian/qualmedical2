@@ -73,6 +73,8 @@ serve(async (req) => {
     if (receptorRfc !== RFC_QUALMEDICAL) {
       console.log('ERROR: RFC del receptor no corresponde a QualMedical');
       console.log('RFC encontrado:', receptorRfc, '| RFC esperado:', RFC_QUALMEDICAL);
+      
+      // Devolver status 200 con success: false para que el cliente pueda leer el mensaje
       return new Response(
         JSON.stringify({
           success: false,
@@ -80,7 +82,7 @@ serve(async (req) => {
           mensaje: `El RFC del receptor en la factura (${receptorRfc || 'no especificado'}) no corresponde a QualMedical (${RFC_QUALMEDICAL}). Por favor verifica que la factura esté emitida correctamente.`
         }),
         { 
-          status: 400,
+          status: 200, // Usar 200 para validaciones de negocio
           headers: { 
             ...corsHeaders, 
             'Content-Type': 'application/json' 
@@ -145,6 +147,8 @@ serve(async (req) => {
     // VALIDACIÓN CRÍTICA: Si FormaPago = 99, entonces MetodoPago DEBE ser PPD
     if (formaPago === '99' && metodoPago !== 'PPD') {
       console.log('ERROR: FormaPago=99 pero MetodoPago no es PPD');
+      
+      // Devolver status 200 con success: false para que el cliente pueda leer el mensaje
       return new Response(
         JSON.stringify({
           success: false,
@@ -152,7 +156,7 @@ serve(async (req) => {
           mensaje: 'Error en el XML: Cuando la Forma de Pago es 99, el Método de Pago debe ser PPD. Se detectó Método de Pago: ' + (metodoPago || 'no especificado') + '.'
         }),
         { 
-          status: 400,
+          status: 200, // Usar 200 para validaciones de negocio
           headers: { 
             ...corsHeaders, 
             'Content-Type': 'application/json' 
