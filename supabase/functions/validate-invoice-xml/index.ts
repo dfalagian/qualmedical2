@@ -66,6 +66,29 @@ serve(async (req) => {
     const receptorRfcMatch = xmlText.match(/cfdi:Receptor[^>]*Rfc="([^"]+)"/);
     const receptorUsoCfdiMatch = xmlText.match(/UsoCFDI="([^"]+)"/);
 
+    // VALIDACIÓN CRÍTICA: Verificar que el RFC del receptor sea de QualMedical
+    const receptorRfc = receptorRfcMatch ? receptorRfcMatch[1] : null;
+    const RFC_QUALMEDICAL = 'QME240321HF3';
+    
+    if (receptorRfc !== RFC_QUALMEDICAL) {
+      console.log('ERROR: RFC del receptor no corresponde a QualMedical');
+      console.log('RFC encontrado:', receptorRfc, '| RFC esperado:', RFC_QUALMEDICAL);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'RFC del receptor inválido',
+          mensaje: `El RFC del receptor en la factura (${receptorRfc || 'no especificado'}) no corresponde a QualMedical (${RFC_QUALMEDICAL}). Por favor verifica que la factura esté emitida correctamente.`
+        }),
+        { 
+          status: 400,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
+    }
+
     // Extraer impuestos totales
     const totalImpuestosMatch = xmlText.match(/TotalImpuestosTrasladados="([0-9.]+)"/);
 
