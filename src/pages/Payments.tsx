@@ -309,12 +309,14 @@ const Payments = () => {
                       }
                     </TableCell>
                     <TableCell>
-                      <PaymentProofUpload 
-                        pagoId={pago.id}
-                        supplierId={pago.supplier_id}
-                        hasProof={!!pago.comprobante_pago_url}
-                        proofUrl={pago.comprobante_pago_url}
-                      />
+                      {isAdmin && (
+                        <PaymentProofUpload 
+                          pagoId={pago.id}
+                          supplierId={pago.supplier_id}
+                          hasProof={!!pago.comprobante_pago_url}
+                          proofUrl={pago.comprobante_pago_url}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

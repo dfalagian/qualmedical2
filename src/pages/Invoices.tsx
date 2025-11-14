@@ -734,12 +734,14 @@ const Invoices = () => {
                         </TooltipProvider>
                       )}
                       
-                      <InvoicePaymentProofUpload
-                        invoiceId={invoice.id}
-                        supplierId={invoice.supplier_id}
-                        hasProof={!!invoice.comprobante_pago_url}
-                        proofUrl={invoice.comprobante_pago_url}
-                      />
+                      {isAdmin && (
+                        <InvoicePaymentProofUpload
+                          invoiceId={invoice.id}
+                          supplierId={invoice.supplier_id}
+                          hasProof={!!invoice.comprobante_pago_url}
+                          proofUrl={invoice.comprobante_pago_url}
+                        />
+                      )}
 
                       {invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 && (
                         <ImageViewer
