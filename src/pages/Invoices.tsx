@@ -1090,56 +1090,68 @@ const Invoices = () => {
                             bucket="invoices"
                           />
                           
-                          {isAdmin && (
+                          <div className="flex items-center gap-1">
+                            {getEvidenceStatusBadge(invoice.evidence_status || 'pending')}
+                          </div>
+                          
+                          {invoice.evidence_status === 'rejected' && invoice.evidence_rejection_reason && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="cursor-help border-destructive text-destructive">
+                                    Motivo
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="font-semibold mb-1">Razón del rechazo:</p>
+                                  <p>{invoice.evidence_rejection_reason}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          
+                          {isAdmin && invoice.evidence_status === 'pending' && (
                             <>
-                              <div className="flex items-center gap-1">
-                                {getEvidenceStatusBadge(invoice.evidence_status || 'pending')}
-                              </div>
-                              
-                              {invoice.evidence_status === 'pending' && (
-                                <>
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="outline"
-                                          size="icon"
-                                          className="h-8 w-8 text-success hover:bg-success/10"
-                                          onClick={() => approveEvidenceMutation.mutate(invoice)}
-                                        >
-                                          <Check className="h-3.5 w-3.5" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Aprobar evidencia</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-8 w-8 text-success hover:bg-success/10"
+                                      onClick={() => approveEvidenceMutation.mutate(invoice)}
+                                    >
+                                      <Check className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Aprobar evidencia</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
 
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="outline"
-                                          size="icon"
-                                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                                          onClick={() => {
-                                            const reason = prompt("Razón del rechazo:");
-                                            if (reason) {
-                                              rejectEvidenceMutation.mutate({ invoice, reason });
-                                            }
-                                          }}
-                                        >
-                                          <X className="h-3.5 w-3.5" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Rechazar evidencia</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                </>
-                              )}
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                      onClick={() => {
+                                        const reason = prompt("Razón del rechazo:");
+                                        if (reason) {
+                                          rejectEvidenceMutation.mutate({ invoice, reason });
+                                        }
+                                      }}
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Rechazar evidencia</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </>
                           )}
                         </>
