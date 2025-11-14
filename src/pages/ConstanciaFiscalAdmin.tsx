@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileText, Download, RefreshCw, Eye, Check, X, Trash2 } from "lucide-react";
+import { FileText, Download, RefreshCw, Eye, Check, XCircle, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -294,7 +294,7 @@ const ConstanciaFiscalAdmin = () => {
                                 status: 'aprobado',
                                 supplierId: doc.supplier_id
                               })}
-                              className="bg-green-600 hover:bg-green-700 text-white"
+                              className="bg-success hover:bg-success/90"
                               disabled={updateStatusMutation.isPending || doc.status === 'aprobado'}
                             >
                               <Check className="h-4 w-4" />
@@ -309,7 +309,7 @@ const ConstanciaFiscalAdmin = () => {
                               })}
                               disabled={updateStatusMutation.isPending || doc.status === 'rechazado'}
                             >
-                              <X className="h-4 w-4" />
+                              <XCircle className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
