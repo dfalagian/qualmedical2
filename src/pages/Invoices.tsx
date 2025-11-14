@@ -1070,7 +1070,7 @@ const Invoices = () => {
                         </TooltipProvider>
                       )}
                       
-                      {isAdmin && (invoice.status === 'pagado' || invoice.evidence_status === 'approved') && (
+                      {(invoice.status === 'pagado' || invoice.evidence_status === 'approved') && (
                         <InvoicePaymentProofUpload
                           invoiceId={invoice.id}
                           supplierId={invoice.supplier_id}
