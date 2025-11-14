@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Receipt, MessageSquare, ShoppingCart } from "lucide-react";
+import { EmailServerStatus } from "@/components/dashboard/EmailServerStatus";
 
 const Dashboard = () => {
   const { user, isAdmin } = useAuth();
@@ -70,6 +71,8 @@ const Dashboard = () => {
             );
           })}
         </div>
+
+        {isAdmin && <EmailServerStatus />}
 
         <Card className="shadow-md">
           <CardHeader>
