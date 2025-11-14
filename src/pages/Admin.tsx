@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus } from "lucide-react";
+import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
@@ -17,6 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { ImageViewer } from "@/components/admin/ImageViewer";
 
 
 const userFormSchema = z.object({
@@ -84,7 +85,24 @@ const Admin = () => {
       
       console.log("Users fetched:", profiles);
       
-      return profiles;
+      // Para cada usuario, obtener sus pagos con comprobantes
+      const usersWithPayments = await Promise.all(
+        profiles.map(async (profile: any) => {
+          const { data: pagosData } = await supabase
+            .from("pagos")
+            .select("id, comprobante_pago_url, amount, fecha_pago, invoices(invoice_number)")
+            .eq("supplier_id", profile.id)
+            .not("comprobante_pago_url", "is", null)
+            .order("created_at", { ascending: false });
+          
+          return {
+            ...profile,
+            pagos_con_comprobante: pagosData || []
+          };
+        })
+      );
+      
+      return usersWithPayments;
     },
     refetchInterval: false,
     staleTime: 0, // Always treat data as stale to ensure fresh data
@@ -443,6 +461,18 @@ const Admin = () => {
                         )}
                         {user.rfc && (
                           <p className="text-sm text-muted-foreground">RFC: {user.rfc}</p>
+                        )}
+                        {user.pagos_con_comprobante && user.pagos_con_comprobante.length > 0 && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <ImageViewer
+                              imageUrls={user.pagos_con_comprobante.map((p: any) => p.comprobante_pago_url)}
+                              bucket="documents"
+                              fileName="Comprobantes de Pago"
+                              triggerText={`Ver ${user.pagos_con_comprobante.length} Comprobante${user.pagos_con_comprobante.length > 1 ? 's' : ''}`}
+                              triggerVariant="outline"
+                              triggerSize="sm"
+                            />
+                          </div>
                         )}
                       </div>
 
