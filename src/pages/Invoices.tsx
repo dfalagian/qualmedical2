@@ -8,15 +8,18 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, Check, X } from "lucide-react";
+import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown } from "lucide-react";
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { InvoiceDetailsDialog } from "@/components/invoices/InvoiceDetailsDialog";
 import { InvoicePaymentProofUpload } from "@/components/invoices/InvoicePaymentProofUpload";
 import { getSignedUrl } from "@/lib/storage";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +46,7 @@ const Invoices = () => {
   const [complementoFile, setComplementoFile] = useState<File | null>(null);
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [supplierSearchTerm, setSupplierSearchTerm] = useState("");
+  const [supplierComboOpen, setSupplierComboOpen] = useState(false);
   const [uploadingEvidence, setUploadingEvidence] = useState<string | null>(null);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [currentEvidenceUrls, setCurrentEvidenceUrls] = useState<string[]>([]);
@@ -681,37 +685,70 @@ const Invoices = () => {
           </CardHeader>
           <CardContent>
             {isAdmin && suppliers && suppliers.length > 0 && (
-              <div className="mb-4 space-y-3">
-                <Label htmlFor="supplier-filter" className="mb-2 block">
+              <div className="mb-4">
+                <Label className="mb-2 block">
                   Filtrar por proveedor
                 </Label>
-                <Input
-                  placeholder="Buscar proveedor..."
-                  value={supplierSearchTerm}
-                  onChange={(e) => setSupplierSearchTerm(e.target.value)}
-                  className="max-w-md"
-                />
-                <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-                  <SelectTrigger className="max-w-md">
-                    <SelectValue placeholder="Todos los proveedores" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los proveedores</SelectItem>
-                    {suppliers
-                      .filter((supplier: any) => {
-                        if (!supplierSearchTerm) return true;
-                        const searchLower = supplierSearchTerm.toLowerCase();
-                        const name = (supplier.company_name || supplier.full_name || "").toLowerCase();
-                        const rfc = (supplier.rfc || "").toLowerCase();
-                        return name.includes(searchLower) || rfc.includes(searchLower);
-                      })
-                      .map((supplier: any) => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.company_name || supplier.full_name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={supplierComboOpen} onOpenChange={setSupplierComboOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={supplierComboOpen}
+                      className="w-full max-w-md justify-between"
+                    >
+                      {supplierFilter === "all"
+                        ? "Todos los proveedores"
+                        : suppliers.find((s: any) => s.id === supplierFilter)?.company_name ||
+                          suppliers.find((s: any) => s.id === supplierFilter)?.full_name ||
+                          "Seleccionar proveedor"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full max-w-md p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar proveedor..." />
+                      <CommandList>
+                        <CommandEmpty>No se encontró proveedor.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="all"
+                            onSelect={() => {
+                              setSupplierFilter("all");
+                              setSupplierComboOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                supplierFilter === "all" ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            Todos los proveedores
+                          </CommandItem>
+                          {suppliers.map((supplier: any) => (
+                            <CommandItem
+                              key={supplier.id}
+                              value={`${supplier.company_name || supplier.full_name} ${supplier.rfc || ""}`}
+                              onSelect={() => {
+                                setSupplierFilter(supplier.id);
+                                setSupplierComboOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  supplierFilter === supplier.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {supplier.company_name || supplier.full_name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             )}
             {isLoading ? (
