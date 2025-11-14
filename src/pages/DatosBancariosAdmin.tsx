@@ -232,14 +232,16 @@ const DatosBancariosAdmin = () => {
                                 status: 'aprobado',
                                 supplierId: doc.supplier_id
                               })}
-                              className="bg-success hover:bg-success/90"
+                              className="bg-success/10 hover:bg-success/20 text-success border-success/20"
+                              variant="outline"
                               disabled={updateStatusMutation.isPending || doc.status === 'aprobado'}
                             >
                               <Check className="h-4 w-4" />
                             </Button>
                             <Button
                               size="sm"
-                              variant="destructive"
+                              variant="outline"
+                              className="bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/20"
                               onClick={() => updateStatusMutation.mutate({ 
                                 documentId: doc.id, 
                                 status: 'rechazado',
