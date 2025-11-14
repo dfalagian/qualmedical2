@@ -10,7 +10,9 @@ type NotificationType =
   | 'payment_completed' 
   | 'payment_pending'
   | 'purchase_order_created' 
-  | 'new_message';
+  | 'new_message'
+  | 'evidence_approved'
+  | 'evidence_rejected';
 
 type AdminNotificationType =
   | 'new_registration'
