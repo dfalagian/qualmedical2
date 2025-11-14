@@ -50,6 +50,7 @@ const Invoices = () => {
   const [uploadingEvidence, setUploadingEvidence] = useState<string | null>(null);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [currentEvidenceUrls, setCurrentEvidenceUrls] = useState<string[]>([]);
+  const [replacingEvidence, setReplacingEvidence] = useState<string | null>(null);
   const [rejectionReasonDialog, setRejectionReasonDialog] = useState<{ 
     open: boolean; 
     reason: string;
@@ -517,15 +518,11 @@ const Invoices = () => {
       // Combinar URLs existentes con las nuevas
       const allUrls = [...existingUrls, ...uploadedPaths];
       
-      // Actualizar la factura con todas las URLs y resetear el estado de evidencia a 'pending'
+      // Actualizar la factura con todas las URLs
       const { error: updateError } = await supabase
         .from('invoices')
         .update({ 
           delivery_evidence_url: allUrls,
-          evidence_status: 'pending',
-          evidence_rejection_reason: null,
-          evidence_reviewed_at: null,
-          evidence_reviewed_by: null,
           updated_at: new Date().toISOString()
         })
         .eq('id', invoiceId);
@@ -543,6 +540,72 @@ const Invoices = () => {
     onError: (error: any) => {
       console.error("Error uploading evidence:", error);
       toast.error(error.message || "Error al subir la evidencia de entrega");
+    },
+  });
+
+  const replaceEvidenceMutation = useMutation({
+    mutationFn: async ({ invoiceId, files, oldUrls }: { invoiceId: string; files: File[]; oldUrls: string[] }) => {
+      if (!user) throw new Error("Usuario no autenticado");
+      
+      const uploadedPaths: string[] = [];
+      
+      try {
+        // Subir nuevos archivos
+        for (const file of files) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${user.id}/evidence/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('invoices')
+            .upload(fileName, file);
+          
+          if (uploadError) throw uploadError;
+          uploadedPaths.push(fileName);
+        }
+        
+        // Actualizar la factura con las nuevas URLs y resetear estado
+        const { error: updateError } = await supabase
+          .from('invoices')
+          .update({ 
+            delivery_evidence_url: uploadedPaths,
+            evidence_status: 'pending',
+            evidence_rejection_reason: null,
+            evidence_reviewed_at: null,
+            evidence_reviewed_by: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', invoiceId);
+
+        if (updateError) throw updateError;
+        
+        // Eliminar archivos antiguos del storage
+        if (oldUrls.length > 0) {
+          const oldPaths = oldUrls.map(url => {
+            const urlPath = new URL(url).pathname;
+            return urlPath.split('/').slice(-3).join('/');
+          });
+          
+          await supabase.storage.from('invoices').remove(oldPaths);
+        }
+        
+        return uploadedPaths;
+      } catch (error) {
+        // Si hay error, limpiar archivos nuevos subidos
+        if (uploadedPaths.length > 0) {
+          await supabase.storage.from('invoices').remove(uploadedPaths);
+        }
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      toast.success("Evidencia reemplazada exitosamente");
+      setReplacingEvidence(null);
+      setEvidenceFiles([]);
+    },
+    onError: (error: any) => {
+      console.error("Error replacing evidence:", error);
+      toast.error(error.message || "Error al reemplazar la evidencia");
     },
   });
 
@@ -1162,6 +1225,93 @@ const Invoices = () => {
                                   Sin motivo especificado
                                 </Badge>
                               )}
+                              
+                              {!isAdmin && (
+                                <Dialog 
+                                  open={replacingEvidence === invoice.id} 
+                                  onOpenChange={(open) => {
+                                    setReplacingEvidence(open ? invoice.id : null);
+                                    if (!open) setEvidenceFiles([]);
+                                  }}
+                                >
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 border-destructive text-destructive hover:bg-destructive/10"
+                                    >
+                                      Reemplazar Evidencia
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                                    <DialogHeader>
+                                      <DialogTitle>Reemplazar Evidencia Rechazada</DialogTitle>
+                                      <DialogDescription>
+                                        La evidencia anterior será eliminada. Sube hasta 4 nuevas imágenes para reemplazarla.
+                                      </DialogDescription>
+                                    </DialogHeader>
+                                    
+                                    <div className="space-y-4">
+                                      <div>
+                                        <Label htmlFor={`replace-evidence-${invoice.id}`}>
+                                          Selecciona nuevas imágenes (máximo 4)
+                                        </Label>
+                                        <Input
+                                          id={`replace-evidence-${invoice.id}`}
+                                          type="file"
+                                          accept="image/*"
+                                          multiple
+                                          onChange={(e) => {
+                                            const files = Array.from(e.target.files || []);
+                                            if (files.length > 4) {
+                                              toast.error("Solo puedes subir un máximo de 4 imágenes");
+                                              e.target.value = '';
+                                              return;
+                                            }
+                                            setEvidenceFiles(files);
+                                          }}
+                                          className="mt-2"
+                                        />
+                                      </div>
+                                      
+                                      {evidenceFiles.length > 0 && (
+                                        <div className="space-y-2">
+                                          <p className="text-sm font-medium">Archivos seleccionados:</p>
+                                          <ul className="text-sm text-muted-foreground space-y-1">
+                                            {evidenceFiles.map((file, idx) => (
+                                              <li key={idx} className="flex items-center gap-2">
+                                                <FileImage className="h-4 w-4" />
+                                                {file.name}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                      
+                                      <Button
+                                        onClick={() => {
+                                          if (evidenceFiles.length === 0) {
+                                            toast.error("Selecciona al menos una imagen");
+                                            return;
+                                          }
+                                          replaceEvidenceMutation.mutate({ 
+                                            invoiceId: invoice.id, 
+                                            files: evidenceFiles,
+                                            oldUrls: invoice.delivery_evidence_url || []
+                                          });
+                                        }}
+                                        disabled={evidenceFiles.length === 0 || replaceEvidenceMutation.isPending}
+                                        className="w-full"
+                                      >
+                                        {replaceEvidenceMutation.isPending 
+                                          ? "Reemplazando..." 
+                                          : `Reemplazar con ${evidenceFiles.length} Imagen(es)`
+                                        }
+                                      </Button>
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
+                              )}
                             </>
                           )}
                           
@@ -1212,7 +1362,7 @@ const Invoices = () => {
                         </>
                       )}
 
-                      {!isAdmin && (
+                      {!isAdmin && invoice.evidence_status !== 'rejected' && (
                         <Dialog 
                           open={uploadingEvidence === invoice.id} 
                           onOpenChange={(open) => {
@@ -1227,10 +1377,7 @@ const Invoices = () => {
                                   <Button 
                                     variant="outline" 
                                     size="icon"
-                                    className={cn(
-                                      "h-8 w-8",
-                                      invoice.evidence_status === 'rejected' && "border-destructive text-destructive hover:bg-destructive/10"
-                                    )}
+                                    className="h-8 w-8"
                                   >
                                     <Truck className="h-3.5 w-3.5" />
                                   </Button>
@@ -1238,28 +1385,20 @@ const Invoices = () => {
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p>
-                                  {invoice.evidence_status === 'rejected'
-                                    ? "Resubir evidencia de entrega (rechazada)"
-                                    : invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 
-                                      ? `Actualizar evidencia de entrega (${invoice.delivery_evidence_url.length}/4)` 
-                                      : "Subir evidencia de entrega"}
+                                  {invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 
+                                    ? `Actualizar evidencia de entrega (${invoice.delivery_evidence_url.length}/4)` 
+                                    : "Subir evidencia de entrega"}
                                 </p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
                           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                             <DialogHeader>
-                              <DialogTitle>
-                                {invoice.evidence_status === 'rejected' 
-                                  ? "Resubir Evidencia de Entrega (Rechazada)" 
-                                  : "Evidencia de Entrega"}
-                              </DialogTitle>
+                              <DialogTitle>Evidencia de Entrega</DialogTitle>
                               <DialogDescription>
-                                {invoice.evidence_status === 'rejected'
-                                  ? "Tu evidencia fue rechazada. Sube nuevas imágenes para que sean revisadas nuevamente."
-                                  : invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0
-                                    ? `Puedes subir hasta ${4 - invoice.delivery_evidence_url.length} imagen(es) más (máximo 4 en total)`
-                                    : "Sube hasta 4 imágenes como evidencia de entrega para esta factura"
+                                {invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0
+                                  ? `Puedes subir hasta ${4 - invoice.delivery_evidence_url.length} imagen(es) más (máximo 4 en total)`
+                                  : "Sube hasta 4 imágenes como evidencia de entrega para esta factura"
                                 }
                               </DialogDescription>
                             </DialogHeader>
