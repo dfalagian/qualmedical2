@@ -692,11 +692,11 @@ const Invoices = () => {
   const getEvidenceStatusBadge = (status: string) => {
     switch (status) {
       case "approved":
-        return <Badge className="bg-success">Aprobada</Badge>;
+        return <Badge className="bg-success">Evidencia Aprobada</Badge>;
       case "rejected":
-        return <Badge variant="destructive">Rechazada</Badge>;
+        return <Badge variant="destructive">Evidencia Rechazada</Badge>;
       default:
-        return <Badge className="bg-warning">Pendiente</Badge>;
+        return <Badge className="bg-warning">Evidencia Pendiente</Badge>;
     }
   };
 
