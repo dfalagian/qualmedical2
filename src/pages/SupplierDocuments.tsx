@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, FileText, Eye, Trash2, CheckCircle2 } from "lucide-react";
+import { Search, FileText, Eye, Trash2, CheckCircle2, Check, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
@@ -141,6 +141,67 @@ const SupplierDocuments = () => {
     },
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ 
+      documentId, 
+      status, 
+      supplierId 
+    }: { 
+      documentId: string; 
+      status: 'aprobado' | 'rechazado'; 
+      supplierId: string;
+    }) => {
+      const { data: document, error: docError } = await supabase
+        .from('documents')
+        .select('document_type')
+        .eq('id', documentId)
+        .single();
+
+      if (docError) throw docError;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error: updateError } = await supabase
+        .from('documents')
+        .update({ 
+          status,
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', documentId);
+
+      if (updateError) throw updateError;
+
+      const { error: notifyError } = await supabase.functions.invoke('notify-supplier', {
+        body: {
+          supplier_id: supplierId,
+          type: status === 'aprobado' ? 'document_approved' : 'document_rejected',
+          data: {
+            document_type: document.document_type,
+            document_id: documentId
+          }
+        }
+      });
+
+      if (notifyError) {
+        console.error('Error al notificar:', notifyError);
+      }
+
+      return { status, documentType: document.document_type };
+    },
+    onSuccess: (data) => {
+      const message = data.status === 'aprobado' 
+        ? '✓ Documento aprobado y proveedor notificado'
+        : '✗ Documento rechazado y proveedor notificado';
+      
+      toast.success(message);
+      queryClient.invalidateQueries({ queryKey: ["supplier_documents", selectedSupplier?.id] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar estado");
+    },
+  });
+
   const handleViewDetails = (doc: any) => {
     setSelectedDocument(doc);
     setDialogOpen(true);
@@ -261,6 +322,7 @@ const SupplierDocuments = () => {
                         <TableHead>Extracción</TableHead>
                         <TableHead>Validación Cruzada</TableHead>
                         <TableHead>Fecha de Subida</TableHead>
+                        <TableHead>Validación</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -289,6 +351,34 @@ const SupplierDocuments = () => {
                             </TableCell>
                             <TableCell>
                               {new Date(doc.created_at).toLocaleDateString("es-MX")}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => updateStatusMutation.mutate({ 
+                                    documentId: doc.id, 
+                                    status: 'aprobado',
+                                    supplierId: doc.supplier_id
+                                  })}
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                  disabled={updateStatusMutation.isPending || doc.status === 'aprobado'}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => updateStatusMutation.mutate({ 
+                                    documentId: doc.id, 
+                                    status: 'rechazado',
+                                    supplierId: doc.supplier_id
+                                  })}
+                                  disabled={updateStatusMutation.isPending || doc.status === 'rechazado'}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
