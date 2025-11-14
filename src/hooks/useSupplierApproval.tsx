@@ -1,9 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useNotifications } from "./useNotifications";
 
 export function useSupplierApproval() {
   const queryClient = useQueryClient();
+  const { notifySupplier } = useNotifications();
 
   const approveMutation = useMutation({
     mutationFn: async ({ supplierId, approved }: { supplierId: string; approved: boolean }) => {
@@ -13,12 +15,21 @@ export function useSupplierApproval() {
         .eq("id", supplierId);
 
       if (error) throw error;
+
+      // Send notification
+      if (approved) {
+        await notifySupplier(supplierId, 'account_approved', {});
+      } else {
+        await notifySupplier(supplierId, 'account_rejected', {
+          rejection_reason: 'Cuenta rechazada por el administrador'
+        });
+      }
     },
     onSuccess: (_, variables) => {
       toast.success(
         variables.approved 
-          ? "Proveedor aprobado exitosamente" 
-          : "Aprobación de proveedor revocada"
+          ? "Proveedor aprobado y notificado por email" 
+          : "Aprobación revocada y proveedor notificado"
       );
       queryClient.invalidateQueries({ queryKey: ["profiles"] });
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
