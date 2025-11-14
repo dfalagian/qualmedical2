@@ -17,6 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { SupplierApprovalButton } from "@/components/admin/SupplierApprovalButton";
 
 const userFormSchema = z.object({
   full_name: z.string().min(1, "El nombre es requerido"),
@@ -424,7 +425,14 @@ const Admin = () => {
                               Administrador
                             </Badge>
                           ) : (
-                            <Badge variant="secondary">Proveedor</Badge>
+                            <>
+                              <Badge variant="secondary">Proveedor</Badge>
+                              {user.approved ? (
+                                <Badge className="bg-success">Aprobado</Badge>
+                              ) : (
+                                <Badge variant="destructive">Sin Aprobar</Badge>
+                              )}
+                            </>
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
@@ -439,6 +447,13 @@ const Admin = () => {
                       </div>
 
                       <div className="flex gap-2">
+                        {!isUserAdmin && (
+                          <SupplierApprovalButton
+                            supplierId={user.id}
+                            supplierName={user.full_name}
+                            approved={user.approved || false}
+                          />
+                        )}
                         <Dialog open={dialogOpen && editingUser?.id === user.id} onOpenChange={(open) => {
                           setDialogOpen(open);
                           if (!open) {
