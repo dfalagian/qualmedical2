@@ -80,7 +80,7 @@ export const EmailServerStatus = () => {
   };
 
   return (
-    <Card className="shadow-md">
+    <Card className={`shadow-md ${status === 'error' ? 'bg-destructive/10 border-destructive' : ''}`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
