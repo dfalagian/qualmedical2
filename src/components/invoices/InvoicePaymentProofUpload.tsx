@@ -56,7 +56,7 @@ export function InvoicePaymentProofUpload({
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
       // Primero, buscar si existe un registro de pago para esta factura
-      const { data: pagoData, error: pagoError } = await supabase
+      let { data: pagoData, error: pagoError } = await supabase
         .from("pagos")
         .select("id")
         .eq("invoice_id", invoiceId)
@@ -64,8 +64,54 @@ export function InvoicePaymentProofUpload({
 
       if (pagoError) throw pagoError;
 
+      // Si no existe el registro de pago, crearlo automáticamente
       if (!pagoData) {
-        throw new Error("No se encontró un registro de pago para esta factura");
+        console.log("No se encontró registro de pago, creando uno nuevo...");
+        
+        // Obtener datos bancarios aprobados del proveedor
+        const { data: bankDocsData, error: bankDocsError } = await supabase
+          .from("documents")
+          .select("id, nombre_banco")
+          .eq("supplier_id", supplierId)
+          .eq("document_type", "datos_bancarios")
+          .eq("status", "aprobado")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (bankDocsError) throw bankDocsError;
+
+        if (!bankDocsData) {
+          throw new Error("No se encontraron datos bancarios aprobados para este proveedor");
+        }
+
+        // Obtener el monto de la factura
+        const { data: invoiceData, error: invoiceError } = await supabase
+          .from("invoices")
+          .select("amount")
+          .eq("id", invoiceId)
+          .single();
+
+        if (invoiceError) throw invoiceError;
+
+        // Crear el registro de pago
+        const { data: newPago, error: createPagoError } = await supabase
+          .from("pagos")
+          .insert({
+            supplier_id: supplierId,
+            datos_bancarios_id: bankDocsData.id,
+            invoice_id: invoiceId,
+            amount: invoiceData.amount,
+            status: "pendiente",
+            nombre_banco: bankDocsData.nombre_banco,
+          })
+          .select("id")
+          .single();
+
+        if (createPagoError) throw createPagoError;
+
+        pagoData = newPago;
+        console.log("Registro de pago creado:", pagoData);
       }
 
       const pagoId = pagoData.id;
