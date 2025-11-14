@@ -50,6 +50,10 @@ const Invoices = () => {
   const [uploadingEvidence, setUploadingEvidence] = useState<string | null>(null);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [currentEvidenceUrls, setCurrentEvidenceUrls] = useState<string[]>([]);
+  const [rejectionReasonDialog, setRejectionReasonDialog] = useState<{ open: boolean; reason: string }>({ 
+    open: false, 
+    reason: '' 
+  });
 
   // Query para obtener el perfil del proveedor y verificar si está aprobado
   const { data: supplierProfile } = useQuery({
@@ -1096,31 +1100,21 @@ const Invoices = () => {
                           
                           {invoice.evidence_status === 'rejected' && (
                             <>
-                              {console.log('Evidence rejection reason:', invoice.evidence_rejection_reason)}
                               {invoice.evidence_rejection_reason ? (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-8 border-destructive text-destructive hover:bg-destructive/10"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          alert(invoice.evidence_rejection_reason);
-                                        }}
-                                      >
-                                        Ver motivo
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="bottom" className="max-w-sm p-3 bg-card">
-                                      <div className="space-y-1">
-                                        <p className="font-semibold text-sm">Razón del rechazo:</p>
-                                        <p className="text-sm">{invoice.evidence_rejection_reason}</p>
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 border-destructive text-destructive hover:bg-destructive/10"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRejectionReasonDialog({ 
+                                      open: true, 
+                                      reason: invoice.evidence_rejection_reason 
+                                    });
+                                  }}
+                                >
+                                  Ver motivo
+                                </Button>
                               ) : (
                                 <Badge variant="outline" className="border-destructive text-destructive">
                                   Sin motivo especificado
@@ -1422,6 +1416,25 @@ const Invoices = () => {
               disabled={!complementoFile}
             >
               Adjuntar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={rejectionReasonDialog.open} onOpenChange={(open) => setRejectionReasonDialog({ open, reason: '' })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <X className="h-5 w-5" />
+              Motivo del Rechazo de Evidencia
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base pt-4">
+              {rejectionReasonDialog.reason}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setRejectionReasonDialog({ open: false, reason: '' })}>
+              Entendido
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
