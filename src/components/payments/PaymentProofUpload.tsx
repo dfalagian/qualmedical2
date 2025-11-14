@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { convertPDFToImages } from "@/lib/pdfToImages";
 import { getSignedUrl } from "@/lib/storage";
+import { useAuth } from "@/hooks/useAuth";
 
 interface PaymentProofUploadProps {
   pagoId: string;
@@ -23,6 +24,7 @@ export function PaymentProofUpload({ pagoId, supplierId, hasProof, proofUrl }: P
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
   const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
 
   // Obtener URL firmada cuando se abre el diálogo y ya hay comprobante
   useEffect(() => {
@@ -184,8 +186,8 @@ export function PaymentProofUpload({ pagoId, supplierId, hasProof, proofUrl }: P
               )}
             </div>
           </>
-        ) : (
-          // Vista de subida de nuevo comprobante
+        ) : isAdmin ? (
+          // Vista de subida de nuevo comprobante (solo para admins)
           <>
             <DialogHeader>
               <DialogTitle>Subir Comprobante de Pago</DialogTitle>
@@ -230,6 +232,20 @@ export function PaymentProofUpload({ pagoId, supplierId, hasProof, proofUrl }: P
                   </>
                 )}
               </Button>
+            </div>
+          </>
+        ) : (
+          // Vista para proveedores cuando no hay comprobante
+          <>
+            <DialogHeader>
+              <DialogTitle>Comprobante de Pago</DialogTitle>
+              <DialogDescription>
+                Aún no se ha subido un comprobante de pago para esta transacción
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-8 text-center text-muted-foreground">
+              <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
+              <p>El comprobante de pago será subido por el administrador</p>
             </div>
           </>
         )}

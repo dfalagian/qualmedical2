@@ -25,13 +25,20 @@ const Payments = () => {
   const queryClient = useQueryClient();
 
   const { data: pagos, isLoading, error: pagosError } = useQuery({
-    queryKey: ["pagos"],
+    queryKey: ["pagos", user?.id, isAdmin],
     queryFn: async () => {
       // Primero obtener los pagos básicos
-      const { data: pagosData, error: pagosErr } = await supabase
+      let query = supabase
         .from("pagos")
         .select("*")
         .order("created_at", { ascending: false });
+      
+      // Si no es admin, filtrar solo pagos del proveedor
+      if (!isAdmin && user?.id) {
+        query = query.eq("supplier_id", user.id);
+      }
+
+      const { data: pagosData, error: pagosErr } = await query;
 
       if (pagosErr) throw pagosErr;
       if (!pagosData) return [];
@@ -212,10 +219,6 @@ const Payments = () => {
     );
   }
 
-  if (!isAdmin) {
-    return <Navigate to="/dashboard" />;
-  }
-
   return (
     <DashboardLayout>
       <div className="p-8">
@@ -309,14 +312,12 @@ const Payments = () => {
                       }
                     </TableCell>
                     <TableCell>
-                      {isAdmin && (
-                        <PaymentProofUpload 
-                          pagoId={pago.id}
-                          supplierId={pago.supplier_id}
-                          hasProof={!!pago.comprobante_pago_url}
-                          proofUrl={pago.comprobante_pago_url}
-                        />
-                      )}
+                      <PaymentProofUpload 
+                        pagoId={pago.id}
+                        supplierId={pago.supplier_id}
+                        hasProof={!!pago.comprobante_pago_url}
+                        proofUrl={pago.comprobante_pago_url}
+                      />
                     </TableCell>
                   </TableRow>
                 ))
