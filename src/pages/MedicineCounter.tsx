@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, Camera, Loader2, X, Save, History, Trash2 } from "lucide-react";
@@ -19,7 +20,13 @@ const MedicineCounter = () => {
   const [deliveryDocFile, setDeliveryDocFile] = useState<File | null>(null);
   const [deliveryDocPreview, setDeliveryDocPreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [result, setResult] = useState<{ count: number | null; analysis: string } | null>(null);
+  const [result, setResult] = useState<{ 
+    count: number | null; 
+    analysis: string;
+    confidence?: string;
+    imageQuality?: string;
+    warnings?: string[];
+  } | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [showDeliveryCamera, setShowDeliveryCamera] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -292,8 +299,22 @@ const MedicineCounter = () => {
 
       setResult({
         count: data.count,
-        analysis: data.analysis
+        analysis: data.analysis,
+        confidence: data.confidence,
+        imageQuality: data.imageQuality,
+        warnings: data.warnings
       });
+
+      // Show warnings if any
+      if (data.warnings && data.warnings.length > 0) {
+        data.warnings.forEach((warning: string) => {
+          toast({
+            title: "Advertencia",
+            description: warning,
+            variant: "default",
+          });
+        });
+      }
 
       toast({
         title: "Análisis completado",
@@ -564,9 +585,49 @@ const MedicineCounter = () => {
               <CardContent className="space-y-4">
                 {result.count !== null && (
                   <div className="p-4 sm:p-6 rounded-lg bg-primary/10 border-2 border-primary">
-                    <div className="text-center">
+                    <div className="text-center space-y-3">
                       <p className="text-xs sm:text-sm text-muted-foreground mb-2">Total de Cajas Detectadas</p>
                       <p className="text-4xl sm:text-5xl font-bold text-primary">{result.count}</p>
+                      
+                      {/* Badges de calidad y confianza */}
+                      <div className="flex justify-center gap-2 flex-wrap mt-3">
+                        {result.confidence && (
+                          <Badge 
+                            variant={
+                              result.confidence === 'Alto' ? 'default' : 
+                              result.confidence === 'Medio' ? 'secondary' : 
+                              'destructive'
+                            }
+                            className="text-xs"
+                          >
+                            Confianza: {result.confidence}
+                          </Badge>
+                        )}
+                        {result.imageQuality && (
+                          <Badge 
+                            variant={
+                              result.imageQuality === 'Excelente' || result.imageQuality === 'Buena' ? 'default' : 
+                              result.imageQuality === 'Regular' ? 'secondary' : 
+                              'outline'
+                            }
+                            className="text-xs"
+                          >
+                            Calidad: {result.imageQuality}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Advertencias si existen */}
+                {result.warnings && result.warnings.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm sm:text-base text-yellow-600">Advertencias</Label>
+                    <div className="p-3 sm:p-4 rounded-lg bg-yellow-50 border border-yellow-200 space-y-1">
+                      {result.warnings.map((warning, idx) => (
+                        <p key={idx} className="text-xs sm:text-sm text-yellow-800">{warning}</p>
+                      ))}
                     </div>
                   </div>
                 )}
