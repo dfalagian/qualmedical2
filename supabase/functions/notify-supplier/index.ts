@@ -570,6 +570,421 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
           </body>
         </html>
       `
+    }),
+
+    invoice_status_processing: (data) => ({
+      subject: `🔄 Factura en Procesamiento - ${data.invoice_number}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body { 
+                font-family: Arial, sans-serif; 
+                line-height: 1.6; 
+                color: #333; 
+                margin: 0;
+                padding: 0;
+                background-color: #f5f5f5;
+              }
+              .container { 
+                max-width: 600px; 
+                margin: 0 auto; 
+                background: white;
+              }
+              .header { 
+                background-color: #3b82f6; 
+                color: white; 
+                padding: 20px 30px; 
+                text-align: center; 
+              }
+              .header h1 {
+                margin: 0;
+                font-size: 24px;
+                font-weight: normal;
+              }
+              .info-notice {
+                background-color: #dbeafe;
+                border: 1px solid #93c5fd;
+                padding: 20px;
+                margin: 20px 30px;
+                text-align: center;
+                border-radius: 4px;
+              }
+              .info-notice h2 {
+                color: #1e40af;
+                margin: 0 0 10px 0;
+                font-size: 20px;
+              }
+              .content { 
+                padding: 0 30px 30px 30px;
+              }
+              .info-box {
+                background: #f9fafb;
+                border-left: 3px solid #3b82f6;
+                padding: 15px;
+                margin: 15px 0;
+              }
+              .info-box p {
+                margin: 5px 0;
+              }
+              .timeline {
+                background: #f0f9ff;
+                border-left: 3px solid #0ea5e9;
+                padding: 15px;
+                margin: 20px 0;
+              }
+              .timeline-step {
+                padding: 10px 0;
+                position: relative;
+              }
+              .timeline-step strong {
+                color: #0369a1;
+              }
+              .footer { 
+                text-align: center; 
+                padding: 20px 30px;
+                background-color: #f9fafb;
+                color: #6b7280; 
+                font-size: 14px;
+                border-top: 1px solid #e5e7eb;
+              }
+              .footer p {
+                margin: 5px 0;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>🔄 Factura en Procesamiento</h1>
+              </div>
+              
+              <div class="info-notice">
+                <h2>Tu factura está siendo procesada</h2>
+                <p>Estamos tramitando el pago de tu factura</p>
+              </div>
+
+              <div class="content">
+                <p><strong>Estimado proveedor,</strong></p>
+                
+                <p>Te informamos que tu factura ha sido marcada como <strong>EN PROCESAMIENTO</strong>. Esto significa que estamos tramitando el pago correspondiente.</p>
+
+                <div class="info-box">
+                  <p><strong>📄 Factura:</strong> ${data.invoice_number}</p>
+                  <p><strong>💰 Monto:</strong> $${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</p>
+                  <p><strong>🔄 Estado:</strong> En Procesamiento</p>
+                </div>
+
+                <div class="timeline">
+                  <p><strong>📋 Proceso de pago:</strong></p>
+                  <div class="timeline-step">✅ Factura recibida y validada</div>
+                  <div class="timeline-step">✅ Evidencia de entrega aprobada</div>
+                  <div class="timeline-step"><strong>🔄 En proceso de pago (Estado actual)</strong></div>
+                  <div class="timeline-step">⏳ Pago completado</div>
+                </div>
+
+                <p>Recibirás una nueva notificación cuando el pago haya sido completado.</p>
+
+                <p style="text-align: center; margin-top: 20px;">
+                  <a href="https://qualmedical.iakan.es" style="display: inline-block; padding: 12px 30px; background: #3b82f6; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    Ver Estado de Factura
+                  </a>
+                </p>
+              </div>
+
+              <div class="footer">
+                <p>Este es un mensaje automático del Sistema QualMedical</p>
+                <p>© 2025 QualMedical. Todos los derechos reservados.</p>
+              </div>
+            </div>
+          </body>
+        </html>
+      `
+    }),
+
+    invoice_status_paid: (data) => ({
+      subject: `✅ Pago Completado - Factura ${data.invoice_number}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body { 
+                font-family: Arial, sans-serif; 
+                line-height: 1.6; 
+                color: #333; 
+                margin: 0;
+                padding: 0;
+                background-color: #f5f5f5;
+              }
+              .container { 
+                max-width: 600px; 
+                margin: 0 auto; 
+                background: white;
+              }
+              .header { 
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white; 
+                padding: 30px 30px; 
+                text-align: center; 
+              }
+              .header h1 {
+                margin: 0;
+                font-size: 28px;
+                font-weight: bold;
+              }
+              .success-icon {
+                font-size: 48px;
+                margin-bottom: 10px;
+              }
+              .success-notice {
+                background-color: #d1fae5;
+                border: 1px solid #a7f3d0;
+                padding: 25px;
+                margin: 20px 30px;
+                text-align: center;
+                border-radius: 4px;
+              }
+              .success-notice h2 {
+                color: #059669;
+                margin: 0 0 10px 0;
+                font-size: 22px;
+              }
+              .content { 
+                padding: 0 30px 30px 30px;
+              }
+              .payment-box {
+                background: #f0fdf4;
+                border: 2px solid #10b981;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 20px 0;
+                text-align: center;
+              }
+              .payment-box .amount {
+                font-size: 32px;
+                font-weight: bold;
+                color: #059669;
+                margin: 10px 0;
+              }
+              .info-box {
+                background: #f9fafb;
+                border-left: 3px solid #10b981;
+                padding: 15px;
+                margin: 15px 0;
+              }
+              .info-box p {
+                margin: 5px 0;
+              }
+              .footer { 
+                text-align: center; 
+                padding: 20px 30px;
+                background-color: #f9fafb;
+                color: #6b7280; 
+                font-size: 14px;
+                border-top: 1px solid #e5e7eb;
+              }
+              .footer p {
+                margin: 5px 0;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <div class="success-icon">🎉</div>
+                <h1>¡Pago Completado!</h1>
+              </div>
+              
+              <div class="success-notice">
+                <h2>Tu factura ha sido pagada</h2>
+                <p>El pago de tu factura se ha procesado exitosamente</p>
+              </div>
+
+              <div class="content">
+                <p><strong>Estimado proveedor,</strong></p>
+                
+                <p>¡Excelente noticia! Nos complace informarte que el pago de tu factura ha sido completado exitosamente.</p>
+
+                <div class="payment-box">
+                  <p style="margin: 0; color: #6b7280; font-size: 14px;">MONTO PAGADO</p>
+                  <div class="amount">$${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</div>
+                </div>
+
+                <div class="info-box">
+                  <p><strong>📄 Factura:</strong> ${data.invoice_number}</p>
+                  <p><strong>📅 Fecha de Pago:</strong> ${new Date(data.payment_date).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                  <p><strong>✅ Estado:</strong> Pagado</p>
+                </div>
+
+                <p style="background: #fef3c7; border-left: 3px solid #f59e0b; padding: 15px; margin: 20px 0;">
+                  <strong>📋 Comprobante de pago:</strong><br>
+                  Puedes consultar el comprobante de pago en el portal, en la sección de facturas.
+                </p>
+
+                <p style="text-align: center; margin-top: 25px;">
+                  <a href="https://qualmedical.iakan.es" style="display: inline-block; padding: 12px 30px; background: #10b981; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    Ver Comprobante
+                  </a>
+                </p>
+
+                <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
+                  Gracias por tu colaboración y profesionalismo.
+                </p>
+              </div>
+
+              <div class="footer">
+                <p>Este es un mensaje automático del Sistema QualMedical</p>
+                <p>© 2025 QualMedical. Todos los derechos reservados.</p>
+              </div>
+            </div>
+          </body>
+        </html>
+      `
+    }),
+
+    invoice_status_rejected: (data) => ({
+      subject: `❌ Factura Rechazada - ${data.invoice_number}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body { 
+                font-family: Arial, sans-serif; 
+                line-height: 1.6; 
+                color: #333; 
+                margin: 0;
+                padding: 0;
+                background-color: #f5f5f5;
+              }
+              .container { 
+                max-width: 600px; 
+                margin: 0 auto; 
+                background: white;
+              }
+              .header { 
+                background-color: #ef4444; 
+                color: white; 
+                padding: 20px 30px; 
+                text-align: center; 
+              }
+              .header h1 {
+                margin: 0;
+                font-size: 24px;
+                font-weight: normal;
+              }
+              .alert-box {
+                background-color: #fee2e2;
+                border: 1px solid #fecaca;
+                padding: 20px;
+                margin: 20px 30px;
+                text-align: center;
+                border-radius: 4px;
+              }
+              .alert-box h2 {
+                color: #dc2626;
+                margin: 0 0 10px 0;
+                font-size: 20px;
+              }
+              .content { 
+                padding: 0 30px 30px 30px;
+              }
+              .info-box {
+                background: #f9fafb;
+                border-left: 3px solid #ef4444;
+                padding: 15px;
+                margin: 15px 0;
+              }
+              .info-box p {
+                margin: 5px 0;
+              }
+              .reason-box {
+                background: #fef3c7;
+                border-left: 3px solid #f59e0b;
+                padding: 15px;
+                margin: 20px 0;
+              }
+              .reason-box strong {
+                color: #d97706;
+              }
+              .action-box {
+                background: #dbeafe;
+                border-left: 3px solid #3b82f6;
+                padding: 15px;
+                margin: 20px 0;
+              }
+              .action-box strong {
+                color: #1e40af;
+              }
+              .footer { 
+                text-align: center; 
+                padding: 20px 30px;
+                background-color: #f9fafb;
+                color: #6b7280; 
+                font-size: 14px;
+                border-top: 1px solid #e5e7eb;
+              }
+              .footer p {
+                margin: 5px 0;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>⚠️ Factura Rechazada</h1>
+              </div>
+              
+              <div class="alert-box">
+                <h2>Tu factura no ha sido aprobada</h2>
+                <p>La factura requiere correcciones</p>
+              </div>
+
+              <div class="content">
+                <p><strong>Estimado proveedor,</strong></p>
+                
+                <p>Lamentamos informarte que tu factura ha sido <strong>RECHAZADA</strong> y no podrá ser procesada para pago.</p>
+
+                <div class="info-box">
+                  <p><strong>📄 Factura:</strong> ${data.invoice_number}</p>
+                  <p><strong>💰 Monto:</strong> $${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</p>
+                  <p><strong>❌ Estado:</strong> Rechazado</p>
+                </div>
+
+                ${data.rejection_reason ? `
+                <div class="reason-box">
+                  <p><strong>📝 Razón del rechazo:</strong></p>
+                  <p style="margin: 10px 0 0 0;">${data.rejection_reason}</p>
+                </div>
+                ` : ''}
+
+                <div class="action-box">
+                  <p><strong>🔧 Acción requerida:</strong></p>
+                  <p>Por favor, revisa la razón del rechazo y toma las acciones necesarias. Si tienes dudas, contacta al departamento administrativo.</p>
+                  <p style="margin-top: 10px;"><strong>Nota:</strong> Es posible que necesites emitir una nueva factura corregida.</p>
+                </div>
+
+                <p style="text-align: center; margin-top: 20px;">
+                  <a href="https://qualmedical.iakan.es" style="display: inline-block; padding: 12px 30px; background: #ef4444; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    Acceder al Portal
+                  </a>
+                </p>
+              </div>
+
+              <div class="footer">
+                <p>Para más información, contacta al departamento de administración</p>
+                <p>Este es un mensaje automático del Sistema QualMedical</p>
+                <p>© 2025 QualMedical. Todos los derechos reservados.</p>
+              </div>
+            </div>
+          </body>
+        </html>
+      `
     })
   };
 

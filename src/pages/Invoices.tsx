@@ -276,11 +276,13 @@ const Invoices = () => {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ 
-      id, 
-      status 
+      invoice,
+      status,
+      rejectionReason
     }: { 
-      id: string; 
+      invoice: any;
       status: "pendiente" | "procesando" | "pagado" | "rechazado";
+      rejectionReason?: string;
     }) => {
       const updates: any = { status };
       
@@ -294,12 +296,45 @@ const Invoices = () => {
       const { error } = await supabase
         .from("invoices")
         .update(updates)
-        .eq("id", id);
+        .eq("id", invoice.id);
 
       if (error) throw error;
+
+      // Enviar notificación por email según el estado
+      let notificationType: string | null = null;
+      let notificationData: any = {
+        invoice_number: invoice.invoice_number,
+        invoice_amount: invoice.amount,
+        invoice_date: invoice.fecha_emision
+      };
+
+      switch (status) {
+        case "procesando":
+          notificationType = 'invoice_status_processing';
+          break;
+        case "pagado":
+          notificationType = 'invoice_status_paid';
+          notificationData.payment_date = new Date().toISOString().split('T')[0];
+          break;
+        case "rechazado":
+          notificationType = 'invoice_status_rejected';
+          notificationData.rejection_reason = rejectionReason || "No se especificó una razón";
+          break;
+      }
+
+      // Solo enviar notificación si hay un tipo válido (no para "pendiente")
+      if (notificationType) {
+        await supabase.functions.invoke("notify-supplier", {
+          body: {
+            supplier_id: invoice.supplier_id,
+            type: notificationType,
+            data: notificationData
+          }
+        });
+      }
     },
     onSuccess: () => {
-      toast.success("Estado actualizado");
+      toast.success("Estado actualizado y notificación enviada");
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
     onError: (error: any) => {
@@ -1053,9 +1088,21 @@ const Invoices = () => {
                       {isAdmin && (
                         <Select
                           value={invoice.status}
-                          onValueChange={(value: any) =>
-                            updateStatusMutation.mutate({ id: invoice.id, status: value })
-                          }
+                          onValueChange={(value: any) => {
+                            // Si es rechazado, solicitar razón
+                            if (value === "rechazado") {
+                              const reason = prompt("Razón del rechazo de la factura:");
+                              if (reason) {
+                                updateStatusMutation.mutate({ 
+                                  invoice, 
+                                  status: value,
+                                  rejectionReason: reason
+                                });
+                              }
+                            } else {
+                              updateStatusMutation.mutate({ invoice, status: value });
+                            }
+                          }}
                         >
                           <SelectTrigger className="w-32">
                             <SelectValue />

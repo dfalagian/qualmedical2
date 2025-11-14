@@ -12,7 +12,10 @@ type NotificationType =
   | 'purchase_order_created' 
   | 'new_message'
   | 'evidence_approved'
-  | 'evidence_rejected';
+  | 'evidence_rejected'
+  | 'invoice_status_processing'
+  | 'invoice_status_paid'
+  | 'invoice_status_rejected';
 
 type AdminNotificationType =
   | 'new_registration'
