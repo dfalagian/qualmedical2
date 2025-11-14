@@ -1,0 +1,2 @@
+-- Forzar regeneración de tipos agregando un comentario a la columna approved
+COMMENT ON COLUMN public.profiles.approved IS 'Indica si el proveedor ha sido aprobado después de validar todos los documentos requeridos';
