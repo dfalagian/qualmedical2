@@ -159,6 +159,13 @@ const SupplierDocuments = () => {
 
       if (docError) throw docError;
 
+      // Obtener estado de aprobación actual del proveedor
+      const { data: supplierBefore } = await supabase
+        .from('profiles')
+        .select('approved')
+        .eq('id', supplierId)
+        .single();
+
       const { data: { user } } = await supabase.auth.getUser();
       
       const { error: updateError } = await supabase
@@ -172,6 +179,7 @@ const SupplierDocuments = () => {
 
       if (updateError) throw updateError;
 
+      // Notificar aprobación/rechazo del documento
       const { error: notifyError } = await supabase.functions.invoke('notify-supplier', {
         body: {
           supplier_id: supplierId,
@@ -184,7 +192,29 @@ const SupplierDocuments = () => {
       });
 
       if (notifyError) {
-        console.error('Error al notificar:', notifyError);
+        console.error('Error al notificar documento:', notifyError);
+      }
+
+      // Verificar si el proveedor acaba de ser aprobado (después de actualizar el documento)
+      const { data: supplierAfter } = await supabase
+        .from('profiles')
+        .select('approved')
+        .eq('id', supplierId)
+        .single();
+
+      // Si el proveedor cambió de no aprobado a aprobado, enviar notificación de aprobación
+      if (supplierBefore && supplierAfter && !supplierBefore.approved && supplierAfter.approved) {
+        const { error: approvalNotifyError } = await supabase.functions.invoke('notify-supplier', {
+          body: {
+            supplier_id: supplierId,
+            type: 'supplier_approved',
+            data: {}
+          }
+        });
+
+        if (approvalNotifyError) {
+          console.error('Error al notificar aprobación del proveedor:', approvalNotifyError);
+        }
       }
 
       return { status, documentType: document.document_type };

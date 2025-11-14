@@ -85,6 +85,12 @@ const ComprobanteDomicilioAdmin = () => {
 
       if (docError) throw docError;
 
+      const { data: supplierBefore } = await supabase
+        .from('profiles')
+        .select('approved')
+        .eq('id', supplierId)
+        .single();
+
       const { data: { user } } = await supabase.auth.getUser();
       
       const { error: updateError } = await supabase
@@ -110,7 +116,27 @@ const ComprobanteDomicilioAdmin = () => {
       });
 
       if (notifyError) {
-        console.error('Error al notificar:', notifyError);
+        console.error('Error al notificar documento:', notifyError);
+      }
+
+      const { data: supplierAfter } = await supabase
+        .from('profiles')
+        .select('approved')
+        .eq('id', supplierId)
+        .single();
+
+      if (supplierBefore && supplierAfter && !supplierBefore.approved && supplierAfter.approved) {
+        const { error: approvalNotifyError } = await supabase.functions.invoke('notify-supplier', {
+          body: {
+            supplier_id: supplierId,
+            type: 'supplier_approved',
+            data: {}
+          }
+        });
+
+        if (approvalNotifyError) {
+          console.error('Error al notificar aprobación del proveedor:', approvalNotifyError);
+        }
       }
 
       return { status, documentType: document.document_type };
