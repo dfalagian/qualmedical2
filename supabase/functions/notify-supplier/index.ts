@@ -1,223 +1,158 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface NotificationRequest {
-  supplier_id: string;
-  type: 'account_approved' | 'account_rejected' | 'document_approved' | 'document_rejected' | 
-        'invoice_validated' | 'invoice_rejected' | 'payment_completed' | 'payment_pending' | 
-        'purchase_order_created' | 'new_message';
-  data?: any;
-}
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
-const getEmailTemplate = (type: string, data: any, supplierName: string) => {
-  const templates = {
-    account_approved: {
-      subject: "¡Tu cuenta ha sido aprobada!",
+const getDocumentTypeName = (type: string): string => {
+  const types: Record<string, string> = {
+    ine: "Credencial INE",
+    constancia_fiscal: "Constancia de Situación Fiscal",
+    comprobante_domicilio: "Comprobante de Domicilio",
+    aviso_funcionamiento: "Aviso de Funcionamiento",
+    datos_bancarios: "Datos Bancarios"
+  };
+  return types[type] || type;
+};
+
+const getEmailTemplate = (type: string, data: any): { subject: string; html: string } => {
+  const templates: Record<string, (data: any) => { subject: string; html: string }> = {
+    document_approved: (data) => ({
+      subject: `✅ Documento Aprobado - ${getDocumentTypeName(data.document_type)}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #22c55e;">Cuenta Aprobada ✓</h2>
-          <p>Hola ${supplierName},</p>
-          <p>Tu cuenta de proveedor ha sido aprobada exitosamente.</p>
-          <p>Ya puedes acceder a todas las funcionalidades del sistema.</p>
-          <p style="margin-top: 30px;">Saludos,<br>Equipo QualMedical</p>
-        </div>
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }
+              .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+              .success-icon { font-size: 48px; margin-bottom: 10px; }
+              .button { display: inline-block; padding: 12px 30px; background: #10b981; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+              .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <div class="success-icon">✓</div>
+                <h1 style="margin: 0;">Documento Aprobado</h1>
+              </div>
+              <div class="content">
+                <p>Estimado proveedor,</p>
+                <p>Nos complace informarle que su documento ha sido <strong>aprobado exitosamente</strong>:</p>
+                <div style="background: white; padding: 15px; border-left: 4px solid #10b981; margin: 20px 0;">
+                  <strong>${getDocumentTypeName(data.document_type)}</strong>
+                </div>
+                <p>Su documento ha pasado todas las validaciones requeridas y ahora forma parte de su expediente activo.</p>
+                <a href="${Deno.env.get('VITE_SUPABASE_URL')}" class="button">Acceder al Portal</a>
+              </div>
+              <div class="footer">
+                <p>Este es un mensaje automático del Sistema QualMedical</p>
+              </div>
+            </div>
+          </body>
+        </html>
       `
-    },
-    account_rejected: {
-      subject: "Actualización sobre tu cuenta",
+    }),
+    
+    document_rejected: (data) => ({
+      subject: `❌ Documento Rechazado - ${getDocumentTypeName(data.document_type)}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #ef4444;">Cuenta Rechazada</h2>
-          <p>Hola ${supplierName},</p>
-          <p>Lamentamos informarte que tu cuenta no ha sido aprobada.</p>
-          <p><strong>Motivo:</strong> ${data?.rejection_reason || 'No especificado'}</p>
-          <p>Por favor, contacta al administrador para más información.</p>
-          <p style="margin-top: 30px;">Saludos,<br>Equipo QualMedical</p>
-        </div>
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }
+              .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+              .button { display: inline-block; padding: 12px 30px; background: #ef4444; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1 style="margin: 0;">Documento Rechazado</h1>
+              </div>
+              <div class="content">
+                <p>Estimado proveedor,</p>
+                <p>Su documento <strong>${getDocumentTypeName(data.document_type)}</strong> ha sido rechazado.</p>
+                <p>Por favor, revise y vuelva a subir el documento corregido.</p>
+                <a href="${Deno.env.get('VITE_SUPABASE_URL')}" class="button">Subir Nuevo Documento</a>
+              </div>
+            </div>
+          </body>
+        </html>
       `
-    },
-    document_approved: {
-      subject: `Documento aprobado: ${data?.document_type || 'Documento'}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #22c55e;">Documento Aprobado ✓</h2>
-          <p>Hola ${supplierName},</p>
-          <p>Tu documento <strong>${data?.document_type || 'documento'}</strong> ha sido aprobado.</p>
-          ${data?.notes ? `<p><strong>Notas:</strong> ${data.notes}</p>` : ''}
-          <p style="margin-top: 30px;">Saludos,<br>Equipo QualMedical</p>
-        </div>
-      `
-    },
-    document_rejected: {
-      subject: `Documento rechazado: ${data?.document_type || 'Documento'}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #ef4444;">Documento Rechazado</h2>
-          <p>Hola ${supplierName},</p>
-          <p>Tu documento <strong>${data?.document_type || 'documento'}</strong> ha sido rechazado.</p>
-          ${data?.rejection_reason ? `<p><strong>Motivo:</strong> ${data.rejection_reason}</p>` : ''}
-          <p>Por favor, revisa y vuelve a subir el documento corregido.</p>
-          <p style="margin-top: 30px;">Saludos,<br>Equipo QualMedical</p>
-        </div>
-      `
-    },
-    invoice_validated: {
-      subject: `Factura validada: ${data?.invoice_number || 'Factura'}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #22c55e;">Factura Validada ✓</h2>
-          <p>Hola ${supplierName},</p>
-          <p>Tu factura <strong>${data?.invoice_number || 'factura'}</strong> ha sido validada exitosamente.</p>
-          <p><strong>Monto:</strong> $${data?.amount || '0.00'}</p>
-          <p><strong>Estado:</strong> ${data?.status || 'Validada'}</p>
-          <p style="margin-top: 30px;">Saludos,<br>Equipo QualMedical</p>
-        </div>
-      `
-    },
-    invoice_rejected: {
-      subject: `Factura rechazada: ${data?.invoice_number || 'Factura'}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #ef4444;">Factura Rechazada</h2>
-          <p>Hola ${supplierName},</p>
-          <p>Tu factura <strong>${data?.invoice_number || 'factura'}</strong> ha sido rechazada.</p>
-          ${data?.rejection_reason ? `<p><strong>Motivo:</strong> ${data.rejection_reason}</p>` : ''}
-          <p>Por favor, revisa y vuelve a subir la factura corregida.</p>
-          <p style="margin-top: 30px;">Saludos,<br>Equipo QualMedical</p>
-        </div>
-      `
-    },
-    payment_completed: {
-      subject: `Pago completado: ${data?.invoice_number || 'Factura'}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #22c55e;">Pago Completado ✓</h2>
-          <p>Hola ${supplierName},</p>
-          <p>El pago de tu factura <strong>${data?.invoice_number || 'factura'}</strong> ha sido completado.</p>
-          <p><strong>Monto pagado:</strong> $${data?.amount || '0.00'}</p>
-          <p><strong>Fecha de pago:</strong> ${data?.payment_date || new Date().toLocaleDateString()}</p>
-          ${data?.payment_method ? `<p><strong>Método:</strong> ${data.payment_method}</p>` : ''}
-          <p style="margin-top: 30px;">Saludos,<br>Equipo QualMedical</p>
-        </div>
-      `
-    },
-    payment_pending: {
-      subject: `Pago en proceso: ${data?.invoice_number || 'Factura'}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #f59e0b;">Pago en Proceso</h2>
-          <p>Hola ${supplierName},</p>
-          <p>Tu pago para la factura <strong>${data?.invoice_number || 'factura'}</strong> está siendo procesado.</p>
-          <p><strong>Monto:</strong> $${data?.amount || '0.00'}</p>
-          <p>Te notificaremos cuando el pago sea completado.</p>
-          <p style="margin-top: 30px;">Saludos,<br>Equipo QualMedical</p>
-        </div>
-      `
-    },
-    purchase_order_created: {
-      subject: `Nueva orden de compra: ${data?.po_number || 'OC'}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #3b82f6;">Nueva Orden de Compra</h2>
-          <p>Hola ${supplierName},</p>
-          <p>Se ha creado una nueva orden de compra: <strong>${data?.po_number || 'orden'}</strong></p>
-          <p><strong>Monto total:</strong> $${data?.total_amount || '0.00'}</p>
-          ${data?.delivery_date ? `<p><strong>Fecha de entrega:</strong> ${data.delivery_date}</p>` : ''}
-          <p>Por favor, revisa los detalles en el sistema.</p>
-          <p style="margin-top: 30px;">Saludos,<br>Equipo QualMedical</p>
-        </div>
-      `
-    },
-    new_message: {
-      subject: `Nuevo mensaje: ${data?.subject || 'Mensaje'}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #3b82f6;">Nuevo Mensaje</h2>
-          <p>Hola ${supplierName},</p>
-          <p>Tienes un nuevo mensaje:</p>
-          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 15px 0;">
-            <p><strong>Asunto:</strong> ${data?.subject || 'Sin asunto'}</p>
-            <p>${data?.message || ''}</p>
-          </div>
-          <p>Por favor, inicia sesión en el sistema para responder.</p>
-          <p style="margin-top: 30px;">Saludos,<br>Equipo QualMedical</p>
-        </div>
-      `
-    }
+    }),
+
+    account_approved: () => ({
+      subject: "🎉 Cuenta Aprobada",
+      html: `<h2>¡Cuenta Aprobada!</h2><p>Tu cuenta ha sido aprobada exitosamente.</p>`
+    }),
+
+    account_rejected: () => ({
+      subject: "Cuenta No Aprobada",
+      html: `<h2>Cuenta No Aprobada</h2><p>Tu solicitud no ha sido aprobada.</p>`
+    })
   };
 
-  return templates[type as keyof typeof templates] || {
-    subject: "Notificación del sistema",
-    html: `<p>Hola ${supplierName}, tienes una nueva notificación.</p>`
+  return templates[type] ? templates[type](data) : {
+    subject: "Notificación del Sistema",
+    html: "<p>Ha recibido una notificación del sistema.</p>"
   };
 };
 
-const handler = async (req: Request): Promise<Response> => {
+serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { supplier_id, type, data }: NotificationRequest = await req.json();
+    const { supplier_id, type, data } = await req.json();
 
-    console.log("Sending notification:", { supplier_id, type });
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get supplier email
-    const { data: profile, error: profileError } = await supabase
+    const { data: supplier, error: supplierError } = await supabaseClient
       .from("profiles")
       .select("email, full_name")
       .eq("id", supplier_id)
       .single();
 
-    if (profileError || !profile) {
-      console.error("Error fetching supplier profile:", profileError);
-      throw new Error("Supplier not found");
+    if (supplierError || !supplier?.email) {
+      throw new Error("Error obteniendo proveedor");
     }
 
-    const template = getEmailTemplate(type, data, profile.full_name || profile.email);
+    const { subject, html } = getEmailTemplate(type, data);
 
-    // Send email via send-email function
-    const emailResponse = await supabase.functions.invoke("send-email", {
-      body: {
-        to: profile.email,
-        subject: template.subject,
-        html: template.html,
-      },
+    const emailResult = await resend.emails.send({
+      from: Deno.env.get("SMTP_FROM_EMAIL") || "QualMedical <noreply@qualmedical.com>",
+      to: [supplier.email],
+      subject,
+      html
     });
 
-    if (emailResponse.error) {
-      throw emailResponse.error;
-    }
-
-    console.log("Notification sent successfully to:", profile.email);
-
     return new Response(
-      JSON.stringify({ success: true, message: "Notification sent" }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
+      JSON.stringify({ success: true, emailId: emailResult.data?.id }),
+      { headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
+
   } catch (error: any) {
-    console.error("Error sending notification:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
+      JSON.stringify({ error: error.message, success: false }),
+      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
-};
-
-serve(handler);
+});
