@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, FileText, Eye, Trash2, CheckCircle2, Check, X } from "lucide-react";
+import { Search, FileText, Eye, Trash2, CheckCircle2, Check, XCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
@@ -361,7 +361,7 @@ const SupplierDocuments = () => {
                                     status: 'aprobado',
                                     supplierId: doc.supplier_id
                                   })}
-                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                  className="bg-success hover:bg-success/90"
                                   disabled={updateStatusMutation.isPending || doc.status === 'aprobado'}
                                 >
                                   <Check className="h-4 w-4" />
@@ -376,7 +376,7 @@ const SupplierDocuments = () => {
                                   })}
                                   disabled={updateStatusMutation.isPending || doc.status === 'rechazado'}
                                 >
-                                  <X className="h-4 w-4" />
+                                  <XCircle className="h-4 w-4" />
                                 </Button>
                               </div>
                             </TableCell>

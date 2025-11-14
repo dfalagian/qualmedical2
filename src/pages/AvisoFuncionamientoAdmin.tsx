@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileText, RefreshCw, Eye, Trash2, Check, X } from "lucide-react";
+import { FileText, RefreshCw, Eye, Trash2, Check, XCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -213,38 +213,38 @@ const AvisoFuncionamientoAdmin = () => {
                         </TableCell>
                         <TableCell>{doc.razon_social || "-"}</TableCell>
                         <TableCell className="max-w-xs truncate">{doc.direccion || "-"}</TableCell>
-                    <TableCell>{getExtractionBadge(doc.extraction_status)}</TableCell>
-                    <TableCell>{getStatusBadge(doc.status)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => updateStatusMutation.mutate({ 
-                            documentId: doc.id, 
-                            status: 'aprobado',
-                            supplierId: doc.supplier_id
-                          })}
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                          disabled={updateStatusMutation.isPending || doc.status === 'aprobado'}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => updateStatusMutation.mutate({ 
-                            documentId: doc.id, 
-                            status: 'rechazado',
-                            supplierId: doc.supplier_id
-                          })}
-                          disabled={updateStatusMutation.isPending || doc.status === 'rechazado'}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
+                        <TableCell>{getExtractionBadge(doc.extraction_status)}</TableCell>
+                        <TableCell>{getStatusBadge(doc.status)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => updateStatusMutation.mutate({ 
+                                documentId: doc.id, 
+                                status: 'aprobado',
+                                supplierId: doc.supplier_id
+                              })}
+                              className="bg-success hover:bg-success/90"
+                              disabled={updateStatusMutation.isPending || doc.status === 'aprobado'}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => updateStatusMutation.mutate({ 
+                                documentId: doc.id, 
+                                status: 'rechazado',
+                                supplierId: doc.supplier_id
+                              })}
+                              disabled={updateStatusMutation.isPending || doc.status === 'rechazado'}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
                             <Dialog>
                               <DialogTrigger asChild>
                                 <Button
