@@ -2,15 +2,188 @@
 ## Sistema de Validación de Evidencias y Notificaciones
 
 ### ⚠️ INSTRUCCIONES PARA LA IA QUE IMPLEMENTARÁ ESTO:
-1. Ejecuta PRIMERO el SQL del PASO 1
-2. Espera confirmación del usuario de que se ejecutó
-3. Luego implementa los archivos en el orden exacto del PASO 2 al PASO 4
-4. NO hagas cambios adicionales que no estén aquí
-5. Copia el código EXACTAMENTE como está
+1. **PRIMERO**: Verifica los estilos en PASO 0
+2. Ejecuta el SQL del PASO 1
+3. Espera confirmación del usuario de que se ejecutó
+4. Luego implementa los archivos en el orden exacto del PASO 2 al PASO 6
+5. NO hagas cambios adicionales que no estén aquí
+6. Copia el código EXACTAMENTE como está
+
+**FUNCIONALIDADES INCLUIDAS:**
+- ✅ Sistema de evidencias de entrega con aprobación/rechazo
+- ✅ Notificaciones por email en cambios de estado de facturas (procesando, pagado, rechazado)
+- ✅ Diálogos para capturar motivos de rechazo
+- ✅ Componente de verificación del servidor SMTP en Dashboard
+- ✅ Plantillas de email profesionales para cada tipo de notificación
 
 ---
 
-## PASO 1: EJECUTAR MIGRACIÓN SQL (PRIMERO)
+## PASO 0: VERIFICAR Y ACTUALIZAR SISTEMA DE DISEÑO
+
+Antes de comenzar, asegúrate de que estos estilos estén presentes en tu sistema de diseño.
+
+### 0.1 Verificar `src/index.css`
+
+**BUSCA** en el archivo `src/index.css` dentro del bloque `@layer base { :root { ... } }` si existen estas variables:
+
+```css
+--success: 142 71% 45%;
+--success-foreground: 0 0% 100%;
+
+--warning: 38 92% 50%;
+--warning-foreground: 0 0% 100%;
+
+--destructive: 0 84% 60%;
+--destructive-foreground: 0 0% 100%;
+```
+
+**SI NO EXISTEN**, agrégalas en el `:root` junto con los demás colores:
+
+```css
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 180 40% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 180 40% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 180 40% 15%;
+
+    --primary: 174 76% 36%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 180 40% 20%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 180 10% 45%;
+
+    --accent: 75 65% 55%;
+    --accent-foreground: 180 40% 15%;
+
+    /* AGREGAR ESTOS SI NO EXISTEN: */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 180 10% 88%;
+    --input: 180 10% 91%;
+    --ring: 174 76% 36%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 180 30% 8%;
+    --foreground: 0 0% 95%;
+
+    /* ... otros colores ... */
+
+    /* AGREGAR ESTOS SI NO EXISTEN: */
+    --success: 142 71% 55%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 60%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* ... otros colores ... */
+  }
+}
+```
+
+### 0.2 Verificar `tailwind.config.ts`
+
+**BUSCA** en el archivo `tailwind.config.ts` dentro del objeto `theme.extend.colors` si existen estos colores:
+
+```typescript
+success: {
+  DEFAULT: "hsl(var(--success))",
+  foreground: "hsl(var(--success-foreground))",
+},
+warning: {
+  DEFAULT: "hsl(var(--warning))",
+  foreground: "hsl(var(--warning-foreground))",
+},
+destructive: {
+  DEFAULT: "hsl(var(--destructive))",
+  foreground: "hsl(var(--destructive-foreground))",
+},
+```
+
+**SI NO EXISTEN**, agrégalos en el objeto `colors`:
+
+```typescript
+export default {
+  darkMode: ["class"],
+  content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  prefix: "",
+  theme: {
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        /* AGREGAR ESTOS SI NO EXISTEN: */
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+} satisfies Config;
+```
+
+**IMPORTANTE:** Los colores `success`, `warning`, y `destructive` son ESENCIALES para los badges y alertas del sistema.
+
+---
+
+## PASO 1: EJECUTAR MIGRACIÓN SQL (DESPUÉS DE VERIFICAR ESTILOS)
 
 ```sql
 -- Agregar columnas para validación de evidencias de entrega
@@ -1280,17 +1453,52 @@ const confirmRejection = () => {
 
 ---
 
-## ✅ VERIFICACIÓN FINAL
+## ✅ CHECKLIST DE VERIFICACIÓN FINAL
 
 Después de implementar todo, verifica:
 
-1. ✅ SQL ejecutado y campos creados en base de datos
-2. ✅ Edge function `notify-supplier` actualizado
-3. ✅ Hook `useNotifications` actualizado  
-4. ✅ Página `Invoices.tsx` con todas las modificaciones
-5. ✅ Botones de aprobar/rechazar evidencia visibles
-6. ✅ Diálogos de rechazo funcionando
-7. ✅ Notificaciones por email enviándose
+### Estilos (PASO 0):
+- ✅ Colores `success`, `warning`, `destructive` definidos en `src/index.css` (:root y .dark)
+- ✅ Colores registrados en `tailwind.config.ts` en el objeto `extend.colors`
+
+### Base de Datos (PASO 1):
+- ✅ SQL ejecutado sin errores
+- ✅ Campos `delivery_evidence_url`, `evidence_status`, `evidence_reviewed_by`, `evidence_reviewed_at`, `evidence_rejection_reason` creados
+- ✅ Campo `rejection_reason` creado
+
+### Backend (PASO 2):
+- ✅ Edge function `notify-supplier/index.ts` actualizado con todos los templates de email
+- ✅ Templates incluidos: `evidence_approved`, `evidence_rejected`, `invoice_status_processing`, `invoice_status_paid`, `invoice_status_rejected`
+- ✅ Edge function desplegado correctamente
+
+### Hooks (PASO 3):
+- ✅ Hook `useNotifications.tsx` actualizado con todos los tipos de notificación
+
+### Componentes (PASO 4 y 5):
+- ✅ Componente `EmailServerStatus.tsx` creado
+- ✅ `EmailServerStatus` agregado al Dashboard (solo visible para admins)
+- ✅ Botón "Verificar Conexión" funcionando
+
+### Página de Facturas (PASO 6):
+- ✅ Todos los imports agregados correctamente
+- ✅ Estados y hooks inicializados
+- ✅ Función `getEvidenceStatusBadge` agregada
+- ✅ Mutación `updateStatusMutation` actualizada con notificaciones
+- ✅ Mutaciones `approveEvidenceMutation` y `rejectEvidenceMutation` agregadas
+- ✅ Handlers actualizados: `handleStatusChange`, `handleApproveEvidence`, `handleRejectEvidence`, `confirmEvidenceRejection`, `confirmRejection`
+- ✅ Columna "Evidencia de Entrega" agregada a la tabla
+- ✅ Badges de estado visible (Pendiente/Aprobada/Rechazada)
+- ✅ Botones Aprobar/Rechazar visibles para admins cuando evidencia está pendiente
+- ✅ Diálogo de rechazo de factura funcionando
+- ✅ Diálogo de rechazo de evidencia funcionando
+
+### Funcionalidad (Pruebas):
+- ✅ Cambiar estado de factura a "procesando" envía email
+- ✅ Cambiar estado de factura a "pagado" envía email
+- ✅ Rechazar factura solicita motivo y envía email con el motivo
+- ✅ Aprobar evidencia actualiza estado y envía email
+- ✅ Rechazar evidencia solicita motivo y envía email con el motivo
+- ✅ Verificación del servidor SMTP funciona desde Dashboard
 
 ---
 
@@ -1301,3 +1509,4 @@ Después de implementar todo, verifica:
 - NO modifiques el código más allá de lo especificado
 - Copia el código EXACTAMENTE como está
 - Si algo falla, reporta el error específico sin intentar arreglarlo por tu cuenta
+- **LOS ESTILOS SON CRÍTICOS**: Si faltan los colores `success`, `warning`, `destructive`, los badges y alertas no se verán correctamente
