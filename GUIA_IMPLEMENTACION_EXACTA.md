@@ -607,11 +607,249 @@ export const useNotifications = () => {
 
 ---
 
-## PASO 4: CAMBIOS EN src/pages/Invoices.tsx
+## PASO 4: CREAR COMPONENTE src/components/dashboard/EmailServerStatus.tsx
+
+Este componente muestra el estado del servidor de correo electrónico SMTP y debe agregarse al Dashboard de administrador.
+
+**CREAR ARCHIVO COMPLETO** `src/components/dashboard/EmailServerStatus.tsx`:
+
+```typescript
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Mail, CheckCircle2, XCircle, RefreshCw, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+export const EmailServerStatus = () => {
+  const [isChecking, setIsChecking] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'success' | 'error' | 'warning'>('idle');
+  const [lastCheck, setLastCheck] = useState<Date | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string>("");
+
+  const checkEmailServer = async () => {
+    setIsChecking(true);
+    setStatus('idle');
+    setErrorDetails("");
+
+    try {
+      // Intentar hacer una llamada de prueba al edge function
+      const { data, error } = await supabase.functions.invoke("notify-supplier", {
+        body: {
+          supplier_id: "test-connection",
+          type: "test",
+          data: {}
+        }
+      });
+
+      if (error) {
+        // Si hay error, verificar el mensaje
+        if (error.message?.includes("timed out") || error.message?.includes("Connection")) {
+          setStatus('error');
+          setErrorDetails("No se puede conectar al servidor SMTP. El servidor de correo no es accesible.");
+        } else if (error.message?.includes("proveedor")) {
+          // Este error es esperado ya que usamos un ID de prueba
+          setStatus('warning');
+          setErrorDetails("El servidor SMTP parece estar configurado, pero no se pudo verificar completamente.");
+        } else {
+          setStatus('error');
+          setErrorDetails(error.message || "Error desconocido al verificar el servidor de correo.");
+        }
+      } else {
+        setStatus('success');
+      }
+    } catch (err: any) {
+      setStatus('error');
+      setErrorDetails(err.message || "Error al intentar conectar con el servidor de correo.");
+    } finally {
+      setIsChecking(false);
+      setLastCheck(new Date());
+    }
+  };
+
+  const getStatusIcon = () => {
+    switch (status) {
+      case 'success':
+        return <CheckCircle2 className="h-5 w-5 text-success" />;
+      case 'error':
+        return <XCircle className="h-5 w-5 text-destructive" />;
+      case 'warning':
+        return <AlertTriangle className="h-5 w-5 text-warning" />;
+      default:
+        return <Mail className="h-5 w-5 text-muted-foreground" />;
+    }
+  };
+
+  const getStatusBadge = () => {
+    switch (status) {
+      case 'success':
+        return <Badge variant="outline" className="bg-success/10 text-success border-success">Conectado</Badge>;
+      case 'error':
+        return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive">Desconectado</Badge>;
+      case 'warning':
+        return <Badge variant="outline" className="bg-warning/10 text-warning border-warning">Advertencia</Badge>;
+      default:
+        return <Badge variant="outline" className="bg-muted text-muted-foreground">Sin verificar</Badge>;
+    }
+  };
+
+  return (
+    <Card className={`shadow-md ${status === 'error' ? 'bg-destructive/10 border-destructive' : ''}`}>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {getStatusIcon()}
+            <div>
+              <CardTitle className="text-lg">Estado del Servidor de Correo Electrónico</CardTitle>
+              <CardDescription>
+                Verificación del servidor SMTP para notificaciones
+              </CardDescription>
+            </div>
+          </div>
+          {getStatusBadge()}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            {lastCheck ? (
+              <>Última verificación: {lastCheck.toLocaleTimeString()}</>
+            ) : (
+              <>No se ha verificado aún</>
+            )}
+          </div>
+          <Button
+            onClick={checkEmailServer}
+            disabled={isChecking}
+            variant="outline"
+            size="sm"
+          >
+            {isChecking ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Verificando...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Verificar Conexión
+              </>
+            )}
+          </Button>
+        </div>
+
+        {status === 'error' && errorDetails && (
+          <Alert variant="destructive">
+            <XCircle className="h-4 w-4" />
+            <AlertTitle>Error de Conexión</AlertTitle>
+            <AlertDescription>
+              {errorDetails}
+              <div className="mt-2 text-xs">
+                <strong>Verifica:</strong>
+                <ul className="list-disc list-inside mt-1">
+                  <li>SMTP_HOST está configurado correctamente</li>
+                  <li>SMTP_PORT es el correcto (usualmente 587 o 465)</li>
+                  <li>SMTP_USER y SMTP_PASSWORD son válidos</li>
+                  <li>El servidor permite conexiones desde Supabase</li>
+                </ul>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {status === 'success' && (
+          <Alert className="bg-success/10 border-success">
+            <CheckCircle2 className="h-4 w-4 text-success" />
+            <AlertTitle className="text-success">Conexión Exitosa</AlertTitle>
+            <AlertDescription className="text-success/80">
+              El servidor de correo está funcionando correctamente y puede enviar notificaciones.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {status === 'warning' && errorDetails && (
+          <Alert className="bg-warning/10 border-warning">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <AlertTitle className="text-warning">Advertencia</AlertTitle>
+            <AlertDescription className="text-warning/80">
+              {errorDetails}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="text-xs text-muted-foreground border-t pt-3">
+          <strong>Variables de entorno requeridas:</strong>
+          <ul className="list-disc list-inside mt-1 space-y-0.5">
+            <li>SMTP_HOST - Servidor SMTP (ej: smtp.gmail.com)</li>
+            <li>SMTP_PORT - Puerto SMTP (ej: 587)</li>
+            <li>SMTP_USER - Usuario del servidor SMTP</li>
+            <li>SMTP_PASSWORD - Contraseña del servidor SMTP</li>
+            <li>SMTP_FROM_EMAIL - Email remitente (ej: noreply@empresa.com)</li>
+          </ul>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+```
+
+---
+
+## PASO 5: AGREGAR EmailServerStatus AL DASHBOARD
+
+Modificar `src/pages/Dashboard.tsx` para incluir el componente de estado del servidor de correo **SOLO para administradores**.
+
+### 5.1 Import a agregar:
+
+**AL INICIO DEL ARCHIVO**, agregar:
+
+```typescript
+import { EmailServerStatus } from "@/components/dashboard/EmailServerStatus";
+```
+
+### 5.2 Ubicación exacta en el JSX:
+
+**DESPUÉS** de la grid de estadísticas (`<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">...</div>`) y **ANTES** de la Card de "Actividad Reciente", agregar:
+
+```typescript
+{isAdmin && <EmailServerStatus />}
+```
+
+El fragmento completo del return debe verse así:
+
+```typescript
+return (
+  <DashboardLayout>
+    <div className="space-y-6">
+      {/* ... sección de bienvenida ... */}
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* ... tarjetas de estadísticas ... */}
+      </div>
+
+      {/* AGREGAR ESTA LÍNEA: */}
+      {isAdmin && <EmailServerStatus />}
+
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle>Actividad Reciente</CardTitle>
+          {/* ... resto del contenido ... */}
+        </CardHeader>
+      </Card>
+    </div>
+  </DashboardLayout>
+);
+```
+
+---
+
+## PASO 6: CAMBIOS EN src/pages/Invoices.tsx
 
 **LOCALIZA Y MODIFICA** las siguientes secciones en `src/pages/Invoices.tsx`:
 
-### 4.1 Imports (AL INICIO DEL ARCHIVO)
+### 6.1 Imports (AL INICIO DEL ARCHIVO)
 
 **AGREGAR** estos imports si no existen:
 
@@ -628,7 +866,7 @@ import {
 } from "@/components/ui/dialog";
 ```
 
-### 4.2 Estado y Hooks (DESPUÉS DE LAS DECLARACIONES DE COMPONENTES)
+### 6.2 Estado y Hooks (DESPUÉS DE LAS DECLARACIONES DE COMPONENTES)
 
 **AGREGAR** estos estados:
 
@@ -643,7 +881,7 @@ const [selectedInvoiceForEvidenceRejection, setSelectedInvoiceForEvidenceRejecti
 const { notifySupplier } = useNotifications();
 ```
 
-### 4.3 Función para Badge de Estado de Evidencia
+### 6.3 Función para Badge de Estado de Evidencia
 
 **AGREGAR** esta función (después de las mutaciones):
 
@@ -662,7 +900,7 @@ const getEvidenceStatusBadge = (status: string | null) => {
 };
 ```
 
-### 4.4 Mutación de Actualización de Estado
+### 6.4 Mutación de Actualización de Estado
 
 **REEMPLAZA** la mutación `updateStatusMutation` con esta versión:
 
@@ -748,7 +986,7 @@ const updateStatusMutation = useMutation({
 });
 ```
 
-### 4.5 Mutaciones de Evidencia
+### 6.5 Mutaciones de Evidencia
 
 **AGREGAR** estas dos mutaciones:
 
@@ -852,7 +1090,7 @@ const rejectEvidenceMutation = useMutation({
 });
 ```
 
-### 4.6 Handler para Cambio de Estado
+### 6.6 Handler para Cambio de Estado
 
 **REEMPLAZA** el handler `handleStatusChange` con:
 
@@ -867,7 +1105,7 @@ const handleStatusChange = (invoiceId: string, newStatus: string) => {
 };
 ```
 
-### 4.7 Handlers de Evidencia
+### 6.7 Handlers de Evidencia
 
 **AGREGAR** estos handlers:
 
@@ -900,7 +1138,7 @@ const confirmRejection = () => {
 };
 ```
 
-### 4.8 Columnas de la Tabla - AGREGAR Columna de Evidencia
+### 6.8 Columnas de la Tabla - AGREGAR Columna de Evidencia
 
 **LOCALIZA** donde se definen las columnas de la tabla y **AGREGA** esta columna ANTES de la columna de "Acciones":
 
@@ -962,7 +1200,7 @@ const confirmRejection = () => {
 }
 ```
 
-### 4.9 Diálogos - AGREGAR al final del return, ANTES del cierre del fragmento
+### 6.9 Diálogos - AGREGAR al final del return, ANTES del cierre del fragmento
 
 **AGREGAR** estos dos diálogos:
 
