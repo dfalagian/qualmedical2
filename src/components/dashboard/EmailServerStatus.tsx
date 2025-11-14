@@ -138,8 +138,6 @@ export const EmailServerStatus = () => {
                   <li>Puerto o configuración TLS incorrectos</li>
                   <li>Firewall bloqueando las conexiones</li>
                 </ul>
-                <p className="font-semibold mt-3">Acción recomendada:</p>
-                <p>Contacte con el administrador del servidor SMTP o considere migrar a un servicio de correo compatible con edge functions como Resend.</p>
               </div>
             </AlertDescription>
           </Alert>
