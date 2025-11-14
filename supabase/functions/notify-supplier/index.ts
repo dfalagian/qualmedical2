@@ -148,25 +148,111 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
           <head>
             <meta charset="utf-8">
             <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }
-              .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-              .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+              body { 
+                font-family: Arial, sans-serif; 
+                line-height: 1.6; 
+                color: #333; 
+                margin: 0;
+                padding: 0;
+                background-color: #f5f5f5;
+              }
+              .container { 
+                max-width: 600px; 
+                margin: 0 auto; 
+                background: white;
+              }
+              .header { 
+                background-color: #ef4444; 
+                color: white; 
+                padding: 20px 30px; 
+                text-align: center; 
+              }
+              .header h1 {
+                margin: 0;
+                font-size: 24px;
+                font-weight: normal;
+              }
+              .alert-box {
+                background-color: #fef3c7;
+                border: 2px solid #f59e0b;
+                padding: 20px;
+                margin: 20px 30px;
+                border-radius: 4px;
+              }
+              .alert-box h2 {
+                color: #d97706;
+                margin: 0 0 10px 0;
+                font-size: 18px;
+              }
+              .content { 
+                padding: 0 30px 30px 30px;
+              }
+              .document-list {
+                background: #fef2f2;
+                border-left: 3px solid #ef4444;
+                padding: 15px;
+                margin: 20px 0;
+              }
+              .document-list h3 {
+                color: #dc2626;
+                margin: 0 0 10px 0;
+                font-size: 16px;
+              }
+              .document-item {
+                padding: 10px 0;
+                border-bottom: 1px solid #fecaca;
+              }
+              .document-item:last-child {
+                border-bottom: none;
+              }
+              .document-item strong {
+                color: #991b1b;
+              }
+              .footer { 
+                text-align: center; 
+                padding: 20px 30px;
+                background-color: #f9fafb;
+                color: #6b7280; 
+                font-size: 14px;
+                border-top: 1px solid #e5e7eb;
+              }
+              .footer p {
+                margin: 5px 0;
+              }
             </style>
           </head>
           <body>
             <div class="container">
               <div class="header">
-                <h1 style="margin: 0;">Documento Rechazado</h1>
+                <h1>⚠️ Documentación Pendiente</h1>
               </div>
+              
+              <div class="alert-box">
+                <h2>Estimado(a) ${data.supplier_name || 'proveedor'},</h2>
+                <p>Tu documentación ha sido revisada y requiere correcciones.</p>
+              </div>
+
               <div class="content">
-                <p>Estimado proveedor,</p>
-                <p>Su documento <strong>${getDocumentTypeName(data.document_type)}</strong> ha sido rechazado.</p>
-                <p>Por favor, revise y vuelva a subir el documento corregido.</p>
+                <p>Hemos revisado la documentación de tu registro en el Sistema CITIO y encontramos que los siguientes documentos no han sido aprobados:</p>
+                
+                <div class="document-list">
+                  <h3>📋 Documentos que requieren atención:</h3>
+                  <div class="document-item">
+                    <strong>• ${getDocumentTypeName(data.document_type)}</strong>
+                    <p style="margin: 5px 0 0 20px; color: #991b1b;">Documento rechazado. Por favor, revise y vuelva a subir.</p>
+                  </div>
+                </div>
+
+                ${data.notes ? `
+                <div style="background: #fef3c7; border-left: 3px solid #f59e0b; padding: 15px; margin: 20px 0;">
+                  <p style="margin: 0;"><strong>📝 Nota del revisor:</strong></p>
+                  <p style="margin: 10px 0 0 0;">${data.notes}</p>
+                </div>
+                ` : ''}
               </div>
+
               <div class="footer">
-                <p>Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #ef4444;">https://qualmedical.iakan.es</a></p>
+                <p>Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #ef4444; text-decoration: none;">https://qualmedical.iakan.es</a></p>
                 <p style="margin-top: 10px;">Este es un mensaje automático del Sistema QualMedical</p>
               </div>
             </div>
