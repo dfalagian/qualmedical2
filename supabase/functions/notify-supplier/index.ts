@@ -286,43 +286,21 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
             <div class="container">
               <div class="header">
                 <div class="celebration-icon">🎉</div>
-                <h1 style="margin: 0; font-size: 28px;">¡Felicidades!</h1>
-                <p style="margin: 10px 0 0 0; font-size: 18px;">Tu cuenta ha sido aprobada</p>
+                <h1 style="margin: 0; font-size: 28px;">¡Tu cuenta ha sido aprobada!</h1>
               </div>
               <div class="content">
-                <p>Estimado proveedor,</p>
-                <p>Nos complace informarte que <strong>todos tus documentos han sido aprobados</strong> y tu cuenta está ahora <strong>completamente activa</strong>.</p>
-                
+                <p><strong>¡Excelente noticia!</strong></p>
+                <p>Tu documentación ha sido validada y tu cuenta está activa.</p>
                 <div class="feature-list">
-                  <h3 style="margin-top: 0; color: #10b981;">Ahora puedes:</h3>
-                  <div class="feature-item">
-                    <span class="check-icon">✓</span>
-                    <strong>Subir facturas</strong> - Gestiona tus facturas en la sección de Facturas
-                  </div>
-                  <div class="feature-item">
-                    <span class="check-icon">✓</span>
-                    <strong>Consultar órdenes de compra</strong> - Revisa tus pedidos asignados
-                  </div>
-                  <div class="feature-item">
-                    <span class="check-icon">✓</span>
-                    <strong>Recibir pagos</strong> - Consulta el estado de tus pagos
-                  </div>
-                  <div class="feature-item">
-                    <span class="check-icon">✓</span>
-                    <strong>Comunicarte con administradores</strong> - Usa el sistema de mensajería
-                  </div>
+                  <h3>Ahora puedes:</h3>
+                  <div class="feature-item"><span class="check-icon">✓</span> Subir tus facturas</div>
+                  <div class="feature-item"><span class="check-icon">✓</span> Ver el estado de tus pagos</div>
+                  <div class="feature-item"><span class="check-icon">✓</span> Acceder a todas las funcionalidades</div>
                 </div>
-
-                <p>Gracias por completar el proceso de registro. Esperamos una excelente relación de negocio contigo.</p>
-                
-                <p style="text-align: center;">
-                  <strong>¡Bienvenido a QualMedical!</strong>
-                </p>
+                <center><a href="https://qualmedical.iakan.es" class="cta-button">Acceder al Portal</a></center>
               </div>
               <div class="footer">
-                <p>Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #10b981;">https://qualmedical.iakan.es</a></p>
-                <p style="margin-top: 10px;">Este es un mensaje automático del Sistema QualMedical</p>
-                <p>Si tienes alguna pregunta, no dudes en contactar a tu administrador</p>
+                <p>QualMedical - Sistema de Gestión de Proveedores</p>
               </div>
             </div>
           </body>
@@ -330,23 +308,267 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
       `
     }),
 
-    account_approved: () => ({
-      subject: "🎉 Cuenta Aprobada",
+    evidence_approved: (data) => ({
+      subject: `✅ Evidencia de Entrega Aprobada - Factura ${data.invoice_number}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #10b981;">¡Cuenta Aprobada!</h2>
-          <p>Tu cuenta ha sido aprobada exitosamente.</p>
-        </div>
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body { 
+                font-family: Arial, sans-serif; 
+                line-height: 1.6; 
+                color: #333; 
+                margin: 0;
+                padding: 0;
+                background-color: #f5f5f5;
+              }
+              .container { 
+                max-width: 600px; 
+                margin: 0 auto; 
+                background: white;
+              }
+              .header { 
+                background-color: #22c55e; 
+                color: white; 
+                padding: 20px 30px; 
+                text-align: center; 
+              }
+              .header h1 {
+                margin: 0;
+                font-size: 24px;
+                font-weight: normal;
+              }
+              .success-notice {
+                background-color: #d1fae5;
+                border: 1px solid #a7f3d0;
+                padding: 20px;
+                margin: 20px 30px;
+                text-align: center;
+                border-radius: 4px;
+              }
+              .success-notice h2 {
+                color: #059669;
+                margin: 0 0 10px 0;
+                font-size: 20px;
+              }
+              .content { 
+                padding: 0 30px 30px 30px;
+              }
+              .info-box {
+                background: #f9fafb;
+                border-left: 3px solid #22c55e;
+                padding: 15px;
+                margin: 15px 0;
+              }
+              .info-box p {
+                margin: 5px 0;
+              }
+              .next-steps {
+                background: #dbeafe;
+                border-left: 3px solid #3b82f6;
+                padding: 15px;
+                margin: 20px 0;
+              }
+              .next-steps strong {
+                color: #1e40af;
+              }
+              .footer { 
+                text-align: center; 
+                padding: 20px 30px;
+                background-color: #f9fafb;
+                color: #6b7280; 
+                font-size: 14px;
+                border-top: 1px solid #e5e7eb;
+              }
+              .footer p {
+                margin: 5px 0;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>✓ Evidencia de Entrega Aprobada</h1>
+              </div>
+              
+              <div class="success-notice">
+                <h2>¡La evidencia ha sido validada!</h2>
+                <p>Tu evidencia de entrega fue revisada y aprobada por el equipo administrativo</p>
+              </div>
+
+              <div class="content">
+                <p><strong>Estimado proveedor,</strong></p>
+                
+                <p>Nos complace informarte que la evidencia de entrega que proporcionaste ha sido aprobada exitosamente.</p>
+
+                <div class="info-box">
+                  <p><strong>📄 Factura:</strong> ${data.invoice_number}</p>
+                  <p><strong>💰 Monto:</strong> $${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</p>
+                  <p><strong>✅ Estado:</strong> Evidencia Aprobada</p>
+                </div>
+
+                <div class="next-steps">
+                  <p><strong>🎯 Siguiente paso:</strong></p>
+                  <p>Ahora que tu evidencia ha sido aprobada, el administrador procederá a subir el comprobante de pago correspondiente.</p>
+                </div>
+
+                <p>Puedes dar seguimiento al estado de tu pago en el portal:</p>
+                <p style="text-align: center; margin-top: 20px;">
+                  <a href="https://qualmedical.iakan.es" style="display: inline-block; padding: 12px 30px; background: #22c55e; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    Acceder al Portal
+                  </a>
+                </p>
+              </div>
+
+              <div class="footer">
+                <p>Este es un mensaje automático del Sistema QualMedical</p>
+                <p>© 2025 QualMedical. Todos los derechos reservados.</p>
+              </div>
+            </div>
+          </body>
+        </html>
       `
     }),
 
-    account_rejected: () => ({
-      subject: "Cuenta No Aprobada",
+    evidence_rejected: (data) => ({
+      subject: `❌ Evidencia de Entrega Rechazada - Factura ${data.invoice_number}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Cuenta No Aprobada</h2>
-          <p>Tu solicitud no ha sido aprobada.</p>
-        </div>
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body { 
+                font-family: Arial, sans-serif; 
+                line-height: 1.6; 
+                color: #333; 
+                margin: 0;
+                padding: 0;
+                background-color: #f5f5f5;
+              }
+              .container { 
+                max-width: 600px; 
+                margin: 0 auto; 
+                background: white;
+              }
+              .header { 
+                background-color: #ef4444; 
+                color: white; 
+                padding: 20px 30px; 
+                text-align: center; 
+              }
+              .header h1 {
+                margin: 0;
+                font-size: 24px;
+                font-weight: normal;
+              }
+              .alert-box {
+                background-color: #fee2e2;
+                border: 1px solid #fecaca;
+                padding: 20px;
+                margin: 20px 30px;
+                text-align: center;
+                border-radius: 4px;
+              }
+              .alert-box h2 {
+                color: #dc2626;
+                margin: 0 0 10px 0;
+                font-size: 20px;
+              }
+              .content { 
+                padding: 0 30px 30px 30px;
+              }
+              .info-box {
+                background: #f9fafb;
+                border-left: 3px solid #ef4444;
+                padding: 15px;
+                margin: 15px 0;
+              }
+              .info-box p {
+                margin: 5px 0;
+              }
+              .reason-box {
+                background: #fef3c7;
+                border-left: 3px solid #f59e0b;
+                padding: 15px;
+                margin: 20px 0;
+              }
+              .reason-box strong {
+                color: #d97706;
+              }
+              .action-box {
+                background: #dbeafe;
+                border-left: 3px solid #3b82f6;
+                padding: 15px;
+                margin: 20px 0;
+              }
+              .action-box strong {
+                color: #1e40af;
+              }
+              .footer { 
+                text-align: center; 
+                padding: 20px 30px;
+                background-color: #f9fafb;
+                color: #6b7280; 
+                font-size: 14px;
+                border-top: 1px solid #e5e7eb;
+              }
+              .footer p {
+                margin: 5px 0;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>⚠️ Evidencia de Entrega Rechazada</h1>
+              </div>
+              
+              <div class="alert-box">
+                <h2>La evidencia requiere correcciones</h2>
+                <p>Tu evidencia de entrega ha sido revisada y necesita ser corregida</p>
+              </div>
+
+              <div class="content">
+                <p><strong>Estimado proveedor,</strong></p>
+                
+                <p>Hemos revisado la evidencia de entrega que proporcionaste y lamentablemente no cumple con los requisitos necesarios.</p>
+
+                <div class="info-box">
+                  <p><strong>📄 Factura:</strong> ${data.invoice_number}</p>
+                  <p><strong>💰 Monto:</strong> $${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</p>
+                  <p><strong>❌ Estado:</strong> Evidencia Rechazada</p>
+                </div>
+
+                ${data.rejection_reason ? `
+                <div class="reason-box">
+                  <p><strong>📝 Razón del rechazo:</strong></p>
+                  <p style="margin: 10px 0 0 0;">${data.rejection_reason}</p>
+                </div>
+                ` : ''}
+
+                <div class="action-box">
+                  <p><strong>🔧 Acción requerida:</strong></p>
+                  <p>Por favor, revisa la razón del rechazo y vuelve a subir la evidencia de entrega con las correcciones necesarias.</p>
+                  <p style="margin-top: 10px;"><strong>Nota:</strong> Asegúrate de que las imágenes sean claras, legibles y muestren la entrega completa del pedido.</p>
+                </div>
+
+                <p style="text-align: center; margin-top: 20px;">
+                  <a href="https://qualmedical.iakan.es" style="display: inline-block; padding: 12px 30px; background: #ef4444; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    Subir Nueva Evidencia
+                  </a>
+                </p>
+              </div>
+
+              <div class="footer">
+                <p>Este es un mensaje automático del Sistema QualMedical</p>
+                <p>© 2025 QualMedical. Todos los derechos reservados.</p>
+              </div>
+            </div>
+          </body>
+        </html>
       `
     })
   };
