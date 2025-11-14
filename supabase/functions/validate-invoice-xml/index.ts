@@ -7,12 +7,41 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('=== INICIO validate-invoice-xml ===');
+  console.log('Método:', req.method);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+
   if (req.method === 'OPTIONS') {
+    console.log('Respuesta OPTIONS CORS');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { xmlPath } = await req.json();
+    console.log('Intentando parsear body del request...');
+    let body;
+    try {
+      body = await req.json();
+      console.log('Body parseado exitosamente:', body);
+    } catch (parseError) {
+      console.error('Error al parsear JSON del request:', parseError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'El cuerpo de la solicitud no es JSON válido',
+          details: parseError instanceof Error ? parseError.message : 'Error desconocido'
+        }),
+        { 
+          status: 400,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
+    }
+
+    const { xmlPath } = body;
+    console.log('xmlPath recibido:', xmlPath);
 
     if (!xmlPath) {
       throw new Error('xmlPath es requerido');
