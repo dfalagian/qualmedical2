@@ -502,20 +502,32 @@ const Invoices = () => {
         const { error: uploadError } = await supabase.storage
           .from('invoices')
           .upload(fileName, file);
-
-        if (uploadError) throw uploadError;
+        
+        if (uploadError) {
+          // Si hay error, limpiar archivos subidos
+          for (const path of uploadedPaths) {
+            await supabase.storage.from('invoices').remove([path]);
+          }
+          throw uploadError;
+        }
+        
         uploadedPaths.push(fileName);
       }
-
-      // Combinar URLs existentes con las nuevas (máximo 4)
-      const allUrls = [...existingUrls, ...uploadedPaths].slice(0, 4);
-
-      // Actualizar la factura con todas las URLs y resetear el estado a pendiente
+      
+      // Combinar URLs existentes con las nuevas
+      const allUrls = [...existingUrls, ...uploadedPaths];
+      
+      // Actualizar la factura con todas las URLs y resetear el estado de evidencia a 'pending'
       const { error: updateError } = await supabase
         .from('invoices')
         .update({ 
-          delivery_evidence_url: allUrls
-        } as any) // Use type assertion to bypass TypeScript error
+          delivery_evidence_url: allUrls,
+          evidence_status: 'pending',
+          evidence_rejection_reason: null,
+          evidence_reviewed_at: null,
+          evidence_reviewed_by: null,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', invoiceId);
 
       if (updateError) throw updateError;
@@ -1215,7 +1227,10 @@ const Invoices = () => {
                                   <Button 
                                     variant="outline" 
                                     size="icon"
-                                    className="h-8 w-8"
+                                    className={cn(
+                                      "h-8 w-8",
+                                      invoice.evidence_status === 'rejected' && "border-destructive text-destructive hover:bg-destructive/10"
+                                    )}
                                   >
                                     <Truck className="h-3.5 w-3.5" />
                                   </Button>
@@ -1223,20 +1238,28 @@ const Invoices = () => {
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p>
-                                  {invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 
-                                    ? `Actualizar evidencia de entrega (${invoice.delivery_evidence_url.length}/4)` 
-                                    : "Subir evidencia de entrega"}
+                                  {invoice.evidence_status === 'rejected'
+                                    ? "Resubir evidencia de entrega (rechazada)"
+                                    : invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 
+                                      ? `Actualizar evidencia de entrega (${invoice.delivery_evidence_url.length}/4)` 
+                                      : "Subir evidencia de entrega"}
                                 </p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
                           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                             <DialogHeader>
-                              <DialogTitle>Evidencia de Entrega</DialogTitle>
+                              <DialogTitle>
+                                {invoice.evidence_status === 'rejected' 
+                                  ? "Resubir Evidencia de Entrega (Rechazada)" 
+                                  : "Evidencia de Entrega"}
+                              </DialogTitle>
                               <DialogDescription>
-                                {invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0
-                                  ? `Puedes subir hasta ${4 - invoice.delivery_evidence_url.length} imagen(es) más (máximo 4 en total)`
-                                  : "Sube hasta 4 imágenes como evidencia de entrega para esta factura"
+                                {invoice.evidence_status === 'rejected'
+                                  ? "Tu evidencia fue rechazada. Sube nuevas imágenes para que sean revisadas nuevamente."
+                                  : invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0
+                                    ? `Puedes subir hasta ${4 - invoice.delivery_evidence_url.length} imagen(es) más (máximo 4 en total)`
+                                    : "Sube hasta 4 imágenes como evidencia de entrega para esta factura"
                                 }
                               </DialogDescription>
                             </DialogHeader>
