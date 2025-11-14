@@ -130,7 +130,7 @@ const IneAdmin = () => {
         .eq('id', supplierId)
         .single();
 
-      if (supplierBefore && supplierAfter && !supplierBefore.approved && supplierAfter.approved) {
+      if (supplierBefore && supplierAfter && !(supplierBefore as any).approved && (supplierAfter as any).approved) {
         const { error: approvalNotifyError } = await supabase.functions.invoke('notify-supplier', {
           body: {
             supplier_id: supplierId,

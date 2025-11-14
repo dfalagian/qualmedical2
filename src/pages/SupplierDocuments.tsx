@@ -203,7 +203,7 @@ const SupplierDocuments = () => {
         .single();
 
       // Si el proveedor cambió de no aprobado a aprobado, enviar notificación de aprobación
-      if (supplierBefore && supplierAfter && !supplierBefore.approved && supplierAfter.approved) {
+      if (supplierBefore && supplierAfter && !(supplierBefore as any).approved && (supplierAfter as any).approved) {
         const { error: approvalNotifyError } = await supabase.functions.invoke('notify-supplier', {
           body: {
             supplier_id: supplierId,
