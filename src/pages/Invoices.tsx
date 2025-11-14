@@ -42,6 +42,7 @@ const Invoices = () => {
   const [invoiceForComplemento, setInvoiceForComplemento] = useState<string | null>(null);
   const [complementoFile, setComplementoFile] = useState<File | null>(null);
   const [supplierFilter, setSupplierFilter] = useState("all");
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState("");
   const [uploadingEvidence, setUploadingEvidence] = useState<string | null>(null);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [currentEvidenceUrls, setCurrentEvidenceUrls] = useState<string[]>([]);
@@ -680,21 +681,35 @@ const Invoices = () => {
           </CardHeader>
           <CardContent>
             {isAdmin && suppliers && suppliers.length > 0 && (
-              <div className="mb-4">
+              <div className="mb-4 space-y-3">
                 <Label htmlFor="supplier-filter" className="mb-2 block">
                   Filtrar por proveedor
                 </Label>
+                <Input
+                  placeholder="Buscar proveedor..."
+                  value={supplierSearchTerm}
+                  onChange={(e) => setSupplierSearchTerm(e.target.value)}
+                  className="max-w-md"
+                />
                 <Select value={supplierFilter} onValueChange={setSupplierFilter}>
                   <SelectTrigger className="max-w-md">
                     <SelectValue placeholder="Todos los proveedores" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los proveedores</SelectItem>
-                    {suppliers.map((supplier: any) => (
-                      <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.company_name || supplier.full_name}
-                      </SelectItem>
-                    ))}
+                    {suppliers
+                      .filter((supplier: any) => {
+                        if (!supplierSearchTerm) return true;
+                        const searchLower = supplierSearchTerm.toLowerCase();
+                        const name = (supplier.company_name || supplier.full_name || "").toLowerCase();
+                        const rfc = (supplier.rfc || "").toLowerCase();
+                        return name.includes(searchLower) || rfc.includes(searchLower);
+                      })
+                      .map((supplier: any) => (
+                        <SelectItem key={supplier.id} value={supplier.id}>
+                          {supplier.company_name || supplier.full_name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
