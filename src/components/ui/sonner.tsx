@@ -14,14 +14,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-2 group-[.toaster]:border-border group-[.toaster]:shadow-2xl group-[.toaster]:font-medium",
+            "group toast group-[.toaster]:bg-card group-[.toaster]:text-foreground group-[.toaster]:border-2 group-[.toaster]:border-border group-[.toaster]:shadow-2xl group-[.toaster]:font-medium group-[.toaster]:backdrop-blur-md",
           description: "group-[.toast]:text-muted-foreground group-[.toast]:font-medium",
           actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground group-[.toast]:font-semibold",
           cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
-          success: "group-[.toaster]:bg-success/10 group-[.toaster]:border-success group-[.toaster]:text-success",
-          error: "group-[.toaster]:bg-destructive/10 group-[.toaster]:border-destructive group-[.toaster]:text-destructive",
-          warning: "group-[.toaster]:bg-warning/10 group-[.toaster]:border-warning group-[.toaster]:text-warning",
-          info: "group-[.toaster]:bg-primary/10 group-[.toaster]:border-primary group-[.toaster]:text-primary",
+          success: "group-[.toaster]:!bg-emerald-50 dark:group-[.toaster]:!bg-emerald-950 group-[.toaster]:border-emerald-500 group-[.toaster]:text-emerald-900 dark:group-[.toaster]:text-emerald-100",
+          error: "group-[.toaster]:!bg-red-50 dark:group-[.toaster]:!bg-red-950 group-[.toaster]:border-red-500 group-[.toaster]:text-red-900 dark:group-[.toaster]:text-red-100",
+          warning: "group-[.toaster]:!bg-amber-50 dark:group-[.toaster]:!bg-amber-950 group-[.toaster]:border-amber-500 group-[.toaster]:text-amber-900 dark:group-[.toaster]:text-amber-100",
+          info: "group-[.toaster]:!bg-blue-50 dark:group-[.toaster]:!bg-blue-950 group-[.toaster]:border-blue-500 group-[.toaster]:text-blue-900 dark:group-[.toaster]:text-blue-100",
         },
       }}
       {...props}
