@@ -324,13 +324,26 @@ const Invoices = () => {
 
       // Solo enviar notificación si hay un tipo válido (no para "pendiente")
       if (notificationType) {
-        await supabase.functions.invoke("notify-supplier", {
+        console.log('Enviando notificación:', { 
+          supplier_id: invoice.supplier_id, 
+          type: notificationType, 
+          data: notificationData 
+        });
+        
+        const { data: notifResult, error: notifError } = await supabase.functions.invoke("notify-supplier", {
           body: {
             supplier_id: invoice.supplier_id,
             type: notificationType,
             data: notificationData
           }
         });
+        
+        if (notifError) {
+          console.error('Error al enviar notificación:', notifError);
+          throw new Error(`Error al enviar notificación: ${notifError.message}`);
+        }
+        
+        console.log('Notificación enviada exitosamente:', notifResult);
       }
     },
     onSuccess: () => {
