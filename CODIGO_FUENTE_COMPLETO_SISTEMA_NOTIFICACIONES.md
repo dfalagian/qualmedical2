@@ -1511,9 +1511,180 @@ export default Dashboard;
 
 ⚠️ **ESTE ARCHIVO YA EXISTE - NO LO REEMPLACES COMPLETO**
 
-Solo necesitas verificar que tenga estos cambios. El archivo ya está funcional, solo asegúrate de que incluya:
+### PARTE 1: Mutation para Cambio de Estado de Facturas (líneas 304-436)
 
-### Verificaciones Necesarias:
+```typescript
+const updateStatusMutation = useMutation({
+  mutationFn: async ({ 
+    invoice,
+    status,
+    rejectionReason
+  }: { 
+    invoice: any;
+    status: "pendiente" | "procesando" | "pagado" | "rechazado";
+    rejectionReason?: string;
+  }) => {
+    const updates: any = { status };
+    
+    if (status === "rechazado" && rejectionReason) {
+      updates.rejection_reason = rejectionReason;
+    } else if (status !== "rechazado") {
+      // Limpiar rejection_reason si se cambia a otro estado
+      updates.rejection_reason = null;
+    }
+    
+    if (status === "pagado") {
+      updates.payment_date = new Date().toISOString().split('T')[0];
+      
+      // Verificar si ya existe un registro de pago para esta factura
+      const { data: existingPago } = await supabase
+        .from("pagos")
+        .select("id")
+        .eq("invoice_id", invoice.id)
+        .maybeSingle();
+      
+      // Si no existe, crear el registro de pago automáticamente
+      if (!existingPago) {
+        // Obtener los datos bancarios aprobados del proveedor
+        const { data: datosBancarios, error: datosBancariosError } = await supabase
+          .from("documents")
+          .select("id, nombre_banco, numero_cuenta_clabe")
+          .eq("supplier_id", invoice.supplier_id)
+          .eq("document_type", "datos_bancarios")
+          .eq("status", "aprobado")
+          .maybeSingle();
+        
+        if (datosBancariosError) {
+          console.error("Error al obtener datos bancarios:", datosBancariosError);
+        }
+        
+        if (!datosBancarios) {
+          throw new Error("El proveedor no tiene datos bancarios aprobados. No se puede crear el registro de pago.");
+        }
+        
+        // Crear el registro de pago
+        const { error: pagoError } = await supabase
+          .from("pagos")
+          .insert({
+            supplier_id: invoice.supplier_id,
+            datos_bancarios_id: datosBancarios.id,
+            invoice_id: invoice.id,
+            amount: invoice.amount,
+            fecha_pago: new Date().toISOString().split('T')[0],
+            status: "pendiente",
+            nombre_banco: datosBancarios.nombre_banco,
+            created_by: user?.id
+          });
+        
+        if (pagoError) {
+          console.error("Error al crear registro de pago:", pagoError);
+          throw new Error("Error al crear el registro de pago automáticamente");
+        }
+      }
+    } else {
+      // Limpiar payment_date si se cambia de "pagado" a otro estado
+      updates.payment_date = null;
+    }
+
+    const { error } = await supabase
+      .from("invoices")
+      .update(updates)
+      .eq("id", invoice.id);
+
+    if (error) throw error;
+
+    // Enviar notificación por email según el estado
+    let notificationType: string | null = null;
+    let notificationData: any = {
+      invoice_number: invoice.invoice_number,
+      invoice_amount: invoice.amount,
+      invoice_date: invoice.fecha_emision
+    };
+
+    switch (status) {
+      case "procesando":
+        notificationType = 'invoice_status_processing';
+        break;
+      case "pagado":
+        notificationType = 'invoice_status_paid';
+        notificationData.payment_date = new Date().toISOString().split('T')[0];
+        break;
+      case "rechazado":
+        notificationType = 'invoice_status_rejected';
+        notificationData.rejection_reason = rejectionReason || "No se especificó una razón";
+        break;
+    }
+
+    // Solo enviar notificación si hay un tipo válido (no para "pendiente")
+    if (notificationType) {
+      console.log('Enviando notificación:', { 
+        supplier_id: invoice.supplier_id, 
+        type: notificationType, 
+        data: notificationData 
+      });
+      
+      const { data: notifResult, error: notifError } = await supabase.functions.invoke("notify-supplier", {
+        body: {
+          supplier_id: invoice.supplier_id,
+          type: notificationType,
+          data: notificationData
+        }
+      });
+      
+      if (notifError) {
+        console.error('Error al enviar notificación:', notifError);
+        throw new Error(`Error al enviar notificación: ${notifError.message}`);
+      }
+      
+      console.log('Notificación enviada exitosamente:', notifResult);
+    }
+  },
+  onSuccess: () => {
+    toast.success("Estado actualizado y notificación enviada");
+    queryClient.invalidateQueries({ queryKey: ["invoices"] });
+  },
+  onError: (error: any) => {
+    toast.error(error.message || "Error al actualizar");
+  },
+});
+```
+
+### PARTE 2: Select en UI para Cambiar Estado (líneas ~1484-1510)
+
+```typescript
+{isAdmin && (
+  <Select
+    value={invoice.status}
+    onValueChange={(value: any) => {
+      // Si es rechazado, solicitar razón
+      if (value === "rechazado") {
+        const reason = prompt("Razón del rechazo de la factura:");
+        if (reason) {
+          updateStatusMutation.mutate({ 
+            invoice, 
+            status: value,
+            rejectionReason: reason
+          });
+        }
+      } else {
+        updateStatusMutation.mutate({ invoice, status: value });
+      }
+    }}
+  >
+    <SelectTrigger className="w-32">
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="pendiente">Pendiente</SelectItem>
+      <SelectItem value="procesando">Procesando</SelectItem>
+      <SelectItem value="pagado">Pagado</SelectItem>
+      <SelectItem value="rechazado">Rechazado</SelectItem>
+    </SelectContent>
+  </Select>
+)}
+```
+
+### PARTE 3: Otras Verificaciones Necesarias
 
 1. ✅ **Estado `rejectionReasonDialog`** (líneas 54-62):
 ```typescript
