@@ -28,31 +28,110 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
           <head>
             <meta charset="utf-8">
             <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }
-              .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-              .success-icon { font-size: 48px; margin-bottom: 10px; }
-              .button { display: inline-block; padding: 12px 30px; background: #10b981; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
-              .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+              body { 
+                font-family: Arial, sans-serif; 
+                line-height: 1.6; 
+                color: #333; 
+                margin: 0;
+                padding: 0;
+                background-color: #f5f5f5;
+              }
+              .container { 
+                max-width: 600px; 
+                margin: 0 auto; 
+                background: white;
+              }
+              .header { 
+                background-color: #22c55e; 
+                color: white; 
+                padding: 20px 30px; 
+                text-align: center; 
+              }
+              .header h1 {
+                margin: 0;
+                font-size: 24px;
+                font-weight: normal;
+              }
+              .success-notice {
+                background-color: #d1fae5;
+                border: 1px solid #a7f3d0;
+                padding: 20px;
+                margin: 20px 30px;
+                text-align: center;
+                border-radius: 4px;
+              }
+              .success-notice h2 {
+                color: #059669;
+                margin: 0 0 10px 0;
+                font-size: 20px;
+              }
+              .content { 
+                padding: 0 30px 30px 30px;
+              }
+              .info-box {
+                background: #f9fafb;
+                border-left: 3px solid #22c55e;
+                padding: 15px;
+                margin: 15px 0;
+              }
+              .info-box p {
+                margin: 5px 0;
+              }
+              .warning-box {
+                background: #fef3c7;
+                border-left: 3px solid #f59e0b;
+                padding: 15px;
+                margin: 20px 0;
+              }
+              .warning-box strong {
+                color: #d97706;
+              }
+              .footer { 
+                text-align: center; 
+                padding: 20px 30px;
+                background-color: #f9fafb;
+                color: #6b7280; 
+                font-size: 14px;
+                border-top: 1px solid #e5e7eb;
+              }
+              .footer p {
+                margin: 5px 0;
+              }
             </style>
           </head>
           <body>
             <div class="container">
               <div class="header">
-                <div class="success-icon">✓</div>
-                <h1 style="margin: 0;">Documento Aprobado</h1>
+                <h1>✓ Documento Aprobado</h1>
               </div>
+              
+              <div class="success-notice">
+                <h2>¡Excelente noticia!</h2>
+                <p>Tu documento ha sido validado exitosamente</p>
+              </div>
+
               <div class="content">
-                <p>Estimado proveedor,</p>
-                <p>Nos complace informarle que su documento ha sido <strong>aprobado exitosamente</strong>:</p>
-                <div style="background: white; padding: 15px; border-left: 4px solid #10b981; margin: 20px 0;">
-                  <strong>${getDocumentTypeName(data.document_type)}</strong>
+                <p><strong>Estimado ${data.supplier_name || 'proveedor'},</strong></p>
+                
+                <p>Te informamos que el siguiente documento ha sido <strong>aprobado</strong>:</p>
+                
+                <div class="info-box">
+                  <p><strong>📄 Documento:</strong> ${getDocumentTypeName(data.document_type)}</p>
                 </div>
-                <p>Su documento ha pasado todas las validaciones requeridas y ahora forma parte de su expediente activo.</p>
+
+                ${data.extracted_data?.rfc ? `
+                <div class="info-box">
+                  <p><strong>RFC:</strong> ${data.extracted_data.rfc}</p>
+                </div>
+                ` : ''}
+
+                <div class="warning-box">
+                  <p><strong>⚠️ Nota importante:</strong> Si aún tienes otros documentos pendientes de validación, te requerimos que tu cuenta será activada completamente una vez que todos los documentos sean aprobados.</p>
+                </div>
               </div>
+
               <div class="footer">
-                <p>Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #10b981;">https://qualmedical.iakan.es</a></p>
+                <p>Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #22c55e; text-decoration: none;">https://qualmedical.iakan.es</a></p>
                 <p style="margin-top: 10px;">Este es un mensaje automático del Sistema QualMedical</p>
               </div>
             </div>
