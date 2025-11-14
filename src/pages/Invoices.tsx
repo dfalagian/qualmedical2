@@ -1098,13 +1098,15 @@ const Invoices = () => {
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Badge variant="outline" className="cursor-help border-destructive text-destructive">
-                                    Motivo
+                                  <Badge variant="outline" className="cursor-help border-destructive text-destructive hover:bg-destructive/10">
+                                    Ver motivo
                                   </Badge>
                                 </TooltipTrigger>
-                                <TooltipContent className="max-w-xs">
-                                  <p className="font-semibold mb-1">Razón del rechazo:</p>
-                                  <p>{invoice.evidence_rejection_reason}</p>
+                                <TooltipContent side="bottom" className="max-w-sm p-3">
+                                  <div className="space-y-1">
+                                    <p className="font-semibold text-sm">Razón del rechazo:</p>
+                                    <p className="text-sm text-muted-foreground">{invoice.evidence_rejection_reason}</p>
+                                  </div>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
