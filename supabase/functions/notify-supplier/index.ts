@@ -52,7 +52,8 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
                 <p>Su documento ha pasado todas las validaciones requeridas y ahora forma parte de su expediente activo.</p>
               </div>
               <div class="footer">
-                <p>Este es un mensaje automático del Sistema QualMedical</p>
+                <p>Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #10b981;">https://qualmedical.iakan.es</a></p>
+                <p style="margin-top: 10px;">Este es un mensaje automático del Sistema QualMedical</p>
               </div>
             </div>
           </body>
@@ -86,7 +87,8 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
                 <p>Por favor, revise y vuelva a subir el documento corregido.</p>
               </div>
               <div class="footer">
-                <p>Este es un mensaje automático del Sistema QualMedical</p>
+                <p>Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #ef4444;">https://qualmedical.iakan.es</a></p>
+                <p style="margin-top: 10px;">Este es un mensaje automático del Sistema QualMedical</p>
               </div>
             </div>
           </body>
@@ -153,7 +155,8 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
                 </p>
               </div>
               <div class="footer">
-                <p>Este es un mensaje automático del Sistema QualMedical</p>
+                <p>Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #10b981;">https://qualmedical.iakan.es</a></p>
+                <p style="margin-top: 10px;">Este es un mensaje automático del Sistema QualMedical</p>
                 <p>Si tienes alguna pregunta, no dudes en contactar a tu administrador</p>
               </div>
             </div>

@@ -26,7 +26,10 @@ const getEmailTemplate = (type: string, data: any) => {
             <p><strong>Fecha de registro:</strong> ${new Date().toLocaleDateString()}</p>
           </div>
           <p>Por favor, revisa y aprueba la cuenta del proveedor.</p>
-          <p style="margin-top: 30px;">Sistema QualMedical</p>
+          <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #3b82f6;">https://qualmedical.iakan.es</a>
+          </p>
+          <p style="margin-top: 10px;">Sistema QualMedical</p>
         </div>
       `
     },
@@ -42,7 +45,10 @@ const getEmailTemplate = (type: string, data: any) => {
             <p><strong>Fecha de subida:</strong> ${new Date().toLocaleDateString()}</p>
           </div>
           <p>Por favor, revisa y aprueba o rechaza el documento.</p>
-          <p style="margin-top: 30px;">Sistema QualMedical</p>
+          <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #f59e0b;">https://qualmedical.iakan.es</a>
+          </p>
+          <p style="margin-top: 10px;">Sistema QualMedical</p>
         </div>
       `
     },
@@ -59,7 +65,10 @@ const getEmailTemplate = (type: string, data: any) => {
             <p><strong>Fecha de subida:</strong> ${new Date().toLocaleDateString()}</p>
           </div>
           <p>Por favor, valida la factura en el sistema.</p>
-          <p style="margin-top: 30px;">Sistema QualMedical</p>
+          <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #f59e0b;">https://qualmedical.iakan.es</a>
+          </p>
+          <p style="margin-top: 10px;">Sistema QualMedical</p>
         </div>
       `
     },
@@ -75,7 +84,10 @@ const getEmailTemplate = (type: string, data: any) => {
             ${data?.extracted_data ? `<p><strong>Datos extraídos:</strong> ${JSON.stringify(data.extracted_data, null, 2)}</p>` : ''}
           </div>
           <p>Los datos están listos para su revisión.</p>
-          <p style="margin-top: 30px;">Sistema QualMedical</p>
+          <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #22c55e;">https://qualmedical.iakan.es</a>
+          </p>
+          <p style="margin-top: 10px;">Sistema QualMedical</p>
         </div>
       `
     },
@@ -91,7 +103,10 @@ const getEmailTemplate = (type: string, data: any) => {
             ${data?.error ? `<p><strong>Error:</strong> ${data.error}</p>` : ''}
           </div>
           <p>Por favor, revisa el documento manualmente.</p>
-          <p style="margin-top: 30px;">Sistema QualMedical</p>
+          <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #ef4444;">https://qualmedical.iakan.es</a>
+          </p>
+          <p style="margin-top: 10px;">Sistema QualMedical</p>
         </div>
       `
     },
@@ -107,7 +122,10 @@ const getEmailTemplate = (type: string, data: any) => {
             <p>${data?.message || ''}</p>
           </div>
           <p>Por favor, inicia sesión en el sistema para responder.</p>
-          <p style="margin-top: 30px;">Sistema QualMedical</p>
+          <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #3b82f6;">https://qualmedical.iakan.es</a>
+          </p>
+          <p style="margin-top: 10px;">Sistema QualMedical</p>
         </div>
       `
     },
@@ -124,7 +142,10 @@ const getEmailTemplate = (type: string, data: any) => {
             <p><strong>Fecha de subida:</strong> ${new Date().toLocaleDateString()}</p>
           </div>
           <p>Por favor, revisa el comprobante en el sistema.</p>
-          <p style="margin-top: 30px;">Sistema QualMedical</p>
+          <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #8b5cf6;">https://qualmedical.iakan.es</a>
+          </p>
+          <p style="margin-top: 10px;">Sistema QualMedical</p>
         </div>
       `
     }
