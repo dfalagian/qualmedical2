@@ -580,9 +580,15 @@ const Invoices = () => {
         
         // Eliminar archivos antiguos del storage
         if (oldUrls.length > 0) {
+          // Extraer solo las rutas del storage, ya que oldUrls puede contener URLs completas o solo rutas
           const oldPaths = oldUrls.map(url => {
-            const urlPath = new URL(url).pathname;
-            return urlPath.split('/').slice(-3).join('/');
+            // Si la URL comienza con http, es una URL completa
+            if (url.startsWith('http')) {
+              const urlPath = new URL(url).pathname;
+              return urlPath.split('/').slice(-3).join('/');
+            }
+            // Si no, ya es una ruta del storage
+            return url;
           });
           
           await supabase.storage.from('invoices').remove(oldPaths);
