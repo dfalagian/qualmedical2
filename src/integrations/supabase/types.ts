@@ -259,6 +259,7 @@ export type Database = {
           receptor_nombre: string | null
           receptor_rfc: string | null
           receptor_uso_cfdi: string | null
+          rejection_reason: string | null
           requiere_complemento: boolean | null
           status: Database["public"]["Enums"]["payment_status"] | null
           subtotal: number | null
@@ -295,6 +296,7 @@ export type Database = {
           receptor_nombre?: string | null
           receptor_rfc?: string | null
           receptor_uso_cfdi?: string | null
+          rejection_reason?: string | null
           requiere_complemento?: boolean | null
           status?: Database["public"]["Enums"]["payment_status"] | null
           subtotal?: number | null
@@ -331,6 +333,7 @@ export type Database = {
           receptor_nombre?: string | null
           receptor_rfc?: string | null
           receptor_uso_cfdi?: string | null
+          rejection_reason?: string | null
           requiere_complemento?: boolean | null
           status?: Database["public"]["Enums"]["payment_status"] | null
           subtotal?: number | null
