@@ -50,9 +50,14 @@ const Invoices = () => {
   const [uploadingEvidence, setUploadingEvidence] = useState<string | null>(null);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [currentEvidenceUrls, setCurrentEvidenceUrls] = useState<string[]>([]);
-  const [rejectionReasonDialog, setRejectionReasonDialog] = useState<{ open: boolean; reason: string }>({ 
+  const [rejectionReasonDialog, setRejectionReasonDialog] = useState<{ 
+    open: boolean; 
+    reason: string;
+    type: 'invoice' | 'evidence';
+  }>({ 
     open: false, 
-    reason: '' 
+    reason: '',
+    type: 'evidence'
   });
 
   // Query para obtener el perfil del proveedor y verificar si está aprobado
@@ -306,6 +311,13 @@ const Invoices = () => {
       rejectionReason?: string;
     }) => {
       const updates: any = { status };
+      
+      if (status === "rechazado" && rejectionReason) {
+        updates.rejection_reason = rejectionReason;
+      } else if (status !== "rechazado") {
+        // Limpiar rejection_reason si se cambia a otro estado
+        updates.rejection_reason = null;
+      }
       
       if (status === "pagado") {
         updates.payment_date = new Date().toISOString().split('T')[0];
@@ -884,6 +896,23 @@ const Invoices = () => {
                           {invoice.invoice_number}
                         </h4>
                         {getStatusBadge(invoice.status)}
+                        {invoice.status === 'rechazado' && invoice.rejection_reason && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 border-destructive text-destructive hover:bg-destructive/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRejectionReasonDialog({ 
+                                open: true, 
+                                reason: invoice.rejection_reason,
+                                type: 'invoice'
+                              });
+                            }}
+                          >
+                            Ver motivo
+                          </Button>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
@@ -1109,7 +1138,8 @@ const Invoices = () => {
                                     e.stopPropagation();
                                     setRejectionReasonDialog({ 
                                       open: true, 
-                                      reason: invoice.evidence_rejection_reason 
+                                      reason: invoice.evidence_rejection_reason,
+                                      type: 'evidence'
                                     });
                                   }}
                                 >
@@ -1421,19 +1451,21 @@ const Invoices = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={rejectionReasonDialog.open} onOpenChange={(open) => setRejectionReasonDialog({ open, reason: '' })}>
+      <AlertDialog open={rejectionReasonDialog.open} onOpenChange={(open) => setRejectionReasonDialog({ open, reason: '', type: 'evidence' })}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <X className="h-5 w-5" />
-              Motivo del Rechazo de Evidencia
+              {rejectionReasonDialog.type === 'invoice' 
+                ? 'Motivo del Rechazo de Factura'
+                : 'Motivo del Rechazo de Evidencia'}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base pt-4">
               {rejectionReasonDialog.reason}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setRejectionReasonDialog({ open: false, reason: '' })}>
+            <AlertDialogAction onClick={() => setRejectionReasonDialog({ open: false, reason: '', type: 'evidence' })}>
               Entendido
             </AlertDialogAction>
           </AlertDialogFooter>
