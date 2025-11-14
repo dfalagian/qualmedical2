@@ -463,7 +463,7 @@ const Invoices = () => {
         </div>
 
         {!isAdmin && (
-          supplierProfile?.approved ? (
+          (supplierProfile as any)?.approved ? (
             <Card className="shadow-md border-accent/20">
               <CardHeader className="bg-gradient-accent/10">
                 <CardTitle className="flex items-center gap-2">
