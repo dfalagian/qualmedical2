@@ -242,9 +242,14 @@ export type Database = {
           emisor_nombre: string | null
           emisor_regimen_fiscal: string | null
           emisor_rfc: string | null
+          evidence_rejection_reason: string | null
+          evidence_reviewed_at: string | null
+          evidence_reviewed_by: string | null
+          evidence_status: string | null
           fecha_emision: string | null
           forma_pago: string | null
           id: string
+          impuestos_detalle: Json | null
           invoice_number: string
           lugar_expedicion: string | null
           metodo_pago: string | null
@@ -273,9 +278,14 @@ export type Database = {
           emisor_nombre?: string | null
           emisor_regimen_fiscal?: string | null
           emisor_rfc?: string | null
+          evidence_rejection_reason?: string | null
+          evidence_reviewed_at?: string | null
+          evidence_reviewed_by?: string | null
+          evidence_status?: string | null
           fecha_emision?: string | null
           forma_pago?: string | null
           id?: string
+          impuestos_detalle?: Json | null
           invoice_number: string
           lugar_expedicion?: string | null
           metodo_pago?: string | null
@@ -304,9 +314,14 @@ export type Database = {
           emisor_nombre?: string | null
           emisor_regimen_fiscal?: string | null
           emisor_rfc?: string | null
+          evidence_rejection_reason?: string | null
+          evidence_reviewed_at?: string | null
+          evidence_reviewed_by?: string | null
+          evidence_status?: string | null
           fecha_emision?: string | null
           forma_pago?: string | null
           id?: string
+          impuestos_detalle?: Json | null
           invoice_number?: string
           lugar_expedicion?: string | null
           metodo_pago?: string | null
@@ -486,6 +501,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          approved: boolean
           company_name: string | null
           created_at: string | null
           email: string
@@ -496,6 +512,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          approved?: boolean
           company_name?: string | null
           created_at?: string | null
           email: string
@@ -506,6 +523,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          approved?: boolean
           company_name?: string | null
           created_at?: string | null
           email?: string
