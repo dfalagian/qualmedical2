@@ -1094,22 +1094,39 @@ const Invoices = () => {
                             {getEvidenceStatusBadge(invoice.evidence_status || 'pending')}
                           </div>
                           
-                          {invoice.evidence_status === 'rejected' && invoice.evidence_rejection_reason && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Badge variant="outline" className="cursor-help border-destructive text-destructive hover:bg-destructive/10">
-                                    Ver motivo
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom" className="max-w-sm p-3">
-                                  <div className="space-y-1">
-                                    <p className="font-semibold text-sm">Razón del rechazo:</p>
-                                    <p className="text-sm text-muted-foreground">{invoice.evidence_rejection_reason}</p>
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                          {invoice.evidence_status === 'rejected' && (
+                            <>
+                              {console.log('Evidence rejection reason:', invoice.evidence_rejection_reason)}
+                              {invoice.evidence_rejection_reason ? (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 border-destructive text-destructive hover:bg-destructive/10"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          alert(invoice.evidence_rejection_reason);
+                                        }}
+                                      >
+                                        Ver motivo
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" className="max-w-sm p-3 bg-card">
+                                      <div className="space-y-1">
+                                        <p className="font-semibold text-sm">Razón del rechazo:</p>
+                                        <p className="text-sm">{invoice.evidence_rejection_reason}</p>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <Badge variant="outline" className="border-destructive text-destructive">
+                                  Sin motivo especificado
+                                </Badge>
+                              )}
+                            </>
                           )}
                           
                           {isAdmin && invoice.evidence_status === 'pending' && (
