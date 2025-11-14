@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck } from "lucide-react";
+import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, Check, X } from "lucide-react";
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -383,10 +383,13 @@ const Invoices = () => {
       // Combinar URLs existentes con las nuevas (máximo 4)
       const allUrls = [...existingUrls, ...uploadedPaths].slice(0, 4);
 
-      // Actualizar la factura con todas las URLs
+      // Actualizar la factura con todas las URLs y resetear el estado a pendiente
       const { error: updateError } = await supabase
         .from('invoices')
-        .update({ delivery_evidence_url: allUrls })
+        .update({ 
+          delivery_evidence_url: allUrls,
+          evidence_status: 'pending' // Reset status to pending when new evidence is uploaded
+        })
         .eq('id', invoiceId);
 
       if (updateError) throw updateError;
@@ -402,6 +405,51 @@ const Invoices = () => {
     onError: (error: any) => {
       console.error("Error uploading evidence:", error);
       toast.error(error.message || "Error al subir la evidencia de entrega");
+    },
+  });
+
+  const approveEvidenceMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const { error } = await supabase
+        .from("invoices")
+        .update({
+          evidence_status: 'approved',
+          evidence_reviewed_by: user!.id,
+          evidence_reviewed_at: new Date().toISOString()
+        })
+        .eq("id", invoiceId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Evidencia aprobada");
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al aprobar evidencia");
+    },
+  });
+
+  const rejectEvidenceMutation = useMutation({
+    mutationFn: async ({ invoiceId, reason }: { invoiceId: string; reason: string }) => {
+      const { error } = await supabase
+        .from("invoices")
+        .update({
+          evidence_status: 'rejected',
+          evidence_reviewed_by: user!.id,
+          evidence_reviewed_at: new Date().toISOString(),
+          evidence_rejection_reason: reason
+        })
+        .eq("id", invoiceId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Evidencia rechazada");
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al rechazar evidencia");
     },
   });
 
@@ -449,6 +497,17 @@ const Invoices = () => {
         return <Badge variant="destructive">Rechazado</Badge>;
       default:
         return <Badge variant="secondary">Pendiente</Badge>;
+    }
+  };
+
+  const getEvidenceStatusBadge = (status: string) => {
+    switch (status) {
+      case "approved":
+        return <Badge className="bg-success">Aprobada</Badge>;
+      case "rejected":
+        return <Badge variant="destructive">Rechazada</Badge>;
+      default:
+        return <Badge className="bg-warning">Pendiente</Badge>;
     }
   };
 
@@ -779,7 +838,7 @@ const Invoices = () => {
                         </TooltipProvider>
                       )}
                       
-                      {isAdmin && (
+                      {isAdmin && invoice.evidence_status === 'approved' && (
                         <InvoicePaymentProofUpload
                           invoiceId={invoice.id}
                           supplierId={invoice.supplier_id}
@@ -789,14 +848,69 @@ const Invoices = () => {
                       )}
 
                       {invoice.delivery_evidence_url && Array.isArray(invoice.delivery_evidence_url) && invoice.delivery_evidence_url.length > 0 && (
-                        <ImageViewer
-                          imageUrls={invoice.delivery_evidence_url}
-                          fileName={`Evidencia-${invoice.invoice_number}`}
-                          triggerText="Evidencia"
-                          triggerSize="icon"
-                          triggerVariant="outline"
-                          bucket="invoices"
-                        />
+                        <>
+                          <ImageViewer
+                            imageUrls={invoice.delivery_evidence_url}
+                            fileName={`Evidencia-${invoice.invoice_number}`}
+                            triggerText="Evidencia"
+                            triggerSize="icon"
+                            triggerVariant="outline"
+                            bucket="invoices"
+                          />
+                          
+                          {isAdmin && (
+                            <>
+                              <div className="flex items-center gap-1">
+                                {getEvidenceStatusBadge(invoice.evidence_status || 'pending')}
+                              </div>
+                              
+                              {invoice.evidence_status === 'pending' && (
+                                <>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          size="icon"
+                                          className="h-8 w-8 text-success hover:bg-success/10"
+                                          onClick={() => approveEvidenceMutation.mutate(invoice.id)}
+                                        >
+                                          <Check className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Aprobar evidencia</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          size="icon"
+                                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                          onClick={() => {
+                                            const reason = prompt("Razón del rechazo:");
+                                            if (reason) {
+                                              rejectEvidenceMutation.mutate({ invoiceId: invoice.id, reason });
+                                            }
+                                          }}
+                                        >
+                                          <X className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Rechazar evidencia</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </>
                       )}
 
                       {!isAdmin && (
