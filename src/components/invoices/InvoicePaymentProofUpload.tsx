@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Loader2, FileCheck } from "lucide-react";
+import { Loader2, FileCheck, RefreshCw } from "lucide-react";
 import { getSignedUrl } from "@/lib/storage";
 import { convertPDFToImages } from "@/lib/pdfToImages";
+import { useAuth } from "@/hooks/useAuth";
 
 interface InvoicePaymentProofUploadProps {
   invoiceId: string;
@@ -28,7 +29,9 @@ export function InvoicePaymentProofUpload({
   const [file, setFile] = useState<File | null>(null);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
+  const [isChanging, setIsChanging] = useState(false);
   const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
 
   // Cargar la URL firmada cuando se abre el diálogo y ya existe un comprobante
   useEffect(() => {
@@ -155,11 +158,12 @@ export function InvoicePaymentProofUpload({
       return data;
     },
     onSuccess: () => {
-      toast.success("Comprobante subido y procesado correctamente");
+      toast.success(isChanging ? "Comprobante actualizado correctamente" : "Comprobante subido y procesado correctamente");
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["pagos"] });
       setFile(null);
       setOpen(false);
+      setIsChanging(false);
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al subir el comprobante");
@@ -193,7 +197,13 @@ export function InvoicePaymentProofUpload({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      setOpen(newOpen);
+      if (!newOpen) {
+        setIsChanging(false);
+        setFile(null);
+      }
+    }}>
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -219,18 +229,30 @@ export function InvoicePaymentProofUpload({
           </DialogTitle>
         </DialogHeader>
 
-        {hasProof && proofUrl ? (
+        {hasProof && proofUrl && !isChanging ? (
           <div className="space-y-4">
             {loadingImage ? (
               <div className="flex items-center justify-center p-8">
                 <Loader2 className="h-8 w-8 animate-spin" />
               </div>
             ) : signedUrl ? (
-              <img 
-                src={signedUrl} 
-                alt="Comprobante de pago" 
-                className="w-full rounded-lg border"
-              />
+              <>
+                <img 
+                  src={signedUrl} 
+                  alt="Comprobante de pago" 
+                  className="w-full rounded-lg border"
+                />
+                {isAdmin && (
+                  <Button
+                    onClick={() => setIsChanging(true)}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Cambiar Comprobante
+                  </Button>
+                )}
+              </>
             ) : (
               <p className="text-center text-muted-foreground p-4">
                 No se pudo cargar la imagen
@@ -255,20 +277,34 @@ export function InvoicePaymentProofUpload({
               )}
             </div>
             
-            <Button
-              onClick={handleUpload}
-              disabled={!file || uploadMutation.isPending}
-              className="w-full"
-            >
-              {uploadMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Procesando...
-                </>
-              ) : (
-                "Subir y Procesar"
+            <div className="flex gap-2">
+              {isChanging && (
+                <Button
+                  onClick={() => {
+                    setIsChanging(false);
+                    setFile(null);
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
               )}
-            </Button>
+              <Button
+                onClick={handleUpload}
+                disabled={!file || uploadMutation.isPending}
+                className={isChanging ? "flex-1" : "w-full"}
+              >
+                {uploadMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Procesando...
+                  </>
+                ) : (
+                  isChanging ? "Actualizar Comprobante" : "Subir y Procesar"
+                )}
+              </Button>
+            </div>
           </div>
         )}
       </DialogContent>
