@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileText, RefreshCw, Eye, Trash2 } from "lucide-react";
+import { FileText, RefreshCw, Eye, Trash2, Check, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -66,6 +66,81 @@ const AvisoFuncionamientoAdmin = () => {
       toast.error(error.message || "Error al eliminar documento");
     },
   });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ 
+      documentId, 
+      status, 
+      supplierId 
+    }: { 
+      documentId: string; 
+      status: 'aprobado' | 'rechazado'; 
+      supplierId: string;
+    }) => {
+      const { data: document, error: docError } = await supabase
+        .from('documents')
+        .select('document_type')
+        .eq('id', documentId)
+        .single();
+
+      if (docError) throw docError;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error: updateError } = await supabase
+        .from('documents')
+        .update({ 
+          status,
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', documentId);
+
+      if (updateError) throw updateError;
+
+      const { error: notifyError } = await supabase.functions.invoke('notify-supplier', {
+        body: {
+          supplier_id: supplierId,
+          type: status === 'aprobado' ? 'document_approved' : 'document_rejected',
+          data: {
+            document_type: document.document_type,
+            document_id: documentId
+          }
+        }
+      });
+
+      if (notifyError) {
+        console.error('Error al notificar:', notifyError);
+      }
+
+      return { status, documentType: document.document_type };
+    },
+    onSuccess: (data) => {
+      const message = data.status === 'aprobado' 
+        ? '✓ Documento aprobado y proveedor notificado'
+        : '✗ Documento rechazado y proveedor notificado';
+      
+      toast.success(message);
+      queryClient.invalidateQueries({ queryKey: ["avisos-funcionamiento"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar estado");
+    },
+  });
+
+  const getStatusBadge = (status: string) => {
+    const variants = {
+      pendiente: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+      aprobado: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+      rechazado: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+    };
+    
+    return (
+      <Badge className={variants[status as keyof typeof variants] || variants.pendiente}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    );
+  };
 
   const getExtractionBadge = (status: string | null) => {
     switch (status) {
@@ -138,9 +213,38 @@ const AvisoFuncionamientoAdmin = () => {
                         </TableCell>
                         <TableCell>{doc.razon_social || "-"}</TableCell>
                         <TableCell className="max-w-xs truncate">{doc.direccion || "-"}</TableCell>
-                        <TableCell>{getExtractionBadge(doc.extraction_status)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
+                    <TableCell>{getExtractionBadge(doc.extraction_status)}</TableCell>
+                    <TableCell>{getStatusBadge(doc.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => updateStatusMutation.mutate({ 
+                            documentId: doc.id, 
+                            status: 'aprobado',
+                            supplierId: doc.supplier_id
+                          })}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          disabled={updateStatusMutation.isPending || doc.status === 'aprobado'}
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => updateStatusMutation.mutate({ 
+                            documentId: doc.id, 
+                            status: 'rechazado',
+                            supplierId: doc.supplier_id
+                          })}
+                          disabled={updateStatusMutation.isPending || doc.status === 'rechazado'}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
                             <Dialog>
                               <DialogTrigger asChild>
                                 <Button
