@@ -157,17 +157,29 @@ const Invoices = () => {
       if (xmlError) throw xmlError;
 
       // Validar XML ANTES de insertar en la base de datos
-      const { data: validationData, error: validationError } = await supabase.functions.invoke(
-        'validate-invoice-xml',
-        {
-          body: { xmlPath: xmlFileName }
-        }
-      );
+      console.log('Llamando a validate-invoice-xml con:', xmlFileName);
+      
+      let validationData, validationError;
+      try {
+        const response = await supabase.functions.invoke(
+          'validate-invoice-xml',
+          {
+            body: { xmlPath: xmlFileName }
+          }
+        );
+        validationData = response.data;
+        validationError = response.error;
+        
+        console.log('Respuesta de validate-invoice-xml:', { validationData, validationError });
+      } catch (invokeError) {
+        console.error('Error al invocar validate-invoice-xml:', invokeError);
+        throw new Error('Error al conectar con el servicio de validación. Por favor, intenta de nuevo.');
+      }
 
       // Si hay error de conexión/red con el edge function
       if (validationError) {
-        console.error('Error al conectar con la función de validación:', validationError);
-        throw new Error('Error al validar el archivo XML: ' + (validationError.message || 'Error de conexión'));
+        console.error('Error de validación:', validationError);
+        throw new Error('Error al validar el archivo XML: ' + (validationError.message || 'Error de validación'));
       }
 
       // Si la validación falló (RFC incorrecto, FormaPago=99 pero MetodoPago!=PPD, etc.)
