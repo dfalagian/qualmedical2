@@ -94,6 +94,74 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
       `
     }),
 
+    supplier_approved: () => ({
+      subject: "🎉 ¡Felicidades! Tu cuenta ha sido aprobada",
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 40px; border-radius: 10px 10px 0 0; text-align: center; }
+              .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+              .celebration-icon { font-size: 64px; margin-bottom: 15px; }
+              .feature-list { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+              .feature-item { padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
+              .feature-item:last-child { border-bottom: none; }
+              .check-icon { color: #10b981; margin-right: 10px; }
+              .cta-button { display: inline-block; padding: 15px 40px; background: #10b981; color: white; text-decoration: none; border-radius: 5px; margin-top: 25px; font-weight: bold; }
+              .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <div class="celebration-icon">🎉</div>
+                <h1 style="margin: 0; font-size: 28px;">¡Felicidades!</h1>
+                <p style="margin: 10px 0 0 0; font-size: 18px;">Tu cuenta ha sido aprobada</p>
+              </div>
+              <div class="content">
+                <p>Estimado proveedor,</p>
+                <p>Nos complace informarte que <strong>todos tus documentos han sido aprobados</strong> y tu cuenta está ahora <strong>completamente activa</strong>.</p>
+                
+                <div class="feature-list">
+                  <h3 style="margin-top: 0; color: #10b981;">Ahora puedes:</h3>
+                  <div class="feature-item">
+                    <span class="check-icon">✓</span>
+                    <strong>Subir facturas</strong> - Gestiona tus facturas en la sección de Facturas
+                  </div>
+                  <div class="feature-item">
+                    <span class="check-icon">✓</span>
+                    <strong>Consultar órdenes de compra</strong> - Revisa tus pedidos asignados
+                  </div>
+                  <div class="feature-item">
+                    <span class="check-icon">✓</span>
+                    <strong>Recibir pagos</strong> - Consulta el estado de tus pagos
+                  </div>
+                  <div class="feature-item">
+                    <span class="check-icon">✓</span>
+                    <strong>Comunicarte con administradores</strong> - Usa el sistema de mensajería
+                  </div>
+                </div>
+
+                <p>Gracias por completar el proceso de registro. Esperamos una excelente relación de negocio contigo.</p>
+                
+                <p style="text-align: center;">
+                  <strong>¡Bienvenido a QualMedical!</strong>
+                </p>
+              </div>
+              <div class="footer">
+                <p>Este es un mensaje automático del Sistema QualMedical</p>
+                <p>Si tienes alguna pregunta, no dudes en contactar a tu administrador</p>
+              </div>
+            </div>
+          </body>
+        </html>
+      `
+    }),
+
     account_approved: () => ({
       subject: "🎉 Cuenta Aprobada",
       html: `

@@ -46,6 +46,22 @@ const Invoices = () => {
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [currentEvidenceUrls, setCurrentEvidenceUrls] = useState<string[]>([]);
 
+  // Query para obtener el perfil del proveedor y verificar si está aprobado
+  const { data: supplierProfile } = useQuery({
+    queryKey: ["supplier_profile", user?.id],
+    enabled: !isAdmin && !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("approved")
+        .eq("id", user!.id)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices"],
     queryFn: async () => {
@@ -447,52 +463,81 @@ const Invoices = () => {
         </div>
 
         {!isAdmin && (
-          <Card className="shadow-md border-accent/20">
-            <CardHeader className="bg-gradient-accent/10">
-              <CardTitle className="flex items-center gap-2">
-                <Upload className="h-5 w-5" />
-                Subir Nueva Factura
-              </CardTitle>
-              <CardDescription>Los datos se extraen automáticamente del XML</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  uploadMutation.mutate();
-                }}
-                className="space-y-4"
-              >
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="pdfFile">Archivo PDF *</Label>
-                    <Input
-                      id="pdfFile"
-                      type="file"
-                      accept=".pdf"
-                      onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-                      required
-                    />
+          supplierProfile?.approved ? (
+            <Card className="shadow-md border-accent/20">
+              <CardHeader className="bg-gradient-accent/10">
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Subir Nueva Factura
+                </CardTitle>
+                <CardDescription>Los datos se extraen automáticamente del XML</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    uploadMutation.mutate();
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="pdfFile">Archivo PDF *</Label>
+                      <Input
+                        id="pdfFile"
+                        type="file"
+                        accept=".pdf"
+                        onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="xmlFile">Archivo XML *</Label>
+                      <Input
+                        id="xmlFile"
+                        type="file"
+                        accept=".xml"
+                        onChange={(e) => setXmlFile(e.target.files?.[0] || null)}
+                        required
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="xmlFile">Archivo XML *</Label>
-                    <Input
-                      id="xmlFile"
-                      type="file"
-                      accept=".xml"
-                      onChange={(e) => setXmlFile(e.target.files?.[0] || null)}
-                      required
-                    />
-                  </div>
+                  <Button type="submit" disabled={isUploading} className="w-full">
+                    {isUploading ? "Subiendo..." : "Subir Factura"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="shadow-md border-warning/20">
+              <CardHeader className="bg-warning/10">
+                <CardTitle className="flex items-center gap-2 text-warning">
+                  <Receipt className="h-5 w-5" />
+                  Cuenta en Proceso de Validación
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <p className="text-muted-foreground">
+                    Tu cuenta está siendo revisada por nuestro equipo. Para poder subir facturas, 
+                    necesitas tener todos tus documentos aprobados:
+                  </p>
+                  <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
+                    <li>INE (Credencial de Identidad)</li>
+                    <li>Constancia de Situación Fiscal</li>
+                    <li>Comprobante de Domicilio</li>
+                    <li>Datos Bancarios</li>
+                  </ul>
+                  <p className="text-sm text-muted-foreground">
+                    Por favor, asegúrate de haber subido todos los documentos requeridos en la sección 
+                    de <strong>Documentos</strong>. Una vez que todos sean aprobados, podrás comenzar a subir facturas.
+                  </p>
                 </div>
-
-                <Button type="submit" disabled={isUploading} className="w-full">
-                  {isUploading ? "Subiendo..." : "Subir Factura"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )
         )}
 
         <Card className="shadow-md">
