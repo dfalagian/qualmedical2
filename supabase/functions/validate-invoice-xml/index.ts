@@ -94,6 +94,46 @@ serve(async (req) => {
     // Extraer impuestos totales
     const totalImpuestosMatch = xmlText.match(/TotalImpuestosTrasladados="([0-9.]+)"/);
 
+    // Extraer impuestos detallados
+    const impuestosDetalle: any = {
+      traslados: [],
+      retenciones: []
+    };
+
+    // Extraer traslados (IVA, IEPS, etc.)
+    const trasladosRegex = /<cfdi:Traslado([^>]*)\/>/g;
+    let trasladoMatch;
+    while ((trasladoMatch = trasladosRegex.exec(xmlText)) !== null) {
+      const trasladoText = trasladoMatch[1];
+      const impuestoMatch = trasladoText.match(/Impuesto="([^"]+)"/);
+      const tipoFactorMatch = trasladoText.match(/TipoFactor="([^"]+)"/);
+      const tasaCuotaMatch = trasladoText.match(/Tasa[Oo]Cuota="([0-9.]+)"/);
+      const baseMatch = trasladoText.match(/Base="([0-9.]+)"/);
+      const importeMatch = trasladoText.match(/Importe="([0-9.]+)"/);
+
+      impuestosDetalle.traslados.push({
+        impuesto: impuestoMatch ? impuestoMatch[1] : null,
+        tipo_factor: tipoFactorMatch ? tipoFactorMatch[1] : null,
+        tasa_o_cuota: tasaCuotaMatch ? tasaCuotaMatch[1] : null,
+        base: baseMatch ? parseFloat(baseMatch[1]) : 0,
+        importe: importeMatch ? parseFloat(importeMatch[1]) : 0
+      });
+    }
+
+    // Extraer retenciones (ISR, IVA retenido, etc.)
+    const retencionesRegex = /<cfdi:Retencion([^>]*)\/>/g;
+    let retencionMatch;
+    while ((retencionMatch = retencionesRegex.exec(xmlText)) !== null) {
+      const retencionText = retencionMatch[1];
+      const impuestoMatch = retencionText.match(/Impuesto="([^"]+)"/);
+      const importeMatch = retencionText.match(/Importe="([0-9.]+)"/);
+
+      impuestosDetalle.retenciones.push({
+        impuesto: impuestoMatch ? impuestoMatch[1] : null,
+        importe: importeMatch ? parseFloat(importeMatch[1]) : 0
+      });
+    }
+
     // Extraer conceptos/artículos
     const conceptosRegex = /<cfdi:Concepto([^>]*)>/g;
     const conceptos = [];
@@ -143,6 +183,8 @@ serve(async (req) => {
     console.log('- UUID:', uuid);
     console.log('- Emisor:', emisorNombreMatch?.[1]);
     console.log('- Conceptos encontrados:', conceptos.length);
+    console.log('- Impuestos detallados - Traslados:', impuestosDetalle.traslados.length);
+    console.log('- Impuestos detallados - Retenciones:', impuestosDetalle.retenciones.length);
 
     // VALIDACIÓN CRÍTICA: Si FormaPago = 99, entonces MetodoPago DEBE ser PPD
     if (formaPago === '99' && metodoPago !== 'PPD') {
@@ -181,6 +223,7 @@ serve(async (req) => {
         subtotal,
         descuento,
         totalImpuestos,
+        impuestosDetalle,
         fecha,
         lugarExpedicion,
         uuid,

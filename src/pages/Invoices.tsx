@@ -183,6 +183,7 @@ const Invoices = () => {
           subtotal: validationData.subtotal,
           descuento: validationData.descuento || 0,
           total_impuestos: validationData.totalImpuestos || 0,
+          impuestos_detalle: validationData.impuestosDetalle || {},
           pdf_url: pdfUrl,
           xml_url: xmlUrl,
           uuid: validationData.uuid,
