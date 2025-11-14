@@ -305,6 +305,52 @@ const Invoices = () => {
       
       if (status === "pagado") {
         updates.payment_date = new Date().toISOString().split('T')[0];
+        
+        // Verificar si ya existe un registro de pago para esta factura
+        const { data: existingPago } = await supabase
+          .from("pagos")
+          .select("id")
+          .eq("invoice_id", invoice.id)
+          .maybeSingle();
+        
+        // Si no existe, crear el registro de pago automáticamente
+        if (!existingPago) {
+          // Obtener los datos bancarios aprobados del proveedor
+          const { data: datosBancarios, error: datosBancariosError } = await supabase
+            .from("documents")
+            .select("id, nombre_banco, numero_cuenta_clabe")
+            .eq("supplier_id", invoice.supplier_id)
+            .eq("document_type", "datos_bancarios")
+            .eq("status", "aprobado")
+            .maybeSingle();
+          
+          if (datosBancariosError) {
+            console.error("Error al obtener datos bancarios:", datosBancariosError);
+          }
+          
+          if (!datosBancarios) {
+            throw new Error("El proveedor no tiene datos bancarios aprobados. No se puede crear el registro de pago.");
+          }
+          
+          // Crear el registro de pago
+          const { error: pagoError } = await supabase
+            .from("pagos")
+            .insert({
+              supplier_id: invoice.supplier_id,
+              datos_bancarios_id: datosBancarios.id,
+              invoice_id: invoice.id,
+              amount: invoice.amount,
+              fecha_pago: new Date().toISOString().split('T')[0],
+              status: "pendiente",
+              nombre_banco: datosBancarios.nombre_banco,
+              created_by: user?.id
+            });
+          
+          if (pagoError) {
+            console.error("Error al crear registro de pago:", pagoError);
+            throw new Error("Error al crear el registro de pago automáticamente");
+          }
+        }
       } else {
         // Limpiar payment_date si se cambia de "pagado" a otro estado
         updates.payment_date = null;
@@ -474,6 +520,7 @@ const Invoices = () => {
 
   const approveEvidenceMutation = useMutation({
     mutationFn: async (invoice: any) => {
+      // Actualizar el estado de la evidencia
       const { error } = await supabase
         .from("invoices")
         .update({
@@ -484,6 +531,54 @@ const Invoices = () => {
         .eq("id", invoice.id);
 
       if (error) throw error;
+      
+      // Verificar si ya existe un registro de pago para esta factura
+      const { data: existingPago } = await supabase
+        .from("pagos")
+        .select("id")
+        .eq("invoice_id", invoice.id)
+        .maybeSingle();
+      
+      // Si no existe, crear el registro de pago automáticamente
+      if (!existingPago) {
+        // Obtener los datos bancarios aprobados del proveedor
+        const { data: datosBancarios, error: datosBancariosError } = await supabase
+          .from("documents")
+          .select("id, nombre_banco, numero_cuenta_clabe")
+          .eq("supplier_id", invoice.supplier_id)
+          .eq("document_type", "datos_bancarios")
+          .eq("status", "aprobado")
+          .maybeSingle();
+        
+        if (datosBancariosError) {
+          console.error("Error al obtener datos bancarios:", datosBancariosError);
+        }
+        
+        if (datosBancarios) {
+          // Crear el registro de pago
+          const { error: pagoError } = await supabase
+            .from("pagos")
+            .insert({
+              supplier_id: invoice.supplier_id,
+              datos_bancarios_id: datosBancarios.id,
+              invoice_id: invoice.id,
+              amount: invoice.amount,
+              fecha_pago: new Date().toISOString().split('T')[0],
+              status: "pendiente",
+              nombre_banco: datosBancarios.nombre_banco,
+              created_by: user?.id
+            });
+          
+          if (pagoError) {
+            console.error("Error al crear registro de pago:", pagoError);
+            // No lanzamos error aquí para no bloquear la aprobación de evidencia
+            toast.warning("Evidencia aprobada, pero no se pudo crear el registro de pago automáticamente");
+          }
+        } else {
+          console.warn("No se encontraron datos bancarios aprobados para crear el registro de pago");
+          toast.info("Evidencia aprobada. Recuerda que el proveedor necesita datos bancarios aprobados para crear el pago.");
+        }
+      }
 
       // Enviar notificación por email al proveedor
       await supabase.functions.invoke("notify-supplier", {
@@ -500,6 +595,7 @@ const Invoices = () => {
     onSuccess: () => {
       toast.success("Evidencia aprobada");
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["pagos"] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al aprobar evidencia");
