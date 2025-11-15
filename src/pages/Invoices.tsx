@@ -311,6 +311,18 @@ const Invoices = () => {
       status: "pendiente" | "procesando" | "pagado" | "rechazado";
       rejectionReason?: string;
     }) => {
+      // Verificar si la factura tiene comprobante de pago subido
+      const { data: pagoData } = await supabase
+        .from('pagos')
+        .select('comprobante_pago_url')
+        .eq('invoice_id', invoice.id)
+        .maybeSingle();
+
+      // Bloquear cambio si ya tiene comprobante de pago subido
+      if (pagoData?.comprobante_pago_url) {
+        throw new Error('No se puede cambiar el estado de una factura que tiene comprobante de pago. El estado está bloqueado en "Pagado".');
+      }
+
       const updates: any = { status };
       
       if (status === "rechazado" && rejectionReason) {
@@ -1499,8 +1511,9 @@ const Invoices = () => {
                               updateStatusMutation.mutate({ invoice, status: value });
                             }
                           }}
+                          disabled={!!invoice.comprobante_pago_url}
                         >
-                          <SelectTrigger className="w-32">
+                          <SelectTrigger className="w-32" disabled={!!invoice.comprobante_pago_url}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
