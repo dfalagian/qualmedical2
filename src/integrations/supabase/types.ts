@@ -508,8 +508,10 @@ export type Database = {
           company_name: string | null
           created_at: string | null
           email: string
+          first_login_at: string | null
           full_name: string
           id: string
+          last_login_at: string | null
           phone: string | null
           rfc: string | null
           updated_at: string | null
@@ -519,8 +521,10 @@ export type Database = {
           company_name?: string | null
           created_at?: string | null
           email: string
+          first_login_at?: string | null
           full_name: string
           id: string
+          last_login_at?: string | null
           phone?: string | null
           rfc?: string | null
           updated_at?: string | null
@@ -530,8 +534,10 @@ export type Database = {
           company_name?: string | null
           created_at?: string | null
           email?: string
+          first_login_at?: string | null
           full_name?: string
           id?: string
+          last_login_at?: string | null
           phone?: string | null
           rfc?: string | null
           updated_at?: string | null
