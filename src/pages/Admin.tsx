@@ -453,35 +453,37 @@ const Admin = () => {
                             </>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span>{user.email}</span>
-                          {user.first_login_at && (
-                            <span className="text-xs">
-                              Primer ingreso: {new Date(user.first_login_at).toLocaleDateString('es-MX', { 
-                                year: 'numeric', 
-                                month: 'short', 
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          )}
-                          {user.last_login_at && (
-                            <span className="text-xs">
-                              Último ingreso: {new Date(user.last_login_at).toLocaleDateString('es-MX', { 
-                                year: 'numeric', 
-                                month: 'short', 
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          )}
-                          {!user.first_login_at && (
-                            <span className="text-xs text-muted-foreground/70">
-                              Sin ingresos al sistema
-                            </span>
-                          )}
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm text-muted-foreground">{user.email}</span>
+                          <div className="flex items-center gap-3 text-xs">
+                            {user.first_login_at && (
+                              <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                Primer ingreso: {new Date(user.first_login_at).toLocaleDateString('es-MX', { 
+                                  year: 'numeric', 
+                                  month: 'short', 
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            )}
+                            {user.last_login_at && (
+                              <span className="text-green-600 dark:text-green-400 font-medium">
+                                Último ingreso: {new Date(user.last_login_at).toLocaleDateString('es-MX', { 
+                                  year: 'numeric', 
+                                  month: 'short', 
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            )}
+                            {!user.first_login_at && (
+                              <span className="text-orange-600 dark:text-orange-400 font-semibold">
+                                Sin ingresos al sistema
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {user.company_name && (
                           <p className="text-sm text-muted-foreground">
