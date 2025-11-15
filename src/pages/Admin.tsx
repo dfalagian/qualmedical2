@@ -453,7 +453,36 @@ const Admin = () => {
                             </>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span>{user.email}</span>
+                          {user.first_login_at && (
+                            <span className="text-xs">
+                              Primer ingreso: {new Date(user.first_login_at).toLocaleDateString('es-MX', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          )}
+                          {user.last_login_at && (
+                            <span className="text-xs">
+                              Último ingreso: {new Date(user.last_login_at).toLocaleDateString('es-MX', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          )}
+                          {!user.first_login_at && (
+                            <span className="text-xs text-muted-foreground/70">
+                              Sin ingresos al sistema
+                            </span>
+                          )}
+                        </div>
                         {user.company_name && (
                           <p className="text-sm text-muted-foreground">
                             Empresa: {user.company_name}
