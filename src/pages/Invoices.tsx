@@ -1495,7 +1495,7 @@ const Invoices = () => {
 
                       {isAdmin && (
                         <Select
-                          value={invoice.status}
+                          value={invoice.comprobante_pago_url ? "pagado" : invoice.status}
                           onValueChange={(value: any) => {
                             // Si es rechazado, solicitar razón
                             if (value === "rechazado") {
