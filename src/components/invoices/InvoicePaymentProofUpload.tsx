@@ -157,8 +157,38 @@ export function InvoicePaymentProofUpload({
 
       return data;
     },
-    onSuccess: () => {
-      toast.success(isChanging ? "Comprobante actualizado correctamente" : "Comprobante subido y procesado correctamente");
+    onSuccess: (data) => {
+      // Verificar si hay discrepancias detectadas
+      if (data?.discrepancias?.detectadas) {
+        const { detalles } = data.discrepancias;
+        let mensaje = "⚠️ DISCREPANCIAS DETECTADAS:\n\n";
+        
+        if (detalles.numero_cuenta) {
+          mensaje += `❌ Número de cuenta:\n`;
+          mensaje += `  • Registrado: ${detalles.numero_cuenta.registrado}\n`;
+          mensaje += `  • En comprobante: ${detalles.numero_cuenta.comprobante}\n`;
+          mensaje += `  • ${detalles.numero_cuenta.mensaje}\n\n`;
+        }
+        
+        if (detalles.tipo_cuenta) {
+          mensaje += `❌ Tipo de cuenta:\n`;
+          mensaje += `  • Registrado: ${detalles.tipo_cuenta.registrado}\n`;
+          mensaje += `  • En comprobante: ${detalles.tipo_cuenta.comprobante}\n\n`;
+        }
+        
+        mensaje += `Titular registrado: ${data.discrepancias.titular_registrado || 'No disponible'}`;
+        
+        toast.error(mensaje, {
+          duration: 10000,
+          style: {
+            whiteSpace: 'pre-line',
+            maxWidth: '500px'
+          }
+        });
+      } else {
+        toast.success(isChanging ? "Comprobante actualizado correctamente" : "Comprobante subido y procesado correctamente");
+      }
+      
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["pagos"] });
       setFile(null);

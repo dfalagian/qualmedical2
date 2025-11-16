@@ -94,8 +94,38 @@ export function PaymentProofUpload({ pagoId, supplierId, hasProof, proofUrl }: P
 
       return extractionData;
     },
-    onSuccess: () => {
-      toast.success("Comprobante de pago subido exitosamente");
+    onSuccess: (data) => {
+      // Verificar si hay discrepancias detectadas
+      if (data?.discrepancias?.detectadas) {
+        const { detalles } = data.discrepancias;
+        let mensaje = "⚠️ DISCREPANCIAS DETECTADAS:\n\n";
+        
+        if (detalles.numero_cuenta) {
+          mensaje += `❌ Número de cuenta:\n`;
+          mensaje += `  • Registrado: ${detalles.numero_cuenta.registrado}\n`;
+          mensaje += `  • En comprobante: ${detalles.numero_cuenta.comprobante}\n`;
+          mensaje += `  • ${detalles.numero_cuenta.mensaje}\n\n`;
+        }
+        
+        if (detalles.tipo_cuenta) {
+          mensaje += `❌ Tipo de cuenta:\n`;
+          mensaje += `  • Registrado: ${detalles.tipo_cuenta.registrado}\n`;
+          mensaje += `  • En comprobante: ${detalles.tipo_cuenta.comprobante}\n\n`;
+        }
+        
+        mensaje += `Titular registrado: ${data.discrepancias.titular_registrado || 'No disponible'}`;
+        
+        toast.error(mensaje, {
+          duration: 10000,
+          style: {
+            whiteSpace: 'pre-line',
+            maxWidth: '500px'
+          }
+        });
+      } else {
+        toast.success("Comprobante de pago subido exitosamente");
+      }
+      
       queryClient.invalidateQueries({ queryKey: ["pagos"] });
       setOpen(false);
       setFile(null);
