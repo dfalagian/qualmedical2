@@ -576,7 +576,7 @@ const MedicineCounter = () => {
                 
                 <Label
                   htmlFor="image-upload"
-                  className="cursor-pointer"
+                  className={`cursor-pointer ${(isAnalyzing || (canManageRecords && !selectedSupplier)) ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
                 >
                   <div className="w-full h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
                     <Upload className="h-8 w-8" />
