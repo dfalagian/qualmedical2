@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +45,30 @@ const MedicineCounter = () => {
   const queryClient = useQueryClient();
   
   const canManageRecords = isAdmin || isContador;
+
+  // Optimizar para móvil si el usuario es contador
+  useEffect(() => {
+    if (isContador) {
+      // Forzar viewport móvil optimizado
+      const viewport = document.querySelector('meta[name="viewport"]');
+      if (viewport) {
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+      
+      // Agregar clase para estilos móviles
+      document.body.classList.add('contador-mobile-mode');
+    }
+    
+    return () => {
+      if (isContador) {
+        const viewport = document.querySelector('meta[name="viewport"]');
+        if (viewport) {
+          viewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
+        }
+        document.body.classList.remove('contador-mobile-mode');
+      }
+    };
+  }, [isContador]);
 
   // Fetch suppliers (proveedores)
   const { data: suppliers } = useQuery({
@@ -479,10 +503,12 @@ const MedicineCounter = () => {
 
   return (
     <DashboardLayout>
-      <div className="w-full py-4 px-2 sm:py-8 sm:px-4 max-w-4xl mx-auto">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">Contador de Cajas de Medicamentos</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
+      <div className={`w-full py-4 px-3 max-w-4xl mx-auto ${isContador ? 'sm:py-4 sm:px-3' : 'sm:py-8 sm:px-4'}`}>
+        <div className={`mb-4 ${isContador ? 'sm:mb-4' : 'sm:mb-8'}`}>
+          <h1 className={`font-bold mb-2 ${isContador ? 'text-2xl' : 'text-2xl sm:text-3xl'}`}>
+            Contador de Cajas de Medicamentos
+          </h1>
+          <p className={`text-muted-foreground ${isContador ? 'text-sm' : 'text-sm sm:text-base'}`}>
             Toma una foto o sube una imagen para contar automáticamente las cajas
           </p>
         </div>
@@ -517,24 +543,32 @@ const MedicineCounter = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className={`grid gap-3 ${isContador ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
                 <Button
                   onClick={openCamera}
-                  disabled={isAnalyzing || (isAdmin && !selectedSupplier)}
+                  disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
                   variant="outline"
-                  className="w-full h-20 sm:h-24 flex flex-col items-center justify-center gap-2"
+                  className={`w-full flex flex-col items-center justify-center gap-2 ${
+                    isContador ? 'h-28 text-lg' : 'h-20 sm:h-24'
+                  }`}
                 >
-                  <Camera className="h-6 w-6 sm:h-8 sm:w-8" />
-                  <span className="text-sm sm:text-base">Tomar Foto</span>
+                  <Camera className={isContador ? 'h-10 w-10' : 'h-6 w-6 sm:h-8 sm:w-8'} />
+                  <span className={isContador ? 'text-base font-semibold' : 'text-sm sm:text-base'}>
+                    Tomar Foto
+                  </span>
                 </Button>
                 
                 <Label
                   htmlFor="image-upload"
                   className="cursor-pointer"
                 >
-                  <div className="w-full h-20 sm:h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
-                    <Upload className="h-6 w-6 sm:h-8 sm:w-8" />
-                    <span className="text-sm sm:text-base">Subir Imagen</span>
+                  <div className={`w-full flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors ${
+                    isContador ? 'h-28' : 'h-20 sm:h-24'
+                  }`}>
+                    <Upload className={isContador ? 'h-10 w-10' : 'h-6 w-6 sm:h-8 sm:w-8'} />
+                    <span className={isContador ? 'text-base font-semibold' : 'text-sm sm:text-base'}>
+                      Subir Imagen
+                    </span>
                   </div>
                   <Input
                     id="image-upload"
@@ -542,7 +576,7 @@ const MedicineCounter = () => {
                     accept="image/*"
                     capture="environment"
                     onChange={handleFileSelect}
-                    disabled={isAnalyzing || (isAdmin && !selectedSupplier)}
+                    disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
                     className="hidden"
                   />
                 </Label>
