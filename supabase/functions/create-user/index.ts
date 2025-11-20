@@ -155,7 +155,19 @@ serve(async (req) => {
     // Assign role - CRITICAL: This must succeed or the user won't have proper access
     console.log("Assigning role:", role, "to user:", authData.user.id);
     
-    // First, try to insert the role
+    // First, delete any existing roles that might have been assigned by triggers
+    console.log("Deleting any auto-assigned roles for user:", authData.user.id);
+    const { error: deleteError } = await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", authData.user.id);
+    
+    if (deleteError) {
+      console.error("Error deleting existing roles:", deleteError);
+      // Don't throw here, just log - it's okay if there are no roles to delete
+    }
+    
+    // Now insert the correct role
     const { data: insertedRole, error: roleInsertError } = await supabaseAdmin
       .from("user_roles")
       .insert({
