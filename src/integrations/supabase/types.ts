@@ -360,8 +360,10 @@ export type Database = {
           created_at: string
           created_by: string
           delivery_document_url: string | null
+          expected_quantity: number | null
           id: string
           image_url: string
+          is_partial_delivery: boolean | null
           notes: string | null
           purchase_order_number: string | null
           supplier_id: string
@@ -372,8 +374,10 @@ export type Database = {
           created_at?: string
           created_by: string
           delivery_document_url?: string | null
+          expected_quantity?: number | null
           id?: string
           image_url: string
+          is_partial_delivery?: boolean | null
           notes?: string | null
           purchase_order_number?: string | null
           supplier_id: string
@@ -384,8 +388,10 @@ export type Database = {
           created_at?: string
           created_by?: string
           delivery_document_url?: string | null
+          expected_quantity?: number | null
           id?: string
           image_url?: string
+          is_partial_delivery?: boolean | null
           notes?: string | null
           purchase_order_number?: string | null
           supplier_id?: string
