@@ -14,6 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ImageViewer } from "@/components/admin/ImageViewer";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 
 const MedicineCounter = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -750,65 +752,85 @@ const MedicineCounter = () => {
                 </div>
                 <div className="space-y-3">
                   {countHistory.map((record: any) => (
-                    <div
-                      key={record.id}
-                      className="flex items-start justify-between p-3 sm:p-4 border rounded-lg hover:bg-accent/5 transition-colors"
-                    >
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-sm sm:text-base">
-                            {record.supplier?.company_name || record.supplier?.full_name}
-                          </span>
-                          <span className="text-xs sm:text-sm text-muted-foreground">
-                            {new Date(record.created_at).toLocaleDateString('es-MX', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </span>
+                    <Collapsible key={record.id} className="border rounded-lg">
+                      <div className="flex items-start justify-between p-3 sm:p-4">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm sm:text-base">
+                              {record.supplier?.company_name || record.supplier?.full_name}
+                            </span>
+                            <span className="text-xs sm:text-sm text-muted-foreground">
+                              {new Date(record.created_at).toLocaleDateString('es-MX', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <p className="text-xs sm:text-sm text-muted-foreground">
+                              Cajas contadas: <span className="font-semibold text-primary">{record.count}</span>
+                            </p>
+                            {record.analysis && (
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                                  Ver análisis completo
+                                  <ChevronDown className="h-3 w-3 ml-1" />
+                                </Button>
+                              </CollapsibleTrigger>
+                            )}
+                          </div>
+                          {record.notes && (
+                            <p className="text-xs text-muted-foreground italic">{record.notes}</p>
+                          )}
                         </div>
-                        <p className="text-xs sm:text-sm text-muted-foreground">
-                          Cajas contadas: <span className="font-semibold text-primary">{record.count}</span>
-                        </p>
-                        {record.notes && (
-                          <p className="text-xs text-muted-foreground italic">{record.notes}</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <ImageViewer
-                          fileUrl={record.image_url}
-                          fileName={'Foto de cajas - ' + (record.supplier?.company_name || record.supplier?.full_name)}
-                          triggerText="Ver cajas"
-                          triggerSize="sm"
-                          triggerVariant="ghost"
-                          bucket="documents"
-                        />
-                        {record.delivery_document_url && (
+                        <div className="flex gap-2">
                           <ImageViewer
-                            fileUrl={record.delivery_document_url}
-                            fileName={'Documento de entrega - ' + (record.supplier?.company_name || record.supplier?.full_name)}
-                            triggerText="Ver documento"
+                            fileUrl={record.image_url}
+                            fileName={'Foto de cajas - ' + (record.supplier?.company_name || record.supplier?.full_name)}
+                            triggerText="Ver cajas"
                             triggerSize="sm"
                             triggerVariant="ghost"
                             bucket="documents"
                           />
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            if (confirm('¿Estás seguro de eliminar este registro?')) {
-                              deleteMutation.mutate(record.id);
-                            }
-                          }}
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                          {record.delivery_document_url && (
+                            <ImageViewer
+                              fileUrl={record.delivery_document_url}
+                              fileName={'Documento de entrega - ' + (record.supplier?.company_name || record.supplier?.full_name)}
+                              triggerText="Ver documento"
+                              triggerSize="sm"
+                              triggerVariant="ghost"
+                              bucket="documents"
+                            />
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              if (confirm('¿Estás seguro de eliminar este registro?')) {
+                                deleteMutation.mutate(record.id);
+                              }
+                            }}
+                            disabled={deleteMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                      
+                      {record.analysis && (
+                        <CollapsibleContent className="px-3 sm:px-4 pb-3 sm:pb-4">
+                          <div className="border-t pt-3 space-y-2">
+                            <h4 className="text-xs font-semibold text-muted-foreground uppercase">Análisis Detallado</h4>
+                            <pre className="text-xs whitespace-pre-wrap font-mono bg-muted/50 p-3 rounded-md">
+                              {record.analysis}
+                            </pre>
+                          </div>
+                        </CollapsibleContent>
+                      )}
+                    </Collapsible>
                   ))}
                 </div>
               </CardContent>
