@@ -142,5 +142,6 @@ export const useAuth = () => {
     signOut,
     isAdmin: userRole === "admin",
     isSupplier: userRole === "proveedor",
+    isContador: userRole === "contador",
   };
 };

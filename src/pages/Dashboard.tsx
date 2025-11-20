@@ -3,9 +3,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Receipt, MessageSquare, ShoppingCart } from "lucide-react";
 import { EmailServerStatus } from "@/components/dashboard/EmailServerStatus";
+import { Navigate } from "react-router-dom";
 
 const Dashboard = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isContador } = useAuth();
+
+  // Redirigir contadores directamente a su página
+  if (isContador) {
+    return <Navigate to="/dashboard/medicine-counter" replace />;
+  }
 
   const stats = [
     {

@@ -41,13 +41,15 @@ const MedicineCounter = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const deliveryCanvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isContador } = useAuth();
   const queryClient = useQueryClient();
+  
+  const canManageRecords = isAdmin || isContador;
 
   // Fetch suppliers (proveedores)
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers"],
-    enabled: isAdmin,
+    enabled: canManageRecords,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
@@ -56,14 +58,14 @@ const MedicineCounter = () => {
       
       if (error) throw error;
       
-      // Filter out admins
-      const { data: nonAdmins } = await supabase
+      // Filter out admins and contadores
+      const { data: suppliers } = await supabase
         .from("user_roles")
         .select("user_id")
-        .neq("role", "admin");
+        .eq("role", "proveedor");
       
-      const nonAdminIds = nonAdmins?.map(r => r.user_id) || [];
-      return data?.filter(p => nonAdminIds.includes(p.id)) || [];
+      const supplierIds = suppliers?.map(r => r.user_id) || [];
+      return data?.filter(p => supplierIds.includes(p.id)) || [];
     },
   });
 
@@ -114,7 +116,7 @@ const MedicineCounter = () => {
         throw new Error("No se pudo verificar tu identidad. Intenta cerrar sesión y volver a entrar.");
       }
 
-      // Double check admin status from database
+      // Double check role status from database
       const { data: roleData, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
@@ -126,8 +128,8 @@ const MedicineCounter = () => {
         throw new Error("Error al verificar permisos: " + roleError.message);
       }
 
-      if (!roleData || roleData.role !== 'admin') {
-        throw new Error("Solo los administradores pueden guardar registros");
+      if (!roleData || (roleData.role !== 'admin' && roleData.role !== 'contador')) {
+        throw new Error("No tienes permisos para guardar registros");
       }
 
       // Upload medicine count image to storage
@@ -497,7 +499,7 @@ const MedicineCounter = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {isAdmin && (
+              {canManageRecords && (
                 <div className="space-y-2">
                   <Label htmlFor="supplier-select">Proveedor</Label>
                   <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
@@ -732,7 +734,7 @@ const MedicineCounter = () => {
             </Card>
           )}
 
-          {isAdmin && countHistory && countHistory.length > 0 && (
+          {canManageRecords && countHistory && countHistory.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
