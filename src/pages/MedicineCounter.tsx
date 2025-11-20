@@ -48,29 +48,6 @@ const MedicineCounter = () => {
   
   const canManageRecords = isAdmin || isContador;
 
-  // Optimizar para móvil si el usuario es contador
-  useEffect(() => {
-    if (isContador) {
-      // Forzar viewport móvil optimizado
-      const viewport = document.querySelector('meta[name="viewport"]');
-      if (viewport) {
-        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-      }
-      
-      // Agregar clase para estilos móviles
-      document.body.classList.add('contador-mobile-mode');
-    }
-    
-    return () => {
-      if (isContador) {
-        const viewport = document.querySelector('meta[name="viewport"]');
-        if (viewport) {
-          viewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
-        }
-        document.body.classList.remove('contador-mobile-mode');
-      }
-    };
-  }, [isContador]);
 
   // Fetch suppliers (proveedores)
   const { data: suppliers } = useQuery({
@@ -515,12 +492,12 @@ const MedicineCounter = () => {
 
   return (
     <DashboardLayout>
-      <div className={`w-full py-4 px-3 max-w-4xl mx-auto ${isContador ? 'sm:py-4 sm:px-3' : 'sm:py-8 sm:px-4'}`}>
-        <div className={`mb-4 ${isContador ? 'sm:mb-4' : 'sm:mb-8'}`}>
-          <h1 className={`font-bold mb-2 ${isContador ? 'text-2xl' : 'text-2xl sm:text-3xl'}`}>
+      <div className="w-full py-4 px-3 sm:py-6 sm:px-4 max-w-4xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2">
             Contador de Cajas de Medicamentos
           </h1>
-          <p className={`text-muted-foreground ${isContador ? 'text-sm' : 'text-sm sm:text-base'}`}>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Toma una foto o sube una imagen para contar automáticamente las cajas
           </p>
         </div>
@@ -563,7 +540,6 @@ const MedicineCounter = () => {
                       placeholder="Ej: OC_CITIO_25_05 o CPED25-24"
                       value={purchaseOrderNumber}
                       onChange={(e) => setPurchaseOrderNumber(e.target.value.toUpperCase())}
-                      className={isContador ? 'text-base h-12' : ''}
                     />
                     <p className="text-xs text-muted-foreground">
                       Formato alfanumérico (ej: OC_CITIO_25_05, CPED25-24)
@@ -579,7 +555,6 @@ const MedicineCounter = () => {
                       placeholder="Ej: 20"
                       value={expectedQuantity}
                       onChange={(e) => setExpectedQuantity(e.target.value)}
-                      className={isContador ? 'text-base h-12' : ''}
                     />
                     <p className="text-xs text-muted-foreground">
                       Número de cajas que debe entregar según la orden de compra
@@ -588,32 +563,24 @@ const MedicineCounter = () => {
                 </>
               )}
 
-              <div className={`grid gap-3 ${isContador ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
                 <Button
                   onClick={openCamera}
                   disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
                   variant="outline"
-                  className={`w-full flex flex-col items-center justify-center gap-2 ${
-                    isContador ? 'h-28 text-lg' : 'h-20 sm:h-24'
-                  }`}
+                  className="w-full h-24 flex flex-col items-center justify-center gap-2"
                 >
-                  <Camera className={isContador ? 'h-10 w-10' : 'h-6 w-6 sm:h-8 sm:w-8'} />
-                  <span className={isContador ? 'text-base font-semibold' : 'text-sm sm:text-base'}>
-                    Tomar Foto
-                  </span>
+                  <Camera className="h-8 w-8" />
+                  <span className="text-base">Tomar Foto</span>
                 </Button>
                 
                 <Label
                   htmlFor="image-upload"
                   className="cursor-pointer"
                 >
-                  <div className={`w-full flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors ${
-                    isContador ? 'h-28' : 'h-20 sm:h-24'
-                  }`}>
-                    <Upload className={isContador ? 'h-10 w-10' : 'h-6 w-6 sm:h-8 sm:w-8'} />
-                    <span className={isContador ? 'text-base font-semibold' : 'text-sm sm:text-base'}>
-                      Subir Imagen
-                    </span>
+                  <div className="w-full h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
+                    <Upload className="h-8 w-8" />
+                    <span className="text-base">Subir Imagen</span>
                   </div>
                   <Input
                     id="image-upload"
