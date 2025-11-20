@@ -121,4 +121,27 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Optimización para modo contador móvil */
+  body.contador-mobile-mode {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body.contador-mobile-mode * {
+    touch-action: manipulation;
+  }
+
+  body.contador-mobile-mode button,
+  body.contador-mobile-mode input,
+  body.contador-mobile-mode select,
+  body.contador-mobile-mode textarea {
+    font-size: 16px !important;
+    min-height: 44px;
+  }
+
+  body.contador-mobile-mode .card {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
 }
