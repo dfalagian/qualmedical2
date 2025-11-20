@@ -363,6 +363,7 @@ export type Database = {
           id: string
           image_url: string
           notes: string | null
+          purchase_order_number: string | null
           supplier_id: string
         }
         Insert: {
@@ -374,6 +375,7 @@ export type Database = {
           id?: string
           image_url: string
           notes?: string | null
+          purchase_order_number?: string | null
           supplier_id: string
         }
         Update: {
@@ -385,6 +387,7 @@ export type Database = {
           id?: string
           image_url?: string
           notes?: string | null
+          purchase_order_number?: string | null
           supplier_id?: string
         }
         Relationships: [

@@ -34,6 +34,7 @@ const MedicineCounter = () => {
   const [showDeliveryCamera, setShowDeliveryCamera] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
+  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [supplierFilter, setSupplierFilter] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -198,6 +199,7 @@ const MedicineCounter = () => {
           analysis: result.analysis,
           image_url: publicUrl,
           delivery_document_url: deliveryDocUrl,
+          purchase_order_number: purchaseOrderNumber || null,
           notes: notes || null,
           created_by: user.id
         });
@@ -219,6 +221,7 @@ const MedicineCounter = () => {
       setDeliveryDocPreview(null);
       setResult(null);
       setSelectedSupplier("");
+      setPurchaseOrderNumber("");
       setNotes("");
       setSelectedFile(null);
       setDeliveryDocFile(null);
@@ -526,21 +529,38 @@ const MedicineCounter = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {canManageRecords && (
-                <div className="space-y-2">
-                  <Label htmlFor="supplier-select">Proveedor</Label>
-                  <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-                    <SelectTrigger id="supplier-select">
-                      <SelectValue placeholder="Selecciona un proveedor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers?.map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.company_name || supplier.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="supplier-select">Proveedor</Label>
+                    <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
+                      <SelectTrigger id="supplier-select">
+                        <SelectValue placeholder="Selecciona un proveedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers?.map((supplier) => (
+                          <SelectItem key={supplier.id} value={supplier.id}>
+                            {supplier.company_name || supplier.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="purchase-order">No. Orden de Compra</Label>
+                    <Input
+                      id="purchase-order"
+                      type="text"
+                      placeholder="Ej: OC_CITIO_25_05 o CPED25-24"
+                      value={purchaseOrderNumber}
+                      onChange={(e) => setPurchaseOrderNumber(e.target.value.toUpperCase())}
+                      className={isContador ? 'text-base h-12' : ''}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Formato alfanumérico (ej: OC_CITIO_25_05, CPED25-24)
+                    </p>
+                  </div>
+                </>
               )}
 
               <div className={`grid gap-3 ${isContador ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
@@ -809,6 +829,11 @@ const MedicineCounter = () => {
                             <p className="text-xs sm:text-sm text-muted-foreground">
                               Cajas contadas: <span className="font-semibold text-primary">{record.count}</span>
                             </p>
+                            {record.purchase_order_number && (
+                              <Badge variant="outline" className="text-xs">
+                                OC: {record.purchase_order_number}
+                              </Badge>
+                            )}
                             {record.analysis && (
                               <CollapsibleTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
