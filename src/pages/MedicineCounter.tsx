@@ -35,6 +35,7 @@ const MedicineCounter = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState<string>("");
+  const [expectedQuantity, setExpectedQuantity] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [supplierFilter, setSupplierFilter] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -190,16 +191,23 @@ const MedicineCounter = () => {
         deliveryDocUrl = deliveryPublicUrl;
       }
 
+      // Calculate if it's a partial delivery
+      const countValue = result.count || 0;
+      const expectedValue = expectedQuantity ? parseInt(expectedQuantity) : null;
+      const isPartialDelivery = expectedValue ? countValue < expectedValue : false;
+
       // Save record
       const { error: insertError } = await supabase
         .from("medicine_counts")
         .insert({
           supplier_id: selectedSupplier,
-          count: result.count || 0,
+          count: countValue,
           analysis: result.analysis,
           image_url: publicUrl,
           delivery_document_url: deliveryDocUrl,
           purchase_order_number: purchaseOrderNumber || null,
+          expected_quantity: expectedValue,
+          is_partial_delivery: isPartialDelivery,
           notes: notes || null,
           created_by: user.id
         });
@@ -222,6 +230,7 @@ const MedicineCounter = () => {
       setResult(null);
       setSelectedSupplier("");
       setPurchaseOrderNumber("");
+      setExpectedQuantity("");
       setNotes("");
       setSelectedFile(null);
       setDeliveryDocFile(null);
@@ -560,6 +569,22 @@ const MedicineCounter = () => {
                       Formato alfanumérico (ej: OC_CITIO_25_05, CPED25-24)
                     </p>
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="expected-quantity">Cantidad Esperada (Cajas)</Label>
+                    <Input
+                      id="expected-quantity"
+                      type="number"
+                      min="1"
+                      placeholder="Ej: 20"
+                      value={expectedQuantity}
+                      onChange={(e) => setExpectedQuantity(e.target.value)}
+                      className={isContador ? 'text-base h-12' : ''}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Número de cajas que debe entregar según la orden de compra
+                    </p>
+                  </div>
                 </>
               )}
 
@@ -646,6 +671,35 @@ const MedicineCounter = () => {
                     <div className="text-center space-y-3">
                       <p className="text-xs sm:text-sm text-muted-foreground mb-2">Total de Cajas Detectadas</p>
                       <p className="text-4xl sm:text-5xl font-bold text-primary">{result.count}</p>
+                      
+                      {/* Mostrar diferencia si hay cantidad esperada */}
+                      {expectedQuantity && parseInt(expectedQuantity) > 0 && (
+                        <div className="mt-3 pt-3 border-t border-primary/20">
+                          <div className="flex justify-center gap-4 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Esperadas</p>
+                              <p className="font-semibold">{expectedQuantity}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Entregadas</p>
+                              <p className="font-semibold">{result.count}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Pendientes</p>
+                              <p className={`font-semibold ${
+                                parseInt(expectedQuantity) > result.count ? 'text-yellow-600' : 'text-green-600'
+                              }`}>
+                                {Math.max(0, parseInt(expectedQuantity) - result.count)}
+                              </p>
+                            </div>
+                          </div>
+                          {parseInt(expectedQuantity) > result.count && (
+                            <Badge variant="secondary" className="mt-2">
+                              ⚠️ Entrega Parcial
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                       
                       {/* Badges de calidad y confianza */}
                       <div className="flex justify-center gap-2 flex-wrap mt-3">
@@ -829,6 +883,23 @@ const MedicineCounter = () => {
                             <p className="text-xs sm:text-sm text-muted-foreground">
                               Cajas contadas: <span className="font-semibold text-primary">{record.count}</span>
                             </p>
+                            {record.expected_quantity && (
+                              <>
+                                <span className="text-xs text-muted-foreground">
+                                  / Esperadas: <span className="font-semibold">{record.expected_quantity}</span>
+                                </span>
+                                {record.expected_quantity > record.count && (
+                                  <span className="text-xs text-yellow-600">
+                                    (Pendientes: {record.expected_quantity - record.count})
+                                  </span>
+                                )}
+                              </>
+                            )}
+                            {record.is_partial_delivery && (
+                              <Badge variant="secondary" className="text-xs">
+                                ⚠️ Entrega Parcial
+                              </Badge>
+                            )}
                             {record.purchase_order_number && (
                               <Badge variant="outline" className="text-xs">
                                 OC: {record.purchase_order_number}
