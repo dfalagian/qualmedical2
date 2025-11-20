@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ImageViewer } from "@/components/admin/ImageViewer";
 
 const MedicineCounter = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -32,7 +33,6 @@ const MedicineCounter = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
-  const [viewerImage, setViewerImage] = useState<{ url: string; title: string } | null>(null);
   const [supplierFilter, setSupplierFilter] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement>(null);
   const deliveryVideoRef = useRef<HTMLVideoElement>(null);
@@ -777,27 +777,23 @@ const MedicineCounter = () => {
                         )}
                       </div>
                       <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setViewerImage({ 
-                            url: record.image_url, 
-                            title: 'Foto de cajas - ' + (record.supplier?.company_name || record.supplier?.full_name) 
-                          })}
-                        >
-                          Ver cajas
-                        </Button>
+                        <ImageViewer
+                          fileUrl={record.image_url}
+                          fileName={'Foto de cajas - ' + (record.supplier?.company_name || record.supplier?.full_name)}
+                          triggerText="Ver cajas"
+                          triggerSize="sm"
+                          triggerVariant="ghost"
+                          bucket="documents"
+                        />
                         {record.delivery_document_url && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setViewerImage({ 
-                              url: record.delivery_document_url, 
-                              title: 'Documento de entrega - ' + (record.supplier?.company_name || record.supplier?.full_name) 
-                            })}
-                          >
-                            Ver documento
-                          </Button>
+                          <ImageViewer
+                            fileUrl={record.delivery_document_url}
+                            fileName={'Documento de entrega - ' + (record.supplier?.company_name || record.supplier?.full_name)}
+                            triggerText="Ver documento"
+                            triggerSize="sm"
+                            triggerVariant="ghost"
+                            bucket="documents"
+                          />
                         )}
                         <Button
                           variant="ghost"
@@ -894,32 +890,6 @@ const MedicineCounter = () => {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={!!viewerImage} onOpenChange={(open) => !open && setViewerImage(null)}>
-          <DialogContent className="max-w-[95vw] sm:max-w-5xl p-4 sm:p-6">
-            <DialogHeader>
-              <DialogTitle className="flex items-center justify-between text-base sm:text-lg">
-                <span>{viewerImage?.title}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setViewerImage(null)}
-                  className="h-8 w-8"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogTitle>
-            </DialogHeader>
-            {viewerImage && (
-              <div className="relative rounded-lg overflow-hidden bg-muted">
-                <img
-                  src={viewerImage.url}
-                  alt={viewerImage.title}
-                  className="w-full h-auto max-h-[80vh] object-contain"
-                />
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
     </DashboardLayout>
   );
