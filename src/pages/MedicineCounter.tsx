@@ -47,6 +47,9 @@ const MedicineCounter = () => {
   const queryClient = useQueryClient();
   
   const canManageRecords = isAdmin || isContador;
+  
+  // Debug log para verificar roles
+  console.log('MedicineCounter - Roles:', { isAdmin, isContador, canManageRecords });
 
 
   // Fetch suppliers (proveedores)
@@ -718,7 +721,7 @@ const MedicineCounter = () => {
                   </div>
                 </div>
 
-                {canManageRecords && (
+                {canManageRecords ? (
                   <>
                     <div className="space-y-4 border-t pt-4">
                       <Label className="text-base font-semibold">Documento de Entrega</Label>
@@ -804,6 +807,10 @@ const MedicineCounter = () => {
                       )}
                     </Button>
                   </>
+                ) : (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                    ⚠️ No tienes permisos para guardar registros. Roles: Admin={isAdmin ? 'Sí' : 'No'}, Contador={isContador ? 'Sí' : 'No'}
+                  </div>
                 )}
               </CardContent>
             </Card>
