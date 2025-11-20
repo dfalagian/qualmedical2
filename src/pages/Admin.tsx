@@ -32,7 +32,7 @@ const createUserFormSchema = z.object({
   full_name: z.string().min(1, "El nombre es requerido"),
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
-  role: z.enum(["admin", "proveedor"], { required_error: "Selecciona un rol" }),
+  role: z.enum(["admin", "proveedor", "contador"], { required_error: "Selecciona un rol" }),
   company_name: z.string().optional(),
   rfc: z.string().optional(),
   phone: z.string().optional(),
@@ -353,6 +353,7 @@ const Admin = () => {
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="proveedor">Proveedor</SelectItem>
+                                <SelectItem value="contador">Contador</SelectItem>
                                 <SelectItem value="admin">Administrador</SelectItem>
                               </SelectContent>
                             </Select>
@@ -428,6 +429,7 @@ const Admin = () => {
                 {users.map((user: any) => {
                   const userRole = user.user_roles?.[0]?.role;
                   const isUserAdmin = userRole === "admin";
+                  const isUserContador = userRole === "contador";
 
                   return (
                     <div
@@ -442,6 +444,8 @@ const Admin = () => {
                               <ShieldCheck className="h-3 w-3 mr-1" />
                               Administrador
                             </Badge>
+                          ) : isUserContador ? (
+                            <Badge className="bg-blue-500">Contador</Badge>
                           ) : (
                             <>
                               <Badge variant="secondary">Proveedor</Badge>

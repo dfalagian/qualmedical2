@@ -640,6 +640,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_contador: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       document_status: "pendiente" | "aprobado" | "rechazado"
@@ -654,7 +655,7 @@ export type Database = {
         | "ine"
         | "datos_bancarios"
       payment_status: "pendiente" | "procesando" | "pagado" | "rechazado"
-      user_role: "admin" | "proveedor"
+      user_role: "admin" | "proveedor" | "contador"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -795,7 +796,7 @@ export const Constants = {
         "datos_bancarios",
       ],
       payment_status: ["pendiente", "procesando", "pagado", "rechazado"],
-      user_role: ["admin", "proveedor"],
+      user_role: ["admin", "proveedor", "contador"],
     },
   },
 } as const
