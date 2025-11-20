@@ -718,7 +718,7 @@ const MedicineCounter = () => {
                   </div>
                 </div>
 
-                {isAdmin && (
+                {canManageRecords && (
                   <>
                     <div className="space-y-4 border-t pt-4">
                       <Label className="text-base font-semibold">Documento de Entrega</Label>
