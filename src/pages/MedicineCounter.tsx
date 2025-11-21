@@ -16,6 +16,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const MedicineCounter = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -45,6 +48,8 @@ const MedicineCounter = () => {
   const { toast } = useToast();
   const { isAdmin, isContador } = useAuth();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+  const [isSupplierDrawerOpen, setIsSupplierDrawerOpen] = useState(false);
   
   const canManageRecords = isAdmin || isContador;
   
@@ -493,14 +498,18 @@ const MedicineCounter = () => {
     }, 'image/jpeg', 0.95);
   };
 
+  const selectedSupplierName = suppliers?.find(s => s.id === selectedSupplier)?.company_name 
+    || suppliers?.find(s => s.id === selectedSupplier)?.full_name 
+    || "Selecciona un proveedor";
+
   return (
     <DashboardLayout>
-      <div className="w-full py-4 px-3 sm:py-6 sm:px-4 max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+      <div className="w-full py-6 px-4 sm:py-6 sm:px-4 max-w-4xl mx-auto">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-3xl sm:text-3xl font-bold mb-3">
             Contador de Cajas de Medicamentos
           </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
+          <p className="text-base sm:text-base text-muted-foreground">
             Toma una foto o sube una imagen para contar automáticamente las cajas
           </p>
         </div>
@@ -516,41 +525,83 @@ const MedicineCounter = () => {
                 Selecciona una opción para comenzar
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5 sm:space-y-4">
               {canManageRecords && (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="supplier-select">Proveedor</Label>
-                    <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-                      <SelectTrigger id="supplier-select">
-                        <SelectValue placeholder="Selecciona un proveedor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {suppliers?.map((supplier) => (
-                          <SelectItem key={supplier.id} value={supplier.id}>
-                            {supplier.company_name || supplier.full_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="supplier-select" className="text-base sm:text-sm">Proveedor</Label>
+                    {isMobile ? (
+                      <Drawer open={isSupplierDrawerOpen} onOpenChange={setIsSupplierDrawerOpen}>
+                        <DrawerTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-start text-left font-normal h-12 text-base"
+                          >
+                            {selectedSupplierName}
+                          </Button>
+                        </DrawerTrigger>
+                        <DrawerContent>
+                          <DrawerHeader>
+                            <DrawerTitle className="text-xl">Seleccionar Proveedor</DrawerTitle>
+                            <DrawerDescription>Elige el proveedor de la lista</DrawerDescription>
+                          </DrawerHeader>
+                          <ScrollArea className="h-[400px] px-4">
+                            <div className="space-y-2 pb-4">
+                              {suppliers?.map((supplier) => (
+                                <Button
+                                  key={supplier.id}
+                                  variant={selectedSupplier === supplier.id ? "default" : "outline"}
+                                  className="w-full justify-start h-14 text-base"
+                                  onClick={() => {
+                                    setSelectedSupplier(supplier.id);
+                                    setIsSupplierDrawerOpen(false);
+                                  }}
+                                >
+                                  {supplier.company_name || supplier.full_name}
+                                </Button>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                          <DrawerFooter>
+                            <DrawerClose asChild>
+                              <Button variant="outline" className="h-12 text-base">Cancelar</Button>
+                            </DrawerClose>
+                          </DrawerFooter>
+                        </DrawerContent>
+                      </Drawer>
+                    ) : (
+                      <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
+                        <SelectTrigger id="supplier-select">
+                          <SelectValue placeholder="Selecciona un proveedor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {suppliers?.map((supplier) => (
+                            <SelectItem key={supplier.id} value={supplier.id}>
+                              {supplier.company_name || supplier.full_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="purchase-order">No. Orden de Compra</Label>
+                    <Label htmlFor="purchase-order" className="text-base sm:text-sm">No. Orden de Compra</Label>
                     <Input
                       id="purchase-order"
                       type="text"
                       placeholder="Ej: OC_CITIO_25_05 o CPED25-24"
                       value={purchaseOrderNumber}
                       onChange={(e) => setPurchaseOrderNumber(e.target.value.toUpperCase())}
+                      className="h-12 sm:h-10 text-base sm:text-sm"
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm sm:text-xs text-muted-foreground">
                       Formato alfanumérico (ej: OC_CITIO_25_05, CPED25-24)
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="expected-quantity">Cantidad Esperada (Cajas)</Label>
+                    <Label htmlFor="expected-quantity" className="text-base sm:text-sm">Cantidad Esperada (Cajas)</Label>
                     <Input
                       id="expected-quantity"
                       type="number"
@@ -558,32 +609,33 @@ const MedicineCounter = () => {
                       placeholder="Ej: 20"
                       value={expectedQuantity}
                       onChange={(e) => setExpectedQuantity(e.target.value)}
+                      className="h-12 sm:h-10 text-base sm:text-sm"
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm sm:text-xs text-muted-foreground">
                       Número de cajas que debe entregar según la orden de compra
                     </p>
                   </div>
                 </>
               )}
 
-              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                 <Button
                   onClick={openCamera}
                   disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
                   variant="outline"
-                  className="w-full h-24 flex flex-col items-center justify-center gap-2"
+                  className="w-full h-28 sm:h-24 flex flex-col items-center justify-center gap-3"
                 >
-                  <Camera className="h-8 w-8" />
-                  <span className="text-base">Tomar Foto</span>
+                  <Camera className="h-10 w-10 sm:h-8 sm:w-8" />
+                  <span className="text-lg sm:text-base font-medium">Tomar Foto</span>
                 </Button>
                 
                 <Label
                   htmlFor="image-upload"
                   className={`cursor-pointer ${(isAnalyzing || (canManageRecords && !selectedSupplier)) ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
                 >
-                  <div className="w-full h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
-                    <Upload className="h-8 w-8" />
-                    <span className="text-base">Subir Imagen</span>
+                  <div className="w-full h-28 sm:h-24 flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
+                    <Upload className="h-10 w-10 sm:h-8 sm:w-8" />
+                    <span className="text-lg sm:text-base font-medium">Subir Imagen</span>
                   </div>
                   <Input
                     id="image-upload"
@@ -610,17 +662,17 @@ const MedicineCounter = () => {
                   <Button
                     onClick={analyzeImage}
                     disabled={isAnalyzing}
-                    className="w-full"
+                    className="w-full h-14 sm:h-11 text-lg sm:text-base"
                     size="lg"
                   >
                     {isAnalyzing ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-5 w-5 sm:h-4 sm:w-4 animate-spin" />
                         Analizando imagen...
                       </>
                     ) : (
                       <>
-                        <Upload className="mr-2 h-4 w-4" />
+                        <Upload className="mr-2 h-5 w-5 sm:h-4 sm:w-4" />
                         Analizar Imagen
                       </>
                     )}
@@ -791,17 +843,17 @@ const MedicineCounter = () => {
                     <Button
                       onClick={() => saveMutation.mutate()}
                       disabled={saveMutation.isPending || !selectedSupplier}
-                      className="w-full"
+                      className="w-full h-14 sm:h-11 text-lg sm:text-base"
                       size="lg"
                     >
                       {saveMutation.isPending ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader2 className="mr-2 h-5 w-5 sm:h-4 sm:w-4 animate-spin" />
                           Guardando...
                         </>
                       ) : (
                         <>
-                          <Save className="mr-2 h-4 w-4" />
+                          <Save className="mr-2 h-5 w-5 sm:h-4 sm:w-4" />
                           Guardar Registro
                         </>
                       )}
