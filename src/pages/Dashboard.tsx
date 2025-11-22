@@ -46,30 +46,30 @@ const Dashboard = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">
-            Bienvenido, {user?.email}
+      <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
+        <div className="space-y-1">
+          <h2 className="text-xl md:text-3xl font-bold tracking-tight">
+            Bienvenido
           </h2>
-          <p className="text-muted-foreground">
-            Aquí está el resumen de tu actividad
+          <p className="text-sm md:text-base text-muted-foreground">
+            {user?.email}
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
               <Card key={stat.title} className="shadow-md hover:shadow-lg transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
+                  <CardTitle className="text-xs md:text-sm font-medium">
                     {stat.title}
                   </CardTitle>
                   <Icon className={`h-4 w-4 ${stat.color}`} />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stat.value}</div>
-                  <p className="text-xs text-muted-foreground">
+                <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                  <div className="text-xl md:text-2xl font-bold">{stat.value}</div>
+                  <p className="text-[10px] md:text-xs text-muted-foreground line-clamp-1">
                     {stat.description}
                   </p>
                 </CardContent>
@@ -81,14 +81,14 @@ const Dashboard = () => {
         {isAdmin && <EmailServerStatus />}
 
         <Card className="shadow-md">
-          <CardHeader>
-            <CardTitle>Actividad Reciente</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 md:p-6">
+            <CardTitle className="text-base md:text-lg">Actividad Reciente</CardTitle>
+            <CardDescription className="text-sm">
               No hay actividad reciente para mostrar
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground text-center py-8">
+          <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
+            <p className="text-xs md:text-sm text-muted-foreground text-center py-6 md:py-8">
               Comienza a usar el sistema para ver tu actividad aquí
             </p>
           </CardContent>
