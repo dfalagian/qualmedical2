@@ -124,12 +124,26 @@ All colors MUST be HSL.
 
   /* Optimización para dispositivos táctiles */
   @media (max-width: 768px) {
+    html {
+      font-size: 14px;
+    }
+    
     button,
     input,
     select,
     textarea {
-      font-size: 16px;
-      min-height: 44px;
+      font-size: 14px;
+    }
+    
+    /* Prevenir zoom en iOS al hacer focus en inputs */
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="password"],
+    textarea,
+    select {
+      font-size: 16px !important;
     }
   }
 }
