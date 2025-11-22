@@ -12,17 +12,7 @@ export const PWAInstallPrompt = () => {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
 
-  // Detectar si es un dispositivo móvil
-  const isMobileDevice = () => {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  };
-
   useEffect(() => {
-    // Solo mostrar en dispositivos móviles
-    if (!isMobileDevice()) {
-      return;
-    }
-
     const handler = (e: Event) => {
       e.preventDefault();
       setInstallPrompt(e as BeforeInstallPromptEvent);
