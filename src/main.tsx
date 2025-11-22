@@ -1,14 +1,33 @@
 import { createRoot } from "react-dom/client";
+import { createElement } from "react";
 import App from "./App.tsx";
 import "./index.css";
 import { registerSW } from 'virtual:pwa-register';
+import { PWAUpdatePrompt } from "./components/PWAUpdatePrompt.tsx";
 
 // Registrar el service worker de la PWA
 const updateSW = registerSW({
   onNeedRefresh() {
-    if (confirm('Hay una nueva versión disponible. ¿Deseas actualizar?')) {
+    // Crear un contenedor temporal para el componente de actualización
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    
+    const handleUpdate = () => {
       updateSW(true);
-    }
+      root.unmount();
+      document.body.removeChild(container);
+    };
+    
+    const handleDismiss = () => {
+      root.unmount();
+      document.body.removeChild(container);
+    };
+    
+    const root = createRoot(container);
+    root.render(createElement(PWAUpdatePrompt, { 
+      onUpdate: handleUpdate, 
+      onDismiss: handleDismiss 
+    }));
   },
   onOfflineReady() {
     console.log('La aplicación está lista para funcionar sin conexión');
