@@ -87,7 +87,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             to={item.href}
             onClick={onItemClick}
             className={cn(
-              "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200",
+              "flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 rounded-lg transition-all duration-200 text-sm md:text-base",
               isActive
                 ? "bg-gradient-primary text-primary-foreground shadow-md"
                 : "text-foreground hover:bg-accent/20 hover:text-accent-foreground"
@@ -105,8 +105,8 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     <div className="min-h-screen bg-background">
       <DashboardHeader />
 
-      <div className="container mx-auto px-4">
-        <div className="flex gap-6 py-6">
+      <div className="container mx-auto px-3 md:px-4">
+        <div className="flex gap-4 md:gap-6 py-3 md:py-6">
           {/* Desktop Sidebar */}
           <aside className="hidden lg:block w-64 shrink-0">
             <nav className="space-y-1 sticky top-6">
@@ -115,19 +115,19 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           </aside>
 
           {/* Mobile Menu Button */}
-          <div className="lg:hidden fixed bottom-6 right-6 z-50">
+          <div className="lg:hidden fixed bottom-4 right-4 z-50">
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button
                   size="lg"
-                  className="rounded-full h-14 w-14 shadow-lg"
+                  className="rounded-full h-12 w-12 md:h-14 md:w-14 shadow-xl hover:shadow-2xl transition-shadow"
                 >
-                  <Menu className="h-6 w-6" />
+                  <Menu className="h-5 w-5 md:h-6 md:w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-72 p-0">
-                <div className="flex items-center justify-between p-4 border-b">
-                  <h2 className="font-semibold text-lg">Menú</h2>
+              <SheetContent side="left" className="w-[280px] md:w-72 p-0">
+                <div className="flex items-center justify-between p-4 border-b bg-card">
+                  <h2 className="font-semibold text-base md:text-lg">Menú</h2>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -136,7 +136,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                     <X className="h-5 w-5" />
                   </Button>
                 </div>
-                <nav className="space-y-1 p-4">
+                <nav className="space-y-1 p-3 md:p-4">
                   <NavigationItems onItemClick={() => setMobileMenuOpen(false)} />
                 </nav>
               </SheetContent>
