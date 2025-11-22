@@ -501,37 +501,37 @@ const MedicineCounter = () => {
 
   return (
     <DashboardLayout>
-      <div className="w-full py-2 px-2 md:py-6 md:px-4 lg:px-6 max-w-4xl mx-auto">
-        <div className="mb-2 md:mb-6">
-          <h1 className="text-base md:text-2xl lg:text-3xl font-bold mb-0.5 md:mb-2">
+      <div className="w-full py-3 px-3 md:py-6 md:px-4 lg:px-6 max-w-4xl mx-auto">
+        <div className="mb-3 md:mb-6">
+          <h1 className="text-lg md:text-2xl lg:text-3xl font-bold mb-1 md:mb-2">
             Contador de Cajas de Medicamentos
           </h1>
-          <p className="text-xs md:text-base text-muted-foreground">
+          <p className="text-sm md:text-base text-muted-foreground">
             Toma una foto o sube una imagen para contar automáticamente las cajas
           </p>
         </div>
 
-        <div className="grid gap-2 md:gap-4 lg:gap-6">
+        <div className="grid gap-3 md:gap-4 lg:gap-6">
           <Card>
-            <CardHeader className="pb-2 md:pb-4 px-2 md:px-6 pt-2 md:pt-6">
-              <CardTitle className="flex items-center gap-1.5 text-sm md:text-xl lg:text-2xl">
-                <Camera className="h-4 w-4 md:h-6 md:w-6" />
+            <CardHeader className="pb-3 md:pb-4 px-3 md:px-6 pt-3 md:pt-6">
+              <CardTitle className="flex items-center gap-2 text-base md:text-xl lg:text-2xl">
+                <Camera className="h-5 w-5 md:h-6 md:w-6" />
                 Cargar Imagen
               </CardTitle>
-              <CardDescription className="text-xs md:text-base">
+              <CardDescription className="text-sm md:text-base">
                 Selecciona una opción para comenzar
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 md:space-y-4 lg:space-y-6 px-2 md:px-6 pb-2 md:pb-6">
+            <CardContent className="space-y-3 md:space-y-4 lg:space-y-6 px-3 md:px-6 pb-3 md:pb-6">
               {canManageRecords && (
                 <>
-                  <div className="space-y-1">
-                    <Label htmlFor="supplier-select" className="text-xs md:text-base font-semibold">Proveedor *</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="supplier-select" className="text-sm md:text-base font-semibold">Proveedor *</Label>
                     <Drawer open={isSupplierDrawerOpen} onOpenChange={setIsSupplierDrawerOpen}>
                       <DrawerTrigger asChild>
                         <Button 
                           variant="outline" 
-                          className="w-full justify-start text-left font-normal h-9 md:h-14 lg:h-12 text-xs md:text-base border-2 hover:border-primary px-2 md:px-4"
+                          className="w-full justify-start text-left font-normal h-11 md:h-14 lg:h-12 text-sm md:text-base border-2 hover:border-primary px-3 md:px-4"
                         >
                           <span className={selectedSupplier ? "text-foreground" : "text-muted-foreground"}>
                             {selectedSupplierName}
@@ -569,20 +569,20 @@ const MedicineCounter = () => {
                     </Drawer>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="purchase-order" className="text-xs md:text-base font-semibold">No. Orden de Compra</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="purchase-order" className="text-sm md:text-base font-semibold">No. Orden de Compra</Label>
                     <Input
                       id="purchase-order"
                       type="text"
                       placeholder="Ej: OC_CITIO_25_05"
                       value={purchaseOrderNumber}
                       onChange={(e) => setPurchaseOrderNumber(e.target.value.toUpperCase())}
-                      className="h-8 md:h-12 lg:h-11 text-xs md:text-base px-2 md:px-4"
+                      className="h-11 md:h-12 lg:h-11 text-sm md:text-base px-3 md:px-4"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="expected-quantity" className="text-xs md:text-base font-semibold">Cantidad Esperada (Cajas)</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="expected-quantity" className="text-sm md:text-base font-semibold">Cantidad Esperada (Cajas)</Label>
                     <Input
                       id="expected-quantity"
                       type="number"
@@ -590,20 +590,20 @@ const MedicineCounter = () => {
                       placeholder="Ej: 20"
                       value={expectedQuantity}
                       onChange={(e) => setExpectedQuantity(e.target.value)}
-                      className="h-8 md:h-12 lg:h-11 text-xs md:text-base px-2 md:px-4"
+                      className="h-11 md:h-12 lg:h-11 text-sm md:text-base px-3 md:px-4"
                     />
                   </div>
                 </>
               )}
 
-              <div className="grid gap-1.5 grid-cols-2">
+              <div className="grid gap-2 grid-cols-2">
                 <Button
                   onClick={openCamera}
                   disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
                   variant="outline"
-                  className="w-full h-16 md:h-24 lg:h-28 flex flex-col items-center justify-center gap-1 border-2 text-xs md:text-base"
+                  className="w-full h-20 md:h-24 lg:h-28 flex flex-col items-center justify-center gap-1.5 border-2 text-sm md:text-base"
                 >
-                  <Camera className="h-5 w-5 md:h-8 md:w-8 lg:h-10 lg:w-10" />
+                  <Camera className="h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10" />
                   <span className="font-semibold">Tomar Foto</span>
                 </Button>
                 
@@ -611,8 +611,8 @@ const MedicineCounter = () => {
                   htmlFor="image-upload"
                   className={`cursor-pointer ${(isAnalyzing || (canManageRecords && !selectedSupplier)) ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
                 >
-                  <div className="w-full h-16 md:h-24 lg:h-28 flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded-md hover:bg-accent transition-colors text-xs md:text-base">
-                    <Upload className="h-5 w-5 md:h-8 md:w-8 lg:h-10 lg:w-10" />
+                  <div className="w-full h-20 md:h-24 lg:h-28 flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-md hover:bg-accent transition-colors text-sm md:text-base">
+                    <Upload className="h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10" />
                     <span className="font-semibold">Subir Imagen</span>
                   </div>
                   <Input
