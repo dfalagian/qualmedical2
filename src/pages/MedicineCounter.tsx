@@ -501,37 +501,35 @@ const MedicineCounter = () => {
 
   return (
     <DashboardLayout>
-      <div className="w-full py-3 px-3 md:py-6 md:px-4 lg:px-6 max-w-4xl mx-auto">
-        <div className="mb-3 md:mb-6">
-          <h1 className="text-lg md:text-2xl lg:text-3xl font-bold mb-1 md:mb-2">
-            Contador de Cajas de Medicamentos
-          </h1>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Toma una foto o sube una imagen para contar automáticamente las cajas
-          </p>
-        </div>
-
-        <div className="grid gap-3 md:gap-4 lg:gap-6">
-          <Card>
-            <CardHeader className="pb-3 md:pb-4 px-3 md:px-6 pt-3 md:pt-6">
-              <CardTitle className="flex items-center gap-2 text-base md:text-xl lg:text-2xl">
-                <Camera className="h-5 w-5 md:h-6 md:w-6" />
-                Cargar Imagen
-              </CardTitle>
-              <CardDescription className="text-sm md:text-base">
-                Selecciona una opción para comenzar
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 md:space-y-4 lg:space-y-6 px-3 md:px-6 pb-3 md:pb-6">
+      <div className="w-full h-full overflow-x-hidden">
+        {/* Mobile: Stack vertical sin gaps, Desktop: Grid con gaps */}
+        <div className="flex flex-col md:max-w-4xl md:mx-auto md:py-6 md:px-4 lg:px-6 md:gap-6">
+          
+          {/* Header - Solo visible en desktop, en móvil está integrado en cada sección */}
+          <div className="hidden md:block mb-6">
+            <h1 className="text-2xl lg:text-3xl font-bold mb-2">
+              Contador de Cajas de Medicamentos
+            </h1>
+            <p className="text-base text-muted-foreground">
+              Toma una foto o sube una imagen para contar automáticamente las cajas
+            </p>
+          </div>
+          {/* Card principal - Sin bordes en móvil, con card en desktop */}
+          <div className="md:hidden bg-background">
+            <div className="p-4 space-y-4 border-b">
+              <div>
+                <h2 className="text-xl font-bold mb-1">Contador de Medicamentos</h2>
+                <p className="text-sm text-muted-foreground">Selecciona una opción para comenzar</p>
+              </div>
               {canManageRecords && (
-                <>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="supplier-select" className="text-sm md:text-base font-semibold">Proveedor *</Label>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="supplier-select" className="font-semibold">Proveedor *</Label>
                     <Drawer open={isSupplierDrawerOpen} onOpenChange={setIsSupplierDrawerOpen}>
                       <DrawerTrigger asChild>
                         <Button 
                           variant="outline" 
-                          className="w-full justify-start text-left font-normal h-11 md:h-14 lg:h-12 text-sm md:text-base border-2 hover:border-primary px-3 md:px-4"
+                          className="w-full justify-start text-left font-normal h-12 border-2 hover:border-primary"
                         >
                           <span className={selectedSupplier ? "text-foreground" : "text-muted-foreground"}>
                             {selectedSupplierName}
@@ -569,20 +567,20 @@ const MedicineCounter = () => {
                     </Drawer>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="purchase-order" className="text-sm md:text-base font-semibold">No. Orden de Compra</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="purchase-order" className="font-semibold">No. Orden de Compra</Label>
                     <Input
                       id="purchase-order"
                       type="text"
                       placeholder="Ej: OC_CITIO_25_05"
                       value={purchaseOrderNumber}
                       onChange={(e) => setPurchaseOrderNumber(e.target.value.toUpperCase())}
-                      className="h-11 md:h-12 lg:h-11 text-sm md:text-base px-3 md:px-4"
+                      className="h-12"
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="expected-quantity" className="text-sm md:text-base font-semibold">Cantidad Esperada (Cajas)</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="expected-quantity" className="font-semibold">Cantidad Esperada (Cajas)</Label>
                     <Input
                       id="expected-quantity"
                       type="number"
@@ -590,30 +588,30 @@ const MedicineCounter = () => {
                       placeholder="Ej: 20"
                       value={expectedQuantity}
                       onChange={(e) => setExpectedQuantity(e.target.value)}
-                      className="h-11 md:h-12 lg:h-11 text-sm md:text-base px-3 md:px-4"
+                      className="h-12"
                     />
                   </div>
-                </>
+                </div>
               )}
 
-              <div className="grid gap-2 grid-cols-2">
+              <div className="grid gap-3 grid-cols-2">
                 <Button
                   onClick={openCamera}
                   disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
                   variant="outline"
-                  className="w-full h-20 md:h-24 lg:h-28 flex flex-col items-center justify-center gap-1.5 border-2 text-sm md:text-base"
+                  className="h-24 flex flex-col items-center justify-center gap-2 border-2"
                 >
-                  <Camera className="h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10" />
-                  <span className="font-semibold">Tomar Foto</span>
+                  <Camera className="h-8 w-8" />
+                  <span className="font-semibold text-sm">Tomar Foto</span>
                 </Button>
                 
                 <Label
                   htmlFor="image-upload"
                   className={`cursor-pointer ${(isAnalyzing || (canManageRecords && !selectedSupplier)) ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
                 >
-                  <div className="w-full h-20 md:h-24 lg:h-28 flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-md hover:bg-accent transition-colors text-sm md:text-base">
-                    <Upload className="h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10" />
-                    <span className="font-semibold">Subir Imagen</span>
+                  <div className="h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
+                    <Upload className="h-8 w-8" />
+                    <span className="font-semibold text-sm">Subir Imagen</span>
                   </div>
                   <Input
                     id="image-upload"
@@ -628,29 +626,176 @@ const MedicineCounter = () => {
               </div>
 
               {preview && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="relative rounded-lg overflow-hidden border bg-muted">
                     <img
                       src={preview}
                       alt="Vista previa"
-                      className="w-full h-auto max-h-[180px] md:max-h-[300px] lg:max-h-96 object-contain"
+                      className="w-full h-auto max-h-[200px] object-contain"
                     />
                   </div>
 
                   <Button
                     onClick={analyzeImage}
                     disabled={isAnalyzing}
-                    className="w-full h-9 md:h-12 text-xs md:text-base font-semibold"
+                    className="w-full h-12 font-semibold"
                     size="lg"
                   >
                     {isAnalyzing ? (
                       <>
-                        <Loader2 className="mr-1.5 h-3.5 w-3.5 md:h-5 md:w-5 animate-spin" />
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Analizando...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-5 w-5" />
+                        Analizar Imagen
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Desktop version with Card */}
+          <Card className="hidden md:block">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl lg:text-2xl">
+                <Camera className="h-6 w-6" />
+                Cargar Imagen
+              </CardTitle>
+              <CardDescription>Selecciona una opción para comenzar</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {canManageRecords && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="supplier-select-desktop" className="font-semibold">Proveedor *</Label>
+                    <Drawer open={isSupplierDrawerOpen} onOpenChange={setIsSupplierDrawerOpen}>
+                      <DrawerTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-start text-left font-normal h-12 border-2 hover:border-primary"
+                        >
+                          <span className={selectedSupplier ? "text-foreground" : "text-muted-foreground"}>
+                            {selectedSupplierName}
+                          </span>
+                        </Button>
+                      </DrawerTrigger>
+                      <DrawerContent className="h-[90vh]">
+                        <DrawerHeader className="border-b pb-4 px-4">
+                          <DrawerTitle className="text-2xl">Seleccionar Proveedor</DrawerTitle>
+                          <DrawerDescription className="mt-1">Toca para seleccionar el proveedor</DrawerDescription>
+                        </DrawerHeader>
+                        <ScrollArea className="flex-1 px-4">
+                          <div className="space-y-2 py-4">
+                            {suppliers?.map((supplier) => (
+                              <Button
+                                key={supplier.id}
+                                variant={selectedSupplier === supplier.id ? "default" : "outline"}
+                                className="w-full justify-start h-14 text-base font-medium border-2"
+                                onClick={() => {
+                                  setSelectedSupplier(supplier.id);
+                                  setIsSupplierDrawerOpen(false);
+                                }}
+                              >
+                                {supplier.company_name || supplier.full_name}
+                              </Button>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                        <DrawerFooter className="border-t pt-4 px-4">
+                          <DrawerClose asChild>
+                            <Button variant="outline" className="h-12">Cancelar</Button>
+                          </DrawerClose>
+                        </DrawerFooter>
+                      </DrawerContent>
+                    </Drawer>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="purchase-order-desktop">No. Orden de Compra</Label>
+                    <Input
+                      id="purchase-order-desktop"
+                      type="text"
+                      placeholder="Ej: OC_CITIO_25_05"
+                      value={purchaseOrderNumber}
+                      onChange={(e) => setPurchaseOrderNumber(e.target.value.toUpperCase())}
+                      className="h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="expected-quantity-desktop">Cantidad Esperada (Cajas)</Label>
+                    <Input
+                      id="expected-quantity-desktop"
+                      type="number"
+                      min="1"
+                      placeholder="Ej: 20"
+                      value={expectedQuantity}
+                      onChange={(e) => setExpectedQuantity(e.target.value)}
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid gap-4 grid-cols-2">
+                <Button
+                  onClick={openCamera}
+                  disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
+                  variant="outline"
+                  className="h-28 flex flex-col items-center justify-center gap-2 border-2"
+                >
+                  <Camera className="h-10 w-10" />
+                  <span className="font-semibold">Tomar Foto</span>
+                </Button>
+                
+                <Label
+                  htmlFor="image-upload-desktop"
+                  className={`cursor-pointer ${(isAnalyzing || (canManageRecords && !selectedSupplier)) ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+                >
+                  <div className="h-28 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
+                    <Upload className="h-10 w-10" />
+                    <span className="font-semibold">Subir Imagen</span>
+                  </div>
+                  <Input
+                    id="image-upload-desktop"
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFileSelect}
+                    disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
+                    className="hidden"
+                  />
+                </Label>
+              </div>
+
+              {preview && (
+                <div className="space-y-4">
+                  <div className="relative rounded-lg overflow-hidden border bg-muted">
+                    <img
+                      src={preview}
+                      alt="Vista previa"
+                      className="w-full h-auto max-h-96 object-contain"
+                    />
+                  </div>
+
+                  <Button
+                    onClick={analyzeImage}
+                    disabled={isAnalyzing}
+                    className="w-full h-12 font-semibold"
+                    size="lg"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                         Analizando imagen...
                       </>
                     ) : (
                       <>
-                        <Upload className="mr-1.5 h-3.5 w-3.5 md:h-5 md:w-5" />
+                        <Upload className="mr-2 h-5 w-5" />
                         Analizar Imagen
                       </>
                     )}
@@ -661,220 +806,396 @@ const MedicineCounter = () => {
           </Card>
 
           {result && (
-            <Card>
-              <CardHeader className="px-2 md:px-6 pt-2 md:pt-6 pb-2 md:pb-6">
-                <CardTitle className="text-sm md:text-xl lg:text-2xl">Resultados del Análisis</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 md:space-y-6 px-2 md:px-6 pb-2 md:pb-6">
-                {result.count !== null && (
-                  <div className="p-3 md:p-6 lg:p-8 rounded-lg bg-primary/10 border-2 border-primary">
-                    <div className="text-center space-y-1 md:space-y-3">
-                      <p className="text-xs text-muted-foreground">Total de Cajas Detectadas</p>
-                      <p className="text-3xl md:text-5xl lg:text-6xl font-bold text-primary">{result.count}</p>
-                      
-                      {/* Mostrar diferencia si hay cantidad esperada */}
-                      {expectedQuantity && parseInt(expectedQuantity) > 0 && (
-                        <div className="mt-3 pt-3 border-t border-primary/20">
-                          <div className="flex justify-center gap-4 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">Esperadas</p>
-                              <p className="font-semibold">{expectedQuantity}</p>
+            <>
+              {/* Mobile version */}
+              <div className="md:hidden bg-background">
+                <div className="p-4 space-y-4 border-b">
+                  <h2 className="text-xl font-bold">Resultados</h2>
+                  {result.count !== null && (
+                    <div className="p-6 rounded-lg bg-primary/10 border-2 border-primary">
+                      <div className="text-center space-y-2">
+                        <p className="text-sm text-muted-foreground">Total de Cajas</p>
+                        <p className="text-5xl font-bold text-primary">{result.count}</p>
+                        
+                        {expectedQuantity && parseInt(expectedQuantity) > 0 && (
+                          <div className="mt-4 pt-4 border-t border-primary/20">
+                            <div className="flex justify-center gap-6">
+                              <div>
+                                <p className="text-xs text-muted-foreground">Esperadas</p>
+                                <p className="text-lg font-semibold">{expectedQuantity}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Entregadas</p>
+                                <p className="text-lg font-semibold">{result.count}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Pendientes</p>
+                                <p className={`text-lg font-semibold ${
+                                  parseInt(expectedQuantity) > result.count ? 'text-yellow-600' : 'text-green-600'
+                                }`}>
+                                  {Math.max(0, parseInt(expectedQuantity) - result.count)}
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-muted-foreground">Entregadas</p>
-                              <p className="font-semibold">{result.count}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Pendientes</p>
-                              <p className={`font-semibold ${
-                                parseInt(expectedQuantity) > result.count ? 'text-yellow-600' : 'text-green-600'
-                              }`}>
-                                {Math.max(0, parseInt(expectedQuantity) - result.count)}
-                              </p>
-                            </div>
+                            {parseInt(expectedQuantity) > result.count && (
+                              <Badge variant="secondary" className="mt-3">
+                                ⚠️ Entrega Parcial
+                              </Badge>
+                            )}
                           </div>
-                          {parseInt(expectedQuantity) > result.count && (
-                            <Badge variant="secondary" className="mt-2">
-                              ⚠️ Entrega Parcial
+                        )}
+                        
+                        <div className="flex justify-center gap-2 flex-wrap mt-3">
+                          {result.confidence && (
+                            <Badge 
+                              variant={
+                                result.confidence === 'Alto' ? 'default' : 
+                                result.confidence === 'Medio' ? 'secondary' : 
+                                'destructive'
+                              }
+                            >
+                              Confianza: {result.confidence}
+                            </Badge>
+                          )}
+                          {result.imageQuality && (
+                            <Badge 
+                              variant={
+                                result.imageQuality === 'Excelente' || result.imageQuality === 'Buena' ? 'default' : 
+                                result.imageQuality === 'Regular' ? 'secondary' : 
+                                'outline'
+                              }
+                            >
+                              Calidad: {result.imageQuality}
                             </Badge>
                           )}
                         </div>
-                      )}
-                      
-                      {/* Badges de calidad y confianza */}
-                      <div className="flex justify-center gap-2 flex-wrap mt-3">
-                        {result.confidence && (
-                          <Badge 
-                            variant={
-                              result.confidence === 'Alto' ? 'default' : 
-                              result.confidence === 'Medio' ? 'secondary' : 
-                              'destructive'
-                            }
-                            className="text-xs"
-                          >
-                            Confianza: {result.confidence}
-                          </Badge>
-                        )}
-                        {result.imageQuality && (
-                          <Badge 
-                            variant={
-                              result.imageQuality === 'Excelente' || result.imageQuality === 'Buena' ? 'default' : 
-                              result.imageQuality === 'Regular' ? 'secondary' : 
-                              'outline'
-                            }
-                            className="text-xs"
-                          >
-                            Calidad: {result.imageQuality}
-                          </Badge>
-                        )}
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Advertencias si existen */}
-                {result.warnings && result.warnings.length > 0 && (
+                  {result.warnings && result.warnings.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-yellow-600 font-semibold">Advertencias</Label>
+                      <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200 space-y-1">
+                        {result.warnings.map((warning, idx) => (
+                          <p key={idx} className="text-sm text-yellow-800">{warning}</p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
-                    <Label className="text-sm sm:text-base text-yellow-600">Advertencias</Label>
-                    <div className="p-3 sm:p-4 rounded-lg bg-yellow-50 border border-yellow-200 space-y-1">
-                      {result.warnings.map((warning, idx) => (
-                        <p key={idx} className="text-xs sm:text-sm text-yellow-800">{warning}</p>
-                      ))}
+                    <Label className="font-semibold">Análisis Detallado</Label>
+                    <div className="p-3 rounded-lg bg-muted whitespace-pre-wrap text-sm">
+                      {result.analysis}
                     </div>
                   </div>
-                )}
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs md:text-base">Análisis Detallado</Label>
-                  <div className="p-2 md:p-4 rounded-lg bg-muted whitespace-pre-wrap text-xs">
-                    {result.analysis}
-                  </div>
-                </div>
-
-                {canManageRecords ? (
-                    <>
-                      <div className="space-y-2 border-t pt-2">
-                        <Label className="text-xs md:text-base font-semibold">Documento de Entrega</Label>
-                        <p className="text-xs text-muted-foreground">
+                  {canManageRecords ? (
+                    <div className="space-y-4">
+                      <div className="space-y-3 border-t pt-4">
+                        <Label className="font-semibold">Documento de Entrega</Label>
+                        <p className="text-sm text-muted-foreground">
                           Captura la hoja firmada de quien recibe el medicamento
                         </p>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        <div className="grid grid-cols-2 gap-3">
                           <Button
                             onClick={openDeliveryCamera}
                             variant="outline"
-                            className="w-full h-16 flex flex-col items-center justify-center gap-1"
+                            className="h-20 flex flex-col items-center justify-center gap-2"
                           >
-                            <Camera className="h-5 w-5" />
-                            <span className="text-xs">Tomar Foto del Documento</span>
+                            <Camera className="h-6 w-6" />
+                            <span className="text-xs font-semibold">Tomar Foto</span>
                           </Button>
                           
                           <Label htmlFor="delivery-doc-upload" className="cursor-pointer">
-                            <div className="w-full h-16 flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
-                              <Upload className="h-5 w-5" />
-                              <span className="text-xs">Subir Documento</span>
+                            <div className="h-20 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
+                              <Upload className="h-6 w-6" />
+                              <span className="text-xs font-semibold">Subir Documento</span>
                             </div>
-                          <Input
-                            id="delivery-doc-upload"
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            onChange={handleDeliveryDocSelect}
-                            className="hidden"
-                          />
-                        </Label>
+                            <Input
+                              id="delivery-doc-upload"
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={handleDeliveryDocSelect}
+                              className="hidden"
+                            />
+                          </Label>
+                        </div>
+
+                        {deliveryDocPreview && (
+                          <div className="relative rounded-lg overflow-hidden border bg-muted">
+                            <img
+                              src={deliveryDocPreview}
+                              alt="Documento de entrega"
+                              className="w-full h-auto max-h-[250px] object-contain"
+                            />
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-2 right-2"
+                              onClick={() => {
+                                setDeliveryDocPreview(null);
+                                setDeliveryDocFile(null);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
 
-                      {deliveryDocPreview && (
-                        <div className="relative rounded-lg overflow-hidden border bg-muted">
-                          <img
-                            src={deliveryDocPreview}
-                            alt="Documento de entrega"
-                            className="w-full h-auto max-h-[300px] object-contain"
-                          />
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            className="absolute top-2 right-2"
-                            onClick={() => {
-                              setDeliveryDocPreview(null);
-                              setDeliveryDocFile(null);
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                      <div className="space-y-2">
+                        <Label htmlFor="notes">Notas Adicionales (Opcional)</Label>
+                        <Textarea
+                          id="notes"
+                          placeholder="Agrega cualquier observación adicional..."
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          rows={3}
+                        />
+                      </div>
+
+                      <Button
+                        onClick={() => saveMutation.mutate()}
+                        disabled={saveMutation.isPending || !selectedSupplier}
+                        className="w-full h-12 font-semibold"
+                        size="lg"
+                      >
+                        {saveMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Guardando...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-5 w-5" />
+                            Guardar Registro
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                      ⚠️ No tienes permisos para guardar registros
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Desktop version */}
+              <Card className="hidden md:block">
+                <CardHeader>
+                  <CardTitle className="text-xl lg:text-2xl">Resultados del Análisis</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {result.count !== null && (
+                    <div className="p-8 rounded-lg bg-primary/10 border-2 border-primary">
+                      <div className="text-center space-y-3">
+                        <p className="text-sm text-muted-foreground">Total de Cajas Detectadas</p>
+                        <p className="text-6xl font-bold text-primary">{result.count}</p>
+                        
+                        {expectedQuantity && parseInt(expectedQuantity) > 0 && (
+                          <div className="mt-4 pt-4 border-t border-primary/20">
+                            <div className="flex justify-center gap-8 text-base">
+                              <div>
+                                <p className="text-muted-foreground">Esperadas</p>
+                                <p className="text-xl font-semibold">{expectedQuantity}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Entregadas</p>
+                                <p className="text-xl font-semibold">{result.count}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Pendientes</p>
+                                <p className={`text-xl font-semibold ${
+                                  parseInt(expectedQuantity) > result.count ? 'text-yellow-600' : 'text-green-600'
+                                }`}>
+                                  {Math.max(0, parseInt(expectedQuantity) - result.count)}
+                                </p>
+                              </div>
+                            </div>
+                            {parseInt(expectedQuantity) > result.count && (
+                              <Badge variant="secondary" className="mt-3">
+                                ⚠️ Entrega Parcial
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-center gap-2 flex-wrap mt-4">
+                          {result.confidence && (
+                            <Badge 
+                              variant={
+                                result.confidence === 'Alto' ? 'default' : 
+                                result.confidence === 'Medio' ? 'secondary' : 
+                                'destructive'
+                              }
+                            >
+                              Confianza: {result.confidence}
+                            </Badge>
+                          )}
+                          {result.imageQuality && (
+                            <Badge 
+                              variant={
+                                result.imageQuality === 'Excelente' || result.imageQuality === 'Buena' ? 'default' : 
+                                result.imageQuality === 'Regular' ? 'secondary' : 
+                                'outline'
+                              }
+                            >
+                              Calidad: {result.imageQuality}
+                            </Badge>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
+                  )}
 
-                    <div className="space-y-1.5">
-                      <Label htmlFor="notes" className="text-xs">Notas Adicionales (Opcional)</Label>
-                      <Textarea
-                        id="notes"
-                        placeholder="Agrega cualquier observación adicional..."
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        rows={3}
-                        className="text-xs"
-                      />
+                  {result.warnings && result.warnings.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-yellow-600 font-semibold">Advertencias</Label>
+                      <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-200 space-y-1">
+                        {result.warnings.map((warning, idx) => (
+                          <p key={idx} className="text-sm text-yellow-800">{warning}</p>
+                        ))}
+                      </div>
                     </div>
+                  )}
 
-                    <Button
-                      onClick={() => saveMutation.mutate()}
-                      disabled={saveMutation.isPending || !selectedSupplier}
-                      className="w-full h-9 md:h-12 text-xs md:text-base font-semibold"
-                      size="lg"
-                    >
-                      {saveMutation.isPending ? (
-                        <>
-                          <Loader2 className="mr-1.5 h-3.5 w-3.5 md:h-5 md:w-5 animate-spin" />
-                          Guardando...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="mr-1.5 h-3.5 w-3.5 md:h-5 md:w-5" />
-                          Guardar Registro
-                        </>
-                      )}
-                    </Button>
-                  </>
-                ) : (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                    ⚠️ No tienes permisos para guardar registros. Roles: Admin={isAdmin ? 'Sí' : 'No'}, Contador={isContador ? 'Sí' : 'No'}
+                  <div className="space-y-2">
+                    <Label>Análisis Detallado</Label>
+                    <div className="p-4 rounded-lg bg-muted whitespace-pre-wrap text-sm">
+                      {result.analysis}
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+
+                  {canManageRecords ? (
+                    <div className="space-y-6">
+                      <div className="space-y-4 border-t pt-6">
+                        <Label className="font-semibold">Documento de Entrega</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Captura la hoja firmada de quien recibe el medicamento
+                        </p>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <Button
+                            onClick={openDeliveryCamera}
+                            variant="outline"
+                            className="h-24 flex flex-col items-center justify-center gap-2"
+                          >
+                            <Camera className="h-8 w-8" />
+                            <span className="text-sm font-semibold">Tomar Foto del Documento</span>
+                          </Button>
+                          
+                          <Label htmlFor="delivery-doc-upload-desktop" className="cursor-pointer">
+                            <div className="h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
+                              <Upload className="h-8 w-8" />
+                              <span className="text-sm font-semibold">Subir Documento</span>
+                            </div>
+                            <Input
+                              id="delivery-doc-upload-desktop"
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={handleDeliveryDocSelect}
+                              className="hidden"
+                            />
+                          </Label>
+                        </div>
+
+                        {deliveryDocPreview && (
+                          <div className="relative rounded-lg overflow-hidden border bg-muted">
+                            <img
+                              src={deliveryDocPreview}
+                              alt="Documento de entrega"
+                              className="w-full h-auto max-h-[300px] object-contain"
+                            />
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-2 right-2"
+                              onClick={() => {
+                                setDeliveryDocPreview(null);
+                                setDeliveryDocFile(null);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="notes-desktop">Notas Adicionales (Opcional)</Label>
+                        <Textarea
+                          id="notes-desktop"
+                          placeholder="Agrega cualquier observación adicional..."
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          rows={3}
+                        />
+                      </div>
+
+                      <Button
+                        onClick={() => saveMutation.mutate()}
+                        disabled={saveMutation.isPending || !selectedSupplier}
+                        className="w-full h-12 font-semibold"
+                        size="lg"
+                      >
+                        {saveMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Guardando...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-5 w-5" />
+                            Guardar Registro
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                      ⚠️ No tienes permisos para guardar registros. Roles: Admin={isAdmin ? 'Sí' : 'No'}, Contador={isContador ? 'Sí' : 'No'}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
           )}
 
           {canManageRecords && countHistory && countHistory.length > 0 && (
-            <Card>
-              <CardHeader className="px-2 md:px-6 pt-2 md:pt-6 pb-2 md:pb-4">
-                <CardTitle className="flex items-center gap-1.5 text-sm md:text-lg">
-                  <History className="h-3.5 w-3.5 md:h-5 md:w-5" />
-                  Historial de Conteos
-                </CardTitle>
-                <CardDescription className="text-xs">Todos los registros guardados</CardDescription>
-              </CardHeader>
-              <CardContent className="px-2 md:px-6 pb-2 md:pb-6">
-                <div className="mb-2">
+            <>
+              {/* Mobile version */}
+              <div className="md:hidden bg-background">
+                <div className="p-4 space-y-4 border-b">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <History className="h-5 w-5" />
+                      <h2 className="text-xl font-bold">Historial</h2>
+                    </div>
+                    <Badge variant="secondary">{countHistory.length}</Badge>
+                  </div>
                   <Input
                     placeholder="Buscar por proveedor..."
                     value={supplierFilter}
                     onChange={(e) => setSupplierFilter(e.target.value)}
-                    className="max-w-md h-8 text-xs"
+                    className="h-10"
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="divide-y">
                   {countHistory.map((record: any) => (
-                    <Collapsible key={record.id} className="border rounded-lg">
-                      <div className="flex items-start justify-between p-2 sm:p-4">
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-semibold text-xs sm:text-base">
+                    <Collapsible key={record.id}>
+                      <div className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 space-y-2 min-w-0">
+                            <p className="font-semibold truncate">
                               {record.supplier?.company_name || record.supplier?.full_name}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
+                            </p>
+                            <p className="text-xs text-muted-foreground">
                               {new Date(record.created_at).toLocaleDateString('es-MX', {
                                 day: '2-digit',
                                 month: 'short',
@@ -882,86 +1203,81 @@ const MedicineCounter = () => {
                                 hour: '2-digit',
                                 minute: '2-digit'
                               })}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-xs text-muted-foreground">
-                              Cajas contadas: <span className="font-semibold text-primary">{record.count}</span>
                             </p>
-                            {record.expected_quantity && (
-                              <>
-                                <span className="text-xs text-muted-foreground">
-                                  / Esperadas: <span className="font-semibold">{record.expected_quantity}</span>
-                                </span>
-                                {record.expected_quantity > record.count && (
-                                  <span className="text-xs text-yellow-600">
-                                    (Pendientes: {record.expected_quantity - record.count})
-                                  </span>
-                                )}
-                              </>
-                            )}
-                            {record.is_partial_delivery && (
-                              <Badge variant="secondary" className="text-xs">
-                                ⚠️ Entrega Parcial
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant="default" className="text-sm">
+                                {record.count} cajas
                               </Badge>
-                            )}
-                            {record.purchase_order_number && (
-                              <Badge variant="outline" className="text-xs">
-                                OC: {record.purchase_order_number}
-                              </Badge>
-                            )}
-                            {record.analysis && (
-                              <CollapsibleTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                                  Ver análisis completo
-                                  <ChevronDown className="h-3 w-3 ml-1" />
-                                </Button>
-                              </CollapsibleTrigger>
+                              {record.expected_quantity && (
+                                <Badge variant="outline" className="text-xs">
+                                  Esperadas: {record.expected_quantity}
+                                </Badge>
+                              )}
+                              {record.is_partial_delivery && (
+                                <Badge variant="secondary" className="text-xs">
+                                  ⚠️ Parcial
+                                </Badge>
+                              )}
+                              {record.purchase_order_number && (
+                                <Badge variant="outline" className="text-xs">
+                                  {record.purchase_order_number}
+                                </Badge>
+                              )}
+                            </div>
+                            {record.notes && (
+                              <p className="text-xs text-muted-foreground italic line-clamp-2">{record.notes}</p>
                             )}
                           </div>
-                          {record.notes && (
-                            <p className="text-xs text-muted-foreground italic">{record.notes}</p>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              if (confirm('¿Eliminar este registro?')) {
+                                deleteMutation.mutate(record.id);
+                              }
+                            }}
+                            disabled={deleteMutation.isPending}
+                            className="shrink-0"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
                         </div>
+                        
                         <div className="flex gap-2">
                           <ImageViewer
                             fileUrl={record.image_url}
-                            fileName={'Foto de cajas - ' + (record.supplier?.company_name || record.supplier?.full_name)}
+                            fileName={'Foto de cajas'}
                             triggerText="Ver cajas"
                             triggerSize="sm"
-                            triggerVariant="ghost"
+                            triggerVariant="outline"
                             bucket="documents"
                           />
                           {record.delivery_document_url && (
                             <ImageViewer
                               fileUrl={record.delivery_document_url}
-                              fileName={'Documento de entrega - ' + (record.supplier?.company_name || record.supplier?.full_name)}
+                              fileName={'Documento de entrega'}
                               triggerText="Ver documento"
                               triggerSize="sm"
-                              triggerVariant="ghost"
+                              triggerVariant="outline"
                               bucket="documents"
                             />
                           )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              if (confirm('¿Estás seguro de eliminar este registro?')) {
-                                deleteMutation.mutate(record.id);
-                              }
-                            }}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          {record.analysis && (
+                            <CollapsibleTrigger asChild>
+                              <Button variant="outline" size="sm" className="text-xs">
+                                Ver análisis
+                                <ChevronDown className="h-3 w-3 ml-1" />
+                              </Button>
+                            </CollapsibleTrigger>
+                          )}
                         </div>
                       </div>
                       
                       {record.analysis && (
-                        <CollapsibleContent className="px-3 sm:px-4 pb-3 sm:pb-4">
+                        <CollapsibleContent className="px-4 pb-4">
                           <div className="border-t pt-3 space-y-2">
                             <h4 className="text-xs font-semibold text-muted-foreground uppercase">Análisis Detallado</h4>
-                            <pre className="text-xs whitespace-pre-wrap font-mono bg-muted/50 p-3 rounded-md">
+                            <pre className="text-xs whitespace-pre-wrap font-mono bg-muted p-3 rounded-md">
                               {record.analysis}
                             </pre>
                           </div>
@@ -970,8 +1286,134 @@ const MedicineCounter = () => {
                     </Collapsible>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              
+              {/* Desktop version */}
+              <Card className="hidden md:block">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <History className="h-5 w-5" />
+                    Historial de Conteos
+                  </CardTitle>
+                  <CardDescription>Todos los registros guardados</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <Input
+                      placeholder="Buscar por proveedor..."
+                      value={supplierFilter}
+                      onChange={(e) => setSupplierFilter(e.target.value)}
+                      className="max-w-md h-10"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    {countHistory.map((record: any) => (
+                      <Collapsible key={record.id} className="border rounded-lg">
+                        <div className="flex items-start justify-between p-4">
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold">
+                                {record.supplier?.company_name || record.supplier?.full_name}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {new Date(record.created_at).toLocaleDateString('es-MX', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <p className="text-sm text-muted-foreground">
+                                Cajas contadas: <span className="font-semibold text-primary">{record.count}</span>
+                              </p>
+                              {record.expected_quantity && (
+                                <>
+                                  <span className="text-sm text-muted-foreground">
+                                    / Esperadas: <span className="font-semibold">{record.expected_quantity}</span>
+                                  </span>
+                                  {record.expected_quantity > record.count && (
+                                    <span className="text-sm text-yellow-600">
+                                      (Pendientes: {record.expected_quantity - record.count})
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                              {record.is_partial_delivery && (
+                                <Badge variant="secondary">
+                                  ⚠️ Entrega Parcial
+                                </Badge>
+                              )}
+                              {record.purchase_order_number && (
+                                <Badge variant="outline">
+                                  OC: {record.purchase_order_number}
+                                </Badge>
+                              )}
+                              {record.analysis && (
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    Ver análisis completo
+                                    <ChevronDown className="h-4 w-4 ml-1" />
+                                  </Button>
+                                </CollapsibleTrigger>
+                              )}
+                            </div>
+                            {record.notes && (
+                              <p className="text-sm text-muted-foreground italic">{record.notes}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <ImageViewer
+                              fileUrl={record.image_url}
+                              fileName={'Foto de cajas - ' + (record.supplier?.company_name || record.supplier?.full_name)}
+                              triggerText="Ver cajas"
+                              triggerSize="sm"
+                              triggerVariant="ghost"
+                              bucket="documents"
+                            />
+                            {record.delivery_document_url && (
+                              <ImageViewer
+                                fileUrl={record.delivery_document_url}
+                                fileName={'Documento de entrega - ' + (record.supplier?.company_name || record.supplier?.full_name)}
+                                triggerText="Ver documento"
+                                triggerSize="sm"
+                                triggerVariant="ghost"
+                                bucket="documents"
+                              />
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                if (confirm('¿Estás seguro de eliminar este registro?')) {
+                                  deleteMutation.mutate(record.id);
+                                }
+                              }}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {record.analysis && (
+                          <CollapsibleContent className="px-4 pb-4">
+                            <div className="border-t pt-3 space-y-2">
+                              <h4 className="text-sm font-semibold text-muted-foreground uppercase">Análisis Detallado</h4>
+                              <pre className="text-sm whitespace-pre-wrap font-mono bg-muted/50 p-3 rounded-md">
+                                {record.analysis}
+                              </pre>
+                            </div>
+                          </CollapsibleContent>
+                        )}
+                      </Collapsible>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           )}
         </div>
 

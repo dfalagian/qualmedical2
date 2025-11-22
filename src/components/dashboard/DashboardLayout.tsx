@@ -102,11 +102,11 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <DashboardHeader />
 
-      <div className="container mx-auto px-3 md:px-4">
-        <div className="flex gap-4 md:gap-6 py-3 md:py-6">
+      <div className="container mx-auto px-3 md:px-4 overflow-x-hidden">
+        <div className="flex gap-4 md:gap-6 py-3 md:py-6 overflow-x-hidden">
           {/* Desktop Sidebar */}
           <aside className="hidden lg:block w-64 shrink-0">
             <nav className="space-y-1 sticky top-6">
@@ -144,7 +144,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           </div>
 
           {/* Main Content */}
-          <main className="flex-1 min-w-0 w-full">
+          <main className="flex-1 min-w-0 w-full overflow-x-hidden">
             {children}
           </main>
         </div>
