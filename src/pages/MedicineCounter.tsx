@@ -501,37 +501,37 @@ const MedicineCounter = () => {
 
   return (
     <DashboardLayout>
-      <div className="w-full py-3 px-3 md:py-6 md:px-4 lg:px-6 max-w-4xl mx-auto">
-        <div className="mb-4 md:mb-6">
-          <h1 className="text-xl md:text-2xl lg:text-3xl font-bold mb-1 md:mb-2">
+      <div className="w-full py-2 px-2 md:py-6 md:px-4 lg:px-6 max-w-4xl mx-auto">
+        <div className="mb-2 md:mb-6">
+          <h1 className="text-base md:text-2xl lg:text-3xl font-bold mb-0.5 md:mb-2">
             Contador de Cajas de Medicamentos
           </h1>
-          <p className="text-sm md:text-base text-muted-foreground">
+          <p className="text-xs md:text-base text-muted-foreground">
             Toma una foto o sube una imagen para contar automáticamente las cajas
           </p>
         </div>
 
-        <div className="grid gap-3 md:gap-4 lg:gap-6">
+        <div className="grid gap-2 md:gap-4 lg:gap-6">
           <Card>
-            <CardHeader className="pb-3 md:pb-4 px-3 md:px-6 pt-3 md:pt-6">
-              <CardTitle className="flex items-center gap-2 text-lg md:text-xl lg:text-2xl">
-                <Camera className="h-5 w-5 md:h-6 md:w-6" />
+            <CardHeader className="pb-2 md:pb-4 px-2 md:px-6 pt-2 md:pt-6">
+              <CardTitle className="flex items-center gap-1.5 text-sm md:text-xl lg:text-2xl">
+                <Camera className="h-4 w-4 md:h-6 md:w-6" />
                 Cargar Imagen
               </CardTitle>
-              <CardDescription className="text-sm md:text-base">
+              <CardDescription className="text-xs md:text-base">
                 Selecciona una opción para comenzar
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3 md:space-y-4 lg:space-y-6 px-3 md:px-6 pb-3 md:pb-6">
+            <CardContent className="space-y-2 md:space-y-4 lg:space-y-6 px-2 md:px-6 pb-2 md:pb-6">
               {canManageRecords && (
                 <>
-                  <div className="space-y-2">
-                    <Label htmlFor="supplier-select" className="text-sm md:text-base font-semibold">Proveedor *</Label>
+                  <div className="space-y-1">
+                    <Label htmlFor="supplier-select" className="text-xs md:text-base font-semibold">Proveedor *</Label>
                     <Drawer open={isSupplierDrawerOpen} onOpenChange={setIsSupplierDrawerOpen}>
                       <DrawerTrigger asChild>
                         <Button 
                           variant="outline" 
-                          className="w-full justify-start text-left font-normal h-12 md:h-14 lg:h-12 text-sm md:text-base border-2 hover:border-primary px-3 md:px-4"
+                          className="w-full justify-start text-left font-normal h-9 md:h-14 lg:h-12 text-xs md:text-base border-2 hover:border-primary px-2 md:px-4"
                         >
                           <span className={selectedSupplier ? "text-foreground" : "text-muted-foreground"}>
                             {selectedSupplierName}
@@ -569,20 +569,20 @@ const MedicineCounter = () => {
                     </Drawer>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="purchase-order" className="text-sm md:text-base font-semibold">No. Orden de Compra</Label>
+                  <div className="space-y-1">
+                    <Label htmlFor="purchase-order" className="text-xs md:text-base font-semibold">No. Orden de Compra</Label>
                     <Input
                       id="purchase-order"
                       type="text"
                       placeholder="Ej: OC_CITIO_25_05"
                       value={purchaseOrderNumber}
                       onChange={(e) => setPurchaseOrderNumber(e.target.value.toUpperCase())}
-                      className="h-11 md:h-12 lg:h-11 text-sm md:text-base px-3 md:px-4"
+                      className="h-8 md:h-12 lg:h-11 text-xs md:text-base px-2 md:px-4"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="expected-quantity" className="text-sm md:text-base font-semibold">Cantidad Esperada (Cajas)</Label>
+                  <div className="space-y-1">
+                    <Label htmlFor="expected-quantity" className="text-xs md:text-base font-semibold">Cantidad Esperada (Cajas)</Label>
                     <Input
                       id="expected-quantity"
                       type="number"
@@ -590,20 +590,20 @@ const MedicineCounter = () => {
                       placeholder="Ej: 20"
                       value={expectedQuantity}
                       onChange={(e) => setExpectedQuantity(e.target.value)}
-                      className="h-11 md:h-12 lg:h-11 text-sm md:text-base px-3 md:px-4"
+                      className="h-8 md:h-12 lg:h-11 text-xs md:text-base px-2 md:px-4"
                     />
                   </div>
                 </>
               )}
 
-              <div className="grid gap-3 grid-cols-2">
+              <div className="grid gap-1.5 grid-cols-2">
                 <Button
                   onClick={openCamera}
                   disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
                   variant="outline"
-                  className="w-full h-20 md:h-24 lg:h-28 flex flex-col items-center justify-center gap-2 border-2 text-sm md:text-base"
+                  className="w-full h-16 md:h-24 lg:h-28 flex flex-col items-center justify-center gap-1 border-2 text-xs md:text-base"
                 >
-                  <Camera className="h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10" />
+                  <Camera className="h-5 w-5 md:h-8 md:w-8 lg:h-10 lg:w-10" />
                   <span className="font-semibold">Tomar Foto</span>
                 </Button>
                 
@@ -611,8 +611,8 @@ const MedicineCounter = () => {
                   htmlFor="image-upload"
                   className={`cursor-pointer ${(isAnalyzing || (canManageRecords && !selectedSupplier)) ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
                 >
-                  <div className="w-full h-20 md:h-24 lg:h-28 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors text-sm md:text-base">
-                    <Upload className="h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10" />
+                  <div className="w-full h-16 md:h-24 lg:h-28 flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded-md hover:bg-accent transition-colors text-xs md:text-base">
+                    <Upload className="h-5 w-5 md:h-8 md:w-8 lg:h-10 lg:w-10" />
                     <span className="font-semibold">Subir Imagen</span>
                   </div>
                   <Input
@@ -628,29 +628,29 @@ const MedicineCounter = () => {
               </div>
 
               {preview && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div className="relative rounded-lg overflow-hidden border bg-muted">
                     <img
                       src={preview}
                       alt="Vista previa"
-                      className="w-full h-auto max-h-[250px] md:max-h-[300px] lg:max-h-96 object-contain"
+                      className="w-full h-auto max-h-[180px] md:max-h-[300px] lg:max-h-96 object-contain"
                     />
                   </div>
 
                   <Button
                     onClick={analyzeImage}
                     disabled={isAnalyzing}
-                    className="w-full h-11 md:h-12 text-sm md:text-base font-semibold"
+                    className="w-full h-9 md:h-12 text-xs md:text-base font-semibold"
                     size="lg"
                   >
                     {isAnalyzing ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 md:h-5 md:w-5 animate-spin" />
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 md:h-5 md:w-5 animate-spin" />
                         Analizando imagen...
                       </>
                     ) : (
                       <>
-                        <Upload className="mr-2 h-4 w-4 md:h-5 md:w-5" />
+                        <Upload className="mr-1.5 h-3.5 w-3.5 md:h-5 md:w-5" />
                         Analizar Imagen
                       </>
                     )}
@@ -662,15 +662,15 @@ const MedicineCounter = () => {
 
           {result && (
             <Card>
-              <CardHeader className="px-3 md:px-6 pt-3 md:pt-6 pb-3 md:pb-6">
-                <CardTitle className="text-lg md:text-xl lg:text-2xl">Resultados del Análisis</CardTitle>
+              <CardHeader className="px-2 md:px-6 pt-2 md:pt-6 pb-2 md:pb-6">
+                <CardTitle className="text-sm md:text-xl lg:text-2xl">Resultados del Análisis</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 md:space-y-6 px-3 md:px-6 pb-3 md:pb-6">
+              <CardContent className="space-y-2 md:space-y-6 px-2 md:px-6 pb-2 md:pb-6">
                 {result.count !== null && (
-                  <div className="p-4 md:p-6 lg:p-8 rounded-lg bg-primary/10 border-2 border-primary">
-                    <div className="text-center space-y-2 md:space-y-3">
-                      <p className="text-xs md:text-sm text-muted-foreground">Total de Cajas Detectadas</p>
-                      <p className="text-4xl md:text-5xl lg:text-6xl font-bold text-primary">{result.count}</p>
+                  <div className="p-3 md:p-6 lg:p-8 rounded-lg bg-primary/10 border-2 border-primary">
+                    <div className="text-center space-y-1 md:space-y-3">
+                      <p className="text-xs text-muted-foreground">Total de Cajas Detectadas</p>
+                      <p className="text-3xl md:text-5xl lg:text-6xl font-bold text-primary">{result.count}</p>
                       
                       {/* Mostrar diferencia si hay cantidad esperada */}
                       {expectedQuantity && parseInt(expectedQuantity) > 0 && (
@@ -744,36 +744,36 @@ const MedicineCounter = () => {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label className="text-sm md:text-base">Análisis Detallado</Label>
-                  <div className="p-3 md:p-4 rounded-lg bg-muted whitespace-pre-wrap text-xs md:text-sm">
+                <div className="space-y-1.5">
+                  <Label className="text-xs md:text-base">Análisis Detallado</Label>
+                  <div className="p-2 md:p-4 rounded-lg bg-muted whitespace-pre-wrap text-xs">
                     {result.analysis}
                   </div>
                 </div>
 
                 {canManageRecords ? (
-                  <>
-                    <div className="space-y-4 border-t pt-4">
-                      <Label className="text-base font-semibold">Documento de Entrega</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Captura la hoja firmada de quien recibe el medicamento
-                      </p>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Button
-                          onClick={openDeliveryCamera}
-                          variant="outline"
-                          className="w-full h-20 flex flex-col items-center justify-center gap-2"
-                        >
-                          <Camera className="h-6 w-6" />
-                          <span className="text-sm">Tomar Foto del Documento</span>
-                        </Button>
+                    <>
+                      <div className="space-y-2 border-t pt-2">
+                        <Label className="text-xs md:text-base font-semibold">Documento de Entrega</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Captura la hoja firmada de quien recibe el medicamento
+                        </p>
                         
-                        <Label htmlFor="delivery-doc-upload" className="cursor-pointer">
-                          <div className="w-full h-20 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
-                            <Upload className="h-6 w-6" />
-                            <span className="text-sm">Subir Documento</span>
-                          </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          <Button
+                            onClick={openDeliveryCamera}
+                            variant="outline"
+                            className="w-full h-16 flex flex-col items-center justify-center gap-1"
+                          >
+                            <Camera className="h-5 w-5" />
+                            <span className="text-xs">Tomar Foto del Documento</span>
+                          </Button>
+                          
+                          <Label htmlFor="delivery-doc-upload" className="cursor-pointer">
+                            <div className="w-full h-16 flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
+                              <Upload className="h-5 w-5" />
+                              <span className="text-xs">Subir Documento</span>
+                            </div>
                           <Input
                             id="delivery-doc-upload"
                             type="file"
@@ -807,31 +807,32 @@ const MedicineCounter = () => {
                       )}
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="notes">Notas Adicionales (Opcional)</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="notes" className="text-xs">Notas Adicionales (Opcional)</Label>
                       <Textarea
                         id="notes"
                         placeholder="Agrega cualquier observación adicional..."
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         rows={3}
+                        className="text-xs"
                       />
                     </div>
 
                     <Button
                       onClick={() => saveMutation.mutate()}
                       disabled={saveMutation.isPending || !selectedSupplier}
-                      className="w-full h-11 md:h-12 text-sm md:text-base font-semibold"
+                      className="w-full h-9 md:h-12 text-xs md:text-base font-semibold"
                       size="lg"
                     >
                       {saveMutation.isPending ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 md:h-5 md:w-5 animate-spin" />
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 md:h-5 md:w-5 animate-spin" />
                           Guardando...
                         </>
                       ) : (
                         <>
-                          <Save className="mr-2 h-4 w-4 md:h-5 md:w-5" />
+                          <Save className="mr-1.5 h-3.5 w-3.5 md:h-5 md:w-5" />
                           Guardar Registro
                         </>
                       )}
@@ -848,32 +849,32 @@ const MedicineCounter = () => {
 
           {canManageRecords && countHistory && countHistory.length > 0 && (
             <Card>
-              <CardHeader className="px-3 md:px-6 pt-3 md:pt-6 pb-3 md:pb-4">
-                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                  <History className="h-4 w-4 md:h-5 md:w-5" />
+              <CardHeader className="px-2 md:px-6 pt-2 md:pt-6 pb-2 md:pb-4">
+                <CardTitle className="flex items-center gap-1.5 text-sm md:text-lg">
+                  <History className="h-3.5 w-3.5 md:h-5 md:w-5" />
                   Historial de Conteos
                 </CardTitle>
-                <CardDescription className="text-xs md:text-sm">Todos los registros guardados</CardDescription>
+                <CardDescription className="text-xs">Todos los registros guardados</CardDescription>
               </CardHeader>
-              <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
-                <div className="mb-4">
+              <CardContent className="px-2 md:px-6 pb-2 md:pb-6">
+                <div className="mb-2">
                   <Input
                     placeholder="Buscar por proveedor..."
                     value={supplierFilter}
                     onChange={(e) => setSupplierFilter(e.target.value)}
-                    className="max-w-md"
+                    className="max-w-md h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-1.5">
                   {countHistory.map((record: any) => (
                     <Collapsible key={record.id} className="border rounded-lg">
-                      <div className="flex items-start justify-between p-3 sm:p-4">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm sm:text-base">
+                      <div className="flex items-start justify-between p-2 sm:p-4">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-xs sm:text-base">
                               {record.supplier?.company_name || record.supplier?.full_name}
                             </span>
-                            <span className="text-xs sm:text-sm text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               {new Date(record.created_at).toLocaleDateString('es-MX', {
                                 day: '2-digit',
                                 month: 'short',
@@ -883,8 +884,8 @@ const MedicineCounter = () => {
                               })}
                             </span>
                           </div>
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <p className="text-xs sm:text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs text-muted-foreground">
                               Cajas contadas: <span className="font-semibold text-primary">{record.count}</span>
                             </p>
                             {record.expected_quantity && (
