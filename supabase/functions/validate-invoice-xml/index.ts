@@ -203,8 +203,14 @@ serve(async (req) => {
     const lugarExpedicion = lugarExpedicionMatch ? lugarExpedicionMatch[1] : null;
     const uuid = uuidMatch ? uuidMatch[1] : null;
     
-    // Construir número de factura (Serie + Folio o solo Folio si no hay Serie)
-    const invoiceNumber = serie ? `${serie}-${folio}` : folio;
+    // Construir número de factura (Serie + Folio, o solo Folio, o UUID si no hay Folio)
+    let invoiceNumber = serie ? `${serie}-${folio}` : folio;
+    
+    // Si no hay Folio, usar el UUID como número de factura
+    if (!invoiceNumber && uuid) {
+      invoiceNumber = uuid;
+      console.log('⚠️ Factura sin Folio/Serie, usando UUID como número de factura:', uuid);
+    }
 
     console.log('Información extraída del XML:');
     console.log('- Número de factura:', invoiceNumber);
