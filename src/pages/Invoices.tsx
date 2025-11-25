@@ -1333,25 +1333,27 @@ const Invoices = () => {
                             </>
                           )}
                           
-                          {isAdmin && invoice.evidence_status === 'pending' && (
+                          {isAdmin && (invoice.evidence_status === 'pending' || invoice.evidence_status === 'approved') && (
                             <>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="icon"
-                                      className="h-8 w-8 text-success hover:bg-success/10"
-                                      onClick={() => approveEvidenceMutation.mutate(invoice)}
-                                    >
-                                      <Check className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Aprobar evidencia</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                              {invoice.evidence_status === 'pending' && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8 text-success hover:bg-success/10"
+                                        onClick={() => approveEvidenceMutation.mutate(invoice)}
+                                      >
+                                        <Check className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Aprobar evidencia</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
 
                               <TooltipProvider>
                                 <Tooltip>
@@ -1371,7 +1373,7 @@ const Invoices = () => {
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p>Rechazar evidencia</p>
+                                    <p>{invoice.evidence_status === 'approved' ? 'Rechazar evidencia aprobada' : 'Rechazar evidencia'}</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
