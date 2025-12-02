@@ -16,6 +16,20 @@ interface InvoiceItem {
   descuento: number;
 }
 
+interface ImpuestosDetalle {
+  traslados?: Array<{
+    impuesto: string;
+    tipo_factor: string;
+    tasa_o_cuota: string;
+    base: number;
+    importe: number;
+  }>;
+  retenciones?: Array<{
+    impuesto: string;
+    importe: number;
+  }>;
+}
+
 interface InvoiceDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,6 +49,7 @@ interface InvoiceDetailsDialogProps {
     subtotal?: number;
     descuento?: number;
     total_impuestos?: number;
+    impuestos_detalle?: ImpuestosDetalle;
     amount: number;
     currency: string;
     status: string;
@@ -244,17 +259,79 @@ export function InvoiceDetailsDialog({ open, onOpenChange, invoice, items = [] }
                   <span className="font-medium">-{formatCurrency(invoice.descuento)}</span>
                 </div>
               )}
-              {invoice.total_impuestos !== undefined && invoice.total_impuestos > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span>Impuestos:</span>
-                  <span className="font-medium">{formatCurrency(invoice.total_impuestos)}</span>
-                </div>
-              )}
+              
+              {/* Impuestos Trasladados (IVA) */}
+              {(() => {
+                const impuestosDetalle = invoice.impuestos_detalle as ImpuestosDetalle | undefined;
+                const ivaTraslado = impuestosDetalle?.traslados?.find(t => t.impuesto === '002');
+                const tasaIVA = ivaTraslado?.tasa_o_cuota ? (parseFloat(ivaTraslado.tasa_o_cuota) * 100).toFixed(2) : '0.00';
+                const importeIVA = ivaTraslado?.importe || 0;
+                
+                return (
+                  <div className="flex justify-between text-sm">
+                    <span>Impuestos trasladados (IVA {tasaIVA}%):</span>
+                    <span className="font-medium">{formatCurrency(importeIVA)}</span>
+                  </div>
+                );
+              })()}
+              
+              {/* Impuestos Retenidos (ISR) */}
+              {(() => {
+                const impuestosDetalle = invoice.impuestos_detalle as ImpuestosDetalle | undefined;
+                const isrRetencion = impuestosDetalle?.retenciones?.find(r => r.impuesto === '001');
+                const importeISR = isrRetencion?.importe || 0;
+                
+                if (importeISR > 0) {
+                  return (
+                    <div className="flex justify-between text-sm text-destructive">
+                      <span>Impuestos retenidos (ISR 1.25%):</span>
+                      <span className="font-medium">-{formatCurrency(importeISR)}</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+              
+              {/* IVA Retenido si existe */}
+              {(() => {
+                const impuestosDetalle = invoice.impuestos_detalle as ImpuestosDetalle | undefined;
+                const ivaRetencion = impuestosDetalle?.retenciones?.find(r => r.impuesto === '002');
+                const importeIVARetenido = ivaRetencion?.importe || 0;
+                
+                if (importeIVARetenido > 0) {
+                  return (
+                    <div className="flex justify-between text-sm text-destructive">
+                      <span>IVA Retenido:</span>
+                      <span className="font-medium">-{formatCurrency(importeIVARetenido)}</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+              
               <Separator />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total:</span>
-                <span>{formatCurrency(invoice.amount)} {invoice.currency}</span>
-              </div>
+              
+              {/* Total calculado: Subtotal + IVA - Retenciones */}
+              {(() => {
+                const impuestosDetalle = invoice.impuestos_detalle as ImpuestosDetalle | undefined;
+                const ivaTraslado = impuestosDetalle?.traslados?.find(t => t.impuesto === '002');
+                const importeIVA = ivaTraslado?.importe || 0;
+                
+                const totalRetenciones = (impuestosDetalle?.retenciones || []).reduce(
+                  (sum, r) => sum + (r.importe || 0), 0
+                );
+                
+                const subtotal = invoice.subtotal || 0;
+                const descuento = invoice.descuento || 0;
+                const totalCalculado = subtotal - descuento + importeIVA - totalRetenciones;
+                
+                return (
+                  <div className="flex justify-between text-lg font-bold">
+                    <span>Total:</span>
+                    <span className="text-primary">{formatCurrency(totalCalculado)} {invoice.currency}</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
