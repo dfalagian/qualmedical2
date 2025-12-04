@@ -260,20 +260,13 @@ export function InvoiceDetailsDialog({ open, onOpenChange, invoice, items = [] }
                 </div>
               )}
               
-              {/* Impuestos Trasladados (IVA) */}
-              {(() => {
-                const impuestosDetalle = invoice.impuestos_detalle as ImpuestosDetalle | undefined;
-                const ivaTraslado = impuestosDetalle?.traslados?.find(t => t.impuesto === '002');
-                const tasaIVA = ivaTraslado?.tasa_o_cuota ? (parseFloat(ivaTraslado.tasa_o_cuota) * 100).toFixed(2) : '0.00';
-                const importeIVA = ivaTraslado?.importe || 0;
-                
-                return (
-                  <div className="flex justify-between text-sm">
-                    <span>Impuestos trasladados (IVA {tasaIVA}%):</span>
-                    <span className="font-medium">{formatCurrency(importeIVA)}</span>
-                  </div>
-                );
-              })()}
+              {/* Impuestos Trasladados (IVA) - usar total_impuestos que viene del XML */}
+              {invoice.total_impuestos !== undefined && invoice.total_impuestos > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span>Impuestos (IVA 16%):</span>
+                  <span className="font-medium">{formatCurrency(invoice.total_impuestos)}</span>
+                </div>
+              )}
               
               {/* Impuestos Retenidos (ISR) */}
               {(() => {
@@ -311,27 +304,11 @@ export function InvoiceDetailsDialog({ open, onOpenChange, invoice, items = [] }
               
               <Separator />
               
-              {/* Total calculado: Subtotal + IVA - Retenciones */}
-              {(() => {
-                const impuestosDetalle = invoice.impuestos_detalle as ImpuestosDetalle | undefined;
-                const ivaTraslado = impuestosDetalle?.traslados?.find(t => t.impuesto === '002');
-                const importeIVA = ivaTraslado?.importe || 0;
-                
-                const totalRetenciones = (impuestosDetalle?.retenciones || []).reduce(
-                  (sum, r) => sum + (r.importe || 0), 0
-                );
-                
-                const subtotal = invoice.subtotal || 0;
-                const descuento = invoice.descuento || 0;
-                const totalCalculado = subtotal - descuento + importeIVA - totalRetenciones;
-                
-                return (
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total:</span>
-                    <span className="text-primary">{formatCurrency(totalCalculado)} {invoice.currency}</span>
-                  </div>
-                );
-              })()}
+              {/* Total: usar invoice.amount que viene directamente del XML */}
+              <div className="flex justify-between text-lg font-bold">
+                <span>Total:</span>
+                <span className="text-primary">{formatCurrency(invoice.amount)} {invoice.currency}</span>
+              </div>
             </div>
           </div>
         </div>
