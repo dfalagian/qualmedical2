@@ -663,7 +663,12 @@ export type Database = {
         | "aviso_funcionamiento"
         | "ine"
         | "datos_bancarios"
-      payment_status: "pendiente" | "procesando" | "pagado" | "rechazado"
+      payment_status:
+        | "pendiente"
+        | "procesando"
+        | "pagado"
+        | "rechazado"
+        | "cancelado"
       user_role: "admin" | "proveedor" | "contador"
     }
     CompositeTypes: {
@@ -804,7 +809,13 @@ export const Constants = {
         "ine",
         "datos_bancarios",
       ],
-      payment_status: ["pendiente", "procesando", "pagado", "rechazado"],
+      payment_status: [
+        "pendiente",
+        "procesando",
+        "pagado",
+        "rechazado",
+        "cancelado",
+      ],
       user_role: ["admin", "proveedor", "contador"],
     },
   },
