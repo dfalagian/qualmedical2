@@ -308,7 +308,7 @@ const Invoices = () => {
       rejectionReason
     }: { 
       invoice: any;
-      status: "pendiente" | "procesando" | "pagado" | "rechazado";
+      status: "pendiente" | "procesando" | "pagado" | "rechazado" | "cancelado";
       rejectionReason?: string;
     }) => {
       // Verificar si la factura tiene comprobante de pago subido
@@ -411,6 +411,10 @@ const Invoices = () => {
         case "rechazado":
           notificationType = 'invoice_status_rejected';
           notificationData.rejection_reason = rejectionReason || "No se especificó una razón";
+          break;
+        case "cancelado":
+          notificationType = 'invoice_status_rejected';
+          notificationData.rejection_reason = "La factura ha sido cancelada.";
           break;
       }
 
@@ -786,9 +790,11 @@ const Invoices = () => {
       case "pagado":
         return <Badge className="bg-success">Pagado</Badge>;
       case "procesando":
-        return <Badge className="bg-warning">Procesando</Badge>;
+        return <Badge className="bg-blue-500">Procesando</Badge>;
       case "rechazado":
         return <Badge variant="destructive">Rechazado</Badge>;
+      case "cancelado":
+        return <Badge variant="destructive">Cancelado</Badge>;
       default:
         return <Badge variant="secondary">Pendiente</Badge>;
     }
@@ -1523,6 +1529,7 @@ const Invoices = () => {
                             <SelectItem value="procesando">Procesando</SelectItem>
                             <SelectItem value="pagado">Pagado</SelectItem>
                             <SelectItem value="rechazado">Rechazado</SelectItem>
+                            <SelectItem value="cancelado">Cancelado</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
