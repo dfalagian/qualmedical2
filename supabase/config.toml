@@ -23,3 +23,12 @@ verify_jwt = true
 
 [functions.notify-admin]
 verify_jwt = true
+
+[functions.export-database-schema]
+verify_jwt = true
+
+[functions.export-database-full]
+verify_jwt = true
+
+[functions.create-user]
+verify_jwt = true
