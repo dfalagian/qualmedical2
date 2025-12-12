@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown } from "lucide-react";
+import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown, Layers } from "lucide-react";
+import { PaymentInstallments } from "@/components/payments/PaymentInstallments";
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -87,11 +88,10 @@ const Invoices = () => {
 
       if (invoicesError) throw invoicesError;
 
-      // Obtener comprobantes de pago para cada factura
+      // Obtener comprobantes de pago para cada factura (incluir datos de split payment)
       const { data: pagosData, error: pagosError } = await supabase
         .from("pagos")
-        .select("invoice_id, comprobante_pago_url")
-        .not("comprobante_pago_url", "is", null);
+        .select("id, invoice_id, comprobante_pago_url, is_split_payment, total_installments");
 
       if (pagosError) console.error("Error fetching pagos:", pagosError);
 
@@ -100,7 +100,10 @@ const Invoices = () => {
         const pago = pagosData?.find(p => p.invoice_id === invoice.id);
         return {
           ...invoice,
-          comprobante_pago_url: pago?.comprobante_pago_url || null
+          comprobante_pago_url: pago?.comprobante_pago_url || null,
+          pago_id: pago?.id || null,
+          is_split_payment: pago?.is_split_payment || false,
+          total_installments: pago?.total_installments || null
         };
       });
 
@@ -1054,6 +1057,23 @@ const Invoices = () => {
                           <Badge variant="outline" className="bg-success/10 text-success border-success/30">
                             Complemento de Pago Adjuntado
                           </Badge>
+                        </div>
+                      )}
+                      
+                      {/* Mostrar cuotas de pago dividido */}
+                      {invoice.is_split_payment && invoice.pago_id && (
+                        <div className="mt-2 border-t pt-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Layers className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground font-medium">
+                              Pago dividido en {invoice.total_installments} cuotas
+                            </span>
+                          </div>
+                          <PaymentInstallments
+                            pagoId={invoice.pago_id}
+                            supplierId={invoice.supplier_id}
+                            isAdmin={isAdmin}
+                          />
                         </div>
                       )}
                     </div>
