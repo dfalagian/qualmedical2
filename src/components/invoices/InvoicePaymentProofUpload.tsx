@@ -11,6 +11,7 @@ import { Loader2, FileCheck, RefreshCw } from "lucide-react";
 import { getSignedUrl } from "@/lib/storage";
 import { convertPDFToImages } from "@/lib/pdfToImages";
 import { useAuth } from "@/hooks/useAuth";
+import { SplitPaymentDialog } from "@/components/payments/SplitPaymentDialog";
 
 interface InvoicePaymentProofUploadProps {
   invoiceId: string;
@@ -30,19 +31,22 @@ export function InvoicePaymentProofUpload({
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
   const [isChanging, setIsChanging] = useState(false);
+  const [showSplitDialog, setShowSplitDialog] = useState(false);
+  const [splitPaymentData, setSplitPaymentData] = useState<{
+    invoiceAmount: number;
+    paidAmount: number;
+    pagoId: string;
+  } | null>(null);
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
 
-  // Cargar la URL firmada cuando se abre el diálogo y ya existe un comprobante
   useEffect(() => {
     const loadSignedUrl = async () => {
       if (open && proofUrl && hasProof) {
         setLoadingImage(true);
         try {
-          // Extraer el path del archivo desde la URL completa
           const urlPath = new URL(proofUrl).pathname;
           const filePath = urlPath.split('/').slice(-3).join('/');
-          
           const url = await getSignedUrl('documents', filePath, 3600);
           setSignedUrl(url);
         } catch (error) {
@@ -52,13 +56,11 @@ export function InvoicePaymentProofUpload({
         }
       }
     };
-
     loadSignedUrl();
   }, [open, proofUrl, hasProof]);
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      // Primero, buscar si existe un registro de pago para esta factura
       let { data: pagoData, error: pagoError } = await supabase
         .from("pagos")
         .select("id")
@@ -67,11 +69,7 @@ export function InvoicePaymentProofUpload({
 
       if (pagoError) throw pagoError;
 
-      // Si no existe el registro de pago, crearlo automáticamente
       if (!pagoData) {
-        console.log("No se encontró registro de pago, creando uno nuevo...");
-        
-        // Obtener datos bancarios aprobados del proveedor
         const { data: bankDocsData, error: bankDocsError } = await supabase
           .from("documents")
           .select("id, nombre_banco")
@@ -83,12 +81,8 @@ export function InvoicePaymentProofUpload({
           .maybeSingle();
 
         if (bankDocsError) throw bankDocsError;
+        if (!bankDocsData) throw new Error("No se encontraron datos bancarios aprobados");
 
-        if (!bankDocsData) {
-          throw new Error("No se encontraron datos bancarios aprobados para este proveedor");
-        }
-
-        // Obtener el monto de la factura
         const { data: invoiceData, error: invoiceError } = await supabase
           .from("invoices")
           .select("amount")
@@ -97,7 +91,6 @@ export function InvoicePaymentProofUpload({
 
         if (invoiceError) throw invoiceError;
 
-        // Crear el registro de pago
         const { data: newPago, error: createPagoError } = await supabase
           .from("pagos")
           .insert({
@@ -112,27 +105,18 @@ export function InvoicePaymentProofUpload({
           .single();
 
         if (createPagoError) throw createPagoError;
-
         pagoData = newPago;
-        console.log("Registro de pago creado:", pagoData);
       }
 
-      const pagoId = pagoData.id;
-
-      // Convertir PDF a imágenes si es necesario
       let imageFile: File;
       if (file.type === 'application/pdf') {
         const result = await convertPDFToImages(file);
-        if (result.images.length === 0) {
-          throw new Error('No se pudo convertir el PDF');
-        }
-        // Convertir Blob a File
+        if (result.images.length === 0) throw new Error('No se pudo convertir el PDF');
         imageFile = new File([result.images[0]], 'comprobante.png', { type: 'image/png' });
       } else {
         imageFile = file;
       }
 
-      // Subir imagen a Supabase Storage
       const fileExt = imageFile.name.split('.').pop();
       const fileName = `${supplierId}/comprobantes/${Date.now()}.${fileExt}`;
       
@@ -142,51 +126,30 @@ export function InvoicePaymentProofUpload({
 
       if (uploadError) throw uploadError;
 
-      // Invocar edge function para extraer información
       const { data, error: functionError } = await supabase.functions.invoke(
         'extract-payment-proof-info',
-        {
-          body: { 
-            pagoId,
-            filePath: fileName
-          }
-        }
+        { body: { pagoId: pagoData.id, filePath: fileName } }
       );
 
       if (functionError) throw functionError;
-
-      return data;
+      return { ...data, pagoId: pagoData.id };
     },
     onSuccess: (data) => {
-      // Verificar si hay discrepancias detectadas
-      if (data?.discrepancias?.detectadas) {
-        const { detalles } = data.discrepancias;
-        let mensaje = "⚠️ DISCREPANCIAS DETECTADAS:\n\n";
-        
-        if (detalles.numero_cuenta) {
-          mensaje += `❌ Número de cuenta:\n`;
-          mensaje += `  • Registrado: ${detalles.numero_cuenta.registrado}\n`;
-          mensaje += `  • En comprobante: ${detalles.numero_cuenta.comprobante}\n`;
-          mensaje += `  • ${detalles.numero_cuenta.mensaje}\n\n`;
-        }
-        
-        if (detalles.tipo_cuenta) {
-          mensaje += `❌ Tipo de cuenta:\n`;
-          mensaje += `  • Registrado: ${detalles.tipo_cuenta.registrado}\n`;
-          mensaje += `  • En comprobante: ${detalles.tipo_cuenta.comprobante}\n\n`;
-        }
-        
-        mensaje += `Titular registrado: ${data.discrepancias.titular_registrado || 'No disponible'}`;
-        
-        toast.error(mensaje, {
-          duration: 10000,
-          style: {
-            whiteSpace: 'pre-line',
-            maxWidth: '500px'
-          }
+      if (data?.needsSplitPayment) {
+        setSplitPaymentData({
+          invoiceAmount: data.invoiceAmount,
+          paidAmount: data.extractedAmount,
+          pagoId: data.pagoId,
         });
+        setShowSplitDialog(true);
+        setOpen(false);
+        return;
+      }
+
+      if (data?.discrepancias?.detectadas) {
+        toast.error("⚠️ Discrepancias detectadas en datos bancarios", { duration: 8000 });
       } else {
-        toast.success(isChanging ? "Comprobante actualizado correctamente" : "Comprobante subido y procesado correctamente");
+        toast.success(isChanging ? "Comprobante actualizado" : "Comprobante procesado correctamente");
       }
       
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
@@ -200,21 +163,43 @@ export function InvoicePaymentProofUpload({
     },
   });
 
+  const handleSplitConfirm = async (installments: number, dates: string[]) => {
+    if (!splitPaymentData) return;
+    
+    const { error } = await supabase.functions.invoke('split-payment', {
+      body: {
+        pagoId: splitPaymentData.pagoId,
+        installmentCount: installments,
+        dates: dates,
+        remainingAmount: splitPaymentData.invoiceAmount - splitPaymentData.paidAmount,
+      }
+    });
+
+    if (error) {
+      toast.error("Error al dividir el pago");
+      return;
+    }
+
+    toast.success(`Pago dividido en ${installments} cuotas`);
+    queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    queryClient.invalidateQueries({ queryKey: ["pagos"] });
+    queryClient.invalidateQueries({ queryKey: ["payment-installments"] });
+    setShowSplitDialog(false);
+    setSplitPaymentData(null);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
-
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
     if (!validTypes.includes(selectedFile.type)) {
       toast.error('Solo se permiten archivos JPG, PNG o PDF');
       return;
     }
-
     if (selectedFile.size > 10 * 1024 * 1024) {
       toast.error('El archivo no debe superar los 10MB');
       return;
     }
-
     setFile(selectedFile);
   };
 
@@ -227,117 +212,89 @@ export function InvoicePaymentProofUpload({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(newOpen) => {
-      setOpen(newOpen);
-      if (!newOpen) {
-        setIsChanging(false);
-        setFile(null);
-      }
-    }}>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DialogTrigger asChild>
-              <Button 
-                variant={hasProof ? "outline" : "default"} 
-                size="icon"
-                className="h-8 w-8"
-              >
-                <FileCheck className="h-3.5 w-3.5" />
-              </Button>
-            </DialogTrigger>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{hasProof ? "Ver comprobante de pago" : "Subir comprobante de pago"}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {hasProof ? "Comprobante de Pago" : "Subir Comprobante de Pago"}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={(newOpen) => {
+        setOpen(newOpen);
+        if (!newOpen) {
+          setIsChanging(false);
+          setFile(null);
+        }
+      }}>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DialogTrigger asChild>
+                <Button variant={hasProof ? "outline" : "default"} size="icon" className="h-8 w-8">
+                  <FileCheck className="h-3.5 w-3.5" />
+                </Button>
+              </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{hasProof ? "Ver comprobante de pago" : "Subir comprobante de pago"}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{hasProof ? "Comprobante de Pago" : "Subir Comprobante de Pago"}</DialogTitle>
+          </DialogHeader>
 
-        {hasProof && proofUrl && !isChanging ? (
-          <div className="space-y-4">
-            {loadingImage ? (
-              <div className="flex items-center justify-center p-8">
-                <Loader2 className="h-8 w-8 animate-spin" />
+          {hasProof && proofUrl && !isChanging ? (
+            <div className="space-y-4">
+              {loadingImage ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+              ) : signedUrl ? (
+                <>
+                  <img src={signedUrl} alt="Comprobante de pago" className="w-full rounded-lg border" />
+                  {isAdmin && (
+                    <Button onClick={() => setIsChanging(true)} variant="outline" className="w-full">
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Cambiar Comprobante
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <p className="text-center text-muted-foreground p-4">No se pudo cargar la imagen</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="proof-file">Archivo del comprobante (JPG, PNG o PDF)</Label>
+                <Input id="proof-file" type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFileChange} className="mt-2" />
+                {file && <p className="text-sm text-muted-foreground mt-1">Archivo seleccionado: {file.name}</p>}
               </div>
-            ) : signedUrl ? (
-              <>
-                <img 
-                  src={signedUrl} 
-                  alt="Comprobante de pago" 
-                  className="w-full rounded-lg border"
-                />
-                {isAdmin && (
-                  <Button
-                    onClick={() => setIsChanging(true)}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Cambiar Comprobante
+              
+              <div className="flex gap-2">
+                {isChanging && (
+                  <Button onClick={() => { setIsChanging(false); setFile(null); }} variant="outline" className="flex-1">
+                    Cancelar
                   </Button>
                 )}
-              </>
-            ) : (
-              <p className="text-center text-muted-foreground p-4">
-                No se pudo cargar la imagen
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="proof-file">Archivo del comprobante (JPG, PNG o PDF)</Label>
-              <Input
-                id="proof-file"
-                type="file"
-                accept=".jpg,.jpeg,.png,.pdf"
-                onChange={handleFileChange}
-                className="mt-2"
-              />
-              {file && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  Archivo seleccionado: {file.name}
-                </p>
-              )}
-            </div>
-            
-            <div className="flex gap-2">
-              {isChanging && (
-                <Button
-                  onClick={() => {
-                    setIsChanging(false);
-                    setFile(null);
-                  }}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Cancelar
+                <Button onClick={handleUpload} disabled={!file || uploadMutation.isPending} className={isChanging ? "flex-1" : "w-full"}>
+                  {uploadMutation.isPending ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Procesando...</>
+                  ) : (
+                    isChanging ? "Actualizar Comprobante" : "Subir y Procesar"
+                  )}
                 </Button>
-              )}
-              <Button
-                onClick={handleUpload}
-                disabled={!file || uploadMutation.isPending}
-                className={isChanging ? "flex-1" : "w-full"}
-              >
-                {uploadMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Procesando...
-                  </>
-                ) : (
-                  isChanging ? "Actualizar Comprobante" : "Subir y Procesar"
-                )}
-              </Button>
+              </div>
             </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {splitPaymentData && (
+        <SplitPaymentDialog
+          open={showSplitDialog}
+          onOpenChange={setShowSplitDialog}
+          invoiceAmount={splitPaymentData.invoiceAmount}
+          paidAmount={splitPaymentData.paidAmount}
+          onConfirm={handleSplitConfirm}
+        />
+      )}
+    </>
   );
 }

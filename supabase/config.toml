@@ -32,3 +32,6 @@ verify_jwt = true
 
 [functions.create-user]
 verify_jwt = true
+
+[functions.split-payment]
+verify_jwt = true

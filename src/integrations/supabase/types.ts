@@ -461,9 +461,12 @@ export type Database = {
           fecha_pago: string | null
           id: string
           invoice_id: string
+          is_split_payment: boolean | null
           nombre_banco: string | null
+          original_amount: number | null
           status: string
           supplier_id: string
+          total_installments: number | null
           updated_at: string
         }
         Insert: {
@@ -475,9 +478,12 @@ export type Database = {
           fecha_pago?: string | null
           id?: string
           invoice_id: string
+          is_split_payment?: boolean | null
           nombre_banco?: string | null
+          original_amount?: number | null
           status?: string
           supplier_id: string
+          total_installments?: number | null
           updated_at?: string
         }
         Update: {
@@ -489,9 +495,12 @@ export type Database = {
           fecha_pago?: string | null
           id?: string
           invoice_id?: string
+          is_split_payment?: boolean | null
           nombre_banco?: string | null
+          original_amount?: number | null
           status?: string
           supplier_id?: string
+          total_installments?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -507,6 +516,66 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: true
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_installments: {
+        Row: {
+          actual_amount: number | null
+          comprobante_url: string | null
+          created_at: string
+          expected_amount: number
+          id: string
+          installment_number: number
+          invoice_id: string
+          notes: string | null
+          pago_id: string
+          payment_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          actual_amount?: number | null
+          comprobante_url?: string | null
+          created_at?: string
+          expected_amount: number
+          id?: string
+          installment_number: number
+          invoice_id: string
+          notes?: string | null
+          pago_id: string
+          payment_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          actual_amount?: number | null
+          comprobante_url?: string | null
+          created_at?: string
+          expected_amount?: number
+          id?: string
+          installment_number?: number
+          invoice_id?: string
+          notes?: string | null
+          pago_id?: string
+          payment_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_installments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_installments_pago_id_fkey"
+            columns: ["pago_id"]
+            isOneToOne: false
+            referencedRelation: "pagos"
             referencedColumns: ["id"]
           },
         ]
