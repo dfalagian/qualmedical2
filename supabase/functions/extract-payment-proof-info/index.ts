@@ -14,12 +14,15 @@ serve(async (req) => {
   }
 
   try {
-    const { pagoId, filePath } = await req.json();
-    console.log('Procesando comprobante de pago:', { pagoId, filePath });
+    const { pagoId, filePath, installmentId, expectedAmount } = await req.json();
+    console.log('Procesando comprobante de pago:', { pagoId, filePath, installmentId, expectedAmount });
 
-    if (!pagoId || !filePath) {
-      throw new Error('pagoId y filePath son requeridos');
+    if (!filePath) {
+      throw new Error('filePath es requerido');
     }
+
+    // Si es una cuota, procesar diferente
+    const isInstallmentPayment = !!installmentId;
 
     // Inicializar Supabase Admin Client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -79,7 +82,8 @@ serve(async (req) => {
 3. Devuelve la fecha en formato YYYY-MM-DD
 4. Extrae el número de cuenta destino (puede ser cuenta completa o CLABE)
 5. Identifica el tipo de cuenta (puede ser "Ahorro", "Corriente", "CLABE", etc.)
-6. Si no encuentras algún dato, devuelve null
+6. IMPORTANTE: Extrae el MONTO/IMPORTE de la transferencia (busca campos como "Monto", "Importe", "Cantidad", etc.)
+7. Si no encuentras algún dato, devuelve null
 
 Por favor, extrae toda la información solicitada del comprobante de pago.`
               },
@@ -112,9 +116,13 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
                   tipo_cuenta: {
                     type: 'string',
                     description: 'Tipo de cuenta (Ahorro, Corriente, CLABE, etc.), o null si no está visible'
+                  },
+                  monto: {
+                    type: 'number',
+                    description: 'Monto/Importe de la transferencia como número decimal, o null si no está visible'
                   }
                 },
-                required: ['fecha_pago', 'numero_cuenta', 'tipo_cuenta']
+                required: ['fecha_pago', 'numero_cuenta', 'tipo_cuenta', 'monto']
               }
             }
           }
@@ -152,7 +160,8 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
       extractedInfo = {
         fecha_pago: null,
         numero_cuenta: null,
-        tipo_cuenta: null
+        tipo_cuenta: null,
+        monto: null
       };
     }
 
@@ -161,12 +170,109 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
     const paymentDate = extractedInfo.fecha_pago;
     const accountNumber = extractedInfo.numero_cuenta;
     const accountType = extractedInfo.tipo_cuenta;
+    const extractedAmount = extractedInfo.monto;
 
-    // Obtener información del pago y proveedor
+    console.log('Monto extraído del comprobante:', extractedAmount);
+
+    // Si es un pago de cuota, procesarlo de manera diferente
+    if (isInstallmentPayment) {
+      console.log('Procesando pago de cuota:', installmentId);
+      
+      // Obtener la URL pública para guardarla
+      const { data: { publicUrl } } = supabaseAdmin.storage
+        .from('documents')
+        .getPublicUrl(filePath);
+
+      // Verificar si el monto coincide con el esperado
+      const amountMismatch = extractedAmount !== null && expectedAmount !== null && 
+        Math.abs(extractedAmount - expectedAmount) > 0.01;
+
+      // Actualizar la cuota
+      const installmentUpdate: any = {
+        comprobante_url: publicUrl,
+        status: 'pagado',
+        actual_amount: extractedAmount,
+      };
+
+      if (paymentDate && paymentDate !== 'No encontrado') {
+        installmentUpdate.payment_date = paymentDate;
+      }
+
+      const { error: installmentError } = await supabaseAdmin
+        .from('payment_installments')
+        .update(installmentUpdate)
+        .eq('id', installmentId);
+
+      if (installmentError) {
+        console.error('Error actualizando cuota:', installmentError);
+        throw installmentError;
+      }
+
+      // Verificar si todas las cuotas están pagadas para actualizar el pago principal
+      const { data: installmentData } = await supabaseAdmin
+        .from('payment_installments')
+        .select('pago_id')
+        .eq('id', installmentId)
+        .single();
+
+      if (installmentData) {
+        const { data: allInstallments } = await supabaseAdmin
+          .from('payment_installments')
+          .select('status')
+          .eq('pago_id', installmentData.pago_id);
+
+        const allPaid = allInstallments?.every(i => i.status === 'pagado');
+
+        if (allPaid) {
+          // Actualizar el pago principal como completado
+          await supabaseAdmin
+            .from('pagos')
+            .update({ status: 'pagado' })
+            .eq('id', installmentData.pago_id);
+
+          // También actualizar la factura
+          const { data: pagoInfo } = await supabaseAdmin
+            .from('pagos')
+            .select('invoice_id')
+            .eq('id', installmentData.pago_id)
+            .single();
+
+          if (pagoInfo) {
+            await supabaseAdmin
+              .from('invoices')
+              .update({ status: 'pagado' })
+              .eq('id', pagoInfo.invoice_id);
+          }
+        }
+      }
+
+      console.log('Cuota actualizada exitosamente');
+
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          fecha_pago: paymentDate,
+          extractedAmount: extractedAmount,
+          expectedAmount: expectedAmount,
+          amountMismatch: amountMismatch,
+          message: amountMismatch 
+            ? 'Comprobante procesado - El monto no coincide con el esperado' 
+            : 'Comprobante de cuota procesado exitosamente'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      );
+    }
+
+    // Procesamiento normal para pagos principales (código original continúa)
+
+    // Obtener información del pago, proveedor y factura
     console.log('Obteniendo información del pago...');
     const { data: pagoData, error: pagoError } = await supabaseAdmin
       .from('pagos')
-      .select('supplier_id, datos_bancarios_id, invoice_id')
+      .select('supplier_id, datos_bancarios_id, invoice_id, amount')
       .eq('id', pagoId)
       .single();
 
@@ -174,6 +280,15 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
       console.error('Error obteniendo información del pago:', pagoError);
       throw new Error('No se pudo obtener información del pago');
     }
+
+    // Obtener monto de la factura
+    const { data: invoiceData } = await supabaseAdmin
+      .from('invoices')
+      .select('amount')
+      .eq('id', pagoData.invoice_id)
+      .single();
+
+    const invoiceAmount = invoiceData?.amount || pagoData.amount;
 
     // Obtener datos bancarios registrados del proveedor
     console.log('Obteniendo datos bancarios del proveedor...');
@@ -245,7 +360,61 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
       }
     }
 
-    // Actualizar el registro de pago
+    // Verificar si el monto del comprobante es menor al monto de la factura
+    const needsSplitPayment = extractedAmount !== null && extractedAmount < invoiceAmount;
+    console.log('Verificación de monto - Factura:', invoiceAmount, 'Comprobante:', extractedAmount, 'Necesita división:', needsSplitPayment);
+
+    // Si el monto es menor, NO actualizar como pagado aún, devolver información para división
+    if (needsSplitPayment) {
+      // Guardar el comprobante pero mantener como procesando
+      const partialUpdateData: any = {
+        comprobante_pago_url: publicUrl,
+        status: 'procesando',
+        original_amount: invoiceAmount,
+      };
+
+      if (paymentDate && paymentDate !== 'No encontrado') {
+        partialUpdateData.fecha_pago = paymentDate;
+      }
+
+      const { error: partialUpdateError } = await supabaseAdmin
+        .from('pagos')
+        .update(partialUpdateData)
+        .eq('id', pagoId);
+
+      if (partialUpdateError) {
+        console.error('Error actualizando pago parcial:', partialUpdateError);
+        throw partialUpdateError;
+      }
+
+      // Actualizar factura a procesando
+      await supabaseAdmin
+        .from('invoices')
+        .update({ status: 'procesando' })
+        .eq('id', pagoData.invoice_id);
+
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          needsSplitPayment: true,
+          extractedAmount: extractedAmount,
+          invoiceAmount: invoiceAmount,
+          remainingAmount: invoiceAmount - extractedAmount,
+          fecha_pago: paymentDate,
+          numero_cuenta: accountNumber,
+          tipo_cuenta: accountType,
+          pagoId: pagoId,
+          discrepancias: discrepancias,
+          message: 'El monto del comprobante es menor al monto de la factura'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      );
+    }
+
+    // Actualizar el registro de pago (pago completo)
     const updateData: any = {
       comprobante_pago_url: publicUrl,
       status: 'pagado',
