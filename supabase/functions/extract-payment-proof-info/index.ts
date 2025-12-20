@@ -167,12 +167,24 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
 
     console.log('Información parseada:', extractedInfo);
 
-    const paymentDate = extractedInfo.fecha_pago;
-    const accountNumber = extractedInfo.numero_cuenta;
-    const accountType = extractedInfo.tipo_cuenta;
-    const extractedAmount = extractedInfo.monto;
+    // Función para sanitizar valores - convertir strings "null", "undefined", etc. a null real
+    const sanitizeValue = (value: any): any => {
+      if (value === null || value === undefined) return null;
+      if (typeof value === 'string') {
+        const lower = value.toLowerCase().trim();
+        if (lower === 'null' || lower === 'undefined' || lower === 'no encontrado' || lower === 'n/a' || lower === '') {
+          return null;
+        }
+      }
+      return value;
+    };
 
-    console.log('Monto extraído del comprobante:', extractedAmount);
+    const paymentDate = sanitizeValue(extractedInfo.fecha_pago);
+    const accountNumber = sanitizeValue(extractedInfo.numero_cuenta);
+    const accountType = sanitizeValue(extractedInfo.tipo_cuenta);
+    const extractedAmount = sanitizeValue(extractedInfo.monto);
+
+    console.log('Valores sanitizados - fecha:', paymentDate, 'cuenta:', accountNumber, 'monto:', extractedAmount);
 
     // Si es un pago de cuota, procesarlo de manera diferente
     if (isInstallmentPayment) {
