@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown, Layers } from "lucide-react";
+import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown, Layers, RotateCcw } from "lucide-react";
 import { PaymentInstallments } from "@/components/payments/PaymentInstallments";
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -754,6 +754,29 @@ const Invoices = () => {
     },
   });
 
+  const revertEvidenceMutation = useMutation({
+    mutationFn: async (invoice: any) => {
+      const { error } = await supabase
+        .from("invoices")
+        .update({
+          evidence_status: 'pending',
+          evidence_reviewed_by: null,
+          evidence_reviewed_at: null,
+          evidence_rejection_reason: null
+        } as any)
+        .eq("id", invoice.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Evidencia revertida a pendiente");
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al revertir evidencia");
+    },
+  });
+
   const handleEvidenceUpload = async (invoiceId: string, existingUrls: string[]) => {
     if (evidenceFiles.length === 0) {
       toast.error("Por favor selecciona al menos una imagen");
@@ -1268,6 +1291,27 @@ const Invoices = () => {
                                 <Badge variant="outline" className="border-destructive text-destructive">
                                   Sin motivo especificado
                                 </Badge>
+                              )}
+                              
+                              {isAdmin && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8 text-warning hover:bg-warning/10"
+                                        onClick={() => revertEvidenceMutation.mutate(invoice)}
+                                        disabled={revertEvidenceMutation.isPending}
+                                      >
+                                        <RotateCcw className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Revertir a pendiente</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               )}
                               
                               {!isAdmin && (
