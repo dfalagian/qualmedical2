@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -11,7 +10,9 @@ import qualmedicalLogo from "@/assets/qualmedical-logo.jpg";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 // Schema de validación para login
 const loginSchema = z.object({
@@ -28,7 +29,7 @@ const loginSchema = z.object({
     .max(100, "Contraseña demasiado larga"),
 });
 
-// Schema de validación para registro
+// Schema de validación para registro con validación de RFC
 const signupSchema = loginSchema.extend({
   full_name: z
     .string()
@@ -43,14 +44,17 @@ const signupSchema = loginSchema.extend({
   rfc: z
     .string()
     .trim()
-    .min(12, "El RFC debe tener al menos 12 caracteres")
-    .max(13, "RFC inválido")
+    .min(12, "El RFC debe tener 12 caracteres (Persona Moral) o 13 caracteres (Persona Física)")
+    .max(13, "El RFC no puede tener más de 13 caracteres")
     .regex(/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/, "Formato de RFC inválido"),
   phone: z
     .string()
     .trim()
     .max(20, "Teléfono demasiado largo")
     .optional(),
+  tipo_venta: z.enum(["medicamentos", "otros"], {
+    required_error: "Selecciona el tipo de venta",
+  }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -78,8 +82,13 @@ export const AuthForm = () => {
       company_name: "",
       rfc: "",
       phone: "",
+      tipo_venta: undefined,
     },
   });
+
+  // Detectar tipo de persona según longitud del RFC
+  const rfcValue = signupForm.watch("rfc");
+  const tipoPersona = rfcValue?.length === 13 ? "fisica" : rfcValue?.length === 12 ? "moral" : null;
 
   // Resetear formularios cuando cambie entre login y registro
   useEffect(() => {
@@ -145,8 +154,10 @@ export const AuthForm = () => {
         throw new Error("Error al crear la cuenta");
       }
 
-      // Actualizar perfil (el trigger ya lo creó, solo actualizamos los datos adicionales)
-      // El rol de proveedor se asigna automáticamente mediante trigger
+      // Determinar tipo de persona por longitud del RFC
+      const tipoPersonaValue = data.rfc.length === 13 ? 'fisica' : 'moral';
+
+      // Actualizar perfil con tipo_persona y tipo_venta
       const { error: profileError } = await supabase
         .from("profiles")
         .upsert({
@@ -156,6 +167,8 @@ export const AuthForm = () => {
           company_name: data.company_name,
           rfc: data.rfc,
           phone: data.phone || null,
+          tipo_persona: tipoPersonaValue,
+          tipo_venta: data.tipo_venta,
         }, {
           onConflict: 'id'
         });
@@ -349,7 +362,14 @@ export const AuthForm = () => {
                   name="rfc"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>RFC *</FormLabel>
+                      <div className="flex items-center justify-between">
+                        <FormLabel>RFC *</FormLabel>
+                        {tipoPersona && (
+                          <Badge variant={tipoPersona === "fisica" ? "secondary" : "default"}>
+                            {tipoPersona === "fisica" ? "Persona Física (13 caracteres)" : "Persona Moral (12 caracteres)"}
+                          </Badge>
+                        )}
+                      </div>
                       <FormControl>
                         <Input
                           {...field}
@@ -362,6 +382,34 @@ export const AuthForm = () => {
                           onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                         />
                       </FormControl>
+                      <FormDescription>
+                        {!tipoPersona && "Ingresa tu RFC para detectar si eres Persona Física o Moral"}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={signupForm.control}
+                  name="tipo_venta"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de Venta *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona el tipo de venta" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="medicamentos">Venta de Medicamentos</SelectItem>
+                          <SelectItem value="otros">Venta de otros productos o servicios</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Esto determina los documentos que deberás subir
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

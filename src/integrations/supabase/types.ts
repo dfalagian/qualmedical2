@@ -592,6 +592,8 @@ export type Database = {
           last_login_at: string | null
           phone: string | null
           rfc: string | null
+          tipo_persona: Database["public"]["Enums"]["tipo_persona"] | null
+          tipo_venta: Database["public"]["Enums"]["tipo_venta"] | null
           updated_at: string | null
         }
         Insert: {
@@ -605,6 +607,8 @@ export type Database = {
           last_login_at?: string | null
           phone?: string | null
           rfc?: string | null
+          tipo_persona?: Database["public"]["Enums"]["tipo_persona"] | null
+          tipo_venta?: Database["public"]["Enums"]["tipo_venta"] | null
           updated_at?: string | null
         }
         Update: {
@@ -618,6 +622,8 @@ export type Database = {
           last_login_at?: string | null
           phone?: string | null
           rfc?: string | null
+          tipo_persona?: Database["public"]["Enums"]["tipo_persona"] | null
+          tipo_venta?: Database["public"]["Enums"]["tipo_venta"] | null
           updated_at?: string | null
         }
         Relationships: []
@@ -732,12 +738,15 @@ export type Database = {
         | "aviso_funcionamiento"
         | "ine"
         | "datos_bancarios"
+        | "ine_sanitario"
       payment_status:
         | "pendiente"
         | "procesando"
         | "pagado"
         | "rechazado"
         | "cancelado"
+      tipo_persona: "fisica" | "moral"
+      tipo_venta: "medicamentos" | "otros"
       user_role: "admin" | "proveedor" | "contador"
     }
     CompositeTypes: {
@@ -877,6 +886,7 @@ export const Constants = {
         "aviso_funcionamiento",
         "ine",
         "datos_bancarios",
+        "ine_sanitario",
       ],
       payment_status: [
         "pendiente",
@@ -885,6 +895,8 @@ export const Constants = {
         "rechazado",
         "cancelado",
       ],
+      tipo_persona: ["fisica", "moral"],
+      tipo_venta: ["medicamentos", "otros"],
       user_role: ["admin", "proveedor", "contador"],
     },
   },
