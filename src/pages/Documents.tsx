@@ -15,16 +15,77 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePDFUpload } from "@/hooks/usePDFUpload";
 import { Progress } from "@/components/ui/progress";
 
-const DOCUMENT_TYPES = [
-  { value: "contrato", label: "Contrato" },
-  { value: "certificado", label: "Certificado" },
-  { value: "constancia_fiscal", label: "Constancia de Situación Fiscal" },
-  { value: "acta_constitutiva", label: "Acta Constitutiva" },
-  { value: "comprobante_domicilio", label: "Comprobante de Domicilio" },
-  { value: "aviso_funcionamiento", label: "Aviso de Funcionamiento" },
-  { value: "ine", label: "INE (Credencial de Identificación)" },
-  { value: "datos_bancarios", label: "Datos Bancarios" },
-];
+// Documentos según tipo de persona y tipo de venta
+const getDocumentTypesForSupplier = (tipoPersona: string | null, tipoVenta: string | null) => {
+  // Si no tiene configuración, mostrar todos
+  if (!tipoPersona || !tipoVenta) {
+    return [
+      { value: "constancia_fiscal", label: "Constancia de Situación Fiscal" },
+      { value: "acta_constitutiva", label: "Acta Constitutiva" },
+      { value: "comprobante_domicilio", label: "Comprobante de Domicilio" },
+      { value: "aviso_funcionamiento", label: "Aviso de Funcionamiento" },
+      { value: "ine", label: "INE (Credencial de Identificación)" },
+      { value: "datos_bancarios", label: "Datos Bancarios" },
+    ];
+  }
+
+  // Venta de Medicamentos - Persona Física
+  if (tipoVenta === "medicamentos" && tipoPersona === "fisica") {
+    return [
+      { value: "constancia_fiscal", label: "Constancia de Situación Fiscal" },
+      { value: "comprobante_domicilio", label: "Comprobante de Domicilio" },
+      { value: "aviso_funcionamiento", label: "Aviso de Funcionamiento" },
+      { value: "ine", label: "INE (Representante Legal)" },
+      { value: "ine_sanitario", label: "INE (Representante Sanitario)" },
+      { value: "datos_bancarios", label: "Datos Bancarios" },
+    ];
+  }
+
+  // Venta de Medicamentos - Persona Moral
+  if (tipoVenta === "medicamentos" && tipoPersona === "moral") {
+    return [
+      { value: "constancia_fiscal", label: "Constancia de Situación Fiscal" },
+      { value: "acta_constitutiva", label: "Acta Constitutiva (PM)" },
+      { value: "comprobante_domicilio", label: "Comprobante de Domicilio (PF y PM)" },
+      { value: "aviso_funcionamiento", label: "Aviso de Funcionamiento" },
+      { value: "ine", label: "INE (Representante Legal) (PF y PM)" },
+      { value: "ine_sanitario", label: "INE (Representante Sanitario)" },
+      { value: "datos_bancarios", label: "Datos Bancarios (PF y PM)" },
+    ];
+  }
+
+  // Venta de otros productos o servicios - Persona Física
+  if (tipoVenta === "otros" && tipoPersona === "fisica") {
+    return [
+      { value: "constancia_fiscal", label: "Constancia de Situación Fiscal" },
+      { value: "acta_constitutiva", label: "Acta Constitutiva" },
+      { value: "comprobante_domicilio", label: "Comprobante de Domicilio" },
+      { value: "ine", label: "INE" },
+      { value: "datos_bancarios", label: "Datos Bancarios" },
+    ];
+  }
+
+  // Venta de otros productos o servicios - Persona Moral
+  if (tipoVenta === "otros" && tipoPersona === "moral") {
+    return [
+      { value: "constancia_fiscal", label: "Constancia de Situación Fiscal" },
+      { value: "acta_constitutiva", label: "Acta Constitutiva" },
+      { value: "comprobante_domicilio", label: "Comprobante de Domicilio" },
+      { value: "ine", label: "INE (Representante Legal)" },
+      { value: "datos_bancarios", label: "Datos Bancarios" },
+    ];
+  }
+
+  // Default: todos los documentos
+  return [
+    { value: "constancia_fiscal", label: "Constancia de Situación Fiscal" },
+    { value: "acta_constitutiva", label: "Acta Constitutiva" },
+    { value: "comprobante_domicilio", label: "Comprobante de Domicilio" },
+    { value: "aviso_funcionamiento", label: "Aviso de Funcionamiento" },
+    { value: "ine", label: "INE (Credencial de Identificación)" },
+    { value: "datos_bancarios", label: "Datos Bancarios" },
+  ];
+};
 
 // Constantes de seguridad
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -42,6 +103,28 @@ const Documents = () => {
   const [notes, setNotes] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Obtener perfil del usuario para determinar tipos de documentos
+  const { data: userProfile } = useQuery({
+    queryKey: ["userProfile", user?.id],
+    enabled: !!user && !isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("tipo_persona, tipo_venta")
+        .eq("id", user!.id)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Obtener tipos de documentos según el perfil del usuario
+  const documentTypes = getDocumentTypesForSupplier(
+    userProfile?.tipo_persona || null,
+    userProfile?.tipo_venta || null
+  );
 
   // Validación de archivo
   const validateFile = (file: File, documentType: string): string | null => {
@@ -507,7 +590,7 @@ const Documents = () => {
                       <SelectValue placeholder="Selecciona el tipo" />
                     </SelectTrigger>
                     <SelectContent>
-                      {DOCUMENT_TYPES.map((type) => (
+                      {documentTypes.map((type) => (
                         <SelectItem key={type.value} value={type.value}>
                           {type.label}
                         </SelectItem>
@@ -667,7 +750,7 @@ const Documents = () => {
                         <span className="text-sm text-muted-foreground">v{doc.version}</span>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {DOCUMENT_TYPES.find((t) => t.value === doc.document_type)?.label}
+                        {documentTypes.find((t) => t.value === doc.document_type)?.label || doc.document_type}
                       </p>
                       {isAdmin && doc.profiles && (
                         <p className="text-sm text-muted-foreground">
