@@ -74,15 +74,21 @@ serve(async (req) => {
             content: [
               {
                 type: 'text',
-                text: `Analiza este comprobante de pago bancario y extrae la siguiente información:
+                text: `Analiza este comprobante de pago bancario mexicano y extrae la siguiente información:
 
-**Instrucciones importantes:**
+**Instrucciones MUY importantes:**
 1. Busca la fecha de pago/transferencia en el documento
 2. La fecha puede aparecer como "Fecha de pago", "Fecha de operación", "Fecha de transferencia" o similar
 3. Devuelve la fecha en formato YYYY-MM-DD
 4. Extrae el número de cuenta destino (puede ser cuenta completa o CLABE)
 5. Identifica el tipo de cuenta (puede ser "Ahorro", "Corriente", "CLABE", etc.)
-6. IMPORTANTE: Extrae el MONTO/IMPORTE de la transferencia (busca campos como "Monto", "Importe", "Cantidad", etc.)
+6. **CRÍTICO PARA EL MONTO**: 
+   - Busca el monto principal de la transferencia en campos como "Monto", "Importe", "Cantidad", "Referere", "Total"
+   - El monto suele estar precedido por el símbolo "$" o "MXN"
+   - IGNORA montos que aparezcan dentro de razones sociales o nombres de empresas (ej: "SA de CV ($1)" NO es el monto)
+   - IGNORA montos muy pequeños como $1 que suelen ser parte del texto de la empresa
+   - El monto real de una transferencia bancaria típica es mayor a $100
+   - Busca números grandes con formato de moneda (ej: $4,511 o $4511)
 7. Si no encuentras algún dato, devuelve null
 
 Por favor, extrae toda la información solicitada del comprobante de pago.`
