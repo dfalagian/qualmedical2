@@ -464,6 +464,7 @@ export type Database = {
           is_split_payment: boolean | null
           nombre_banco: string | null
           original_amount: number | null
+          paid_amount: number | null
           status: string
           supplier_id: string
           total_installments: number | null
@@ -481,6 +482,7 @@ export type Database = {
           is_split_payment?: boolean | null
           nombre_banco?: string | null
           original_amount?: number | null
+          paid_amount?: number | null
           status?: string
           supplier_id: string
           total_installments?: number | null
@@ -498,6 +500,7 @@ export type Database = {
           is_split_payment?: boolean | null
           nombre_banco?: string | null
           original_amount?: number | null
+          paid_amount?: number | null
           status?: string
           supplier_id?: string
           total_installments?: number | null
@@ -573,6 +576,57 @@ export type Database = {
           },
           {
             foreignKeyName: "payment_installments_pago_id_fkey"
+            columns: ["pago_id"]
+            isOneToOne: false
+            referencedRelation: "pagos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_proofs: {
+        Row: {
+          amount: number
+          comprobante_url: string
+          created_at: string
+          created_by: string | null
+          fecha_pago: string | null
+          id: string
+          invoice_id: string
+          pago_id: string
+          proof_number: number
+        }
+        Insert: {
+          amount: number
+          comprobante_url: string
+          created_at?: string
+          created_by?: string | null
+          fecha_pago?: string | null
+          id?: string
+          invoice_id: string
+          pago_id: string
+          proof_number?: number
+        }
+        Update: {
+          amount?: number
+          comprobante_url?: string
+          created_at?: string
+          created_by?: string | null
+          fecha_pago?: string | null
+          id?: string
+          invoice_id?: string
+          pago_id?: string
+          proof_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_proofs_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_proofs_pago_id_fkey"
             columns: ["pago_id"]
             isOneToOne: false
             referencedRelation: "pagos"

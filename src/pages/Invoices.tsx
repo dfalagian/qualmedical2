@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown, Layers, RotateCcw } from "lucide-react";
-import { PaymentInstallments } from "@/components/payments/PaymentInstallments";
+import { PaymentProofsHistory } from "@/components/payments/PaymentProofsHistory";
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -88,10 +88,10 @@ const Invoices = () => {
 
       if (invoicesError) throw invoicesError;
 
-      // Obtener comprobantes de pago para cada factura (incluir datos de split payment)
+      // Obtener comprobantes de pago para cada factura (incluir datos de pagos parciales)
       const { data: pagosData, error: pagosError } = await supabase
         .from("pagos")
-        .select("id, invoice_id, comprobante_pago_url, is_split_payment, total_installments");
+        .select("id, invoice_id, comprobante_pago_url, is_split_payment, total_installments, paid_amount, original_amount, status");
 
       if (pagosError) console.error("Error fetching pagos:", pagosError);
 
@@ -103,7 +103,9 @@ const Invoices = () => {
           comprobante_pago_url: pago?.comprobante_pago_url || null,
           pago_id: pago?.id || null,
           is_split_payment: pago?.is_split_payment || false,
-          total_installments: pago?.total_installments || null
+          total_installments: pago?.total_installments || null,
+          paid_amount: pago?.paid_amount || 0,
+          pago_status: pago?.status || null
         };
       });
 
@@ -1083,21 +1085,14 @@ const Invoices = () => {
                         </div>
                       )}
                       
-                      {/* Mostrar cuotas de pago dividido */}
-                      {invoice.is_split_payment && invoice.pago_id && (
-                        <div className="mt-2 border-t pt-2">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Layers className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground font-medium">
-                              Pago dividido en {invoice.total_installments} cuotas
-                            </span>
-                          </div>
-                          <PaymentInstallments
-                            pagoId={invoice.pago_id}
-                            supplierId={invoice.supplier_id}
-                            isAdmin={isAdmin}
-                          />
-                        </div>
+                      {/* Mostrar historial de pagos si hay comprobantes */}
+                      {invoice.pago_id && invoice.paid_amount > 0 && (
+                        <PaymentProofsHistory
+                          pagoId={invoice.pago_id}
+                          invoiceAmount={invoice.amount}
+                          paidAmount={invoice.paid_amount}
+                          status={invoice.pago_status || invoice.status}
+                        />
                       )}
                     </div>
 

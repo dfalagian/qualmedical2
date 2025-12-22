@@ -378,54 +378,92 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
       }
     }
 
-    // Verificar si el monto del comprobante es menor al monto de la factura
-    const isPartialPayment = extractedAmount !== null && extractedAmount < invoiceAmount;
-    const remainingAmount = isPartialPayment ? invoiceAmount - extractedAmount : 0;
-    console.log('Verificación de monto - Factura:', invoiceAmount, 'Comprobante:', extractedAmount, 'Pago parcial:', isPartialPayment, 'Restante:', remainingAmount);
+    // Obtener el total ya pagado de comprobantes anteriores
+    const { data: existingProofs } = await supabaseAdmin
+      .from('payment_proofs')
+      .select('amount, proof_number')
+      .eq('pago_id', pagoId)
+      .order('proof_number', { ascending: false });
 
-    // Si el monto es menor, marcar como procesando y mostrar la diferencia
-    if (isPartialPayment) {
-      // Guardar el comprobante pero mantener como procesando
-      const partialUpdateData: any = {
-        comprobante_pago_url: publicUrl,
-        status: 'procesando',
-        original_amount: invoiceAmount,
-        amount: extractedAmount, // Guardar el monto pagado
-      };
+    const totalPaidBefore = existingProofs?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
+    const nextProofNumber = (existingProofs?.[0]?.proof_number || 0) + 1;
+    const currentPaymentAmount = extractedAmount || 0;
+    const totalPaidNow = totalPaidBefore + currentPaymentAmount;
+    const remainingAmount = invoiceAmount - totalPaidNow;
+    const isFullyPaid = remainingAmount <= 0;
 
-      if (paymentDate && paymentDate !== 'No encontrado') {
-        partialUpdateData.fecha_pago = paymentDate;
-      }
+    console.log('Análisis de pagos:', {
+      invoiceAmount,
+      totalPaidBefore,
+      currentPaymentAmount,
+      totalPaidNow,
+      remainingAmount,
+      isFullyPaid,
+      nextProofNumber
+    });
 
-      const { error: partialUpdateError } = await supabaseAdmin
-        .from('pagos')
-        .update(partialUpdateData)
-        .eq('id', pagoId);
+    // Guardar el comprobante en payment_proofs
+    const { error: proofError } = await supabaseAdmin
+      .from('payment_proofs')
+      .insert({
+        pago_id: pagoId,
+        invoice_id: pagoData.invoice_id,
+        proof_number: nextProofNumber,
+        amount: currentPaymentAmount,
+        comprobante_url: publicUrl,
+        fecha_pago: paymentDate && paymentDate !== 'No encontrado' ? paymentDate : null,
+      });
 
-      if (partialUpdateError) {
-        console.error('Error actualizando pago parcial:', partialUpdateError);
-        throw partialUpdateError;
-      }
+    if (proofError) {
+      console.error('Error guardando comprobante:', proofError);
+      throw proofError;
+    }
 
-      // Actualizar factura a procesando
-      await supabaseAdmin
-        .from('invoices')
-        .update({ status: 'procesando' })
-        .eq('id', pagoData.invoice_id);
+    // Actualizar pago con el total acumulado
+    const pagoUpdateData: any = {
+      comprobante_pago_url: publicUrl, // Último comprobante
+      paid_amount: totalPaidNow,
+      status: isFullyPaid ? 'pagado' : 'procesando',
+      original_amount: invoiceAmount,
+    };
 
+    if (paymentDate && paymentDate !== 'No encontrado') {
+      pagoUpdateData.fecha_pago = paymentDate;
+    }
+
+    const { error: updatePagoError } = await supabaseAdmin
+      .from('pagos')
+      .update(pagoUpdateData)
+      .eq('id', pagoId);
+
+    if (updatePagoError) {
+      console.error('Error actualizando pago:', updatePagoError);
+      throw updatePagoError;
+    }
+
+    // Actualizar estado de factura
+    await supabaseAdmin
+      .from('invoices')
+      .update({ status: isFullyPaid ? 'pagado' : 'procesando' })
+      .eq('id', pagoData.invoice_id);
+
+    // Preparar historial de pagos para la respuesta
+    const paymentHistory = existingProofs?.map(p => ({
+      number: p.proof_number,
+      amount: p.amount
+    })) || [];
+    paymentHistory.push({ number: nextProofNumber, amount: currentPaymentAmount });
+
+    if (isFullyPaid) {
       return new Response(
         JSON.stringify({ 
           success: true,
-          isPartialPayment: true,
-          extractedAmount: extractedAmount,
-          invoiceAmount: invoiceAmount,
-          remainingAmount: remainingAmount,
-          fecha_pago: paymentDate,
-          numero_cuenta: accountNumber,
-          tipo_cuenta: accountType,
-          pagoId: pagoId,
-          discrepancias: discrepancias,
-          message: `Pago parcial detectado. Monto pagado: $${extractedAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}. Resta por pagar: $${remainingAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+          isFullyPaid: true,
+          invoiceAmount,
+          totalPaid: totalPaidNow,
+          paymentHistory,
+          discrepancias,
+          message: `✅ Factura pagada completamente. Total: $${invoiceAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -434,48 +472,19 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
       );
     }
 
-    // Actualizar el registro de pago (pago completo)
-    const updateData: any = {
-      comprobante_pago_url: publicUrl,
-      status: 'pagado',
-    };
-
-    if (paymentDate && paymentDate !== 'No encontrado') {
-      updateData.fecha_pago = paymentDate;
-    }
-
-    const { error: updateError } = await supabaseAdmin
-      .from('pagos')
-      .update(updateData)
-      .eq('id', pagoId);
-
-    if (updateError) {
-      console.error('Error actualizando pago:', updateError);
-      throw updateError;
-    }
-
-    // Actualizar estado de factura a "pagado"
-    const { error: invoiceUpdateError } = await supabaseAdmin
-      .from('invoices')
-      .update({ status: 'pagado' })
-      .eq('id', pagoData.invoice_id);
-
-    if (invoiceUpdateError) {
-      console.error('Error actualizando estado de factura:', invoiceUpdateError);
-    }
-
-    console.log('Pago actualizado exitosamente');
-
+    // Pago parcial
     return new Response(
       JSON.stringify({ 
         success: true,
-        fecha_pago: paymentDate,
-        numero_cuenta: accountNumber,
-        tipo_cuenta: accountType,
-        discrepancias: discrepancias,
-        message: discrepancias 
-          ? 'Comprobante procesado con advertencias - Se detectaron discrepancias en los datos' 
-          : 'Comprobante procesado exitosamente'
+        isPartialPayment: true,
+        invoiceAmount,
+        currentPayment: currentPaymentAmount,
+        totalPaid: totalPaidNow,
+        remainingAmount,
+        paymentHistory,
+        proofNumber: nextProofNumber,
+        discrepancias,
+        message: `Pago #${nextProofNumber} registrado: $${currentPaymentAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}. Total pagado: $${totalPaidNow.toLocaleString('es-MX', { minimumFractionDigits: 2 })}. Resta: $${remainingAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
