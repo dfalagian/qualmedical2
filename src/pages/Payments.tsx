@@ -24,8 +24,9 @@ const Payments = () => {
   const { loading, isAdmin, user } = useAuth();
   const queryClient = useQueryClient();
 
+  // Query para obtener los comprobantes de pago individuales
   const { data: pagos, isLoading, error: pagosError } = useQuery({
-    queryKey: ["pagos", user?.id, isAdmin],
+    queryKey: ["pagos-con-comprobantes", user?.id, isAdmin],
     queryFn: async () => {
       // Primero obtener los pagos básicos
       let query = supabase
@@ -43,53 +44,115 @@ const Payments = () => {
       if (pagosErr) throw pagosErr;
       if (!pagosData) return [];
 
-      // Enriquecer con datos relacionados
-      const enrichedPagos = await Promise.all(
-        pagosData.map(async (pago: any) => {
-          // Obtener profile
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("full_name, company_name, rfc")
-            .eq("id", pago.supplier_id)
-            .single();
+      // Enriquecer con datos relacionados y expandir comprobantes
+      const allPaymentRows: any[] = [];
 
-          // Obtener datos bancarios con nombre del banco
-          const { data: bankData } = await supabase
-            .from("documents")
-            .select("nombre_cliente, numero_cuenta, numero_cuenta_clabe, nombre_banco, image_urls")
-            .eq("id", pago.datos_bancarios_id)
-            .single();
+      for (const pago of pagosData) {
+        // Obtener profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, company_name, rfc")
+          .eq("id", pago.supplier_id)
+          .single();
 
-          // Obtener factura
-          const { data: invoice } = await supabase
-            .from("invoices")
-            .select("invoice_number, amount, fecha_emision")
-            .eq("id", pago.invoice_id)
-            .single();
+        // Obtener datos bancarios con nombre del banco
+        const { data: bankData } = await supabase
+          .from("documents")
+          .select("nombre_cliente, numero_cuenta, numero_cuenta_clabe, nombre_banco, image_urls")
+          .eq("id", pago.datos_bancarios_id)
+          .single();
 
-          // Obtener régimen fiscal de la constancia fiscal del proveedor
-          const { data: constanciaFiscal } = await supabase
-            .from("documents")
-            .select("regimen_fiscal")
-            .eq("supplier_id", pago.supplier_id)
-            .eq("document_type", "constancia_fiscal")
-            .not("regimen_fiscal", "is", null)
-            .not("regimen_fiscal", "eq", "No encontrado")
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+        // Obtener factura
+        const { data: invoice } = await supabase
+          .from("invoices")
+          .select("invoice_number, amount, fecha_emision")
+          .eq("id", pago.invoice_id)
+          .single();
 
-          return {
+        // Obtener régimen fiscal de la constancia fiscal del proveedor
+        const { data: constanciaFiscal } = await supabase
+          .from("documents")
+          .select("regimen_fiscal")
+          .eq("supplier_id", pago.supplier_id)
+          .eq("document_type", "constancia_fiscal")
+          .not("regimen_fiscal", "is", null)
+          .not("regimen_fiscal", "eq", "No encontrado")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        // Obtener comprobantes de pago (payment_proofs) para este pago
+        const { data: paymentProofs } = await supabase
+          .from("payment_proofs")
+          .select("*")
+          .eq("pago_id", pago.id)
+          .order("proof_number", { ascending: true });
+
+        const baseData = {
+          profiles: profile,
+          datos_bancarios: bankData,
+          invoices: invoice,
+          regimen_fiscal: constanciaFiscal?.regimen_fiscal || null,
+          supplier_id: pago.supplier_id,
+          datos_bancarios_id: pago.datos_bancarios_id,
+          invoice_id: pago.invoice_id,
+          nombre_banco: pago.nombre_banco,
+          original_pago_id: pago.id,
+          invoice_amount: invoice?.amount || pago.amount,
+        };
+
+        // Si hay comprobantes de pago, crear una fila por cada uno
+        if (paymentProofs && paymentProofs.length > 0) {
+          for (const proof of paymentProofs) {
+            allPaymentRows.push({
+              ...baseData,
+              id: proof.id,
+              amount: proof.amount,
+              status: "pagado",
+              fecha_pago: proof.fecha_pago,
+              created_at: proof.created_at,
+              comprobante_pago_url: proof.comprobante_url,
+              proof_number: proof.proof_number,
+              is_proof: true,
+              total_proofs: paymentProofs.length,
+            });
+          }
+
+          // Calcular monto pendiente
+          const totalPagado = paymentProofs.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+          const montoFactura = invoice?.amount || pago.amount;
+          const restante = montoFactura - totalPagado;
+
+          // Si hay monto restante, agregar fila de pendiente
+          if (restante > 0.01) {
+            allPaymentRows.push({
+              ...baseData,
+              id: `${pago.id}-pending`,
+              amount: restante,
+              status: "pendiente",
+              fecha_pago: null,
+              created_at: pago.created_at,
+              comprobante_pago_url: null,
+              proof_number: null,
+              is_pending_remainder: true,
+              total_proofs: paymentProofs.length,
+            });
+          }
+        } else {
+          // Si no hay comprobantes, mostrar el pago original
+          allPaymentRows.push({
+            ...baseData,
             ...pago,
-            profiles: profile,
-            datos_bancarios: bankData,
-            invoices: invoice,
-            regimen_fiscal: constanciaFiscal?.regimen_fiscal || null,
-          };
-        })
-      );
+            is_proof: false,
+            total_proofs: 0,
+          });
+        }
+      }
 
-      return enrichedPagos;
+      // Ordenar por fecha de creación descendente
+      return allPaymentRows.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
     },
   });
 
@@ -293,16 +356,41 @@ const Payments = () => {
                     <TableCell className="font-mono text-sm">
                       {pago.datos_bancarios?.numero_cuenta_clabe || "N/A"}
                     </TableCell>
-                    <TableCell>{pago.invoices?.invoice_number || "N/A"}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <span>{pago.invoices?.invoice_number || "N/A"}</span>
+                        {pago.is_proof && (
+                          <Badge variant="outline" className="text-xs">
+                            Pago {pago.proof_number}
+                          </Badge>
+                        )}
+                        {pago.is_pending_remainder && (
+                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/30">
+                            Resto
+                          </Badge>
+                        )}
+                      </div>
+                      {(pago.is_proof || pago.is_pending_remainder) && (
+                        <div className="text-xs text-muted-foreground">
+                          Total factura: ${parseFloat(pago.invoice_amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-semibold">
                       ${parseFloat(pago.amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell>
                       <Badge 
                         variant={pago.status === "pagado" ? "default" : "secondary"}
-                        className={pago.status === "pagado" ? "bg-green-600 hover:bg-green-700" : ""}
+                        className={
+                          pago.status === "pagado" 
+                            ? "bg-green-600 hover:bg-green-700" 
+                            : pago.is_pending_remainder 
+                              ? "bg-amber-500/20 text-amber-700 border-amber-500/30"
+                              : ""
+                        }
                       >
-                        {pago.status}
+                        {pago.is_pending_remainder ? "Pendiente" : pago.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">
@@ -312,12 +400,16 @@ const Payments = () => {
                       }
                     </TableCell>
                     <TableCell>
-                      <PaymentProofUpload 
-                        pagoId={pago.id}
-                        supplierId={pago.supplier_id}
-                        hasProof={!!pago.comprobante_pago_url}
-                        proofUrl={pago.comprobante_pago_url}
-                      />
+                      {pago.is_pending_remainder ? (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      ) : (
+                        <PaymentProofUpload 
+                          pagoId={pago.original_pago_id || pago.id}
+                          supplierId={pago.supplier_id}
+                          hasProof={!!pago.comprobante_pago_url}
+                          proofUrl={pago.comprobante_pago_url}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
