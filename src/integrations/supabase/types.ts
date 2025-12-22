@@ -523,6 +523,63 @@ export type Database = {
           },
         ]
       }
+      payment_complements: {
+        Row: {
+          created_at: string
+          fecha_pago: string | null
+          id: string
+          invoice_id: string
+          monto: number | null
+          payment_proof_id: string
+          pdf_url: string | null
+          supplier_id: string
+          updated_at: string
+          uuid_cfdi: string | null
+          xml_url: string
+        }
+        Insert: {
+          created_at?: string
+          fecha_pago?: string | null
+          id?: string
+          invoice_id: string
+          monto?: number | null
+          payment_proof_id: string
+          pdf_url?: string | null
+          supplier_id: string
+          updated_at?: string
+          uuid_cfdi?: string | null
+          xml_url: string
+        }
+        Update: {
+          created_at?: string
+          fecha_pago?: string | null
+          id?: string
+          invoice_id?: string
+          monto?: number | null
+          payment_proof_id?: string
+          pdf_url?: string | null
+          supplier_id?: string
+          updated_at?: string
+          uuid_cfdi?: string | null
+          xml_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_complements_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_complements_payment_proof_id_fkey"
+            columns: ["payment_proof_id"]
+            isOneToOne: false
+            referencedRelation: "payment_proofs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_installments: {
         Row: {
           actual_amount: number | null

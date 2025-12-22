@@ -18,6 +18,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { InvoiceDetailsDialog } from "@/components/invoices/InvoiceDetailsDialog";
 import { InvoicePaymentProofUpload } from "@/components/invoices/InvoicePaymentProofUpload";
+import { PaymentComplementUpload } from "@/components/invoices/PaymentComplementUpload";
 import { getSignedUrl } from "@/lib/storage";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -1574,6 +1575,15 @@ const Invoices = () => {
                             </div>
                           </DialogContent>
                         </Dialog>
+                      )}
+
+                      {/* Botón de complementos de pago para proveedores - solo cuando hay comprobantes */}
+                      {!isAdmin && invoice.pago_id && invoice.paid_amount > 0 && (
+                        <PaymentComplementUpload
+                          invoiceId={invoice.id}
+                          supplierId={invoice.supplier_id}
+                          invoiceNumber={invoice.invoice_number}
+                        />
                       )}
 
                       {isAdmin && (
