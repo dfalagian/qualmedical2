@@ -304,11 +304,27 @@ export function InvoiceDetailsDialog({ open, onOpenChange, invoice, items = [] }
               
               <Separator />
               
-              {/* Total: usar invoice.amount que viene directamente del XML */}
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total:</span>
-                <span className="text-primary">{formatCurrency(invoice.amount)} {invoice.currency}</span>
-              </div>
+              {/* Total: Subtotal + IVA - ISR - IVA Retenido */}
+              {(() => {
+                const impuestosDetalle = invoice.impuestos_detalle as ImpuestosDetalle | undefined;
+                const isrRetencion = impuestosDetalle?.retenciones?.find(r => r.impuesto === '001');
+                const ivaRetencion = impuestosDetalle?.retenciones?.find(r => r.impuesto === '002');
+                const importeISR = isrRetencion?.importe || 0;
+                const importeIVARetenido = ivaRetencion?.importe || 0;
+                
+                // Calcular total: Subtotal - Descuento + IVA - Retenciones
+                const subtotal = invoice.subtotal || 0;
+                const descuento = invoice.descuento || 0;
+                const iva = invoice.total_impuestos || 0;
+                const totalCalculado = subtotal - descuento + iva - importeISR - importeIVARetenido;
+                
+                return (
+                  <div className="flex justify-between text-lg font-bold">
+                    <span>Total:</span>
+                    <span className="text-primary">{formatCurrency(totalCalculado)} {invoice.currency}</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
