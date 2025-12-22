@@ -122,45 +122,98 @@ serve(async (req) => {
 
     // Extraer impuestos totales
     const totalImpuestosMatch = xmlText.match(/TotalImpuestosTrasladados="([0-9.]+)"/);
+    const totalRetenidosMatch = xmlText.match(/TotalImpuestosRetenidos="([0-9.]+)"/);
 
-    // Extraer impuestos detallados
+    // Extraer impuestos detallados del bloque <cfdi:Impuestos> del comprobante (totales consolidados)
+    // NO de los conceptos individuales
     const impuestosDetalle: any = {
       traslados: [],
       retenciones: []
     };
 
-    // Extraer traslados (IVA, IEPS, etc.)
-    const trasladosRegex = /<cfdi:Traslado([^>]*)\/>/g;
-    let trasladoMatch;
-    while ((trasladoMatch = trasladosRegex.exec(xmlText)) !== null) {
-      const trasladoText = trasladoMatch[1];
-      const impuestoMatch = trasladoText.match(/Impuesto="([^"]+)"/);
-      const tipoFactorMatch = trasladoText.match(/TipoFactor="([^"]+)"/);
-      const tasaCuotaMatch = trasladoText.match(/Tasa[Oo]Cuota="([0-9.]+)"/);
-      const baseMatch = trasladoText.match(/Base="([0-9.]+)"/);
-      const importeMatch = trasladoText.match(/Importe="([0-9.]+)"/);
+    // Buscar el bloque principal de Impuestos del Comprobante (al final del XML)
+    // Este bloque contiene los totales consolidados, no los impuestos por concepto
+    const impuestosBloqueMatch = xmlText.match(/<cfdi:Impuestos[^>]*TotalImpuesto[^>]*>([\s\S]*?)<\/cfdi:Impuestos>/);
+    
+    if (impuestosBloqueMatch) {
+      const impuestosBloque = impuestosBloqueMatch[0];
+      console.log('Bloque de Impuestos consolidados encontrado');
+      
+      // Extraer traslados consolidados del bloque <cfdi:Traslados>
+      const trasladosBloqueMatch = impuestosBloque.match(/<cfdi:Traslados>([\s\S]*?)<\/cfdi:Traslados>/);
+      if (trasladosBloqueMatch) {
+        const trasladosBloque = trasladosBloqueMatch[1];
+        const trasladosRegex = /<cfdi:Traslado([^>]*)\/>/g;
+        let trasladoMatch;
+        while ((trasladoMatch = trasladosRegex.exec(trasladosBloque)) !== null) {
+          const trasladoText = trasladoMatch[1];
+          const impuestoMatch = trasladoText.match(/Impuesto="([^"]+)"/);
+          const tipoFactorMatch = trasladoText.match(/TipoFactor="([^"]+)"/);
+          const tasaCuotaMatch = trasladoText.match(/Tasa[Oo]Cuota="([0-9.]+)"/);
+          const baseMatch = trasladoText.match(/Base="([0-9.]+)"/);
+          const importeMatch = trasladoText.match(/Importe="([0-9.]+)"/);
 
-      impuestosDetalle.traslados.push({
-        impuesto: impuestoMatch ? impuestoMatch[1] : null,
-        tipo_factor: tipoFactorMatch ? tipoFactorMatch[1] : null,
-        tasa_o_cuota: tasaCuotaMatch ? tasaCuotaMatch[1] : null,
-        base: baseMatch ? parseFloat(baseMatch[1]) : 0,
-        importe: importeMatch ? parseFloat(importeMatch[1]) : 0
-      });
-    }
+          impuestosDetalle.traslados.push({
+            impuesto: impuestoMatch ? impuestoMatch[1] : null,
+            tipo_factor: tipoFactorMatch ? tipoFactorMatch[1] : null,
+            tasa_o_cuota: tasaCuotaMatch ? tasaCuotaMatch[1] : null,
+            base: baseMatch ? parseFloat(baseMatch[1]) : 0,
+            importe: importeMatch ? parseFloat(importeMatch[1]) : 0
+          });
+        }
+      }
+      
+      // Extraer retenciones consolidadas del bloque <cfdi:Retenciones>
+      const retencionesBloqueMatch = impuestosBloque.match(/<cfdi:Retenciones>([\s\S]*?)<\/cfdi:Retenciones>/);
+      if (retencionesBloqueMatch) {
+        const retencionesBloque = retencionesBloqueMatch[1];
+        const retencionesRegex = /<cfdi:Retencion([^>]*)\/>/g;
+        let retencionMatch;
+        while ((retencionMatch = retencionesRegex.exec(retencionesBloque)) !== null) {
+          const retencionText = retencionMatch[1];
+          const impuestoMatch = retencionText.match(/Impuesto="([^"]+)"/);
+          const importeMatch = retencionText.match(/Importe="([0-9.]+)"/);
 
-    // Extraer retenciones (ISR, IVA retenido, etc.)
-    const retencionesRegex = /<cfdi:Retencion([^>]*)\/>/g;
-    let retencionMatch;
-    while ((retencionMatch = retencionesRegex.exec(xmlText)) !== null) {
-      const retencionText = retencionMatch[1];
-      const impuestoMatch = retencionText.match(/Impuesto="([^"]+)"/);
-      const importeMatch = retencionText.match(/Importe="([0-9.]+)"/);
+          impuestosDetalle.retenciones.push({
+            impuesto: impuestoMatch ? impuestoMatch[1] : null,
+            importe: importeMatch ? parseFloat(importeMatch[1]) : 0
+          });
+        }
+      }
+    } else {
+      console.log('⚠️ No se encontró bloque de Impuestos consolidados, buscando impuestos individuales');
+      // Fallback: buscar todos los impuestos (para XMLs más simples)
+      const trasladosRegex = /<cfdi:Traslado([^>]*)\/>/g;
+      let trasladoMatch;
+      while ((trasladoMatch = trasladosRegex.exec(xmlText)) !== null) {
+        const trasladoText = trasladoMatch[1];
+        const impuestoMatch = trasladoText.match(/Impuesto="([^"]+)"/);
+        const tipoFactorMatch = trasladoText.match(/TipoFactor="([^"]+)"/);
+        const tasaCuotaMatch = trasladoText.match(/Tasa[Oo]Cuota="([0-9.]+)"/);
+        const baseMatch = trasladoText.match(/Base="([0-9.]+)"/);
+        const importeMatch = trasladoText.match(/Importe="([0-9.]+)"/);
 
-      impuestosDetalle.retenciones.push({
-        impuesto: impuestoMatch ? impuestoMatch[1] : null,
-        importe: importeMatch ? parseFloat(importeMatch[1]) : 0
-      });
+        impuestosDetalle.traslados.push({
+          impuesto: impuestoMatch ? impuestoMatch[1] : null,
+          tipo_factor: tipoFactorMatch ? tipoFactorMatch[1] : null,
+          tasa_o_cuota: tasaCuotaMatch ? tasaCuotaMatch[1] : null,
+          base: baseMatch ? parseFloat(baseMatch[1]) : 0,
+          importe: importeMatch ? parseFloat(importeMatch[1]) : 0
+        });
+      }
+      
+      const retencionesRegex = /<cfdi:Retencion([^>]*)\/>/g;
+      let retencionMatch;
+      while ((retencionMatch = retencionesRegex.exec(xmlText)) !== null) {
+        const retencionText = retencionMatch[1];
+        const impuestoMatch = retencionText.match(/Impuesto="([^"]+)"/);
+        const importeMatch = retencionText.match(/Importe="([0-9.]+)"/);
+
+        impuestosDetalle.retenciones.push({
+          impuesto: impuestoMatch ? impuestoMatch[1] : null,
+          importe: importeMatch ? parseFloat(importeMatch[1]) : 0
+        });
+      }
     }
 
     // Extraer conceptos/artículos
