@@ -128,7 +128,9 @@ export function InvoicePaymentProofUpload({
       return { ...data, pagoId: pagoData.id };
     },
     onSuccess: (data) => {
-      if (data?.isPartialPayment) {
+      if (data?.isFullyPaid) {
+        toast.success(data.message, { duration: 8000 });
+      } else if (data?.isPartialPayment) {
         toast.warning(data.message, { duration: 10000 });
       } else if (data?.discrepancias?.detectadas) {
         toast.error("⚠️ Discrepancias detectadas en datos bancarios", { duration: 8000 });
@@ -138,6 +140,7 @@ export function InvoicePaymentProofUpload({
       
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["pagos"] });
+      queryClient.invalidateQueries({ queryKey: ["payment-proofs"] });
       setFile(null);
       setOpen(false);
       setIsChanging(false);
