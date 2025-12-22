@@ -268,34 +268,34 @@ export function InvoiceDetailsDialog({ open, onOpenChange, invoice, items = [] }
                 </div>
               )}
               
-              {/* Impuestos Retenidos (ISR) */}
+              {/* Impuestos Retenidos (ISR) - Sumar todas las retenciones con impuesto 001 */}
               {(() => {
                 const impuestosDetalle = invoice.impuestos_detalle as ImpuestosDetalle | undefined;
-                const isrRetencion = impuestosDetalle?.retenciones?.find(r => r.impuesto === '001');
-                const importeISR = isrRetencion?.importe || 0;
+                const isrRetenciones = impuestosDetalle?.retenciones?.filter(r => r.impuesto === '001') || [];
+                const totalISR = isrRetenciones.reduce((sum, r) => sum + (r.importe || 0), 0);
                 
-                if (importeISR > 0) {
+                if (totalISR > 0) {
                   return (
                     <div className="flex justify-between text-sm text-destructive">
                       <span>Impuestos retenidos (ISR 1.25%):</span>
-                      <span className="font-medium">-{formatCurrency(importeISR)}</span>
+                      <span className="font-medium">-{formatCurrency(totalISR)}</span>
                     </div>
                   );
                 }
                 return null;
               })()}
               
-              {/* IVA Retenido si existe */}
+              {/* IVA Retenido si existe - Sumar todas las retenciones con impuesto 002 */}
               {(() => {
                 const impuestosDetalle = invoice.impuestos_detalle as ImpuestosDetalle | undefined;
-                const ivaRetencion = impuestosDetalle?.retenciones?.find(r => r.impuesto === '002');
-                const importeIVARetenido = ivaRetencion?.importe || 0;
+                const ivaRetenciones = impuestosDetalle?.retenciones?.filter(r => r.impuesto === '002') || [];
+                const totalIVARetenido = ivaRetenciones.reduce((sum, r) => sum + (r.importe || 0), 0);
                 
-                if (importeIVARetenido > 0) {
+                if (totalIVARetenido > 0) {
                   return (
                     <div className="flex justify-between text-sm text-destructive">
                       <span>IVA Retenido:</span>
-                      <span className="font-medium">-{formatCurrency(importeIVARetenido)}</span>
+                      <span className="font-medium">-{formatCurrency(totalIVARetenido)}</span>
                     </div>
                   );
                 }
