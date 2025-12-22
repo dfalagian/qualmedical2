@@ -331,20 +331,79 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
     if (datosBancarios) {
       const discrepanciaDetectada: any = {};
       
-      // Comparar número de cuenta
-      const numeroCuentaRegistradoRaw = datosBancarios.numero_cuenta || datosBancarios.numero_cuenta_clabe || '';
-      // Ignorar valores como "No encontrado" que pueden haber sido guardados por error
-      const numeroCuentaRegistrado = (numeroCuentaRegistradoRaw && numeroCuentaRegistradoRaw !== 'No encontrado') 
-        ? numeroCuentaRegistradoRaw 
-        : (datosBancarios.numero_cuenta_clabe || '');
+      // Obtener el número de cuenta registrado (preferir numero_cuenta sobre CLABE)
+      const numeroCuentaRegistrado = (datosBancarios.numero_cuenta && datosBancarios.numero_cuenta !== 'No encontrado') 
+        ? datosBancarios.numero_cuenta 
+        : '';
+      const clabeRegistrada = (datosBancarios.numero_cuenta_clabe && datosBancarios.numero_cuenta_clabe !== 'No encontrado')
+        ? datosBancarios.numero_cuenta_clabe
+        : '';
       const numeroCuentaComprobante = accountNumber || '';
       
       console.log('Número de cuenta registrado:', numeroCuentaRegistrado);
+      console.log('CLABE registrada:', clabeRegistrada);
       console.log('Número de cuenta del comprobante:', numeroCuentaComprobante);
+      
+      // Función para extraer solo dígitos
+      const soloDigitos = (str: string) => str.replace(/\D/g, '');
+      
+      // Función para verificar si una cuenta está contenida en una CLABE
+      // La CLABE tiene 18 dígitos: 3 (banco) + 3 (plaza) + 11 (cuenta) + 1 (verificador)
+      // El número de cuenta usualmente son los 11 dígitos del medio (posiciones 6-16)
+      const cuentaEnClabe = (cuenta: string, clabe: string): boolean => {
+        if (!cuenta || !clabe) return false;
+        const cuentaLimpia = soloDigitos(cuenta);
+        const clabeLimpia = soloDigitos(clabe);
+        // Verificar si la cuenta está contenida en la CLABE
+        return clabeLimpia.includes(cuentaLimpia);
+      };
+      
+      // Función para comparar cuentas con tolerancia a formatos
+      const cuentasCoinciden = (cuenta1: string, cuenta2: string, clabe1: string, clabe2: string): boolean => {
+        const c1 = soloDigitos(cuenta1);
+        const c2 = soloDigitos(cuenta2);
+        const cl1 = soloDigitos(clabe1);
+        const cl2 = soloDigitos(clabe2);
+        
+        // Caso 1: Las cuentas coinciden directamente
+        if (c1 && c2 && c1 === c2) return true;
+        
+        // Caso 2: Las CLABEs coinciden
+        if (cl1 && cl2 && cl1 === cl2) return true;
+        
+        // Caso 3: La cuenta del comprobante está en la CLABE registrada
+        if (c2 && cl1 && cuentaEnClabe(c2, cl1)) return true;
+        
+        // Caso 4: La CLABE del comprobante coincide con la registrada
+        if (cl2 && cl1 && cl2 === cl1) return true;
+        
+        // Caso 5: El comprobante muestra CLABE y la cuenta registrada está en ella
+        if (c1 && cl2 && cuentaEnClabe(c1, cl2)) return true;
+        
+        // Caso 6: Comparar últimos dígitos con tolerancia
+        // Si uno es cuenta (10-11 dígitos) y otro es CLABE (18 dígitos), comparar últimos dígitos
+        if (c1.length >= 10 && c2.length === 18) {
+          // c2 es CLABE, extraer cuenta de CLABE (posiciones 6-16, excluyendo verificador)
+          const cuentaDeClabe = c2.substring(6, 17);
+          if (c1 === cuentaDeClabe || c1.slice(-10) === cuentaDeClabe.slice(-10)) return true;
+        }
+        if (c2.length >= 10 && c1.length === 18) {
+          // c1 es CLABE, extraer cuenta de CLABE
+          const cuentaDeClabe = c1.substring(6, 17);
+          if (c2 === cuentaDeClabe || c2.slice(-10) === cuentaDeClabe.slice(-10)) return true;
+        }
+        
+        // Caso 7: Últimos 10 dígitos coinciden (sin el dígito verificador de CLABE)
+        const u10_1 = c1.slice(-10) || cl1.slice(6, 16);
+        const u10_2 = c2.slice(-10) || cl2.slice(6, 16);
+        if (u10_1 && u10_2 && u10_1 === u10_2) return true;
+        
+        return false;
+      };
       
       // Si hay un número en el comprobante, verificar contra el registrado
       if (numeroCuentaComprobante) {
-        if (!numeroCuentaRegistrado) {
+        if (!numeroCuentaRegistrado && !clabeRegistrada) {
           // No hay número de cuenta registrado
           discrepanciaDetectada.numero_cuenta = {
             registrado: 'No encontrado',
@@ -352,16 +411,17 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
             mensaje: 'No se encontró número de cuenta registrado en los datos bancarios'
           };
         } else {
-          // Comparar últimos 4 dígitos
-          const ultimos4Registrado = numeroCuentaRegistrado.slice(-4);
-          const ultimos4Comprobante = numeroCuentaComprobante.slice(-4);
+          // Comparar con tolerancia a formatos (cuenta vs CLABE)
+          const coincide = cuentasCoinciden(numeroCuentaRegistrado, numeroCuentaComprobante, clabeRegistrada, '');
           
-          if (ultimos4Registrado !== ultimos4Comprobante) {
+          if (!coincide) {
             discrepanciaDetectada.numero_cuenta = {
-              registrado: numeroCuentaRegistrado,
+              registrado: numeroCuentaRegistrado || clabeRegistrada,
               comprobante: numeroCuentaComprobante,
-              mensaje: 'Los últimos 4 dígitos de la cuenta no coinciden'
+              mensaje: 'El número de cuenta del comprobante no coincide con el registrado'
             };
+          } else {
+            console.log('✅ Cuenta verificada: coincide con los datos registrados');
           }
         }
       }
