@@ -379,16 +379,18 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
     }
 
     // Verificar si el monto del comprobante es menor al monto de la factura
-    const needsSplitPayment = extractedAmount !== null && extractedAmount < invoiceAmount;
-    console.log('Verificación de monto - Factura:', invoiceAmount, 'Comprobante:', extractedAmount, 'Necesita división:', needsSplitPayment);
+    const isPartialPayment = extractedAmount !== null && extractedAmount < invoiceAmount;
+    const remainingAmount = isPartialPayment ? invoiceAmount - extractedAmount : 0;
+    console.log('Verificación de monto - Factura:', invoiceAmount, 'Comprobante:', extractedAmount, 'Pago parcial:', isPartialPayment, 'Restante:', remainingAmount);
 
-    // Si el monto es menor, NO actualizar como pagado aún, devolver información para división
-    if (needsSplitPayment) {
+    // Si el monto es menor, marcar como procesando y mostrar la diferencia
+    if (isPartialPayment) {
       // Guardar el comprobante pero mantener como procesando
       const partialUpdateData: any = {
         comprobante_pago_url: publicUrl,
         status: 'procesando',
         original_amount: invoiceAmount,
+        amount: extractedAmount, // Guardar el monto pagado
       };
 
       if (paymentDate && paymentDate !== 'No encontrado') {
@@ -414,16 +416,16 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
       return new Response(
         JSON.stringify({ 
           success: true,
-          needsSplitPayment: true,
+          isPartialPayment: true,
           extractedAmount: extractedAmount,
           invoiceAmount: invoiceAmount,
-          remainingAmount: invoiceAmount - extractedAmount,
+          remainingAmount: remainingAmount,
           fecha_pago: paymentDate,
           numero_cuenta: accountNumber,
           tipo_cuenta: accountType,
           pagoId: pagoId,
           discrepancias: discrepancias,
-          message: 'El monto del comprobante es menor al monto de la factura'
+          message: `Pago parcial detectado. Monto pagado: $${extractedAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}. Resta por pagar: $${remainingAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
