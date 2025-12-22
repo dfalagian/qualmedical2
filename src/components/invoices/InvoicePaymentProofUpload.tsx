@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -7,8 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Loader2, FileCheck, RefreshCw } from "lucide-react";
-import { getSignedUrl } from "@/lib/storage";
+import { Loader2, FileCheck, Plus, CheckCircle2 } from "lucide-react";
 import { convertPDFToImages } from "@/lib/pdfToImages";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -17,40 +16,45 @@ interface InvoicePaymentProofUploadProps {
   supplierId: string;
   hasProof: boolean;
   proofUrl?: string | null;
+  invoiceAmount?: number;
+  paidAmount?: number;
 }
 
 export function InvoicePaymentProofUpload({ 
   invoiceId, 
   supplierId, 
   hasProof, 
-  proofUrl 
+  proofUrl,
+  invoiceAmount = 0,
+  paidAmount = 0
 }: InvoicePaymentProofUploadProps) {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
-  const [loadingImage, setLoadingImage] = useState(false);
-  const [isChanging, setIsChanging] = useState(false);
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
 
-  useEffect(() => {
-    const loadSignedUrl = async () => {
-      if (open && proofUrl && hasProof) {
-        setLoadingImage(true);
-        try {
-          const urlPath = new URL(proofUrl).pathname;
-          const filePath = urlPath.split('/').slice(-3).join('/');
-          const url = await getSignedUrl('documents', filePath, 3600);
-          setSignedUrl(url);
-        } catch (error) {
-          console.error('Error loading signed URL:', error);
-        } finally {
-          setLoadingImage(false);
-        }
-      }
-    };
-    loadSignedUrl();
-  }, [open, proofUrl, hasProof]);
+  const isFullyPaid = paidAmount >= invoiceAmount && invoiceAmount > 0;
+  const remainingAmount = Math.max(0, invoiceAmount - paidAmount);
+
+  // Fetch payment info to get accurate paid amount
+  const { data: paymentInfo } = useQuery({
+    queryKey: ["payment-info", invoiceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pagos")
+        .select("id, paid_amount, amount, status")
+        .eq("invoice_id", invoiceId)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: open
+  });
+
+  const effectivePaidAmount = paymentInfo?.paid_amount ?? paidAmount;
+  const effectiveIsFullyPaid = effectivePaidAmount >= invoiceAmount && invoiceAmount > 0;
+  const effectiveRemainingAmount = Math.max(0, invoiceAmount - effectivePaidAmount);
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -135,15 +139,15 @@ export function InvoicePaymentProofUpload({
       } else if (data?.discrepancias?.detectadas) {
         toast.error("⚠️ Discrepancias detectadas en datos bancarios", { duration: 8000 });
       } else {
-        toast.success(isChanging ? "Comprobante actualizado" : "Comprobante procesado correctamente");
+        toast.success("Comprobante procesado correctamente");
       }
       
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["pagos"] });
       queryClient.invalidateQueries({ queryKey: ["payment-proofs"] });
+      queryClient.invalidateQueries({ queryKey: ["payment-info"] });
       setFile(null);
       setOpen(false);
-      setIsChanging(false);
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al subir el comprobante");
@@ -173,11 +177,33 @@ export function InvoicePaymentProofUpload({
     uploadMutation.mutate(file);
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
+  };
+
+  // Determine button appearance
+  const getButtonVariant = () => {
+    if (effectiveIsFullyPaid) return "outline";
+    if (hasProof) return "secondary";
+    return "default";
+  };
+
+  const getButtonIcon = () => {
+    if (effectiveIsFullyPaid) return <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />;
+    if (hasProof) return <Plus className="h-3.5 w-3.5" />;
+    return <FileCheck className="h-3.5 w-3.5" />;
+  };
+
+  const getTooltipText = () => {
+    if (effectiveIsFullyPaid) return "Factura pagada completamente";
+    if (hasProof) return "Agregar otro comprobante de pago";
+    return "Subir comprobante de pago";
+  };
+
   return (
     <Dialog open={open} onOpenChange={(newOpen) => {
       setOpen(newOpen);
       if (!newOpen) {
-        setIsChanging(false);
         setFile(null);
       }
     }}>
@@ -185,40 +211,48 @@ export function InvoicePaymentProofUpload({
         <Tooltip>
           <TooltipTrigger asChild>
             <DialogTrigger asChild>
-              <Button variant={hasProof ? "outline" : "default"} size="icon" className="h-8 w-8">
-                <FileCheck className="h-3.5 w-3.5" />
+              <Button variant={getButtonVariant()} size="icon" className="h-8 w-8">
+                {getButtonIcon()}
               </Button>
             </DialogTrigger>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{hasProof ? "Ver comprobante de pago" : "Subir comprobante de pago"}</p>
+            <p>{getTooltipText()}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{hasProof ? "Comprobante de Pago" : "Subir Comprobante de Pago"}</DialogTitle>
+          <DialogTitle>
+            {effectiveIsFullyPaid ? "Factura Pagada" : hasProof ? "Agregar Comprobante de Pago" : "Subir Comprobante de Pago"}
+          </DialogTitle>
         </DialogHeader>
 
-        {hasProof && proofUrl && !isChanging ? (
-          <div className="space-y-4">
-            {loadingImage ? (
-              <div className="flex items-center justify-center p-8">
-                <Loader2 className="h-8 w-8 animate-spin" />
-              </div>
-            ) : signedUrl ? (
-              <>
-                <img src={signedUrl} alt="Comprobante de pago" className="w-full rounded-lg border" />
-                {isAdmin && (
-                  <Button onClick={() => setIsChanging(true)} variant="outline" className="w-full">
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Cambiar Comprobante
-                  </Button>
-                )}
-              </>
-            ) : (
-              <p className="text-center text-muted-foreground p-4">No se pudo cargar la imagen</p>
-            )}
+        {/* Payment summary */}
+        <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span>Total de factura:</span>
+            <span className="font-medium">{formatCurrency(invoiceAmount)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Total pagado:</span>
+            <span className="font-medium text-green-600">{formatCurrency(effectivePaidAmount)}</span>
+          </div>
+          <div className="flex justify-between text-sm border-t pt-2">
+            <span className="font-medium">Pendiente por pagar:</span>
+            <span className={`font-bold ${effectiveIsFullyPaid ? 'text-green-600' : 'text-orange-600'}`}>
+              {effectiveIsFullyPaid ? "Pagado" : formatCurrency(effectiveRemainingAmount)}
+            </span>
+          </div>
+        </div>
+
+        {effectiveIsFullyPaid ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <CheckCircle2 className="h-16 w-16 text-green-500 mb-4" />
+            <p className="text-lg font-semibold text-green-600">¡Factura completamente pagada!</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Se han registrado todos los pagos para esta factura.
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -228,20 +262,13 @@ export function InvoicePaymentProofUpload({
               {file && <p className="text-sm text-muted-foreground mt-1">Archivo seleccionado: {file.name}</p>}
             </div>
             
-            <div className="flex gap-2">
-              {isChanging && (
-                <Button onClick={() => { setIsChanging(false); setFile(null); }} variant="outline" className="flex-1">
-                  Cancelar
-                </Button>
+            <Button onClick={handleUpload} disabled={!file || uploadMutation.isPending} className="w-full">
+              {uploadMutation.isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Procesando...</>
+              ) : (
+                hasProof ? "Agregar Comprobante" : "Subir y Procesar"
               )}
-              <Button onClick={handleUpload} disabled={!file || uploadMutation.isPending} className={isChanging ? "flex-1" : "w-full"}>
-                {uploadMutation.isPending ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Procesando...</>
-                ) : (
-                  isChanging ? "Actualizar Comprobante" : "Subir y Procesar"
-                )}
-              </Button>
-            </div>
+            </Button>
           </div>
         )}
       </DialogContent>

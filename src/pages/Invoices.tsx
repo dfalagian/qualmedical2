@@ -1240,12 +1240,14 @@ const Invoices = () => {
                         </TooltipProvider>
                       )}
                       
-                      {(invoice.status === 'pagado' || invoice.evidence_status === 'approved') && (
+                      {(invoice.status === 'pagado' || invoice.status === 'procesando' || invoice.evidence_status === 'approved') && (
                         <InvoicePaymentProofUpload
                           invoiceId={invoice.id}
                           supplierId={invoice.supplier_id}
                           hasProof={!!invoice.comprobante_pago_url}
                           proofUrl={invoice.comprobante_pago_url}
+                          invoiceAmount={invoice.amount}
+                          paidAmount={invoice.paid_amount || 0}
                         />
                       )}
 
