@@ -205,9 +205,23 @@ const Invoices = () => {
       // Extraer datos del XML validado
       const invoiceNumber = validationData.invoiceNumber;
       const amount = validationData.amount;
+      const invoiceUuid = validationData.uuid;
 
       if (!invoiceNumber || !amount) {
         throw new Error('No se pudo extraer el número de factura o el monto del XML');
+      }
+
+      // Verificar que no exista una factura con el mismo UUID (duplicado)
+      if (invoiceUuid) {
+        const { data: existingInvoice } = await supabase
+          .from("invoices")
+          .select("id, invoice_number")
+          .eq("uuid", invoiceUuid)
+          .maybeSingle();
+
+        if (existingInvoice) {
+          throw new Error(`Esta factura ya fue subida anteriormente (Folio: ${existingInvoice.invoice_number}). No se permiten facturas duplicadas.`);
+        }
       }
 
       console.log('Datos extraídos del XML:', validationData);
