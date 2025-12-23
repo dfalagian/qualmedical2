@@ -807,14 +807,14 @@ export default function Inventory() {
                       <div className="space-y-2">
                         <Label>Producto asociado</Label>
                         <Select
-                          value={tagForm.product_id}
-                          onValueChange={(value) => setTagForm({ ...tagForm, product_id: value })}
+                          value={tagForm.product_id || "none"}
+                          onValueChange={(value) => setTagForm({ ...tagForm, product_id: value === "none" ? "" : value })}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Seleccionar producto..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Sin asignar</SelectItem>
+                            <SelectItem value="none">Sin asignar</SelectItem>
                             {products.map((product) => (
                               <SelectItem key={product.id} value={product.id}>
                                 {product.sku} - {product.name}
@@ -843,14 +843,14 @@ export default function Inventory() {
                       <div className="space-y-2">
                         <Label>Ubicación actual</Label>
                         <Select
-                          value={tagForm.last_location}
-                          onValueChange={(value) => setTagForm({ ...tagForm, last_location: value })}
+                          value={tagForm.last_location || "none"}
+                          onValueChange={(value) => setTagForm({ ...tagForm, last_location: value === "none" ? "" : value })}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Seleccionar ubicación..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Sin ubicación</SelectItem>
+                            <SelectItem value="none">Sin ubicación</SelectItem>
                             {ANTENNA_LOCATIONS.map((loc) => (
                               <SelectItem key={loc.id} value={loc.name}>
                                 <div className="flex items-center gap-2">
