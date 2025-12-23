@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -24,8 +25,36 @@ import {
   ArrowUpDown,
   Radio,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Bell,
+  MapPin,
+  ArrowRight,
+  Eye,
+  EyeOff
 } from "lucide-react";
+
+// Ubicaciones de las antenas RFID
+const ANTENNA_LOCATIONS = [
+  { id: "antena-1", name: "Antena 1 - Almacén Principal", color: "bg-blue-500" },
+  { id: "antena-2", name: "Antena 2 - Zona de Salida", color: "bg-green-500" }
+];
+
+interface StockAlert {
+  id: string;
+  product_id: string | null;
+  rfid_tag_id: string | null;
+  alert_type: string;
+  previous_location: string | null;
+  new_location: string | null;
+  message: string;
+  severity: string;
+  is_read: boolean;
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  rfid_tags?: { epc: string; products?: { name: string; sku: string } | null } | null;
+  products?: { name: string; sku: string } | null;
+}
 
 interface Product {
   id: string;
@@ -80,6 +109,7 @@ export default function Inventory() {
     epc: "",
     product_id: "",
     status: "disponible",
+    last_location: "",
     notes: ""
   });
 
@@ -113,6 +143,56 @@ export default function Inventory() {
       return data as RfidTag[];
     }
   });
+
+  // Fetch stock alerts
+  const { data: alerts = [], isLoading: loadingAlerts, refetch: refetchAlerts } = useQuery({
+    queryKey: ["stock_alerts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("stock_alerts")
+        .select(`
+          *,
+          rfid_tags:rfid_tag_id (
+            epc,
+            products:product_id (name, sku)
+          ),
+          products:product_id (name, sku)
+        `)
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      return data as StockAlert[];
+    }
+  });
+
+  // Realtime subscription for alerts
+  useEffect(() => {
+    const channel = supabase
+      .channel('stock-alerts-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'stock_alerts'
+        },
+        (payload) => {
+          console.log('Nueva alerta:', payload);
+          refetchAlerts();
+          toast({
+            title: "Nueva alerta de movimiento",
+            description: (payload.new as StockAlert).message,
+            variant: payload.new.severity === 'critical' ? 'destructive' : 'default'
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetchAlerts, toast]);
 
   // Create/Update product
   const productMutation = useMutation({
@@ -202,7 +282,9 @@ export default function Inventory() {
             epc: tag.epc,
             product_id: tag.product_id || null,
             status: tag.status,
-            notes: tag.notes || null
+            last_location: tag.last_location || null,
+            notes: tag.notes || null,
+            last_read_at: tag.last_location ? new Date().toISOString() : undefined
           })
           .eq("id", tag.id);
         if (error) throw error;
@@ -213,7 +295,9 @@ export default function Inventory() {
             epc: tag.epc,
             product_id: tag.product_id || null,
             status: tag.status,
-            notes: tag.notes || null
+            last_location: tag.last_location || null,
+            notes: tag.notes || null,
+            last_read_at: tag.last_location ? new Date().toISOString() : null
           });
         if (error) throw error;
       }
@@ -226,6 +310,48 @@ export default function Inventory() {
       toast({
         title: editingTag ? "Tag actualizado" : "Tag registrado",
         description: "Los cambios se guardaron correctamente."
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Mark alert as read
+  const markAlertReadMutation = useMutation({
+    mutationFn: async ({ id, isRead }: { id: string; isRead: boolean }) => {
+      const { error } = await supabase
+        .from("stock_alerts")
+        .update({ is_read: isRead })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock_alerts"] });
+    }
+  });
+
+  // Simulate tag reading from antenna (for testing)
+  const simulateTagRead = useMutation({
+    mutationFn: async ({ tagId, location }: { tagId: string; location: string }) => {
+      const { error } = await supabase
+        .from("rfid_tags")
+        .update({
+          last_location: location,
+          last_read_at: new Date().toISOString()
+        })
+        .eq("id", tagId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
+      toast({
+        title: "Tag leído",
+        description: "La ubicación del tag fue actualizada."
       });
     },
     onError: (error: Error) => {
@@ -280,6 +406,7 @@ export default function Inventory() {
       epc: "",
       product_id: "",
       status: "disponible",
+      last_location: "",
       notes: ""
     });
   };
@@ -305,6 +432,7 @@ export default function Inventory() {
       epc: tag.epc,
       product_id: tag.product_id || "",
       status: tag.status,
+      last_location: tag.last_location || "",
       notes: tag.notes || ""
     });
     setTagDialogOpen(true);
@@ -325,6 +453,7 @@ export default function Inventory() {
   const lowStockProducts = products.filter(p => p.current_stock <= p.minimum_stock);
   const assignedTags = rfidTags.filter(t => t.status === "asignado").length;
   const availableTags = rfidTags.filter(t => t.status === "disponible").length;
+  const unreadAlerts = alerts.filter(a => !a.is_read).length;
 
   const canEdit = isAdmin || isContador;
 
@@ -411,7 +540,7 @@ export default function Inventory() {
 
         {/* Tabs */}
         <Tabs defaultValue="products" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsList className="grid w-full grid-cols-3 max-w-lg">
             <TabsTrigger value="products" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
               Productos
@@ -419,6 +548,15 @@ export default function Inventory() {
             <TabsTrigger value="tags" className="flex items-center gap-2">
               <Tag className="h-4 w-4" />
               Tags RFID
+            </TabsTrigger>
+            <TabsTrigger value="alerts" className="flex items-center gap-2 relative">
+              <Bell className="h-4 w-4" />
+              Alertas
+              {unreadAlerts > 0 && (
+                <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                  {unreadAlerts}
+                </Badge>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -703,6 +841,28 @@ export default function Inventory() {
                         </Select>
                       </div>
                       <div className="space-y-2">
+                        <Label>Ubicación actual</Label>
+                        <Select
+                          value={tagForm.last_location}
+                          onValueChange={(value) => setTagForm({ ...tagForm, last_location: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar ubicación..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">Sin ubicación</SelectItem>
+                            {ANTENNA_LOCATIONS.map((loc) => (
+                              <SelectItem key={loc.id} value={loc.name}>
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="h-3 w-3" />
+                                  {loc.name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
                         <Label>Notas</Label>
                         <Textarea
                           value={tagForm.notes}
@@ -738,6 +898,7 @@ export default function Inventory() {
                     <TableRow>
                       <TableHead>EPC</TableHead>
                       <TableHead>Producto</TableHead>
+                      <TableHead>Ubicación</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Última lectura</TableHead>
                       {canEdit && <TableHead className="text-right">Acciones</TableHead>}
@@ -746,7 +907,7 @@ export default function Inventory() {
                   <TableBody>
                     {loadingTags ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8">
+                        <TableCell colSpan={6} className="text-center py-8">
                           <div className="flex items-center justify-center gap-2">
                             <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                             Cargando...
@@ -755,7 +916,7 @@ export default function Inventory() {
                       </TableRow>
                     ) : filteredTags.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           No hay tags RFID registrados
                         </TableCell>
                       </TableRow>
@@ -768,6 +929,16 @@ export default function Inventory() {
                               <span>{tag.products.sku} - {tag.products.name}</span>
                             ) : (
                               <span className="text-muted-foreground">Sin asignar</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {tag.last_location ? (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-sm">{tag.last_location}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
                             )}
                           </TableCell>
                           <TableCell>
@@ -812,6 +983,144 @@ export default function Inventory() {
                     )}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+
+            {/* Simulate RFID Reading Section */}
+            {canEdit && rfidTags.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Radio className="h-5 w-5" />
+                    Simular Lectura de Antena (Testing)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Usa esta sección para simular la lectura de tags desde las antenas RFID mientras no tengas el hardware conectado.
+                  </p>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {ANTENNA_LOCATIONS.map((antenna) => (
+                      <Card key={antenna.id} className="border-dashed">
+                        <CardContent className="pt-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className={`h-3 w-3 rounded-full ${antenna.color} animate-pulse`} />
+                            <span className="font-medium">{antenna.name}</span>
+                          </div>
+                          <Select
+                            onValueChange={(tagId) => {
+                              if (tagId) {
+                                simulateTagRead.mutate({ tagId, location: antenna.name });
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar tag para simular lectura..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {rfidTags.map((tag) => (
+                                <SelectItem key={tag.id} value={tag.id}>
+                                  {tag.epc} {tag.products ? `(${tag.products.name})` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Alerts Tab */}
+          <TabsContent value="alerts" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold">Alertas de Movimiento</h2>
+              {unreadAlerts > 0 && (
+                <Badge variant="destructive">
+                  {unreadAlerts} sin leer
+                </Badge>
+              )}
+            </div>
+
+            <Card>
+              <CardContent className="p-0">
+                <ScrollArea className="h-[500px]">
+                  {loadingAlerts ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      <span className="ml-2">Cargando alertas...</span>
+                    </div>
+                  ) : alerts.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No hay alertas registradas</p>
+                      <p className="text-sm">Las alertas aparecerán aquí cuando un tag cambie de ubicación</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {alerts.map((alert) => (
+                        <div 
+                          key={alert.id} 
+                          className={`p-4 hover:bg-muted/50 transition-colors ${!alert.is_read ? 'bg-primary/5' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`p-2 rounded-full ${
+                              alert.severity === 'critical' ? 'bg-destructive/10 text-destructive' :
+                              alert.severity === 'warning' ? 'bg-orange-500/10 text-orange-500' :
+                              'bg-blue-500/10 text-blue-500'
+                            }`}>
+                              {alert.alert_type === 'movement' ? (
+                                <ArrowRight className="h-4 w-4" />
+                              ) : (
+                                <AlertTriangle className="h-4 w-4" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium">{alert.message}</span>
+                                {!alert.is_read && (
+                                  <Badge variant="secondary" className="text-xs">Nuevo</Badge>
+                                )}
+                              </div>
+                              {alert.alert_type === 'movement' && (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                                  <MapPin className="h-3 w-3" />
+                                  <span>{alert.previous_location}</span>
+                                  <ArrowRight className="h-3 w-3" />
+                                  <span>{alert.new_location}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                <span>{new Date(alert.created_at).toLocaleString()}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {alert.alert_type}
+                                </Badge>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => markAlertReadMutation.mutate({ 
+                                id: alert.id, 
+                                isRead: !alert.is_read 
+                              })}
+                              title={alert.is_read ? "Marcar como no leído" : "Marcar como leído"}
+                            >
+                              {alert.is_read ? (
+                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
               </CardContent>
             </Card>
           </TabsContent>
