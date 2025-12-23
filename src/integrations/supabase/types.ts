@@ -963,6 +963,73 @@ export type Database = {
           },
         ]
       }
+      stock_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string
+          id: string
+          is_read: boolean | null
+          message: string
+          new_location: string | null
+          previous_location: string | null
+          product_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          rfid_tag_id: string | null
+          severity: string
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          new_location?: string | null
+          previous_location?: string | null
+          product_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          rfid_tag_id?: string | null
+          severity?: string
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          new_location?: string | null
+          previous_location?: string | null
+          product_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          rfid_tag_id?: string | null
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_alerts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_alerts_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_alerts_rfid_tag_id_fkey"
+            columns: ["rfid_tag_id"]
+            isOneToOne: false
+            referencedRelation: "rfid_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
