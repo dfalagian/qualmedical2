@@ -181,6 +181,76 @@ export type Database = {
           },
         ]
       }
+      inventory_movements: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          location: string | null
+          movement_type: string
+          new_stock: number | null
+          notes: string | null
+          previous_stock: number | null
+          product_id: string
+          quantity: number
+          reference_id: string | null
+          reference_type: string | null
+          rfid_tag_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          location?: string | null
+          movement_type: string
+          new_stock?: number | null
+          notes?: string | null
+          previous_stock?: number | null
+          product_id: string
+          quantity: number
+          reference_id?: string | null
+          reference_type?: string | null
+          rfid_tag_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          location?: string | null
+          movement_type?: string
+          new_stock?: number | null
+          notes?: string | null
+          previous_stock?: number | null
+          product_id?: string
+          quantity?: number
+          reference_id?: string | null
+          reference_type?: string | null
+          rfid_tag_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_rfid_tag_id_fkey"
+            columns: ["rfid_tag_id"]
+            isOneToOne: false
+            referencedRelation: "rfid_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
           cantidad: number
@@ -691,6 +761,62 @@ export type Database = {
           },
         ]
       }
+      products: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          current_stock: number | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          minimum_stock: number | null
+          name: string
+          sku: string
+          supplier_id: string | null
+          unit: string | null
+          unit_price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          current_stock?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          minimum_stock?: number | null
+          name: string
+          sku: string
+          supplier_id?: string | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          current_stock?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          minimum_stock?: number | null
+          name?: string
+          sku?: string
+          supplier_id?: string | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           approved: boolean
@@ -789,6 +915,50 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfid_tags: {
+        Row: {
+          created_at: string | null
+          epc: string
+          id: string
+          last_location: string | null
+          last_read_at: string | null
+          notes: string | null
+          product_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          epc: string
+          id?: string
+          last_location?: string | null
+          last_read_at?: string | null
+          notes?: string | null
+          product_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          epc?: string
+          id?: string
+          last_location?: string | null
+          last_read_at?: string | null
+          notes?: string | null
+          product_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfid_tags_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]

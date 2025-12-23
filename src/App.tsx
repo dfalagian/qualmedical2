@@ -22,6 +22,7 @@ import MedicineCounter from "./pages/MedicineCounter";
 import SupplierDocuments from "./pages/SupplierDocuments";
 import DatabaseBackup from "./pages/DatabaseBackup";
 import Payments from "./pages/Payments";
+import Inventory from "./pages/Inventory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -51,6 +52,7 @@ const App = () => (
           <Route path="/dashboard/supplier-documents" element={<ProtectedRoute><SupplierDocuments /></ProtectedRoute>} />
           <Route path="/dashboard/database-backup" element={<ProtectedRoute><DatabaseBackup /></ProtectedRoute>} />
           <Route path="/dashboard/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+          <Route path="/dashboard/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
