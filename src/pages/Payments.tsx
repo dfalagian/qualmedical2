@@ -237,11 +237,13 @@ const Payments = () => {
       "Número de Cuenta": pago.datos_bancarios?.numero_cuenta || "N/A",
       "CLABE": pago.datos_bancarios?.numero_cuenta_clabe || "N/A",
       "Número de Factura": pago.invoices?.invoice_number || "N/A",
-      "Importe Factura": pago.invoices?.amount || 0,
+      "Número de Pago": pago.is_proof ? `Pago ${pago.proof_number}` : (pago.is_pending_remainder ? "Resto pendiente" : "Pago único"),
+      "Importe Pago": pago.amount || 0,
+      "Importe Total Factura": pago.invoice_amount || pago.invoices?.amount || 0,
       "Fecha Emisión Factura": pago.invoices?.fecha_emision 
         ? new Date(pago.invoices.fecha_emision).toLocaleDateString() 
         : "N/A",
-      "Estado Pago": pago.status,
+      "Estado Pago": pago.is_pending_remainder ? "pendiente" : pago.status,
       "Fecha Pago": pago.fecha_pago 
         ? new Date(pago.fecha_pago).toLocaleDateString() 
         : "N/A",
@@ -262,7 +264,9 @@ const Payments = () => {
       { wch: 20 }, // Número de Cuenta
       { wch: 20 }, // CLABE
       { wch: 20 }, // Número de Factura
-      { wch: 15 }, // Importe
+      { wch: 15 }, // Número de Pago
+      { wch: 15 }, // Importe Pago
+      { wch: 18 }, // Importe Total Factura
       { wch: 15 }, // Fecha Emisión
       { wch: 15 }, // Estado
       { wch: 15 }, // Fecha Pago
