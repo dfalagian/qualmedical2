@@ -1059,7 +1059,7 @@ const Invoices = () => {
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <DollarSign className="h-3 w-3" />
-                          ${invoice.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} {invoice.currency}
+                          ${((invoice.subtotal || invoice.amount) + (invoice.total_impuestos || 0) - (invoice.descuento || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })} {invoice.currency}
                         </span>
                         <span>
                           {new Date(invoice.created_at).toLocaleDateString('es-MX')}
