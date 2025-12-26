@@ -137,7 +137,10 @@ export const useAuth = () => {
   return {
     user,
     session,
-    loading: loading || roleLoading,
+    // Carga inicial de sesión + carga inicial de rol (solo cuando aún no tenemos userRole).
+    // Importante: roleLoading puede activarse por refresh de token al volver al foco; eso NO debe desmontar pantallas.
+    loading: loading || (!!user && userRole === null && roleLoading),
+    roleLoading,
     userRole,
     signOut,
     isAdmin: userRole === "admin",
