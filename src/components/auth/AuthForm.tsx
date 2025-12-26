@@ -286,10 +286,12 @@ export const AuthForm = () => {
                       <FormControl>
                         <Input
                           type="text"
-                          placeholder="Juan Pérez"
+                          placeholder="JUAN PÉREZ"
                           disabled={isLoading}
                           required
                           {...field}
+                          style={{ textTransform: 'uppercase' }}
+                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                         />
                       </FormControl>
                       <FormMessage />
@@ -347,9 +349,11 @@ export const AuthForm = () => {
                         <Input
                           {...field}
                           type="text"
-                          placeholder="Mi Empresa S.A."
+                          placeholder="MI EMPRESA S.A."
                           disabled={isLoading}
                           required
+                          style={{ textTransform: 'uppercase' }}
+                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                         />
                       </FormControl>
                       <FormMessage />
