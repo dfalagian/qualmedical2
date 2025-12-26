@@ -33,6 +33,33 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// Helper para calcular el total real de una factura
+const calculateInvoiceTotal = (invoice: any): number => {
+  const subtotal = invoice.subtotal || invoice.amount || 0;
+  const descuento = invoice.descuento || 0;
+  
+  // Calcular traslados (IVA a favor)
+  let totalTraslados = 0;
+  // Calcular retenciones (deducciones)
+  let totalRetenciones = 0;
+  
+  if (invoice.impuestos_detalle) {
+    const impuestos = typeof invoice.impuestos_detalle === 'string' 
+      ? JSON.parse(invoice.impuestos_detalle) 
+      : invoice.impuestos_detalle;
+    
+    if (impuestos.traslados && Array.isArray(impuestos.traslados)) {
+      totalTraslados = impuestos.traslados.reduce((sum: number, t: any) => sum + (parseFloat(t.importe) || 0), 0);
+    }
+    if (impuestos.retenciones && Array.isArray(impuestos.retenciones)) {
+      totalRetenciones = impuestos.retenciones.reduce((sum: number, r: any) => sum + (parseFloat(r.importe) || 0), 0);
+    }
+  }
+  
+  // Total = Subtotal - Descuento + Traslados - Retenciones
+  return subtotal - descuento + totalTraslados - totalRetenciones;
+};
+
 const Invoices = () => {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
@@ -1059,7 +1086,7 @@ const Invoices = () => {
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <DollarSign className="h-3 w-3" />
-                          ${((invoice.subtotal || invoice.amount) + (invoice.total_impuestos || 0) - (invoice.descuento || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })} {invoice.currency}
+                          ${calculateInvoiceTotal(invoice).toLocaleString('es-MX', { minimumFractionDigits: 2 })} {invoice.currency}
                         </span>
                         <span>
                           {new Date(invoice.created_at).toLocaleDateString('es-MX')}
