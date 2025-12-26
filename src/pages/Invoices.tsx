@@ -911,18 +911,7 @@ const Invoices = () => {
                 >
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="pdfFile">Archivo PDF *</Label>
-                      <Input
-                        id="pdfFile"
-                        type="file"
-                        accept=".pdf"
-                        onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="xmlFile">Archivo XML *</Label>
+                      <Label htmlFor="xmlFile">Archivo XML * (primero)</Label>
                       <Input
                         id="xmlFile"
                         type="file"
@@ -930,6 +919,33 @@ const Invoices = () => {
                         onChange={(e) => setXmlFile(e.target.files?.[0] || null)}
                         required
                       />
+                      {xmlFile && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          {xmlFile.name}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="pdfFile" className={!xmlFile ? "text-muted-foreground" : ""}>
+                        Archivo PDF * {!xmlFile && "(sube primero el XML)"}
+                      </Label>
+                      <Input
+                        id="pdfFile"
+                        type="file"
+                        accept=".pdf"
+                        onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                        disabled={!xmlFile}
+                        required
+                        className={!xmlFile ? "opacity-50 cursor-not-allowed" : ""}
+                      />
+                      {pdfFile && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          {pdfFile.name}
+                        </p>
+                      )}
                     </div>
                   </div>
 
