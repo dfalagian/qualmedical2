@@ -965,9 +965,9 @@ const Invoices = () => {
                     >
                       {supplierFilter === "all"
                         ? "Todos los proveedores"
-                        : suppliers.find((s: any) => s.id === supplierFilter)?.company_name ||
+                        : (suppliers.find((s: any) => s.id === supplierFilter)?.company_name ||
                           suppliers.find((s: any) => s.id === supplierFilter)?.full_name ||
-                          "Seleccionar proveedor"}
+                          "Seleccionar proveedor").toUpperCase()}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
@@ -1007,7 +1007,7 @@ const Invoices = () => {
                                   supplierFilter === supplier.id ? "opacity-100" : "opacity-0"
                                 )}
                               />
-                              {supplier.company_name || supplier.full_name}
+                              {(supplier.company_name || supplier.full_name).toUpperCase()}
                             </CommandItem>
                           ))}
                         </CommandGroup>

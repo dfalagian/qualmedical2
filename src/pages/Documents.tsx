@@ -722,7 +722,7 @@ const Documents = () => {
                     <SelectItem value="all">Todos los proveedores</SelectItem>
                     {suppliers.map((supplier: any) => (
                       <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.company_name || supplier.full_name}
+                        {(supplier.company_name || supplier.full_name).toUpperCase()}
                       </SelectItem>
                     ))}
                   </SelectContent>
