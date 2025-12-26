@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown, Layers, RotateCcw } from "lucide-react";
+import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown, Layers, RotateCcw, History } from "lucide-react";
 import { PaymentProofsHistory } from "@/components/payments/PaymentProofsHistory";
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -89,6 +89,7 @@ const Invoices = () => {
     reason: '',
     type: 'evidence'
   });
+  const [paymentHistoryInvoice, setPaymentHistoryInvoice] = useState<any>(null);
 
   // Query para obtener el perfil del proveedor y verificar si está aprobado
   const { data: supplierProfile } = useQuery({
@@ -1163,16 +1164,6 @@ const Invoices = () => {
                           </Badge>
                         </div>
                       )}
-                      
-                      {/* Mostrar historial de pagos si hay comprobantes */}
-                      {invoice.pago_id && invoice.paid_amount > 0 && (
-                        <PaymentProofsHistory
-                          pagoId={invoice.pago_id}
-                          invoiceAmount={invoice.amount}
-                          paidAmount={invoice.paid_amount}
-                          status={invoice.pago_status || invoice.status}
-                        />
-                      )}
                     </div>
 
                     <div className="flex gap-1">
@@ -1314,6 +1305,27 @@ const Invoices = () => {
                             </TooltipTrigger>
                             <TooltipContent>
                               <p>Descargar complemento de pago (PDF)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+
+                      {/* Botón de historial de pagos */}
+                      {invoice.pago_id && invoice.paid_amount > 0 && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="icon"
+                                className="h-8 w-8 border-green-500 text-green-600 hover:bg-green-50"
+                                onClick={() => setPaymentHistoryInvoice(invoice)}
+                              >
+                                <History className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Ver historial de pagos</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -1789,6 +1801,32 @@ const Invoices = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Diálogo de historial de pagos */}
+      <Dialog open={!!paymentHistoryInvoice} onOpenChange={(open) => !open && setPaymentHistoryInvoice(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-green-600" />
+              Historial de Pagos
+            </DialogTitle>
+            <DialogDescription>
+              Factura: {paymentHistoryInvoice?.invoice_number}
+            </DialogDescription>
+          </DialogHeader>
+          {paymentHistoryInvoice && (
+            <div className="py-2">
+              <PaymentProofsHistory
+                pagoId={paymentHistoryInvoice.pago_id}
+                invoiceAmount={paymentHistoryInvoice.amount}
+                paidAmount={paymentHistoryInvoice.paid_amount || 0}
+                status={paymentHistoryInvoice.pago_status || paymentHistoryInvoice.status}
+                defaultOpen={true}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={rejectionReasonDialog.open} onOpenChange={(open) => setRejectionReasonDialog({ open, reason: '', type: 'evidence' })}>
         <AlertDialogContent>
