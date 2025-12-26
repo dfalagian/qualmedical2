@@ -909,18 +909,39 @@ const Invoices = () => {
                   }}
                   className="space-y-4"
                 >
+                  {!xmlFile && (
+                    <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                      <p className="text-sm text-primary font-medium flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Primero debe subir el archivo XML
+                      </p>
+                    </div>
+                  )}
+                  
+                  {xmlFile && !pdfFile && (
+                    <div className="p-3 bg-success/10 border border-success/20 rounded-lg">
+                      <p className="text-sm text-success font-medium flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Ahora puede subir el archivo PDF
+                      </p>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="xmlFile">Archivo XML * (primero)</Label>
+                      <Label htmlFor="xmlFile">Archivo XML *</Label>
                       <Input
                         id="xmlFile"
                         type="file"
                         accept=".xml"
-                        onChange={(e) => setXmlFile(e.target.files?.[0] || null)}
+                        onChange={(e) => {
+                          setXmlFile(e.target.files?.[0] || null);
+                          setPdfFile(null);
+                        }}
                         required
                       />
                       {xmlFile && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <p className="text-xs text-success flex items-center gap-1">
                           <FileText className="h-3 w-3" />
                           {xmlFile.name}
                         </p>
@@ -929,7 +950,7 @@ const Invoices = () => {
 
                     <div className="space-y-2">
                       <Label htmlFor="pdfFile" className={!xmlFile ? "text-muted-foreground" : ""}>
-                        Archivo PDF * {!xmlFile && "(sube primero el XML)"}
+                        Archivo PDF *
                       </Label>
                       <Input
                         id="pdfFile"
@@ -941,7 +962,7 @@ const Invoices = () => {
                         className={!xmlFile ? "opacity-50 cursor-not-allowed" : ""}
                       />
                       {pdfFile && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <p className="text-xs text-success flex items-center gap-1">
                           <FileText className="h-3 w-3" />
                           {pdfFile.name}
                         </p>
