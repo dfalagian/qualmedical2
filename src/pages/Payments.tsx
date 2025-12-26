@@ -222,55 +222,126 @@ const Payments = () => {
     },
   });
 
+  // Función para formatear números con separador de miles (,) y decimales (.)
+  const formatCurrency = (value: number): string => {
+    return value.toLocaleString('es-ES', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    });
+  };
+
+  // Función para calcular el remanente por pagar
+  const calculateRemanente = (pago: any): string => {
+    const totalFactura = parseFloat(pago.invoice_amount || pago.invoices?.amount || 0);
+    const importePago = parseFloat(pago.amount || 0);
+    
+    // Si es un pago con múltiples comprobantes (is_proof)
+    if (pago.is_proof || pago.is_pending_remainder) {
+      // El remanente es el total de la factura menos todos los pagos anteriores (incluyendo el actual si es pagado)
+      // Necesitamos calcular cuánto queda después de este pago
+      if (pago.is_pending_remainder) {
+        // Si es el resto pendiente, el remanente es 0 porque aún no se paga
+        return "";
+      }
+      // Para pagos realizados, calculamos el remanente después de este pago
+      const remanente = totalFactura - (pago.accumulated_paid || importePago);
+      return remanente > 0.01 ? formatCurrency(remanente) : "0";
+    }
+    
+    // Para pagos únicos, no hay remanente
+    return "";
+  };
+
   const handleExportExcel = () => {
     if (!pagos || pagos.length === 0) {
       toast.error("No hay pagos para exportar");
       return;
     }
 
-    const excelData = pagos.map((pago: any) => ({
-      "Proveedor": pago.profiles?.full_name || pago.profiles?.company_name || "N/A",
-      "RFC": pago.profiles?.rfc || "N/A",
-      "Régimen Fiscal": pago.regimen_fiscal || "N/A",
-      "Nombre Banco": pago.datos_bancarios?.nombre_banco || pago.nombre_banco || "N/A",
-      "Cliente Bancario": pago.datos_bancarios?.nombre_cliente || "N/A",
-      "Número de Cuenta": pago.datos_bancarios?.numero_cuenta || "N/A",
-      "CLABE": pago.datos_bancarios?.numero_cuenta_clabe || "N/A",
-      "Número de Factura": pago.invoices?.invoice_number || "N/A",
-      "Número de Pago": pago.is_proof ? `Pago ${pago.proof_number}` : (pago.is_pending_remainder ? "Resto pendiente" : "Pago único"),
-      "Importe Pago": pago.amount || 0,
-      "Importe Total Factura": pago.invoice_amount || pago.invoices?.amount || 0,
-      "Fecha Emisión Factura": pago.invoices?.fecha_emision 
-        ? new Date(pago.invoices.fecha_emision).toLocaleDateString() 
-        : "N/A",
-      "Estado Pago": pago.is_pending_remainder ? "pendiente" : pago.status,
-      "Fecha Pago": pago.fecha_pago 
-        ? new Date(pago.fecha_pago).toLocaleDateString() 
-        : "N/A",
-      "Fecha Creación": new Date(pago.created_at).toLocaleDateString(),
-    }));
+    // Agrupar pagos por invoice_id para calcular acumulados
+    const paymentsByInvoice: { [key: string]: any[] } = {};
+    pagos.forEach((pago: any) => {
+      const invoiceId = pago.invoice_id;
+      if (!paymentsByInvoice[invoiceId]) {
+        paymentsByInvoice[invoiceId] = [];
+      }
+      paymentsByInvoice[invoiceId].push(pago);
+    });
+
+    // Calcular acumulado para cada pago
+    Object.keys(paymentsByInvoice).forEach(invoiceId => {
+      const invoicePayments = paymentsByInvoice[invoiceId]
+        .filter((p: any) => p.is_proof && p.status === 'pagado')
+        .sort((a: any, b: any) => a.proof_number - b.proof_number);
+      
+      let accumulated = 0;
+      invoicePayments.forEach((pago: any) => {
+        accumulated += parseFloat(pago.amount || 0);
+        pago.accumulated_paid = accumulated;
+      });
+    });
+
+    const excelData = pagos.map((pago: any) => {
+      const totalFactura = parseFloat(pago.invoice_amount || pago.invoices?.amount || 0);
+      const importePago = parseFloat(pago.amount || 0);
+      
+      // Calcular remanente
+      let remanente = "";
+      if (pago.is_proof && pago.status === 'pagado') {
+        const remanenteValue = totalFactura - (pago.accumulated_paid || importePago);
+        remanente = remanenteValue > 0.01 ? formatCurrency(remanenteValue) : "0";
+      } else if (pago.is_pending_remainder) {
+        remanente = ""; // El resto pendiente no tiene remanente porque es lo que falta por pagar
+      }
+
+      return {
+        "Proveedor": pago.profiles?.full_name || pago.profiles?.company_name || "N/A",
+        "RFC": pago.profiles?.rfc || "N/A",
+        "Régimen Fiscal": pago.regimen_fiscal || "N/A",
+        "Nombre Banco": pago.datos_bancarios?.nombre_banco || pago.nombre_banco || "N/A",
+        "Cliente Bancario": pago.datos_bancarios?.nombre_cliente || "N/A",
+        "Número de Cuenta": pago.datos_bancarios?.numero_cuenta || "N/A",
+        "CLABE": pago.datos_bancarios?.numero_cuenta_clabe || "N/A",
+        "Fecha Emisión Factura": pago.invoices?.fecha_emision 
+          ? new Date(pago.invoices.fecha_emision).toLocaleDateString('es-MX') 
+          : "N/A",
+        "Número de Factura": pago.invoices?.invoice_number || "N/A",
+        "Importe Total Factura": formatCurrency(totalFactura),
+        "Número de Pago": pago.is_proof 
+          ? `Pago ${pago.proof_number}` 
+          : (pago.is_pending_remainder ? "Resto pendiente" : "Pago único"),
+        "Importe Pago": formatCurrency(importePago),
+        "Remanente x pagar": remanente,
+        "Estado Pago": pago.is_pending_remainder ? "pendiente" : pago.status,
+        "Fecha Pago": pago.fecha_pago 
+          ? new Date(pago.fecha_pago).toLocaleDateString('es-MX') 
+          : "N/A",
+        "Fecha Creación": new Date(pago.created_at).toLocaleDateString('es-MX'),
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Pagos");
 
-    // Ajustar ancho de columnas
+    // Ajustar ancho de columnas según la nueva estructura
     const columnWidths = [
-      { wch: 30 }, // Proveedor
+      { wch: 35 }, // Proveedor
       { wch: 15 }, // RFC
-      { wch: 25 }, // Régimen Fiscal
+      { wch: 40 }, // Régimen Fiscal
       { wch: 20 }, // Nombre Banco
-      { wch: 30 }, // Cliente Bancario
-      { wch: 20 }, // Número de Cuenta
+      { wch: 35 }, // Cliente Bancario
+      { wch: 18 }, // Número de Cuenta
       { wch: 20 }, // CLABE
-      { wch: 20 }, // Número de Factura
+      { wch: 18 }, // Fecha Emisión Factura
+      { wch: 40 }, // Número de Factura
+      { wch: 20 }, // Importe Total Factura
       { wch: 15 }, // Número de Pago
-      { wch: 15 }, // Importe Pago
-      { wch: 18 }, // Importe Total Factura
-      { wch: 15 }, // Fecha Emisión
-      { wch: 15 }, // Estado
-      { wch: 15 }, // Fecha Pago
-      { wch: 15 }, // Fecha Creación
+      { wch: 18 }, // Importe Pago
+      { wch: 18 }, // Remanente x pagar
+      { wch: 12 }, // Estado Pago
+      { wch: 12 }, // Fecha Pago
+      { wch: 12 }, // Fecha Creación
     ];
     worksheet["!cols"] = columnWidths;
 
