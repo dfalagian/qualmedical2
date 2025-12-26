@@ -14,6 +14,7 @@ interface PaymentProofsHistoryProps {
   invoiceAmount: number;
   paidAmount?: number;
   status: string;
+  defaultOpen?: boolean;
 }
 
 interface PaymentProof {
@@ -29,9 +30,10 @@ export function PaymentProofsHistory({
   pagoId, 
   invoiceAmount, 
   paidAmount = 0,
-  status 
+  status,
+  defaultOpen = false
 }: PaymentProofsHistoryProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [selectedProofUrl, setSelectedProofUrl] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
