@@ -268,29 +268,33 @@ export function InvoiceDetailsDialog({ open, onOpenChange, invoice, items = [] }
                 </div>
               )}
               
-              {/* Impuestos Retenidos (ISR) - Ahora el XML guarda solo los totales consolidados */}
+              {/* Impuestos Retenidos (ISR) - sumar todas las retenciones 001 */}
               {(() => {
                 const impuestosDetalle = invoice.impuestos_detalle as ImpuestosDetalle | undefined;
-                const isrRetencion = impuestosDetalle?.retenciones?.find(r => r.impuesto === '001');
-                const importeISR = isrRetencion?.importe || 0;
-                
+                const retenciones = impuestosDetalle?.retenciones ?? [];
+                const importeISR = retenciones
+                  .filter((r) => r.impuesto === "001")
+                  .reduce((sum, r) => sum + (Number(r.importe) || 0), 0);
+
                 if (importeISR > 0) {
                   return (
                     <div className="flex justify-between text-sm text-destructive">
-                      <span>Impuestos retenidos (ISR 1.25%):</span>
+                      <span>Impuestos retenidos (ISR):</span>
                       <span className="font-medium">-{formatCurrency(importeISR)}</span>
                     </div>
                   );
                 }
                 return null;
               })()}
-              
-              {/* IVA Retenido si existe */}
+
+              {/* IVA Retenido (sumar todas las retenciones 002) */}
               {(() => {
                 const impuestosDetalle = invoice.impuestos_detalle as ImpuestosDetalle | undefined;
-                const ivaRetencion = impuestosDetalle?.retenciones?.find(r => r.impuesto === '002');
-                const importeIVARetenido = ivaRetencion?.importe || 0;
-                
+                const retenciones = impuestosDetalle?.retenciones ?? [];
+                const importeIVARetenido = retenciones
+                  .filter((r) => r.impuesto === "002")
+                  .reduce((sum, r) => sum + (Number(r.importe) || 0), 0);
+
                 if (importeIVARetenido > 0) {
                   return (
                     <div className="flex justify-between text-sm text-destructive">
@@ -301,23 +305,26 @@ export function InvoiceDetailsDialog({ open, onOpenChange, invoice, items = [] }
                 }
                 return null;
               })()}
-              
+
               <Separator />
-              
-              {/* Total: Subtotal + IVA - ISR - IVA Retenido */}
+
+              {/* Total: Subtotal + IVA - (Retenciones) */}
               {(() => {
                 const impuestosDetalle = invoice.impuestos_detalle as ImpuestosDetalle | undefined;
-                const isrRetencion = impuestosDetalle?.retenciones?.find(r => r.impuesto === '001');
-                const ivaRetencion = impuestosDetalle?.retenciones?.find(r => r.impuesto === '002');
-                const importeISR = isrRetencion?.importe || 0;
-                const importeIVARetenido = ivaRetencion?.importe || 0;
-                
+                const retenciones = impuestosDetalle?.retenciones ?? [];
+                const importeISR = retenciones
+                  .filter((r) => r.impuesto === "001")
+                  .reduce((sum, r) => sum + (Number(r.importe) || 0), 0);
+                const importeIVARetenido = retenciones
+                  .filter((r) => r.impuesto === "002")
+                  .reduce((sum, r) => sum + (Number(r.importe) || 0), 0);
+
                 // Calcular total: Subtotal - Descuento + IVA - Retenciones
                 const subtotal = invoice.subtotal || 0;
                 const descuento = invoice.descuento || 0;
                 const iva = invoice.total_impuestos || 0;
                 const totalCalculado = subtotal - descuento + iva - importeISR - importeIVARetenido;
-                
+
                 return (
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total:</span>
