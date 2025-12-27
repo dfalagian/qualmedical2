@@ -90,8 +90,29 @@ const Invoices = () => {
     type: 'evidence'
   });
   const [paymentHistoryInvoice, setPaymentHistoryInvoice] = useState<any>(null);
+  const [complementoToDelete, setComplementoToDelete] = useState<string | null>(null);
 
-  // Query para obtener el perfil del proveedor y verificar si está aprobado
+  // Mutation para eliminar complemento de pago
+  const deleteComplementoMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const { error } = await supabase
+        .from("invoices")
+        .update({ complemento_pago_url: null })
+        .eq("id", invoiceId);
+      
+      if (error) throw error;
+      return { success: true };
+    },
+    onSuccess: () => {
+      toast.success("Complemento de pago eliminado correctamente");
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      setComplementoToDelete(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar el complemento");
+    },
+  });
+
   const { data: supplierProfile } = useQuery({
     queryKey: ["supplier_profile", user?.id],
     enabled: !isAdmin && !!user,
@@ -1373,45 +1394,68 @@ const Invoices = () => {
                       </TooltipProvider>
 
                       {invoice.complemento_pago_url && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={async () => {
-                                  try {
-                                    const urlPath = new URL(invoice.complemento_pago_url).pathname;
-                                    const filePath = urlPath.split('/').slice(-3).join('/');
-                                    
-                                    const { data, error } = await supabase.storage
-                                      .from('invoices')
-                                      .download(filePath);
-                                    
-                                    if (error) throw error;
-                                    
-                                    const url = URL.createObjectURL(data);
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.download = `complemento-${invoice.invoice_number}.pdf`;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    URL.revokeObjectURL(url);
-                                  } catch (error) {
-                                    toast.error('Error al descargar el complemento');
-                                  }
-                                }}
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Descargar complemento de pago (PDF)</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  variant="outline" 
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={async () => {
+                                    try {
+                                      const urlPath = new URL(invoice.complemento_pago_url).pathname;
+                                      const filePath = urlPath.split('/').slice(-3).join('/');
+                                      
+                                      const { data, error } = await supabase.storage
+                                        .from('invoices')
+                                        .download(filePath);
+                                      
+                                      if (error) throw error;
+                                      
+                                      const url = URL.createObjectURL(data);
+                                      const link = document.createElement('a');
+                                      link.href = url;
+                                      link.download = `complemento-${invoice.invoice_number}.pdf`;
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
+                                      URL.revokeObjectURL(url);
+                                    } catch (error) {
+                                      toast.error('Error al descargar el complemento');
+                                    }
+                                  }}
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Descargar complemento de pago (PDF)</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          {isAdmin && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => {
+                                      setComplementoToDelete(invoice.id);
+                                    }}
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Eliminar complemento de pago</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </>
                       )}
 
                       {/* Botón de historial de pagos */}
@@ -1948,6 +1992,27 @@ const Invoices = () => {
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setRejectionReasonDialog({ open: false, reason: '', type: 'evidence' })}>
               Entendido
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Diálogo para confirmar eliminación de complemento de pago */}
+      <AlertDialog open={!!complementoToDelete} onOpenChange={(open) => !open && setComplementoToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar complemento de pago?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará el complemento de pago de esta factura permanentemente. El proveedor deberá subir uno nuevo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => complementoToDelete && deleteComplementoMutation.mutate(complementoToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteComplementoMutation.isPending ? "Eliminando..." : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
