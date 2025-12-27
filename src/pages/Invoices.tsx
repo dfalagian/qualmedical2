@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown, Layers, RotateCcw, History } from "lucide-react";
+import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown, Layers, RotateCcw, History, RefreshCw } from "lucide-react";
 import { PaymentProofsHistory } from "@/components/payments/PaymentProofsHistory";
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -819,6 +819,80 @@ const Invoices = () => {
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al revertir evidencia");
+    },
+  });
+
+  // Mutación para reprocesar XML y actualizar impuestos
+  const reprocessXmlMutation = useMutation({
+    mutationFn: async (invoice: any) => {
+      // Extraer la ruta del XML desde la URL almacenada
+      const xmlUrl = invoice.xml_url;
+      if (!xmlUrl) {
+        throw new Error("Esta factura no tiene un XML almacenado");
+      }
+
+      // Extraer solo la ruta del storage (usuario/invoices/archivo.xml)
+      let xmlPath: string;
+      try {
+        const urlPath = new URL(xmlUrl).pathname;
+        // La ruta tiene formato: /storage/v1/object/public/invoices/USER_ID/invoices/TIMESTAMP.xml
+        // Necesitamos extraer: USER_ID/invoices/TIMESTAMP.xml
+        const parts = urlPath.split('/');
+        const invoicesIndex = parts.findIndex(p => p === 'invoices');
+        if (invoicesIndex !== -1) {
+          xmlPath = parts.slice(invoicesIndex + 1).join('/');
+        } else {
+          xmlPath = parts.slice(-3).join('/');
+        }
+      } catch {
+        // Si no es una URL completa, asumir que ya es una ruta
+        xmlPath = xmlUrl;
+      }
+
+      console.log('Reprocesando XML desde:', xmlPath);
+
+      // Llamar al edge function para revalidar el XML
+      const { data: validationData, error: validationError } = await supabase.functions.invoke(
+        'validate-invoice-xml',
+        {
+          body: { xmlPath }
+        }
+      );
+
+      if (validationError) {
+        console.error('Error al reprocesar XML:', validationError);
+        throw new Error('Error al conectar con el servicio de validación');
+      }
+
+      if (!validationData?.success) {
+        throw new Error(validationData?.mensaje || validationData?.error || 'Error al validar el XML');
+      }
+
+      console.log('Datos reprocesados del XML:', validationData);
+
+      // Actualizar la factura con los nuevos datos de impuestos
+      const { error: updateError } = await supabase
+        .from("invoices")
+        .update({
+          subtotal: validationData.subtotal,
+          descuento: validationData.descuento || 0,
+          total_impuestos: validationData.totalImpuestos || 0,
+          impuestos_detalle: validationData.impuestosDetalle || {},
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", invoice.id);
+
+      if (updateError) throw updateError;
+
+      return validationData;
+    },
+    onSuccess: (data) => {
+      toast.success("Impuestos recalculados correctamente");
+      console.log('Nuevos impuestos:', data.impuestosDetalle);
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al reprocesar el XML");
     },
   });
 
@@ -1693,6 +1767,27 @@ const Invoices = () => {
                             <SelectItem value="cancelado">Cancelado</SelectItem>
                           </SelectContent>
                         </Select>
+                      )}
+                      
+                      {isAdmin && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 text-blue-600 hover:bg-blue-50 border-blue-300"
+                                onClick={() => reprocessXmlMutation.mutate(invoice)}
+                                disabled={reprocessXmlMutation.isPending}
+                              >
+                                <RefreshCw className={cn("h-3.5 w-3.5", reprocessXmlMutation.isPending && "animate-spin")} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Reprocesar XML (recalcular impuestos)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                       
                       {isAdmin && (
