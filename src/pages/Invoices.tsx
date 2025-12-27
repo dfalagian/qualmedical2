@@ -1757,8 +1757,8 @@ const Invoices = () => {
                         </Dialog>
                       )}
 
-                      {/* Botón de complementos de pago para proveedores - solo cuando hay comprobantes */}
-                      {!isAdmin && invoice.pago_id && invoice.paid_amount > 0 && (
+                      {/* Botón de complementos de pago - visible para proveedores y admins cuando hay comprobantes */}
+                      {invoice.pago_id && invoice.paid_amount > 0 && (
                         <PaymentComplementUpload
                           invoiceId={invoice.id}
                           supplierId={invoice.supplier_id}
