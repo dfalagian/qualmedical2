@@ -181,8 +181,13 @@ serve(async (req) => {
         }
       }
     } else {
-      console.log('⚠️ No se encontró bloque de Impuestos consolidados, buscando impuestos individuales');
-      // Fallback: buscar todos los impuestos (para XMLs más simples)
+      console.log('⚠️ No se encontró bloque de Impuestos consolidados, sumando impuestos de conceptos');
+      
+      // Fallback: buscar todos los impuestos y SUMAR por tipo de impuesto
+      // Mapas para acumular totales por tipo de impuesto
+      const trasladosMap: Record<string, { impuesto: string; tipo_factor: string | null; tasa_o_cuota: string | null; base: number; importe: number }> = {};
+      const retencionesMap: Record<string, { impuesto: string; importe: number }> = {};
+      
       const trasladosRegex = /<cfdi:Traslado([^>]*)\/>/g;
       let trasladoMatch;
       while ((trasladoMatch = trasladosRegex.exec(xmlText)) !== null) {
@@ -192,14 +197,23 @@ serve(async (req) => {
         const tasaCuotaMatch = trasladoText.match(/Tasa[Oo]Cuota="([0-9.]+)"/);
         const baseMatch = trasladoText.match(/Base="([0-9.]+)"/);
         const importeMatch = trasladoText.match(/Importe="([0-9.]+)"/);
-
-        impuestosDetalle.traslados.push({
-          impuesto: impuestoMatch ? impuestoMatch[1] : null,
-          tipo_factor: tipoFactorMatch ? tipoFactorMatch[1] : null,
-          tasa_o_cuota: tasaCuotaMatch ? tasaCuotaMatch[1] : null,
-          base: baseMatch ? parseFloat(baseMatch[1]) : 0,
-          importe: importeMatch ? parseFloat(importeMatch[1]) : 0
-        });
+        
+        const impuesto = impuestoMatch ? impuestoMatch[1] : 'desconocido';
+        const tasaOCuota = tasaCuotaMatch ? tasaCuotaMatch[1] : null;
+        const key = `${impuesto}-${tasaOCuota || 'sin-tasa'}`;
+        
+        if (!trasladosMap[key]) {
+          trasladosMap[key] = {
+            impuesto,
+            tipo_factor: tipoFactorMatch ? tipoFactorMatch[1] : null,
+            tasa_o_cuota: tasaOCuota,
+            base: 0,
+            importe: 0
+          };
+        }
+        
+        trasladosMap[key].base += baseMatch ? parseFloat(baseMatch[1]) : 0;
+        trasladosMap[key].importe += importeMatch ? parseFloat(importeMatch[1]) : 0;
       }
       
       const retencionesRegex = /<cfdi:Retencion([^>]*)\/>/g;
@@ -208,12 +222,25 @@ serve(async (req) => {
         const retencionText = retencionMatch[1];
         const impuestoMatch = retencionText.match(/Impuesto="([^"]+)"/);
         const importeMatch = retencionText.match(/Importe="([0-9.]+)"/);
-
-        impuestosDetalle.retenciones.push({
-          impuesto: impuestoMatch ? impuestoMatch[1] : null,
-          importe: importeMatch ? parseFloat(importeMatch[1]) : 0
-        });
+        
+        const impuesto = impuestoMatch ? impuestoMatch[1] : 'desconocido';
+        
+        if (!retencionesMap[impuesto]) {
+          retencionesMap[impuesto] = {
+            impuesto,
+            importe: 0
+          };
+        }
+        
+        retencionesMap[impuesto].importe += importeMatch ? parseFloat(importeMatch[1]) : 0;
       }
+      
+      // Convertir los mapas a arrays
+      impuestosDetalle.traslados = Object.values(trasladosMap);
+      impuestosDetalle.retenciones = Object.values(retencionesMap);
+      
+      console.log('Traslados acumulados:', impuestosDetalle.traslados);
+      console.log('Retenciones acumuladas:', impuestosDetalle.retenciones);
     }
 
     // Extraer conceptos/artículos
