@@ -7,11 +7,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, FileText, Upload, CheckCircle2, Download, Eye, X } from "lucide-react";
+import { Loader2, FileText, Upload, CheckCircle2, Download, Eye, X, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getSignedUrl } from "@/lib/storage";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface PaymentComplementUploadProps {
   invoiceId: string;
@@ -28,6 +38,7 @@ export function PaymentComplementUpload({
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [selectedProofId, setSelectedProofId] = useState<string | null>(null);
+  const [complementToDelete, setComplementToDelete] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { isAdmin, user } = useAuth();
 
@@ -160,6 +171,28 @@ export function PaymentComplementUpload({
     },
   });
 
+  // Mutation para eliminar complemento (solo admin)
+  const deleteComplementMutation = useMutation({
+    mutationFn: async (complementId: string) => {
+      const { error } = await supabase
+        .from("payment_complements")
+        .delete()
+        .eq("id", complementId);
+
+      if (error) throw error;
+      return { success: true };
+    },
+    onSuccess: () => {
+      toast.success("Complemento de pago eliminado correctamente");
+      queryClient.invalidateQueries({ queryKey: ["payment-proofs-for-complements", invoiceId] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      setComplementToDelete(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar el complemento");
+    },
+  });
+
   const handleXmlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -220,6 +253,7 @@ export function PaymentComplementUpload({
   const proofsWithComplement = paymentProofs?.filter(p => p.complement) || [];
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(newOpen) => {
       setOpen(newOpen);
       if (!newOpen) {
@@ -395,6 +429,17 @@ export function PaymentComplementUpload({
                         <Upload className="h-3.5 w-3.5" />
                         Reemplazar
                       </Button>
+                      {isAdmin && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setComplementToDelete(proof.complement.id)}
+                          className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Eliminar
+                        </Button>
+                      )}
                     </div>
 
                     {selectedProofId === proof.id && (
@@ -454,5 +499,27 @@ export function PaymentComplementUpload({
         )}
       </DialogContent>
     </Dialog>
+
+    {/* AlertDialog para confirmar eliminación */}
+    <AlertDialog open={!!complementToDelete} onOpenChange={(open) => !open && setComplementToDelete(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar complemento de pago?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta acción eliminará el complemento de pago permanentemente. El proveedor deberá subir uno nuevo.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => complementToDelete && deleteComplementMutation.mutate(complementToDelete)}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {deleteComplementMutation.isPending ? "Eliminando..." : "Eliminar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
