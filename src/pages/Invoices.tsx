@@ -1843,6 +1843,7 @@ const Invoices = () => {
                           invoiceId={invoice.id}
                           supplierId={invoice.supplier_id}
                           invoiceNumber={invoice.invoice_number}
+                          invoiceUUID={invoice.uuid}
                         />
                       )}
 

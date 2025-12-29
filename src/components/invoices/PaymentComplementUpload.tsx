@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, FileText, Upload, CheckCircle2, Eye, X, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, FileText, Upload, CheckCircle2, Eye, X, Trash2, AlertTriangle, Copy, Check } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -27,18 +27,23 @@ interface PaymentComplementUploadProps {
   invoiceId: string;
   supplierId: string;
   invoiceNumber: string;
+  invoiceUUID?: string | null;
 }
 
 export function PaymentComplementUpload({ 
   invoiceId, 
   supplierId,
-  invoiceNumber
+  invoiceNumber,
+  invoiceUUID
 }: PaymentComplementUploadProps) {
   const [open, setOpen] = useState(false);
   const [complementFile, setComplementFile] = useState<File | null>(null);
   const [selectedProofId, setSelectedProofId] = useState<string | null>(null);
   const [complementToDelete, setComplementToDelete] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [viewingComplementUrl, setViewingComplementUrl] = useState<string | null>(null);
+  const [loadingComplementImage, setLoadingComplementImage] = useState(false);
+  const [copiedUUID, setCopiedUUID] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
 
@@ -276,19 +281,35 @@ export function PaymentComplementUpload({
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
   };
 
-  const handleViewDocument = async (url: string, isPrivate: boolean = true) => {
-    if (isPrivate && url.includes('/documents/')) {
-      const urlParts = url.split('/documents/');
-      if (urlParts.length > 1) {
-        const path = urlParts[1];
-        const signedUrl = await getSignedUrl('documents', path, 3600);
-        if (signedUrl) {
-          window.open(signedUrl, '_blank');
-          return;
+  // Ver complemento en visor interno
+  const handleViewComplement = async (url: string) => {
+    setLoadingComplementImage(true);
+    try {
+      if (url.includes('/documents/')) {
+        const urlParts = url.split('/documents/');
+        if (urlParts.length > 1) {
+          const path = urlParts[1];
+          const signedUrl = await getSignedUrl('documents', path, 3600);
+          if (signedUrl) {
+            setViewingComplementUrl(signedUrl);
+            return;
+          }
         }
       }
+      setViewingComplementUrl(url);
+    } catch (error) {
+      console.error('Error al obtener URL del complemento:', error);
+      toast.error('Error al cargar el complemento');
+    } finally {
+      setLoadingComplementImage(false);
     }
-    window.open(url, '_blank');
+  };
+
+  const handleCopyUUID = (uuid: string) => {
+    navigator.clipboard.writeText(uuid);
+    setCopiedUUID(uuid);
+    setTimeout(() => setCopiedUUID(null), 2000);
+    toast.success('UUID copiado al portapapeles');
   };
 
   const proofsWithoutComplement = paymentProofs?.filter(p => !p.complement) || [];
@@ -446,11 +467,70 @@ export function PaymentComplementUpload({
                       </Badge>
                     </div>
 
+                    {/* Mostrar UUID extraído vs UUID de factura */}
+                    <div className="bg-muted/50 rounded-lg p-3 space-y-2 text-xs">
+                      <div className="font-medium text-sm mb-2 text-muted-foreground">Comparación de UUIDs:</div>
+                      
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">UUID Factura (Base de datos):</span>
+                        <div className="flex items-center gap-1 font-mono bg-background rounded px-2 py-1">
+                          <span className="truncate max-w-[200px]" title={invoiceUUID || 'No disponible'}>
+                            {invoiceUUID || 'No disponible'}
+                          </span>
+                          {invoiceUUID && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={() => handleCopyUUID(invoiceUUID)}
+                            >
+                              {copiedUUID === invoiceUUID ? (
+                                <Check className="h-3 w-3 text-green-600" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">UUID Complemento (Extraído):</span>
+                        <div className="flex items-center gap-1 font-mono bg-background rounded px-2 py-1">
+                          <span className="truncate max-w-[200px]" title={proof.complement.uuid_cfdi || 'No disponible'}>
+                            {proof.complement.uuid_cfdi || 'No disponible'}
+                          </span>
+                          {proof.complement.uuid_cfdi && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={() => handleCopyUUID(proof.complement.uuid_cfdi)}
+                            >
+                              {copiedUUID === proof.complement.uuid_cfdi ? (
+                                <Check className="h-3 w-3 text-green-600" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {invoiceUUID && proof.complement.uuid_cfdi && 
+                       invoiceUUID.toUpperCase() === proof.complement.uuid_cfdi.toUpperCase() && (
+                        <div className="flex items-center gap-1 text-green-600 mt-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <span>Los UUIDs coinciden correctamente</span>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="flex gap-2 pt-2 border-t border-green-200 dark:border-green-900">
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => handleViewDocument(proof.complement.xml_url)}
+                        onClick={() => handleViewComplement(proof.complement.xml_url)}
                         className="gap-1"
                       >
                         <Eye className="h-3.5 w-3.5" />
@@ -460,7 +540,7 @@ export function PaymentComplementUpload({
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => handleViewDocument(proof.complement.pdf_url)}
+                          onClick={() => handleViewComplement(proof.complement.pdf_url)}
                           className="gap-1"
                         >
                           <Eye className="h-3.5 w-3.5" />
@@ -539,6 +619,46 @@ export function PaymentComplementUpload({
             )}
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+
+    {/* Visor interno de complemento de pago */}
+    <Dialog open={!!viewingComplementUrl} onOpenChange={(open) => !open && setViewingComplementUrl(null)}>
+      <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Complemento de Pago
+          </DialogTitle>
+        </DialogHeader>
+        <div className="relative flex items-center justify-center bg-muted/30 rounded-lg min-h-[400px] max-h-[70vh] overflow-auto">
+          {loadingComplementImage ? (
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Cargando complemento...</span>
+            </div>
+          ) : viewingComplementUrl ? (
+            viewingComplementUrl.toLowerCase().includes('.pdf') ? (
+              <iframe 
+                src={viewingComplementUrl} 
+                className="w-full h-[70vh] rounded-lg"
+                title="Complemento de Pago PDF"
+              />
+            ) : (
+              <img 
+                src={viewingComplementUrl} 
+                alt="Complemento de Pago"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                onError={() => {
+                  toast.error('Error al cargar la imagen del complemento');
+                  setViewingComplementUrl(null);
+                }}
+              />
+            )
+          ) : (
+            <p className="text-muted-foreground">No se pudo cargar el complemento</p>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
 
