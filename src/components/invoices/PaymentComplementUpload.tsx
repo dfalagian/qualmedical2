@@ -510,23 +510,47 @@ export function PaymentComplementUpload({
                             </Button>
                           )}
                           {xmlValidated && xmlValidationData?.extractedInfo && (
-                            <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-sm space-y-1">
-                              <p className="font-medium text-green-700 dark:text-green-300">Información extraída del XML:</p>
-                              {xmlValidationData.extractedInfo.fecha_pago && (
-                                <p className="text-green-600 dark:text-green-400">
-                                  Fecha de pago: {xmlValidationData.extractedInfo.fecha_pago}
-                                </p>
-                              )}
-                              {xmlValidationData.extractedInfo.monto_pagado && (
-                                <p className="text-green-600 dark:text-green-400">
-                                  Monto: {formatCurrency(xmlValidationData.extractedInfo.monto_pagado)}
-                                </p>
-                              )}
-                              {xmlValidationData.uuidComplemento && (
-                                <p className="text-green-600 dark:text-green-400 font-mono text-xs">
-                                  UUID Complemento: {xmlValidationData.uuidComplemento}
-                                </p>
-                              )}
+                            <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-sm space-y-2">
+                              <p className="font-medium text-green-700 dark:text-green-300">✓ XML Validado - Información extraída:</p>
+                              
+                              {/* UUIDs claramente diferenciados */}
+                              <div className="space-y-1 bg-white/50 dark:bg-black/20 rounded p-2">
+                                <p className="text-xs text-muted-foreground font-medium">Validación de UUID:</p>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground w-32">UUID Factura (BD):</span>
+                                  <span className="font-mono text-xs text-green-700 dark:text-green-300">{invoiceUUID}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground w-32">UUID Relacionado (XML):</span>
+                                  <span className="font-mono text-xs text-green-700 dark:text-green-300">
+                                    {xmlValidationData.extractedInfo.uuid_documento_relacionado}
+                                  </span>
+                                  <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                </div>
+                                {xmlValidationData.uuidComplemento && (
+                                  <div className="flex items-center gap-2 pt-1 border-t border-green-200 dark:border-green-800 mt-1">
+                                    <span className="text-xs text-muted-foreground w-32">UUID del CFDI Pago:</span>
+                                    <span className="font-mono text-xs text-blue-600 dark:text-blue-400">
+                                      {xmlValidationData.uuidComplemento}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">(folio del complemento)</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Otros datos */}
+                              <div className="flex flex-wrap gap-4">
+                                {xmlValidationData.extractedInfo.fecha_pago && (
+                                  <p className="text-green-600 dark:text-green-400">
+                                    <span className="text-muted-foreground">Fecha:</span> {xmlValidationData.extractedInfo.fecha_pago}
+                                  </p>
+                                )}
+                                {xmlValidationData.extractedInfo.monto_pagado && (
+                                  <p className="text-green-600 dark:text-green-400">
+                                    <span className="text-muted-foreground">Monto:</span> {formatCurrency(xmlValidationData.extractedInfo.monto_pagado)}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
