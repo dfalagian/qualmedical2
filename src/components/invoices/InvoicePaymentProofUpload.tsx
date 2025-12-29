@@ -6,10 +6,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, FileCheck, Plus, CheckCircle2 } from "lucide-react";
+import { Loader2, FileCheck, Plus, CheckCircle2, Eye, Receipt } from "lucide-react";
 import { convertPDFToImages } from "@/lib/pdfToImages";
 import { useAuth } from "@/hooks/useAuth";
+import { getSignedUrl } from "@/lib/storage";
 
 interface InvoicePaymentProofUploadProps {
   invoiceId: string;
@@ -30,6 +32,8 @@ export function InvoicePaymentProofUpload({
 }: InvoicePaymentProofUploadProps) {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [selectedProofUrl, setSelectedProofUrl] = useState<string | null>(null);
+  const [loadingImage, setLoadingImage] = useState(false);
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
 
@@ -51,6 +55,39 @@ export function InvoicePaymentProofUpload({
     },
     enabled: open
   });
+
+  // Fetch payment proofs for this invoice (for suppliers to view)
+  const { data: paymentProofs, isLoading: proofsLoading } = useQuery({
+    queryKey: ["payment-proofs-invoice", invoiceId],
+    queryFn: async () => {
+      if (!paymentInfo?.id) return [];
+      const { data, error } = await supabase
+        .from("payment_proofs")
+        .select("*")
+        .eq("pago_id", paymentInfo.id)
+        .order("proof_number", { ascending: true });
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!paymentInfo?.id
+  });
+
+  // Handle viewing a proof image
+  const handleViewProof = async (url: string) => {
+    setLoadingImage(true);
+    try {
+      const urlPath = new URL(url).pathname;
+      const filePath = urlPath.split('/').slice(-3).join('/');
+      const signedUrl = await getSignedUrl('documents', filePath, 3600);
+      setSelectedProofUrl(signedUrl);
+    } catch (error) {
+      console.error('Error loading signed URL:', error);
+      toast.error('Error al cargar la imagen');
+    } finally {
+      setLoadingImage(false);
+    }
+  };
 
   const effectivePaidAmount = paymentInfo?.paid_amount ?? paidAmount;
   const effectiveIsFullyPaid = effectivePaidAmount >= invoiceAmount && invoiceAmount > 0;
@@ -183,18 +220,21 @@ export function InvoicePaymentProofUpload({
 
   // Determine button appearance
   const getButtonVariant = () => {
+    if (!isAdmin) return "outline"; // Proveedores siempre ven el botón de "ver"
     if (effectiveIsFullyPaid) return "outline";
     if (hasProof) return "secondary";
     return "default";
   };
 
   const getButtonIcon = () => {
+    if (!isAdmin) return <Eye className="h-3.5 w-3.5 text-green-600" />; // Proveedores ven icono de ojo
     if (effectiveIsFullyPaid) return <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />;
     if (hasProof) return <Plus className="h-3.5 w-3.5" />;
     return <FileCheck className="h-3.5 w-3.5" />;
   };
 
   const getTooltipText = () => {
+    if (!isAdmin) return "Ver comprobantes de pago"; // Proveedores
     if (effectiveIsFullyPaid) return "Factura pagada completamente";
     if (hasProof) return "Agregar otro comprobante de pago";
     return "Subir comprobante de pago";
@@ -224,7 +264,7 @@ export function InvoicePaymentProofUpload({
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {effectiveIsFullyPaid ? "Factura Pagada" : hasProof ? "Agregar Comprobante de Pago" : "Subir Comprobante de Pago"}
+            {!isAdmin ? "Comprobantes de Pago" : (effectiveIsFullyPaid ? "Factura Pagada" : hasProof ? "Agregar Comprobante de Pago" : "Subir Comprobante de Pago")}
           </DialogTitle>
         </DialogHeader>
 
@@ -246,7 +286,70 @@ export function InvoicePaymentProofUpload({
           </div>
         </div>
 
-        {effectiveIsFullyPaid ? (
+        {/* Vista para proveedores: solo ver comprobantes */}
+        {!isAdmin ? (
+          <div className="space-y-4">
+            {proofsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : paymentProofs && paymentProofs.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Haz clic en un comprobante para verlo:</p>
+                {paymentProofs.map((proof: any) => (
+                  <div 
+                    key={proof.id}
+                    className="flex justify-between items-center p-3 bg-muted/30 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                    onClick={() => handleViewProof(proof.comprobante_url)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Receipt className="h-5 w-5 text-green-600" />
+                      <div>
+                        <Badge variant="outline" className="text-xs">
+                          Pago #{proof.proof_number}
+                        </Badge>
+                        {proof.fecha_pago && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            {new Date(proof.fecha_pago).toLocaleDateString('es-MX')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-green-600">
+                        {formatCurrency(Number(proof.amount))}
+                      </span>
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                ))}
+
+                {/* Mostrar imagen seleccionada */}
+                {selectedProofUrl && (
+                  <div className="mt-4 border rounded-lg overflow-hidden">
+                    {loadingImage ? (
+                      <div className="flex items-center justify-center p-8">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    ) : (
+                      <img 
+                        src={selectedProofUrl} 
+                        alt="Comprobante de pago" 
+                        className="w-full rounded-lg"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                <Receipt className="h-12 w-12 mb-4 opacity-50" />
+                <p>Aún no hay comprobantes de pago registrados</p>
+                <p className="text-sm mt-2">El administrador subirá los comprobantes cuando se realicen los pagos</p>
+              </div>
+            )}
+          </div>
+        ) : effectiveIsFullyPaid ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <CheckCircle2 className="h-16 w-16 text-green-500 mb-4" />
             <p className="text-lg font-semibold text-green-600">¡Factura completamente pagada!</p>

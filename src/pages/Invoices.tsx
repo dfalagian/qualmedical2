@@ -1514,7 +1514,8 @@ const Invoices = () => {
                         </TooltipProvider>
                       )}
                       
-                      {isAdmin && (invoice.status === 'pagado' || invoice.status === 'procesando' || invoice.evidence_status === 'approved') && (
+                      {/* Mostrar botón de comprobante: admin siempre puede ver/subir, proveedor solo puede ver cuando hay comprobante */}
+                      {(isAdmin || (!isAdmin && invoice.paid_amount > 0)) && (invoice.status === 'pagado' || invoice.status === 'procesando' || invoice.evidence_status === 'approved') && (
                         <InvoicePaymentProofUpload
                           invoiceId={invoice.id}
                           supplierId={invoice.supplier_id}
