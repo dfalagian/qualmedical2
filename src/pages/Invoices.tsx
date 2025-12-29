@@ -1222,26 +1222,6 @@ const Invoices = () => {
               </div>
             )}
             
-            {isAdmin && invoices && invoices.length > 0 && (
-              <div className="mb-4 flex items-center gap-4">
-                <Button
-                  variant="outline"
-                  onClick={handleReprocessAll}
-                  disabled={reprocessingAll}
-                  className="gap-2"
-                >
-                  <RefreshCw className={cn("h-4 w-4", reprocessingAll && "animate-spin")} />
-                  {reprocessingAll 
-                    ? `Reprocesando ${reprocessProgress.current}/${reprocessProgress.total}...` 
-                    : "Reprocesar todas las facturas"}
-                </Button>
-                {reprocessingAll && (
-                  <span className="text-sm text-muted-foreground">
-                    Por favor espera mientras se actualizan los impuestos...
-                  </span>
-                )}
-              </div>
-            )}
             
             {isLoading ? (
               <p className="text-center py-8 text-muted-foreground">Cargando facturas...</p>
