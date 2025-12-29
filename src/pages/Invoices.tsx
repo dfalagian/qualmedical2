@@ -201,9 +201,27 @@ const Invoices = () => {
         throw new Error("Los archivos PDF y XML son obligatorios");
       }
 
+      // Validar que los archivos tengan contenido
+      console.log('Validando archivos antes de subir:', {
+        xmlName: xmlFile.name,
+        xmlSize: xmlFile.size,
+        xmlType: xmlFile.type,
+        pdfName: pdfFile.name,
+        pdfSize: pdfFile.size,
+        pdfType: pdfFile.type
+      });
+
+      if (xmlFile.size === 0) {
+        throw new Error("El archivo XML está vacío. Por favor, selecciona un archivo XML válido.");
+      }
+
+      if (pdfFile.size === 0) {
+        throw new Error("El archivo PDF está vacío. Por favor, selecciona un archivo PDF válido.");
+      }
+
       setIsUploading(true);
 
-      // Upload PDF
+      // Upload PDF primero
       const pdfExt = pdfFile.name.split(".").pop();
       const pdfFileName = `${user.id}/invoices/${Date.now()}.${pdfExt}`;
       const { error: pdfError } = await supabase.storage
@@ -212,12 +230,29 @@ const Invoices = () => {
 
       if (pdfError) throw pdfError;
 
-      // Upload XML
+      // Pequeña pausa para asegurar nombres únicos
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Upload XML - leer el contenido como ArrayBuffer para asegurar que se suba correctamente
       const xmlExt = xmlFile.name.split(".").pop();
       const xmlFileName = `${user.id}/invoices/${Date.now()}.${xmlExt}`;
+      
+      // Leer el archivo XML como ArrayBuffer para evitar problemas de encoding
+      const xmlArrayBuffer = await xmlFile.arrayBuffer();
+      const xmlBlob = new Blob([xmlArrayBuffer], { type: 'text/xml' });
+      
+      console.log('Subiendo XML:', { 
+        fileName: xmlFileName, 
+        blobSize: xmlBlob.size,
+        originalSize: xmlFile.size 
+      });
+
       const { error: xmlError } = await supabase.storage
         .from("invoices")
-        .upload(xmlFileName, xmlFile);
+        .upload(xmlFileName, xmlBlob, {
+          contentType: 'text/xml',
+          cacheControl: '3600'
+        });
 
       if (xmlError) throw xmlError;
 
