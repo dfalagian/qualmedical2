@@ -1,5 +1,6 @@
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
+import { formatSupplierName } from "@/lib/formatters";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -235,7 +236,7 @@ const AvisoFuncionamientoAdmin = () => {
                     {avisosFuncionamiento.map((doc: any) => (
                       <TableRow key={doc.id}>
                         <TableCell className="font-medium">
-                          {doc.profiles?.company_name || doc.profiles?.full_name || "N/A"}
+                          {formatSupplierName(doc.profiles)}
                         </TableCell>
                         <TableCell>{doc.razon_social || "-"}</TableCell>
                         <TableCell className="max-w-xs truncate">{doc.direccion || "-"}</TableCell>
@@ -292,7 +293,7 @@ const AvisoFuncionamientoAdmin = () => {
                                   <div className="space-y-4">
                                     <div>
                                       <h4 className="font-semibold text-sm text-muted-foreground">Proveedor</h4>
-                                      <p>{selectedDoc.profiles?.company_name || selectedDoc.profiles?.full_name}</p>
+                                      <p>{formatSupplierName(selectedDoc.profiles)}</p>
                                     </div>
                                     <div>
                                       <h4 className="font-semibold text-sm text-muted-foreground">Razón Social</h4>

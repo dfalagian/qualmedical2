@@ -20,6 +20,7 @@ import { InvoiceDetailsDialog } from "@/components/invoices/InvoiceDetailsDialog
 import { InvoicePaymentProofUpload } from "@/components/invoices/InvoicePaymentProofUpload";
 import { PaymentComplementUpload } from "@/components/invoices/PaymentComplementUpload";
 import { getSignedUrl } from "@/lib/storage";
+import { formatSupplierName } from "@/lib/formatters";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
@@ -1297,7 +1298,7 @@ const Invoices = () => {
                       </div>
                       {isAdmin && invoice.profiles && (
                         <p className="text-sm text-muted-foreground mt-1">
-                          Proveedor: {invoice.profiles.company_name || invoice.profiles.full_name}
+                          Proveedor: {formatSupplierName(invoice.profiles)}
                         </p>
                       )}
                       {!isAdmin && invoice.requiere_complemento && !invoice.complemento_pago_url && (

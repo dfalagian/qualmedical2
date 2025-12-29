@@ -1,6 +1,7 @@
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { formatSupplierName } from "@/lib/formatters";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -242,7 +243,7 @@ const PurchaseOrders = () => {
                           {getStatusBadge(order.status)}
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          Proveedor: {order.profiles?.company_name || order.profiles?.full_name}
+                          Proveedor: {formatSupplierName(order.profiles)}
                         </p>
                       </div>
                       <div className="text-right">
