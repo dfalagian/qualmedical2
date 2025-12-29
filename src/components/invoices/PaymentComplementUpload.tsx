@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, FileText, Upload, CheckCircle2, Eye, X, Trash2, AlertTriangle, Copy, Check } from "lucide-react";
+import { Loader2, FileText, Upload, CheckCircle2, Eye, X, Trash2, AlertTriangle, Copy, Check, FileCode } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -30,6 +30,21 @@ interface PaymentComplementUploadProps {
   invoiceUUID?: string | null;
 }
 
+interface ProofWithComplement {
+  id: string;
+  proof_number: number;
+  amount: number;
+  fecha_pago: string | null;
+  complement: {
+    id: string;
+    xml_url: string;
+    pdf_url: string | null;
+    uuid_cfdi: string | null;
+    fecha_pago: string | null;
+    monto: number | null;
+  } | null;
+}
+
 export function PaymentComplementUpload({ 
   invoiceId, 
   supplierId,
@@ -37,10 +52,13 @@ export function PaymentComplementUpload({
   invoiceUUID
 }: PaymentComplementUploadProps) {
   const [open, setOpen] = useState(false);
-  const [complementFile, setComplementFile] = useState<File | null>(null);
+  const [xmlFile, setXmlFile] = useState<File | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [selectedProofId, setSelectedProofId] = useState<string | null>(null);
   const [complementToDelete, setComplementToDelete] = useState<string | null>(null);
-  const [isValidating, setIsValidating] = useState(false);
+  const [isValidatingXml, setIsValidatingXml] = useState(false);
+  const [xmlValidated, setXmlValidated] = useState(false);
+  const [xmlValidationData, setXmlValidationData] = useState<any>(null);
   const [viewingComplementUrl, setViewingComplementUrl] = useState<string | null>(null);
   const [loadingComplementImage, setLoadingComplementImage] = useState(false);
   const [copiedUUID, setCopiedUUID] = useState<string | null>(null);
@@ -89,21 +107,19 @@ export function PaymentComplementUpload({
         })
       );
 
-      return proofsWithComplements;
+      return proofsWithComplements as ProofWithComplement[];
     },
     enabled: open
   });
 
-  const uploadMutation = useMutation({
+  // Mutation para validar XML
+  const validateXmlMutation = useMutation({
     mutationFn: async ({ proofId, file }: { proofId: string; file: File }) => {
-      // Subir archivo temporalmente para validación
-      const fileExt = file.name.split('.').pop()?.toLowerCase();
-      const isPdf = fileExt === 'pdf';
-      const tempFileName = `${supplierId}/complementos/temp_${Date.now()}.${fileExt}`;
+      setIsValidatingXml(true);
       
-      setIsValidating(true);
+      // Subir archivo XML temporalmente
+      const tempFileName = `${supplierId}/complementos/temp_xml_${Date.now()}.xml`;
       
-      // Subir archivo temporalmente
       const { error: uploadError } = await supabase.storage
         .from('documents')
         .upload(tempFileName, file);
@@ -111,119 +127,156 @@ export function PaymentComplementUpload({
       if (uploadError) throw uploadError;
 
       try {
-        // Validar UUID del complemento con la edge function
+        // Validar XML con la edge function
         const { data: validationResult, error: validationError } = await supabase.functions
-          .invoke('validate-payment-complement', {
+          .invoke('validate-complement-xml', {
             body: {
               invoiceId,
-              filePath: tempFileName,
-              fileType: isPdf ? 'pdf' : 'image'
+              filePath: tempFileName
             }
           });
 
         if (validationError) {
-          // Eliminar archivo temporal
           await supabase.storage.from('documents').remove([tempFileName]);
-          throw new Error('Error al validar el complemento de pago');
+          throw new Error('Error al validar el XML del complemento');
         }
 
         if (!validationResult.valid) {
-          // Eliminar archivo temporal
           await supabase.storage.from('documents').remove([tempFileName]);
-          throw new Error(validationResult.error || 'El complemento de pago no es válido para esta factura');
+          throw new Error(validationResult.error || 'El XML del complemento no es válido');
         }
 
-        // Validación exitosa - mover archivo a ubicación final
-        const finalFileName = `${supplierId}/complementos/${Date.now()}.${fileExt}`;
-        
-        // Copiar a ubicación final
-        const { error: copyError } = await supabase.storage
-          .from('documents')
-          .copy(tempFileName, finalFileName);
-
-        if (copyError) {
-          await supabase.storage.from('documents').remove([tempFileName]);
-          throw copyError;
-        }
-
-        // Eliminar temporal
-        await supabase.storage.from('documents').remove([tempFileName]);
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('documents')
-          .getPublicUrl(finalFileName);
-
-        // Guardar en payment_complements
-        const { data: existingComplement } = await supabase
-          .from("payment_complements")
-          .select("id")
-          .eq("payment_proof_id", proofId)
-          .maybeSingle();
-
-        const complementData: any = {
-          xml_url: publicUrl, // Usamos xml_url para mantener compatibilidad
-          pdf_url: isPdf ? publicUrl : null,
-          updated_at: new Date().toISOString()
-        };
-
-        // Agregar datos extraídos si existen
-        if (validationResult.extractedInfo) {
-          if (validationResult.extractedInfo.fecha_pago) {
-            complementData.fecha_pago = validationResult.extractedInfo.fecha_pago;
-          }
-          if (validationResult.extractedInfo.monto_pagado) {
-            complementData.monto = validationResult.extractedInfo.monto_pagado;
-          }
-          if (validationResult.extractedInfo.uuid_complemento) {
-            complementData.uuid_cfdi = validationResult.extractedInfo.uuid_complemento;
-          }
-        }
-
-        if (existingComplement) {
-          const { error: updateError } = await supabase
-            .from("payment_complements")
-            .update(complementData)
-            .eq("id", existingComplement.id);
-
-          if (updateError) throw updateError;
-        } else {
-          const { error: insertError } = await supabase
-            .from("payment_complements")
-            .insert({
-              payment_proof_id: proofId,
-              invoice_id: invoiceId,
-              supplier_id: supplierId,
-              ...complementData
-            });
-
-          if (insertError) throw insertError;
-        }
-
+        // XML válido - guardar la ruta temporal para después
         return { 
           success: true, 
-          extractedInfo: validationResult.extractedInfo 
+          tempFilePath: tempFileName,
+          extractedInfo: validationResult.extractedInfo,
+          uuidComplemento: validationResult.uuidComplemento
         };
 
       } catch (error) {
-        // Asegurar que se elimine el archivo temporal en caso de error
         await supabase.storage.from('documents').remove([tempFileName]);
         throw error;
       } finally {
-        setIsValidating(false);
+        setIsValidatingXml(false);
       }
     },
     onSuccess: (data) => {
-      toast.success("Complemento de pago validado y subido correctamente", {
-        description: "El UUID del complemento coincide con la factura"
+      toast.success("XML validado correctamente", {
+        description: "El UUID del complemento coincide con la factura. Ahora puede subir el PDF (opcional)."
       });
-      queryClient.invalidateQueries({ queryKey: ["payment-proofs-for-complements", invoiceId] });
-      queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      setComplementFile(null);
-      setSelectedProofId(null);
+      setXmlValidated(true);
+      setXmlValidationData(data);
     },
     onError: (error: any) => {
-      toast.error("Error de validación", {
-        description: error.message || "Error al subir el complemento"
+      toast.error("Error de validación del XML", {
+        description: error.message || "El XML no pudo ser validado"
+      });
+      setXmlValidated(false);
+      setXmlValidationData(null);
+    },
+  });
+
+  // Mutation para guardar el complemento (XML + PDF opcional)
+  const saveComplementMutation = useMutation({
+    mutationFn: async ({ proofId }: { proofId: string }) => {
+      if (!xmlValidationData?.tempFilePath) {
+        throw new Error('Primero debe validar el XML');
+      }
+
+      // Mover XML a ubicación final
+      const finalXmlPath = `${supplierId}/complementos/${Date.now()}_complemento.xml`;
+      
+      const { error: copyXmlError } = await supabase.storage
+        .from('documents')
+        .copy(xmlValidationData.tempFilePath, finalXmlPath);
+
+      if (copyXmlError) throw copyXmlError;
+
+      // Eliminar temporal
+      await supabase.storage.from('documents').remove([xmlValidationData.tempFilePath]);
+
+      const { data: { publicUrl: xmlPublicUrl } } = supabase.storage
+        .from('documents')
+        .getPublicUrl(finalXmlPath);
+
+      let pdfPublicUrl = null;
+
+      // Si hay PDF, subirlo
+      if (pdfFile) {
+        const fileExt = pdfFile.name.split('.').pop()?.toLowerCase();
+        const finalPdfPath = `${supplierId}/complementos/${Date.now()}_complemento.${fileExt}`;
+        
+        const { error: uploadPdfError } = await supabase.storage
+          .from('documents')
+          .upload(finalPdfPath, pdfFile);
+
+        if (uploadPdfError) throw uploadPdfError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('documents')
+          .getPublicUrl(finalPdfPath);
+        
+        pdfPublicUrl = publicUrl;
+      }
+
+      // Verificar si ya existe un complemento para este proof
+      const { data: existingComplement } = await supabase
+        .from("payment_complements")
+        .select("id")
+        .eq("payment_proof_id", proofId)
+        .maybeSingle();
+
+      const complementData: any = {
+        xml_url: xmlPublicUrl,
+        pdf_url: pdfPublicUrl,
+        updated_at: new Date().toISOString()
+      };
+
+      // Agregar datos extraídos
+      if (xmlValidationData.extractedInfo) {
+        if (xmlValidationData.extractedInfo.fecha_pago) {
+          complementData.fecha_pago = xmlValidationData.extractedInfo.fecha_pago;
+        }
+        if (xmlValidationData.extractedInfo.monto_pagado) {
+          complementData.monto = xmlValidationData.extractedInfo.monto_pagado;
+        }
+      }
+      if (xmlValidationData.uuidComplemento) {
+        complementData.uuid_cfdi = xmlValidationData.uuidComplemento;
+      }
+
+      if (existingComplement) {
+        const { error: updateError } = await supabase
+          .from("payment_complements")
+          .update(complementData)
+          .eq("id", existingComplement.id);
+
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from("payment_complements")
+          .insert({
+            payment_proof_id: proofId,
+            invoice_id: invoiceId,
+            supplier_id: supplierId,
+            ...complementData
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      return { success: true };
+    },
+    onSuccess: () => {
+      toast.success("Complemento de pago guardado correctamente");
+      queryClient.invalidateQueries({ queryKey: ["payment-proofs-for-complements", invoiceId] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast.error("Error al guardar", {
+        description: error.message || "No se pudo guardar el complemento"
       });
     },
   });
@@ -250,7 +303,34 @@ export function PaymentComplementUpload({
     },
   });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const resetForm = () => {
+    setXmlFile(null);
+    setPdfFile(null);
+    setSelectedProofId(null);
+    setXmlValidated(false);
+    setXmlValidationData(null);
+  };
+
+  const handleXmlFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+    
+    if (!selectedFile.name.toLowerCase().endsWith('.xml')) {
+      toast.error('Solo se permiten archivos XML');
+      return;
+    }
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      toast.error('El archivo no debe superar los 10MB');
+      return;
+    }
+    setXmlFile(selectedFile);
+    // Reset validation when new file is selected
+    setXmlValidated(false);
+    setXmlValidationData(null);
+    setPdfFile(null);
+  };
+
+  const handlePdfFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
     
@@ -266,15 +346,23 @@ export function PaymentComplementUpload({
       toast.error('El archivo no debe superar los 10MB');
       return;
     }
-    setComplementFile(selectedFile);
+    setPdfFile(selectedFile);
   };
 
-  const handleUpload = (proofId: string) => {
-    if (!complementFile) {
-      toast.error("Seleccione un archivo de complemento de pago");
+  const handleValidateXml = (proofId: string) => {
+    if (!xmlFile) {
+      toast.error("Seleccione un archivo XML");
       return;
     }
-    uploadMutation.mutate({ proofId, file: complementFile });
+    validateXmlMutation.mutate({ proofId, file: xmlFile });
+  };
+
+  const handleSaveComplement = (proofId: string) => {
+    if (!xmlValidated) {
+      toast.error("Primero debe validar el XML");
+      return;
+    }
+    saveComplementMutation.mutate({ proofId });
   };
 
   const formatCurrency = (amount: number) => {
@@ -315,15 +403,14 @@ export function PaymentComplementUpload({
   const proofsWithoutComplement = paymentProofs?.filter(p => !p.complement) || [];
   const proofsWithComplement = paymentProofs?.filter(p => p.complement) || [];
 
-  const isPending = uploadMutation.isPending || isValidating;
+  const isPending = validateXmlMutation.isPending || saveComplementMutation.isPending || isValidatingXml;
 
   return (
     <>
     <Dialog open={open} onOpenChange={(newOpen) => {
       setOpen(newOpen);
       if (!newOpen) {
-        setComplementFile(null);
-        setSelectedProofId(null);
+        resetForm();
       }
     }}>
       <DialogTrigger asChild>
@@ -344,8 +431,12 @@ export function PaymentComplementUpload({
         <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-2">
           <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-blue-700 dark:text-blue-300">
-            <strong>Validación automática:</strong> El sistema verificará que el UUID del complemento de pago 
-            coincida con el UUID de la factura antes de aceptarlo.
+            <strong>Proceso de carga:</strong>
+            <ol className="list-decimal ml-4 mt-1 space-y-1">
+              <li><strong>Primero suba el XML</strong> del complemento de pago (obligatorio)</li>
+              <li>El sistema validará que el UUID coincida con la factura</li>
+              <li>Después puede subir el <strong>PDF o imagen</strong> (opcional)</li>
+            </ol>
           </div>
         </div>
 
@@ -367,7 +458,7 @@ export function PaymentComplementUpload({
                 <h3 className="font-medium text-destructive">
                   Pendientes de Complemento ({proofsWithoutComplement.length})
                 </h3>
-                {proofsWithoutComplement.map((proof: any) => (
+                {proofsWithoutComplement.map((proof) => (
                   <div key={proof.id} className="border rounded-lg p-4 space-y-3 bg-destructive/5 border-destructive/20">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -383,42 +474,104 @@ export function PaymentComplementUpload({
                     </div>
 
                     {selectedProofId === proof.id ? (
-                      <div className="space-y-3 pt-2 border-t">
-                        <div>
-                          <Label htmlFor={`complement-${proof.id}`}>
-                            Archivo del Complemento de Pago (PDF o imagen)
+                      <div className="space-y-4 pt-2 border-t">
+                        {/* Paso 1: Subir y validar XML */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={xmlValidated ? "default" : "secondary"} className="gap-1">
+                              {xmlValidated ? <CheckCircle2 className="h-3 w-3" /> : <FileCode className="h-3 w-3" />}
+                              Paso 1: XML
+                            </Badge>
+                            {xmlValidated && <span className="text-xs text-green-600">✓ Validado</span>}
+                          </div>
+                          <Label htmlFor={`xml-${proof.id}`}>
+                            Archivo XML del Complemento de Pago (Obligatorio)
                           </Label>
                           <Input 
-                            id={`complement-${proof.id}`} 
+                            id={`xml-${proof.id}`} 
                             type="file" 
-                            accept=".pdf,.jpg,.jpeg,.png" 
-                            onChange={handleFileChange} 
+                            accept=".xml" 
+                            onChange={handleXmlFileChange} 
                             className="mt-1"
-                            disabled={isPending}
+                            disabled={isPending || xmlValidated}
                           />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Se validará que el UUID del documento relacionado coincida con la factura
-                          </p>
+                          {!xmlValidated && (
+                            <Button 
+                              onClick={() => handleValidateXml(proof.id)} 
+                              disabled={!xmlFile || isPending}
+                              variant="secondary"
+                              className="w-full mt-2"
+                            >
+                              {isValidatingXml || validateXmlMutation.isPending ? (
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Validando UUID...</>
+                              ) : (
+                                <><FileCode className="mr-2 h-4 w-4" />Validar XML</>
+                              )}
+                            </Button>
+                          )}
+                          {xmlValidated && xmlValidationData?.extractedInfo && (
+                            <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-sm space-y-1">
+                              <p className="font-medium text-green-700 dark:text-green-300">Información extraída del XML:</p>
+                              {xmlValidationData.extractedInfo.fecha_pago && (
+                                <p className="text-green-600 dark:text-green-400">
+                                  Fecha de pago: {xmlValidationData.extractedInfo.fecha_pago}
+                                </p>
+                              )}
+                              {xmlValidationData.extractedInfo.monto_pagado && (
+                                <p className="text-green-600 dark:text-green-400">
+                                  Monto: {formatCurrency(xmlValidationData.extractedInfo.monto_pagado)}
+                                </p>
+                              )}
+                              {xmlValidationData.uuidComplemento && (
+                                <p className="text-green-600 dark:text-green-400 font-mono text-xs">
+                                  UUID Complemento: {xmlValidationData.uuidComplemento}
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex gap-2">
+
+                        {/* Paso 2: Subir PDF (solo si XML validado) */}
+                        {xmlValidated && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="gap-1">
+                                <FileText className="h-3 w-3" />
+                                Paso 2: PDF/Imagen (Opcional)
+                              </Badge>
+                            </div>
+                            <Label htmlFor={`pdf-${proof.id}`}>
+                              Archivo PDF o imagen del Complemento (Opcional)
+                            </Label>
+                            <Input 
+                              id={`pdf-${proof.id}`} 
+                              type="file" 
+                              accept=".pdf,.jpg,.jpeg,.png" 
+                              onChange={handlePdfFileChange} 
+                              className="mt-1"
+                              disabled={isPending}
+                            />
+                          </div>
+                        )}
+
+                        {/* Botones de acción */}
+                        <div className="flex gap-2 pt-2">
                           <Button 
-                            onClick={() => handleUpload(proof.id)} 
-                            disabled={!complementFile || isPending}
+                            onClick={() => handleSaveComplement(proof.id)} 
+                            disabled={!xmlValidated || isPending}
                             className="flex-1"
                           >
-                            {isPending ? (
-                              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              {isValidating ? 'Validando UUID...' : 'Subiendo...'}</>
+                            {saveComplementMutation.isPending ? (
+                              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</>
                             ) : (
-                              <><Upload className="mr-2 h-4 w-4" />Subir y Validar</>
+                              <><Upload className="mr-2 h-4 w-4" />
+                                {pdfFile ? 'Guardar XML y PDF' : 'Guardar solo XML'}
+                              </>
                             )}
                           </Button>
                           <Button 
                             variant="outline" 
-                            onClick={() => {
-                              setSelectedProofId(null);
-                              setComplementFile(null);
-                            }}
+                            onClick={resetForm}
                             disabled={isPending}
                           >
                             <X className="h-4 w-4" />
@@ -447,7 +600,7 @@ export function PaymentComplementUpload({
                 <h3 className="font-medium text-green-600">
                   Con Complemento ({proofsWithComplement.length})
                 </h3>
-                {proofsWithComplement.map((proof: any) => (
+                {proofsWithComplement.map((proof) => (
                   <div key={proof.id} className="border rounded-lg p-4 space-y-3 bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -495,17 +648,17 @@ export function PaymentComplementUpload({
                       </div>
                       
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-muted-foreground">UUID Complemento (Extraído):</span>
+                        <span className="text-muted-foreground">UUID Complemento (Extraído del XML):</span>
                         <div className="flex items-center gap-1 font-mono bg-background rounded px-2 py-1">
-                          <span className="truncate max-w-[200px]" title={proof.complement.uuid_cfdi || 'No disponible'}>
-                            {proof.complement.uuid_cfdi || 'No disponible'}
+                          <span className="truncate max-w-[200px]" title={proof.complement?.uuid_cfdi || 'No disponible'}>
+                            {proof.complement?.uuid_cfdi || 'No disponible'}
                           </span>
-                          {proof.complement.uuid_cfdi && (
+                          {proof.complement?.uuid_cfdi && (
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-5 w-5"
-                              onClick={() => handleCopyUUID(proof.complement.uuid_cfdi)}
+                              onClick={() => handleCopyUUID(proof.complement!.uuid_cfdi!)}
                             >
                               {copiedUUID === proof.complement.uuid_cfdi ? (
                                 <Check className="h-3 w-3 text-green-600" />
@@ -517,7 +670,7 @@ export function PaymentComplementUpload({
                         </div>
                       </div>
                       
-                      {invoiceUUID && proof.complement.uuid_cfdi && 
+                      {invoiceUUID && proof.complement?.uuid_cfdi && 
                        invoiceUUID.toUpperCase() === proof.complement.uuid_cfdi.toUpperCase() && (
                         <div className="flex items-center gap-1 text-green-600 mt-1">
                           <CheckCircle2 className="h-3.5 w-3.5" />
@@ -530,17 +683,17 @@ export function PaymentComplementUpload({
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => handleViewComplement(proof.complement.xml_url)}
+                        onClick={() => handleViewComplement(proof.complement!.xml_url)}
                         className="gap-1"
                       >
-                        <Eye className="h-3.5 w-3.5" />
-                        Ver Complemento
+                        <FileCode className="h-3.5 w-3.5" />
+                        Ver XML
                       </Button>
-                      {proof.complement.pdf_url && proof.complement.pdf_url !== proof.complement.xml_url && (
+                      {proof.complement?.pdf_url && (
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => handleViewComplement(proof.complement.pdf_url)}
+                          onClick={() => handleViewComplement(proof.complement!.pdf_url!)}
                           className="gap-1"
                         >
                           <Eye className="h-3.5 w-3.5" />
@@ -560,7 +713,7 @@ export function PaymentComplementUpload({
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => setComplementToDelete(proof.complement.id)}
+                          onClick={() => setComplementToDelete(proof.complement!.id)}
                           className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -570,42 +723,69 @@ export function PaymentComplementUpload({
                     </div>
 
                     {selectedProofId === proof.id && (
-                      <div className="space-y-3 pt-2 border-t border-green-200 dark:border-green-900">
-                        <div>
-                          <Label htmlFor={`complement-replace-${proof.id}`}>
-                            Nuevo Complemento de Pago (PDF o imagen)
-                          </Label>
+                      <div className="space-y-4 pt-2 border-t border-green-200 dark:border-green-900">
+                        {/* Paso 1: Nuevo XML */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={xmlValidated ? "default" : "secondary"} className="gap-1">
+                              {xmlValidated ? <CheckCircle2 className="h-3 w-3" /> : <FileCode className="h-3 w-3" />}
+                              Paso 1: Nuevo XML
+                            </Badge>
+                            {xmlValidated && <span className="text-xs text-green-600">✓ Validado</span>}
+                          </div>
                           <Input 
-                            id={`complement-replace-${proof.id}`} 
                             type="file" 
-                            accept=".pdf,.jpg,.jpeg,.png" 
-                            onChange={handleFileChange} 
-                            className="mt-1"
-                            disabled={isPending}
+                            accept=".xml" 
+                            onChange={handleXmlFileChange} 
+                            disabled={isPending || xmlValidated}
                           />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Se validará que el UUID del documento relacionado coincida con la factura
-                          </p>
+                          {!xmlValidated && (
+                            <Button 
+                              onClick={() => handleValidateXml(proof.id)} 
+                              disabled={!xmlFile || isPending}
+                              variant="secondary"
+                              className="w-full"
+                            >
+                              {isValidatingXml || validateXmlMutation.isPending ? (
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Validando...</>
+                              ) : (
+                                <><FileCode className="mr-2 h-4 w-4" />Validar nuevo XML</>
+                              )}
+                            </Button>
+                          )}
                         </div>
+
+                        {/* Paso 2: Nuevo PDF */}
+                        {xmlValidated && (
+                          <div className="space-y-2">
+                            <Badge variant="secondary" className="gap-1">
+                              <FileText className="h-3 w-3" />
+                              Paso 2: Nuevo PDF/Imagen (Opcional)
+                            </Badge>
+                            <Input 
+                              type="file" 
+                              accept=".pdf,.jpg,.jpeg,.png" 
+                              onChange={handlePdfFileChange} 
+                              disabled={isPending}
+                            />
+                          </div>
+                        )}
+
                         <div className="flex gap-2">
                           <Button 
-                            onClick={() => handleUpload(proof.id)} 
-                            disabled={!complementFile || isPending}
+                            onClick={() => handleSaveComplement(proof.id)} 
+                            disabled={!xmlValidated || isPending}
                             className="flex-1"
                           >
-                            {isPending ? (
-                              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              {isValidating ? 'Validando UUID...' : 'Subiendo...'}</>
+                            {saveComplementMutation.isPending ? (
+                              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</>
                             ) : (
-                              <><Upload className="mr-2 h-4 w-4" />Reemplazar y Validar</>
+                              <><Upload className="mr-2 h-4 w-4" />Reemplazar Complemento</>
                             )}
                           </Button>
                           <Button 
                             variant="outline" 
-                            onClick={() => {
-                              setSelectedProofId(null);
-                              setComplementFile(null);
-                            }}
+                            onClick={resetForm}
                             disabled={isPending}
                           >
                             <X className="h-4 w-4" />
@@ -638,7 +818,23 @@ export function PaymentComplementUpload({
               <span className="text-sm text-muted-foreground">Cargando complemento...</span>
             </div>
           ) : viewingComplementUrl ? (
-            viewingComplementUrl.toLowerCase().includes('.pdf') ? (
+            viewingComplementUrl.toLowerCase().includes('.xml') ? (
+              <div className="w-full h-[70vh] p-4 overflow-auto">
+                <pre className="text-xs whitespace-pre-wrap break-all font-mono bg-muted p-4 rounded-lg">
+                  Descargando XML...
+                </pre>
+                <div className="mt-4 text-center">
+                  <a 
+                    href={viewingComplementUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary underline"
+                  >
+                    Descargar XML
+                  </a>
+                </div>
+              </div>
+            ) : viewingComplementUrl.toLowerCase().includes('.pdf') ? (
               <iframe 
                 src={viewingComplementUrl} 
                 className="w-full h-[70vh] rounded-lg"
