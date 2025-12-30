@@ -61,6 +61,21 @@ const MedicineCounter = () => {
   // Debug log para verificar roles
   console.log('MedicineCounter - Roles:', { isAdmin, isContador, isContadorProveedor, parentSupplierId, canManageRecords });
 
+  // Fetch parent supplier name for contador_proveedor
+  const { data: parentSupplier } = useQuery({
+    queryKey: ["parent_supplier", parentSupplierId],
+    enabled: isContadorProveedor && !!parentSupplierId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("full_name, company_name")
+        .eq("id", parentSupplierId!)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+  });
 
   // Fetch suppliers (proveedores)
   const { data: suppliers } = useQuery({
@@ -522,6 +537,15 @@ const MedicineCounter = () => {
               Toma una foto o sube una imagen para contar automáticamente las cajas
             </p>
           </div>
+          {/* Banner para contador_proveedor - Móvil y Desktop */}
+          {isContadorProveedor && parentSupplier && (
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mx-4 md:mx-0 mb-4">
+              <p className="text-sm font-medium text-primary">
+                Usuario asociado al proveedor: <span className="font-bold">{parentSupplier.company_name || parentSupplier.full_name}</span>
+              </p>
+            </div>
+          )}
+
           {/* Card principal - Sin bordes en móvil, con card en desktop */}
           <div className="md:hidden bg-background">
             <div className="p-4 space-y-4 border-b">
