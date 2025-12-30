@@ -426,6 +426,7 @@ export type Database = {
       medicine_counts: {
         Row: {
           analysis: string | null
+          brand_image_urls: string[] | null
           count: number
           created_at: string
           created_by: string
@@ -434,12 +435,15 @@ export type Database = {
           id: string
           image_url: string
           is_partial_delivery: boolean | null
+          lot_expiry_image_urls: string[] | null
           notes: string | null
           purchase_order_number: string | null
+          receipt_acknowledgment_url: string | null
           supplier_id: string
         }
         Insert: {
           analysis?: string | null
+          brand_image_urls?: string[] | null
           count: number
           created_at?: string
           created_by: string
@@ -448,12 +452,15 @@ export type Database = {
           id?: string
           image_url: string
           is_partial_delivery?: boolean | null
+          lot_expiry_image_urls?: string[] | null
           notes?: string | null
           purchase_order_number?: string | null
+          receipt_acknowledgment_url?: string | null
           supplier_id: string
         }
         Update: {
           analysis?: string | null
+          brand_image_urls?: string[] | null
           count?: number
           created_at?: string
           created_by?: string
@@ -462,8 +469,10 @@ export type Database = {
           id?: string
           image_url?: string
           is_partial_delivery?: boolean | null
+          lot_expiry_image_urls?: string[] | null
           notes?: string | null
           purchase_order_number?: string | null
+          receipt_acknowledgment_url?: string | null
           supplier_id?: string
         }
         Relationships: [
