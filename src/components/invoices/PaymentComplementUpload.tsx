@@ -60,6 +60,7 @@ export function PaymentComplementUpload({
   const [xmlValidated, setXmlValidated] = useState(false);
   const [xmlValidationData, setXmlValidationData] = useState<any>(null);
   const [viewingComplementUrl, setViewingComplementUrl] = useState<string | null>(null);
+  const [viewingComplementType, setViewingComplementType] = useState<'xml' | 'pdf' | 'image'>('image');
   const [loadingComplementImage, setLoadingComplementImage] = useState(false);
   const [copiedUUID, setCopiedUUID] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -370,8 +371,9 @@ export function PaymentComplementUpload({
   };
 
   // Ver complemento en visor interno
-  const handleViewComplement = async (url: string, isPdf: boolean = false) => {
+  const handleViewComplement = async (url: string, type: 'xml' | 'pdf' | 'image' = 'image') => {
     setLoadingComplementImage(true);
+    setViewingComplementType(type);
     try {
       let finalUrl = url;
       
@@ -384,13 +386,6 @@ export function PaymentComplementUpload({
             finalUrl = signedUrl;
           }
         }
-      }
-      
-      // Para PDFs, abrir directamente en nueva pestaña para evitar bloqueo del navegador
-      if (isPdf) {
-        window.open(finalUrl, '_blank', 'noopener,noreferrer');
-        setLoadingComplementImage(false);
-        return;
       }
       
       setViewingComplementUrl(finalUrl);
@@ -690,7 +685,7 @@ export function PaymentComplementUpload({
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => handleViewComplement(proof.complement!.xml_url)}
+                        onClick={() => handleViewComplement(proof.complement!.xml_url, 'xml')}
                         className="gap-1"
                       >
                         <FileCode className="h-3.5 w-3.5" />
@@ -703,7 +698,7 @@ export function PaymentComplementUpload({
                           onClick={() => {
                             const url = proof.complement!.pdf_url!;
                             const isPdf = url.toLowerCase().includes('.pdf');
-                            handleViewComplement(url, isPdf);
+                            handleViewComplement(url, isPdf ? 'pdf' : 'image');
                           }}
                           className="gap-1"
                         >
@@ -829,7 +824,7 @@ export function PaymentComplementUpload({
               <span className="text-sm text-muted-foreground">Cargando complemento...</span>
             </div>
           ) : viewingComplementUrl ? (
-            viewingComplementUrl.toLowerCase().includes('.xml') ? (
+            viewingComplementType === 'xml' ? (
               <div className="w-full h-[70vh] p-4 overflow-auto">
                 <pre className="text-xs whitespace-pre-wrap break-all font-mono bg-muted p-4 rounded-lg">
                   Descargando XML...
@@ -845,7 +840,7 @@ export function PaymentComplementUpload({
                   </a>
                 </div>
               </div>
-            ) : viewingComplementUrl.toLowerCase().includes('.pdf') ? (
+            ) : viewingComplementType === 'pdf' ? (
               <iframe 
                 src={viewingComplementUrl} 
                 className="w-full h-[70vh] rounded-lg"
