@@ -80,7 +80,6 @@ export function ManageContador() {
 
     try {
       setCreating(true);
-      const { data: { session } } = await supabase.auth.getSession();
       
       const response = await supabase.functions.invoke('create-supplier-contador', {
         body: {
@@ -90,12 +89,18 @@ export function ManageContador() {
         }
       });
 
-      if (response.error) {
-        throw new Error(response.error.message || 'Error al crear contador');
-      }
-
+      // Check for error in response data first (edge function returned error)
       if (response.data?.error) {
         throw new Error(response.data.error);
+      }
+
+      // Check for SDK-level error
+      if (response.error) {
+        // Try to parse the error context for the actual message
+        const errorMessage = response.error.context?.body 
+          ? JSON.parse(response.error.context.body)?.error 
+          : response.error.message;
+        throw new Error(errorMessage || 'Error al crear contador');
       }
 
       toast.success("Contador creado exitosamente");
@@ -104,7 +109,12 @@ export function ManageContador() {
       fetchContador();
     } catch (error: any) {
       console.error('Error creating contador:', error);
-      toast.error(error.message || "Error al crear el contador");
+      // Translate common error messages
+      let errorMsg = error.message || "Error al crear el contador";
+      if (errorMsg.includes('already been registered')) {
+        errorMsg = "Este correo electrónico ya está registrado en el sistema";
+      }
+      toast.error(errorMsg);
     } finally {
       setCreating(false);
     }
