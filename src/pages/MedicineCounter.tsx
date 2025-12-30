@@ -127,19 +127,29 @@ const MedicineCounter = () => {
   });
 
   // Helper function to upload photos to storage
-  const uploadPhotoToStorage = async (base64Photo: string, prefix: string): Promise<string> => {
-    const fileName = `${selectedSupplier}_${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-    const blob = await fetch(base64Photo).then(r => r.blob());
-    
+  const uploadPhotoToStorage = async (
+    base64Photo: string,
+    supplierId: string,
+    prefix: string
+  ): Promise<string> => {
+    const fileName = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+    const blob = await fetch(base64Photo).then((r) => r.blob());
+
+    // Ruta compatible con políticas de Storage: medicine-counts/{supplierId}/...
+    const filePath = `medicine-counts/${supplierId}/${fileName}`;
+
     const { error: uploadError } = await supabase.storage
       .from("documents")
-      .upload(`medicine-counts/${fileName}`, blob);
+      .upload(filePath, blob, {
+        contentType: "image/jpeg",
+        upsert: false,
+      });
 
     if (uploadError) throw uploadError;
 
-    const { data: { publicUrl } } = supabase.storage
-      .from("documents")
-      .getPublicUrl(`medicine-counts/${fileName}`);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("documents").getPublicUrl(filePath);
 
     return publicUrl;
   };
@@ -181,19 +191,40 @@ const MedicineCounter = () => {
         throw new Error("No tienes permisos para guardar registros");
       }
 
+      // Determinar proveedor efectivo (necesario para permisos de Storage y para RLS)
+      const effectiveSupplierId =
+        roleData.role === "contador_proveedor"
+          ? (parentSupplierId ||
+              (
+                await supabase
+                  .from("profiles")
+                  .select("parent_supplier_id")
+                  .eq("id", user.id)
+                  .single()
+              ).data?.parent_supplier_id)
+          : selectedSupplier;
+
+      if (!effectiveSupplierId) {
+        throw new Error("No se pudo determinar el proveedor asociado");
+      }
+
       // Upload all brand photos
       const brandUrls = await Promise.all(
-        phasePhotos.brand.map((photo, idx) => uploadPhotoToStorage(photo, `brand_${idx}`))
+        phasePhotos.brand.map((photo, idx) =>
+          uploadPhotoToStorage(photo, effectiveSupplierId, `brand_${idx}`)
+        )
       );
 
       // Upload all lot/expiry photos
       const lotExpiryUrls = await Promise.all(
-        phasePhotos.lot_expiry.map((photo, idx) => uploadPhotoToStorage(photo, `lot_${idx}`))
+        phasePhotos.lot_expiry.map((photo, idx) =>
+          uploadPhotoToStorage(photo, effectiveSupplierId, `lot_${idx}`)
+        )
       );
 
       // Upload receipt acknowledgment
-      const receiptUrl = phasePhotos.receipt 
-        ? await uploadPhotoToStorage(phasePhotos.receipt, 'receipt')
+      const receiptUrl = phasePhotos.receipt
+        ? await uploadPhotoToStorage(phasePhotos.receipt, effectiveSupplierId, "receipt")
         : null;
 
       // Calculate if it's a partial delivery
@@ -203,15 +234,6 @@ const MedicineCounter = () => {
 
       // Use first brand photo as main image_url for backward compatibility
       const mainImageUrl = brandUrls[0];
-
-      // For contador_proveedor, always use parentSupplierId to comply with RLS
-      const effectiveSupplierId = roleData.role === 'contador_proveedor' 
-        ? (await supabase.from("profiles").select("parent_supplier_id").eq("id", user.id).single()).data?.parent_supplier_id
-        : selectedSupplier;
-
-      if (!effectiveSupplierId) {
-        throw new Error("No se pudo determinar el proveedor asociado");
-      }
 
       // Save record
       const { error: insertError } = await supabase
