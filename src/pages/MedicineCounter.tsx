@@ -39,12 +39,15 @@ const MedicineCounter = () => {
   const [notes, setNotes] = useState<string>("");
   const [supplierFilter, setSupplierFilter] = useState<string>("");
   const { toast } = useToast();
-  const { isAdmin, isContador, isContadorProveedor, parentSupplierId, user } = useAuth();
+  const { isAdmin, isContador, isContadorProveedor, isSupplier, parentSupplierId, user } = useAuth();
   const queryClient = useQueryClient();
   const [isSupplierDrawerOpen, setIsSupplierDrawerOpen] = useState(false);
   
-  // Contador proveedor o admin/contador interno pueden gestionar
+  // Admin/contadores pueden capturar/gestionar registros
   const canManageRecords = isAdmin || isContador || isContadorProveedor;
+
+  // Proveedores (padres) solo deben visualizar historial
+  const canViewHistory = canManageRecords || isSupplier;
   
   // Para contador_proveedor, auto-seleccionar su proveedor padre
   useEffect(() => {
@@ -926,7 +929,7 @@ const MedicineCounter = () => {
           )}
 
           {/* History section */}
-          {canManageRecords && countHistory && countHistory.length > 0 && (
+          {canViewHistory && countHistory && countHistory.length > 0 && (
             <>
               {/* Mobile version */}
               <div className="md:hidden bg-background">
