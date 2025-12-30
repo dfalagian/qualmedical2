@@ -51,8 +51,15 @@ const MedicineCounter = () => {
   // Contador proveedor o admin/contador interno pueden gestionar
   const canManageRecords = isAdmin || isContador || isContadorProveedor;
   
+  // Para contador_proveedor, auto-seleccionar su proveedor padre
+  useEffect(() => {
+    if (isContadorProveedor && parentSupplierId) {
+      setSelectedSupplier(parentSupplierId);
+    }
+  }, [isContadorProveedor, parentSupplierId]);
+  
   // Debug log para verificar roles
-  console.log('MedicineCounter - Roles:', { isAdmin, isContador, canManageRecords });
+  console.log('MedicineCounter - Roles:', { isAdmin, isContador, isContadorProveedor, parentSupplierId, canManageRecords });
 
 
   // Fetch suppliers (proveedores)
@@ -524,49 +531,52 @@ const MedicineCounter = () => {
               </div>
               {canManageRecords && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="supplier-select" className="font-semibold">Proveedor *</Label>
-                    <Drawer open={isSupplierDrawerOpen} onOpenChange={setIsSupplierDrawerOpen}>
-                      <DrawerTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          className="w-full justify-start text-left font-normal h-12 border-2 hover:border-primary"
-                        >
-                          <span className={selectedSupplier ? "text-foreground" : "text-muted-foreground"}>
-                            {selectedSupplierName}
-                          </span>
-                        </Button>
-                      </DrawerTrigger>
-                      <DrawerContent className="h-[90vh]">
-                        <DrawerHeader className="border-b pb-4 px-4">
-                          <DrawerTitle className="text-xl md:text-2xl">Seleccionar Proveedor</DrawerTitle>
-                          <DrawerDescription className="text-sm md:text-base mt-1">Toca para seleccionar el proveedor</DrawerDescription>
-                        </DrawerHeader>
-                        <ScrollArea className="flex-1 px-4">
-                          <div className="space-y-2 py-4">
-                            {suppliers?.map((supplier) => (
-                              <Button
-                                key={supplier.id}
-                                variant={selectedSupplier === supplier.id ? "default" : "outline"}
-                                className="w-full justify-start h-14 text-base font-medium border-2"
-                                onClick={() => {
-                                  setSelectedSupplier(supplier.id);
-                                  setIsSupplierDrawerOpen(false);
-                                }}
-                              >
-                                {supplier.company_name || supplier.full_name}
-                              </Button>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                        <DrawerFooter className="border-t pt-4 px-4">
-                          <DrawerClose asChild>
-                            <Button variant="outline" className="h-12 text-base">Cancelar</Button>
-                          </DrawerClose>
-                        </DrawerFooter>
-                      </DrawerContent>
-                    </Drawer>
-                  </div>
+                  {/* Selector de proveedor - oculto para contador_proveedor ya que solo trabaja con su proveedor padre */}
+                  {!isContadorProveedor && (
+                    <div className="space-y-2">
+                      <Label htmlFor="supplier-select" className="font-semibold">Proveedor *</Label>
+                      <Drawer open={isSupplierDrawerOpen} onOpenChange={setIsSupplierDrawerOpen}>
+                        <DrawerTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-start text-left font-normal h-12 border-2 hover:border-primary"
+                          >
+                            <span className={selectedSupplier ? "text-foreground" : "text-muted-foreground"}>
+                              {selectedSupplierName}
+                            </span>
+                          </Button>
+                        </DrawerTrigger>
+                        <DrawerContent className="h-[90vh]">
+                          <DrawerHeader className="border-b pb-4 px-4">
+                            <DrawerTitle className="text-xl md:text-2xl">Seleccionar Proveedor</DrawerTitle>
+                            <DrawerDescription className="text-sm md:text-base mt-1">Toca para seleccionar el proveedor</DrawerDescription>
+                          </DrawerHeader>
+                          <ScrollArea className="flex-1 px-4">
+                            <div className="space-y-2 py-4">
+                              {suppliers?.map((supplier) => (
+                                <Button
+                                  key={supplier.id}
+                                  variant={selectedSupplier === supplier.id ? "default" : "outline"}
+                                  className="w-full justify-start h-14 text-base font-medium border-2"
+                                  onClick={() => {
+                                    setSelectedSupplier(supplier.id);
+                                    setIsSupplierDrawerOpen(false);
+                                  }}
+                                >
+                                  {supplier.company_name || supplier.full_name}
+                                </Button>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                          <DrawerFooter className="border-t pt-4 px-4">
+                            <DrawerClose asChild>
+                              <Button variant="outline" className="h-12 text-base">Cancelar</Button>
+                            </DrawerClose>
+                          </DrawerFooter>
+                        </DrawerContent>
+                      </Drawer>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label htmlFor="purchase-order" className="font-semibold">No. Orden de Compra</Label>
@@ -671,49 +681,52 @@ const MedicineCounter = () => {
             <CardContent className="space-y-6">
               {canManageRecords && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="supplier-select-desktop" className="font-semibold">Proveedor *</Label>
-                    <Drawer open={isSupplierDrawerOpen} onOpenChange={setIsSupplierDrawerOpen}>
-                      <DrawerTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          className="w-full justify-start text-left font-normal h-12 border-2 hover:border-primary"
-                        >
-                          <span className={selectedSupplier ? "text-foreground" : "text-muted-foreground"}>
-                            {selectedSupplierName}
-                          </span>
-                        </Button>
-                      </DrawerTrigger>
-                      <DrawerContent className="h-[90vh]">
-                        <DrawerHeader className="border-b pb-4 px-4">
-                          <DrawerTitle className="text-2xl">Seleccionar Proveedor</DrawerTitle>
-                          <DrawerDescription className="mt-1">Toca para seleccionar el proveedor</DrawerDescription>
-                        </DrawerHeader>
-                        <ScrollArea className="flex-1 px-4">
-                          <div className="space-y-2 py-4">
-                            {suppliers?.map((supplier) => (
-                              <Button
-                                key={supplier.id}
-                                variant={selectedSupplier === supplier.id ? "default" : "outline"}
-                                className="w-full justify-start h-14 text-base font-medium border-2"
-                                onClick={() => {
-                                  setSelectedSupplier(supplier.id);
-                                  setIsSupplierDrawerOpen(false);
-                                }}
-                              >
-                                {supplier.company_name || supplier.full_name}
-                              </Button>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                        <DrawerFooter className="border-t pt-4 px-4">
-                          <DrawerClose asChild>
-                            <Button variant="outline" className="h-12">Cancelar</Button>
-                          </DrawerClose>
-                        </DrawerFooter>
-                      </DrawerContent>
-                    </Drawer>
-                  </div>
+                  {/* Selector de proveedor - oculto para contador_proveedor ya que solo trabaja con su proveedor padre */}
+                  {!isContadorProveedor && (
+                    <div className="space-y-2">
+                      <Label htmlFor="supplier-select-desktop" className="font-semibold">Proveedor *</Label>
+                      <Drawer open={isSupplierDrawerOpen} onOpenChange={setIsSupplierDrawerOpen}>
+                        <DrawerTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-start text-left font-normal h-12 border-2 hover:border-primary"
+                          >
+                            <span className={selectedSupplier ? "text-foreground" : "text-muted-foreground"}>
+                              {selectedSupplierName}
+                            </span>
+                          </Button>
+                        </DrawerTrigger>
+                        <DrawerContent className="h-[90vh]">
+                          <DrawerHeader className="border-b pb-4 px-4">
+                            <DrawerTitle className="text-2xl">Seleccionar Proveedor</DrawerTitle>
+                            <DrawerDescription className="mt-1">Toca para seleccionar el proveedor</DrawerDescription>
+                          </DrawerHeader>
+                          <ScrollArea className="flex-1 px-4">
+                            <div className="space-y-2 py-4">
+                              {suppliers?.map((supplier) => (
+                                <Button
+                                  key={supplier.id}
+                                  variant={selectedSupplier === supplier.id ? "default" : "outline"}
+                                  className="w-full justify-start h-14 text-base font-medium border-2"
+                                  onClick={() => {
+                                    setSelectedSupplier(supplier.id);
+                                    setIsSupplierDrawerOpen(false);
+                                  }}
+                                >
+                                  {supplier.company_name || supplier.full_name}
+                                </Button>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                          <DrawerFooter className="border-t pt-4 px-4">
+                            <DrawerClose asChild>
+                              <Button variant="outline" className="h-12">Cancelar</Button>
+                            </DrawerClose>
+                          </DrawerFooter>
+                        </DrawerContent>
+                      </Drawer>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label htmlFor="purchase-order-desktop">No. Orden de Compra</Label>
