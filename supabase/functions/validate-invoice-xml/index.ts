@@ -77,6 +77,8 @@ serve(async (req) => {
     const metodoPagoMatch = xmlText.match(/MetodoPago="([^"]+)"/);
     const folioMatch = xmlText.match(/Folio="([^"]+)"/);
     const serieMatch = xmlText.match(/Serie="([^"]+)"/);
+    const tipoComprobanteMatch = xmlText.match(/TipoDeComprobante="([^"]+)"/);
+
     
     // Mejorar extracción de Total - buscar en diferentes formatos posibles
     // El atributo Total está en el elemento cfdi:Comprobante
@@ -290,16 +292,18 @@ serve(async (req) => {
 
     const formaPago = formaPagoMatch ? formaPagoMatch[1] : null;
     const metodoPago = metodoPagoMatch ? metodoPagoMatch[1] : null;
+    const tipoComprobante = tipoComprobanteMatch ? tipoComprobanteMatch[1] : null;
     const folio = folioMatch ? folioMatch[1] : null;
     const serie = serieMatch ? serieMatch[1] : null;
     const total = totalMatch ? parseFloat(totalMatch[1]) : null;
     const subtotal = subtotalMatch ? parseFloat(subtotalMatch[1]) : null;
     const descuento = descuentoMatch ? parseFloat(descuentoMatch[1]) : 0;
     const totalImpuestos = totalImpuestosMatch ? parseFloat(totalImpuestosMatch[1]) : 0;
+
     const fecha = fechaMatch ? fechaMatch[1] : null;
     const lugarExpedicion = lugarExpedicionMatch ? lugarExpedicionMatch[1] : null;
     const uuid = uuidMatch ? uuidMatch[1] : null;
-    
+
     // Construir número de factura (Serie + Folio, o solo Folio, o UUID si no hay Folio)
     let invoiceNumber = serie ? `${serie}-${folio}` : folio;
     
@@ -310,6 +314,7 @@ serve(async (req) => {
     }
 
     console.log('Información extraída del XML:');
+    console.log('- Tipo de comprobante:', tipoComprobante);
     console.log('- Número de factura:', invoiceNumber);
     console.log('- Total:', total);
     console.log('- UUID:', uuid);
