@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,8 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, Camera, Loader2, X, Save, History, Trash2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Loader2, Save, History, Trash2, Camera, Package, Calendar, FileText } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,12 +16,15 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronDown } from "lucide-react";
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { MultiPhasePhotoCapture, PhasePhotos } from "@/components/medicine-counter/MultiPhasePhotoCapture";
 
 const MedicineCounter = () => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [deliveryDocFile, setDeliveryDocFile] = useState<File | null>(null);
-  const [deliveryDocPreview, setDeliveryDocPreview] = useState<string | null>(null);
+  // Estados para el nuevo sistema de fotos en fases
+  const [phasePhotos, setPhasePhotos] = useState<PhasePhotos>({
+    brand: [],
+    lot_expiry: [],
+    receipt: null,
+  });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<{ 
     count: number | null; 
@@ -31,18 +33,11 @@ const MedicineCounter = () => {
     imageQuality?: string;
     warnings?: string[];
   } | null>(null);
-  const [showCamera, setShowCamera] = useState(false);
-  const [showDeliveryCamera, setShowDeliveryCamera] = useState(false);
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState<string>("");
   const [expectedQuantity, setExpectedQuantity] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [supplierFilter, setSupplierFilter] = useState<string>("");
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const deliveryVideoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const deliveryCanvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
   const { isAdmin, isContador, isContadorProveedor, parentSupplierId, user } = useAuth();
   const queryClient = useQueryClient();
@@ -58,8 +53,13 @@ const MedicineCounter = () => {
     }
   }, [isContadorProveedor, parentSupplierId]);
   
-  // Debug log para verificar roles
-  console.log('MedicineCounter - Roles:', { isAdmin, isContador, isContadorProveedor, parentSupplierId, canManageRecords });
+  // Verificar si hay al menos una foto de marca para poder analizar
+  const canAnalyze = phasePhotos.brand.length > 0;
+  
+  // Verificar si todas las fases están completas para poder guardar
+  const allPhasesComplete = phasePhotos.brand.length > 0 && 
+                           phasePhotos.lot_expiry.length > 0 && 
+                           phasePhotos.receipt !== null;
 
   // Fetch parent supplier name for contador_proveedor
   const { data: parentSupplier } = useQuery({
@@ -126,10 +126,28 @@ const MedicineCounter = () => {
     return companyName.includes(searchLower) || fullName.includes(searchLower);
   });
 
+  // Helper function to upload photos to storage
+  const uploadPhotoToStorage = async (base64Photo: string, prefix: string): Promise<string> => {
+    const fileName = `${selectedSupplier}_${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+    const blob = await fetch(base64Photo).then(r => r.blob());
+    
+    const { error: uploadError } = await supabase.storage
+      .from("documents")
+      .upload(`medicine-counts/${fileName}`, blob);
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from("documents")
+      .getPublicUrl(`medicine-counts/${fileName}`);
+
+    return publicUrl;
+  };
+
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!result || !preview || !selectedSupplier) {
+      if (!result || !selectedSupplier || !allPhasesComplete) {
         throw new Error("Faltan datos requeridos");
       }
 
@@ -140,7 +158,7 @@ const MedicineCounter = () => {
         throw new Error("Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.");
       }
 
-      // Verify user is authenticated and is admin
+      // Verify user is authenticated
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
@@ -163,43 +181,28 @@ const MedicineCounter = () => {
         throw new Error("No tienes permisos para guardar registros");
       }
 
-      // Upload medicine count image to storage
-      const fileName = `${selectedSupplier}_${Date.now()}.jpg`;
-      const blob = await fetch(preview).then(r => r.blob());
-      
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(`medicine-counts/${fileName}`, blob);
+      // Upload all brand photos
+      const brandUrls = await Promise.all(
+        phasePhotos.brand.map((photo, idx) => uploadPhotoToStorage(photo, `brand_${idx}`))
+      );
 
-      if (uploadError) throw uploadError;
+      // Upload all lot/expiry photos
+      const lotExpiryUrls = await Promise.all(
+        phasePhotos.lot_expiry.map((photo, idx) => uploadPhotoToStorage(photo, `lot_${idx}`))
+      );
 
-      const { data: { publicUrl } } = supabase.storage
-        .from("documents")
-        .getPublicUrl(`medicine-counts/${fileName}`);
-
-      // Upload delivery document if provided
-      let deliveryDocUrl = null;
-      if (deliveryDocPreview) {
-        const deliveryFileName = `${selectedSupplier}_delivery_${Date.now()}.jpg`;
-        const deliveryBlob = await fetch(deliveryDocPreview).then(r => r.blob());
-        
-        const { error: deliveryUploadError } = await supabase.storage
-          .from("documents")
-          .upload(`medicine-counts/${deliveryFileName}`, deliveryBlob);
-
-        if (deliveryUploadError) throw deliveryUploadError;
-
-        const { data: { publicUrl: deliveryPublicUrl } } = supabase.storage
-          .from("documents")
-          .getPublicUrl(`medicine-counts/${deliveryFileName}`);
-        
-        deliveryDocUrl = deliveryPublicUrl;
-      }
+      // Upload receipt acknowledgment
+      const receiptUrl = phasePhotos.receipt 
+        ? await uploadPhotoToStorage(phasePhotos.receipt, 'receipt')
+        : null;
 
       // Calculate if it's a partial delivery
       const countValue = result.count || 0;
       const expectedValue = expectedQuantity ? parseInt(expectedQuantity) : null;
       const isPartialDelivery = expectedValue ? countValue < expectedValue : false;
+
+      // Use first brand photo as main image_url for backward compatibility
+      const mainImageUrl = brandUrls[0];
 
       // Save record
       const { error: insertError } = await supabase
@@ -208,8 +211,11 @@ const MedicineCounter = () => {
           supplier_id: selectedSupplier,
           count: countValue,
           analysis: result.analysis,
-          image_url: publicUrl,
-          delivery_document_url: deliveryDocUrl,
+          image_url: mainImageUrl,
+          brand_image_urls: brandUrls,
+          lot_expiry_image_urls: lotExpiryUrls,
+          receipt_acknowledgment_url: receiptUrl,
+          delivery_document_url: receiptUrl, // backward compatibility
           purchase_order_number: purchaseOrderNumber || null,
           expected_quantity: expectedValue,
           is_partial_delivery: isPartialDelivery,
@@ -225,20 +231,19 @@ const MedicineCounter = () => {
     onSuccess: () => {
       toast({
         title: "Registro guardado",
-        description: "El conteo se guardó correctamente",
+        description: "El conteo se guardó correctamente con todas las fotos",
       });
       queryClient.invalidateQueries({ queryKey: ["medicine_counts"] });
       
       // Reset form
-      setPreview(null);
-      setDeliveryDocPreview(null);
+      setPhasePhotos({ brand: [], lot_expiry: [], receipt: null });
       setResult(null);
-      setSelectedSupplier("");
+      if (!isContadorProveedor) {
+        setSelectedSupplier("");
+      }
       setPurchaseOrderNumber("");
       setExpectedQuantity("");
       setNotes("");
-      setSelectedFile(null);
-      setDeliveryDocFile(null);
     },
     onError: (error: any) => {
       toast({
@@ -275,60 +280,16 @@ const MedicineCounter = () => {
     },
   });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Error",
-          description: "Por favor selecciona una imagen válida",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setSelectedFile(file);
-      setResult(null);
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleDeliveryDocSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Error",
-          description: "Por favor selecciona una imagen válida",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setDeliveryDocFile(file);
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setDeliveryDocPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const analyzeImage = async () => {
-    if (!preview) return;
+    if (!canAnalyze) return;
 
     setIsAnalyzing(true);
     setResult(null);
 
     try {
+      // Use the first brand photo for analysis
       const { data, error } = await supabase.functions.invoke('count-medicine-boxes', {
-        body: { imageBase64: preview }
+        body: { imageBase64: phasePhotos.brand[0] }
       });
 
       if (error) throw error;
@@ -379,145 +340,6 @@ const MedicineCounter = () => {
     }
   };
 
-  const openCamera = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-        audio: false
-      });
-      
-      setStream(mediaStream);
-      setShowCamera(true);
-      
-      // Wait for video element to be available
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream;
-        }
-      }, 100);
-    } catch (error) {
-      console.error("Error accessing camera:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo acceder a la cámara. Verifica los permisos.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const closeCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-    setShowCamera(false);
-  };
-
-  const openDeliveryCamera = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-        audio: false
-      });
-      
-      setStream(mediaStream);
-      setShowDeliveryCamera(true);
-      
-      // Wait for video element to be available
-      setTimeout(() => {
-        if (deliveryVideoRef.current) {
-          deliveryVideoRef.current.srcObject = mediaStream;
-        }
-      }, 100);
-    } catch (error) {
-      console.error("Error accessing camera:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo acceder a la cámara. Verifica los permisos.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const closeDeliveryCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-    setShowDeliveryCamera(false);
-  };
-
-  const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0);
-    
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      
-      const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
-      setSelectedFile(file);
-      setResult(null);
-      
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-      
-      closeCamera();
-      
-      toast({
-        title: "Foto capturada",
-        description: "Ahora puedes analizar la imagen",
-      });
-    }, 'image/jpeg', 0.95);
-  };
-
-  const captureDeliveryDoc = () => {
-    if (!deliveryVideoRef.current || !deliveryCanvasRef.current) return;
-
-    const video = deliveryVideoRef.current;
-    const canvas = deliveryCanvasRef.current;
-    
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0);
-    
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      
-      const file = new File([blob], 'delivery-document.jpg', { type: 'image/jpeg' });
-      setDeliveryDocFile(file);
-      
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setDeliveryDocPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-      
-      closeDeliveryCamera();
-      
-      toast({
-        title: "Documento capturado",
-        description: "Documento de entrega guardado",
-      });
-    }, 'image/jpeg', 0.95);
-  };
-
   const selectedSupplierName = suppliers?.find(s => s.id === selectedSupplier)?.company_name 
     || suppliers?.find(s => s.id === selectedSupplier)?.full_name 
     || "Selecciona un proveedor";
@@ -525,19 +347,19 @@ const MedicineCounter = () => {
   return (
     <DashboardLayout>
       <div className="w-full h-full overflow-x-hidden">
-        {/* Mobile: Stack vertical sin gaps, Desktop: Grid con gaps */}
         <div className="flex flex-col md:max-w-4xl md:mx-auto md:py-6 md:px-4 lg:px-6 md:gap-6">
           
-          {/* Header - Solo visible en desktop, en móvil está integrado en cada sección */}
+          {/* Header - Solo visible en desktop */}
           <div className="hidden md:block mb-6">
             <h1 className="text-2xl lg:text-3xl font-bold mb-2">
               Contador de Cajas de Medicamentos
             </h1>
             <p className="text-base text-muted-foreground">
-              Toma una foto o sube una imagen para contar automáticamente las cajas
+              Captura fotos en 3 fases: marca, lote/caducidad y acuse de recibo
             </p>
           </div>
-          {/* Banner para contador_proveedor - Móvil y Desktop */}
+
+          {/* Banner para contador_proveedor */}
           {isContadorProveedor && parentSupplier && (
             <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mx-4 md:mx-0 mb-4">
               <p className="text-sm font-medium text-primary">
@@ -546,16 +368,17 @@ const MedicineCounter = () => {
             </div>
           )}
 
-          {/* Card principal - Sin bordes en móvil, con card en desktop */}
+          {/* Mobile version */}
           <div className="md:hidden bg-background">
             <div className="p-4 space-y-4 border-b">
               <div>
                 <h2 className="text-xl font-bold mb-1">Contador de Medicamentos</h2>
-                <p className="text-sm text-muted-foreground">Selecciona una opción para comenzar</p>
+                <p className="text-sm text-muted-foreground">Captura fotos en 3 fases</p>
               </div>
+
               {canManageRecords && (
                 <div className="space-y-4">
-                  {/* Selector de proveedor - oculto para contador_proveedor ya que solo trabaja con su proveedor padre */}
+                  {/* Selector de proveedor */}
                   {!isContadorProveedor && (
                     <div className="space-y-2">
                       <Label htmlFor="supplier-select" className="font-semibold">Proveedor *</Label>
@@ -629,66 +452,35 @@ const MedicineCounter = () => {
                 </div>
               )}
 
-              <div className="grid gap-3 grid-cols-2">
+              {/* Multi-phase photo capture */}
+              {selectedSupplier && (
+                <MultiPhasePhotoCapture
+                  photos={phasePhotos}
+                  onPhotosChange={setPhasePhotos}
+                  disabled={isAnalyzing || saveMutation.isPending}
+                />
+              )}
+
+              {/* Analyze button */}
+              {canAnalyze && !result && (
                 <Button
-                  onClick={openCamera}
-                  disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
-                  variant="outline"
-                  className="h-24 flex flex-col items-center justify-center gap-2 border-2"
+                  onClick={analyzeImage}
+                  disabled={isAnalyzing}
+                  className="w-full h-12 font-semibold"
+                  size="lg"
                 >
-                  <Camera className="h-8 w-8" />
-                  <span className="font-semibold text-sm">Tomar Foto</span>
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Analizando...
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="mr-2 h-5 w-5" />
+                      Analizar Fotos de Marca
+                    </>
+                  )}
                 </Button>
-                
-                <Label
-                  htmlFor="image-upload"
-                  className={`cursor-pointer ${(isAnalyzing || (canManageRecords && !selectedSupplier)) ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
-                >
-                  <div className="h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
-                    <Upload className="h-8 w-8" />
-                    <span className="font-semibold text-sm">Subir Imagen</span>
-                  </div>
-                  <Input
-                    id="image-upload"
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleFileSelect}
-                    disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
-                    className="hidden"
-                  />
-                </Label>
-              </div>
-
-              {preview && (
-                <div className="space-y-3">
-                  <div className="relative rounded-lg overflow-hidden border bg-muted">
-                    <img
-                      src={preview}
-                      alt="Vista previa"
-                      className="w-full h-auto max-h-[200px] object-contain"
-                    />
-                  </div>
-
-                  <Button
-                    onClick={analyzeImage}
-                    disabled={isAnalyzing}
-                    className="w-full h-12 font-semibold"
-                    size="lg"
-                  >
-                    {isAnalyzing ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Analizando...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="mr-2 h-5 w-5" />
-                        Analizar Imagen
-                      </>
-                    )}
-                  </Button>
-                </div>
               )}
             </div>
           </div>
@@ -698,14 +490,14 @@ const MedicineCounter = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl lg:text-2xl">
                 <Camera className="h-6 w-6" />
-                Cargar Imagen
+                Captura de Fotos
               </CardTitle>
-              <CardDescription>Selecciona una opción para comenzar</CardDescription>
+              <CardDescription>Captura fotos en 3 fases para documentar la recepción</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {canManageRecords && (
                 <div className="space-y-4">
-                  {/* Selector de proveedor - oculto para contador_proveedor ya que solo trabaja con su proveedor padre */}
+                  {/* Selector de proveedor */}
                   {!isContadorProveedor && (
                     <div className="space-y-2">
                       <Label htmlFor="supplier-select-desktop" className="font-semibold">Proveedor *</Label>
@@ -752,97 +544,69 @@ const MedicineCounter = () => {
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="purchase-order-desktop">No. Orden de Compra</Label>
-                    <Input
-                      id="purchase-order-desktop"
-                      type="text"
-                      placeholder="Ej: OC_CITIO_25_05"
-                      value={purchaseOrderNumber}
-                      onChange={(e) => setPurchaseOrderNumber(e.target.value.toUpperCase())}
-                      className="h-11"
-                    />
-                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="purchase-order-desktop">No. Orden de Compra</Label>
+                      <Input
+                        id="purchase-order-desktop"
+                        type="text"
+                        placeholder="Ej: OC_CITIO_25_05"
+                        value={purchaseOrderNumber}
+                        onChange={(e) => setPurchaseOrderNumber(e.target.value.toUpperCase())}
+                        className="h-11"
+                      />
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="expected-quantity-desktop">Cantidad Esperada (Cajas)</Label>
-                    <Input
-                      id="expected-quantity-desktop"
-                      type="number"
-                      min="1"
-                      placeholder="Ej: 20"
-                      value={expectedQuantity}
-                      onChange={(e) => setExpectedQuantity(e.target.value)}
-                      className="h-11"
-                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="expected-quantity-desktop">Cantidad Esperada (Cajas)</Label>
+                      <Input
+                        id="expected-quantity-desktop"
+                        type="number"
+                        min="1"
+                        placeholder="Ej: 20"
+                        value={expectedQuantity}
+                        onChange={(e) => setExpectedQuantity(e.target.value)}
+                        className="h-11"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
 
-              <div className="grid gap-4 grid-cols-2">
+              {/* Multi-phase photo capture */}
+              {selectedSupplier && (
+                <MultiPhasePhotoCapture
+                  photos={phasePhotos}
+                  onPhotosChange={setPhasePhotos}
+                  disabled={isAnalyzing || saveMutation.isPending}
+                />
+              )}
+
+              {/* Analyze button */}
+              {canAnalyze && !result && (
                 <Button
-                  onClick={openCamera}
-                  disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
-                  variant="outline"
-                  className="h-28 flex flex-col items-center justify-center gap-2 border-2"
+                  onClick={analyzeImage}
+                  disabled={isAnalyzing}
+                  className="w-full h-12 font-semibold"
+                  size="lg"
                 >
-                  <Camera className="h-10 w-10" />
-                  <span className="font-semibold">Tomar Foto</span>
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Analizando imagen...
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="mr-2 h-5 w-5" />
+                      Analizar Fotos de Marca
+                    </>
+                  )}
                 </Button>
-                
-                <Label
-                  htmlFor="image-upload-desktop"
-                  className={`cursor-pointer ${(isAnalyzing || (canManageRecords && !selectedSupplier)) ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
-                >
-                  <div className="h-28 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
-                    <Upload className="h-10 w-10" />
-                    <span className="font-semibold">Subir Imagen</span>
-                  </div>
-                  <Input
-                    id="image-upload-desktop"
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleFileSelect}
-                    disabled={isAnalyzing || (canManageRecords && !selectedSupplier)}
-                    className="hidden"
-                  />
-                </Label>
-              </div>
-
-              {preview && (
-                <div className="space-y-4">
-                  <div className="relative rounded-lg overflow-hidden border bg-muted">
-                    <img
-                      src={preview}
-                      alt="Vista previa"
-                      className="w-full h-auto max-h-96 object-contain"
-                    />
-                  </div>
-
-                  <Button
-                    onClick={analyzeImage}
-                    disabled={isAnalyzing}
-                    className="w-full h-12 font-semibold"
-                    size="lg"
-                  >
-                    {isAnalyzing ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Analizando imagen...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="mr-2 h-5 w-5" />
-                        Analizar Imagen
-                      </>
-                    )}
-                  </Button>
-                </div>
               )}
             </CardContent>
           </Card>
 
+          {/* Results section */}
           {result && (
             <>
               {/* Mobile version */}
@@ -883,7 +647,7 @@ const MedicineCounter = () => {
                           </div>
                         )}
                         
-                        <div className="flex justify-center gap-2 flex-wrap mt-3">
+                        <div className="flex justify-center gap-2 flex-wrap mt-4">
                           {result.confidence && (
                             <Badge 
                               variant={
@@ -911,82 +675,32 @@ const MedicineCounter = () => {
                     </div>
                   )}
 
-                  {result.warnings && result.warnings.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-yellow-600 font-semibold">Advertencias</Label>
-                      <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200 space-y-1">
-                        {result.warnings.map((warning, idx) => (
-                          <p key={idx} className="text-sm text-yellow-800">{warning}</p>
-                        ))}
+                  {/* Resumen de fotos capturadas */}
+                  <div className="p-4 rounded-lg bg-muted space-y-2">
+                    <h3 className="font-semibold text-sm">Fotos Capturadas</h3>
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="p-2 rounded bg-blue-500/10">
+                        <Package className="h-4 w-4 mx-auto mb-1 text-blue-500" />
+                        <span className="font-medium">{phasePhotos.brand.length}/4</span>
+                        <p className="text-muted-foreground">Marca</p>
                       </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label className="font-semibold">Análisis Detallado</Label>
-                    <div className="p-3 rounded-lg bg-muted whitespace-pre-wrap text-sm">
-                      {result.analysis}
+                      <div className="p-2 rounded bg-green-500/10">
+                        <Calendar className="h-4 w-4 mx-auto mb-1 text-green-500" />
+                        <span className="font-medium">{phasePhotos.lot_expiry.length}/4</span>
+                        <p className="text-muted-foreground">Lote</p>
+                      </div>
+                      <div className="p-2 rounded bg-purple-500/10">
+                        <FileText className="h-4 w-4 mx-auto mb-1 text-purple-500" />
+                        <span className="font-medium">{phasePhotos.receipt ? 1 : 0}/1</span>
+                        <p className="text-muted-foreground">Acuse</p>
+                      </div>
                     </div>
                   </div>
 
-                  {canManageRecords ? (
+                  {canManageRecords && allPhasesComplete ? (
                     <div className="space-y-4">
-                      <div className="space-y-3 border-t pt-4">
-                        <Label className="font-semibold">Documento de Entrega</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Captura la hoja firmada de quien recibe el medicamento
-                        </p>
-                        
-                        <div className="grid grid-cols-2 gap-3">
-                          <Button
-                            onClick={openDeliveryCamera}
-                            variant="outline"
-                            className="h-20 flex flex-col items-center justify-center gap-2"
-                          >
-                            <Camera className="h-6 w-6" />
-                            <span className="text-xs font-semibold">Tomar Foto</span>
-                          </Button>
-                          
-                          <Label htmlFor="delivery-doc-upload" className="cursor-pointer">
-                            <div className="h-20 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
-                              <Upload className="h-6 w-6" />
-                              <span className="text-xs font-semibold">Subir Documento</span>
-                            </div>
-                            <Input
-                              id="delivery-doc-upload"
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              onChange={handleDeliveryDocSelect}
-                              className="hidden"
-                            />
-                          </Label>
-                        </div>
-
-                        {deliveryDocPreview && (
-                          <div className="relative rounded-lg overflow-hidden border bg-muted">
-                            <img
-                              src={deliveryDocPreview}
-                              alt="Documento de entrega"
-                              className="w-full h-auto max-h-[250px] object-contain"
-                            />
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              className="absolute top-2 right-2"
-                              onClick={() => {
-                                setDeliveryDocPreview(null);
-                                setDeliveryDocFile(null);
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-
                       <div className="space-y-2">
-                        <Label htmlFor="notes">Notas Adicionales (Opcional)</Label>
+                        <Label htmlFor="notes" className="font-semibold">Notas Adicionales (Opcional)</Label>
                         <Textarea
                           id="notes"
                           placeholder="Agrega cualquier observación adicional..."
@@ -1015,9 +729,9 @@ const MedicineCounter = () => {
                         )}
                       </Button>
                     </div>
-                  ) : (
+                  ) : !allPhasesComplete && (
                     <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                      ⚠️ No tienes permisos para guardar registros
+                      ⚠️ Completa las 3 fases de fotos para poder guardar el registro
                     </div>
                   )}
                 </div>
@@ -1091,6 +805,28 @@ const MedicineCounter = () => {
                     </div>
                   )}
 
+                  {/* Resumen de fotos capturadas */}
+                  <div className="p-4 rounded-lg bg-muted space-y-3">
+                    <h3 className="font-semibold">Resumen de Fotos Capturadas</h3>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                        <Package className="h-5 w-5 mx-auto mb-2 text-blue-500" />
+                        <span className="text-lg font-bold">{phasePhotos.brand.length}/4</span>
+                        <p className="text-sm text-muted-foreground">Fotos de Marca</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                        <Calendar className="h-5 w-5 mx-auto mb-2 text-green-500" />
+                        <span className="text-lg font-bold">{phasePhotos.lot_expiry.length}/4</span>
+                        <p className="text-sm text-muted-foreground">Fotos Lote/Caducidad</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                        <FileText className="h-5 w-5 mx-auto mb-2 text-purple-500" />
+                        <span className="text-lg font-bold">{phasePhotos.receipt ? 1 : 0}/1</span>
+                        <p className="text-sm text-muted-foreground">Acuse de Recibo</p>
+                      </div>
+                    </div>
+                  </div>
+
                   {result.warnings && result.warnings.length > 0 && (
                     <div className="space-y-2">
                       <Label className="text-yellow-600 font-semibold">Advertencias</Label>
@@ -1102,69 +838,22 @@ const MedicineCounter = () => {
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <Label>Análisis Detallado</Label>
-                    <div className="p-4 rounded-lg bg-muted whitespace-pre-wrap text-sm">
-                      {result.analysis}
-                    </div>
-                  </div>
-
-                  {canManageRecords ? (
-                    <div className="space-y-6">
-                      <div className="space-y-4 border-t pt-6">
-                        <Label className="font-semibold">Documento de Entrega</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Captura la hoja firmada de quien recibe el medicamento
-                        </p>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <Button
-                            onClick={openDeliveryCamera}
-                            variant="outline"
-                            className="h-24 flex flex-col items-center justify-center gap-2"
-                          >
-                            <Camera className="h-8 w-8" />
-                            <span className="text-sm font-semibold">Tomar Foto del Documento</span>
-                          </Button>
-                          
-                          <Label htmlFor="delivery-doc-upload-desktop" className="cursor-pointer">
-                            <div className="h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md hover:bg-accent transition-colors">
-                              <Upload className="h-8 w-8" />
-                              <span className="text-sm font-semibold">Subir Documento</span>
-                            </div>
-                            <Input
-                              id="delivery-doc-upload-desktop"
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              onChange={handleDeliveryDocSelect}
-                              className="hidden"
-                            />
-                          </Label>
-                        </div>
-
-                        {deliveryDocPreview && (
-                          <div className="relative rounded-lg overflow-hidden border bg-muted">
-                            <img
-                              src={deliveryDocPreview}
-                              alt="Documento de entrega"
-                              className="w-full h-auto max-h-[300px] object-contain"
-                            />
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              className="absolute top-2 right-2"
-                              onClick={() => {
-                                setDeliveryDocPreview(null);
-                                setDeliveryDocFile(null);
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="outline" className="w-full">
+                        Ver Análisis Detallado
+                        <ChevronDown className="h-4 w-4 ml-2" />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-4">
+                      <div className="p-4 rounded-lg bg-muted whitespace-pre-wrap text-sm">
+                        {result.analysis}
                       </div>
+                    </CollapsibleContent>
+                  </Collapsible>
 
+                  {canManageRecords && allPhasesComplete ? (
+                    <div className="space-y-6">
                       <div className="space-y-2">
                         <Label htmlFor="notes-desktop">Notas Adicionales (Opcional)</Label>
                         <Textarea
@@ -1195,9 +884,9 @@ const MedicineCounter = () => {
                         )}
                       </Button>
                     </div>
-                  ) : (
+                  ) : !allPhasesComplete && (
                     <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                      ⚠️ No tienes permisos para guardar registros. Roles: Admin={isAdmin ? 'Sí' : 'No'}, Contador={isContador ? 'Sí' : 'No'}
+                      ⚠️ Completa las 3 fases de fotos para poder guardar el registro
                     </div>
                   )}
                 </CardContent>
@@ -1205,6 +894,7 @@ const MedicineCounter = () => {
             </>
           )}
 
+          {/* History section */}
           {canManageRecords && countHistory && countHistory.length > 0 && (
             <>
               {/* Mobile version */}
@@ -1281,20 +971,35 @@ const MedicineCounter = () => {
                           </Button>
                         </div>
                         
-                        <div className="flex gap-2">
-                          <ImageViewer
-                            fileUrl={record.image_url}
-                            fileName={'Foto de cajas'}
-                            triggerText="Ver cajas"
-                            triggerSize="sm"
-                            triggerVariant="outline"
-                            bucket="documents"
-                          />
-                          {record.delivery_document_url && (
+                        <div className="flex gap-2 flex-wrap">
+                          {/* Mostrar fotos de marca */}
+                          {(record.brand_image_urls?.length > 0 || record.image_url) && (
                             <ImageViewer
-                              fileUrl={record.delivery_document_url}
-                              fileName={'Documento de entrega'}
-                              triggerText="Ver documento"
+                              fileUrl={record.brand_image_urls?.[0] || record.image_url}
+                              fileName={'Foto de marca'}
+                              triggerText="Ver marca"
+                              triggerSize="sm"
+                              triggerVariant="outline"
+                              bucket="documents"
+                            />
+                          )}
+                          {/* Mostrar fotos de lote */}
+                          {record.lot_expiry_image_urls?.length > 0 && (
+                            <ImageViewer
+                              fileUrl={record.lot_expiry_image_urls[0]}
+                              fileName={'Foto lote/caducidad'}
+                              triggerText="Ver lote"
+                              triggerSize="sm"
+                              triggerVariant="outline"
+                              bucket="documents"
+                            />
+                          )}
+                          {/* Mostrar acuse de recibo */}
+                          {(record.receipt_acknowledgment_url || record.delivery_document_url) && (
+                            <ImageViewer
+                              fileUrl={record.receipt_acknowledgment_url || record.delivery_document_url}
+                              fileName={'Acuse de recibo'}
+                              triggerText="Ver acuse"
                               triggerSize="sm"
                               triggerVariant="outline"
                               bucket="documents"
@@ -1389,6 +1094,44 @@ const MedicineCounter = () => {
                                   OC: {record.purchase_order_number}
                                 </Badge>
                               )}
+                            </div>
+                            {record.notes && (
+                              <p className="text-sm text-muted-foreground italic">{record.notes}</p>
+                            )}
+                            <div className="flex gap-2 flex-wrap pt-2">
+                              {/* Mostrar fotos de marca */}
+                              {(record.brand_image_urls?.length > 0 || record.image_url) && (
+                                <ImageViewer
+                                  fileUrl={record.brand_image_urls?.[0] || record.image_url}
+                                  fileName={'Foto de marca - ' + (record.supplier?.company_name || record.supplier?.full_name)}
+                                  triggerText={`Ver marca (${record.brand_image_urls?.length || 1})`}
+                                  triggerSize="sm"
+                                  triggerVariant="ghost"
+                                  bucket="documents"
+                                />
+                              )}
+                              {/* Mostrar fotos de lote */}
+                              {record.lot_expiry_image_urls?.length > 0 && (
+                                <ImageViewer
+                                  fileUrl={record.lot_expiry_image_urls[0]}
+                                  fileName={'Foto lote/caducidad - ' + (record.supplier?.company_name || record.supplier?.full_name)}
+                                  triggerText={`Ver lote (${record.lot_expiry_image_urls.length})`}
+                                  triggerSize="sm"
+                                  triggerVariant="ghost"
+                                  bucket="documents"
+                                />
+                              )}
+                              {/* Mostrar acuse de recibo */}
+                              {(record.receipt_acknowledgment_url || record.delivery_document_url) && (
+                                <ImageViewer
+                                  fileUrl={record.receipt_acknowledgment_url || record.delivery_document_url}
+                                  fileName={'Acuse de recibo - ' + (record.supplier?.company_name || record.supplier?.full_name)}
+                                  triggerText="Ver acuse"
+                                  triggerSize="sm"
+                                  triggerVariant="ghost"
+                                  bucket="documents"
+                                />
+                              )}
                               {record.analysis && (
                                 <CollapsibleTrigger asChild>
                                   <Button variant="ghost" size="sm">
@@ -1397,42 +1140,19 @@ const MedicineCounter = () => {
                                   </Button>
                                 </CollapsibleTrigger>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  if (confirm('¿Estás seguro de eliminar este registro?')) {
+                                    deleteMutation.mutate(record.id);
+                                  }
+                                }}
+                                disabled={deleteMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
                             </div>
-                            {record.notes && (
-                              <p className="text-sm text-muted-foreground italic">{record.notes}</p>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <ImageViewer
-                              fileUrl={record.image_url}
-                              fileName={'Foto de cajas - ' + (record.supplier?.company_name || record.supplier?.full_name)}
-                              triggerText="Ver cajas"
-                              triggerSize="sm"
-                              triggerVariant="ghost"
-                              bucket="documents"
-                            />
-                            {record.delivery_document_url && (
-                              <ImageViewer
-                                fileUrl={record.delivery_document_url}
-                                fileName={'Documento de entrega - ' + (record.supplier?.company_name || record.supplier?.full_name)}
-                                triggerText="Ver documento"
-                                triggerSize="sm"
-                                triggerVariant="ghost"
-                                bucket="documents"
-                              />
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                if (confirm('¿Estás seguro de eliminar este registro?')) {
-                                  deleteMutation.mutate(record.id);
-                                }
-                              }}
-                              disabled={deleteMutation.isPending}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
                           </div>
                         </div>
                         
@@ -1454,81 +1174,6 @@ const MedicineCounter = () => {
             </>
           )}
         </div>
-
-        <Dialog open={showCamera} onOpenChange={(open) => !open && closeCamera()}>
-          <DialogContent className="max-w-[95vw] sm:max-w-3xl p-4 sm:p-6">
-            <DialogHeader>
-              <DialogTitle className="flex items-center justify-between text-base sm:text-lg">
-                <span>Capturar Foto de Cajas</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={closeCamera}
-                  className="h-8 w-8"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <Button
-                onClick={capturePhoto}
-                className="w-full"
-                size="lg"
-              >
-                <Camera className="mr-2 h-4 w-4" />
-                Capturar Foto
-              </Button>
-            </div>
-            <canvas ref={canvasRef} className="hidden" />
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={showDeliveryCamera} onOpenChange={(open) => !open && closeDeliveryCamera()}>
-          <DialogContent className="max-w-[95vw] sm:max-w-3xl p-4 sm:p-6">
-            <DialogHeader>
-              <DialogTitle className="flex items-center justify-between text-base sm:text-lg">
-                <span>Capturar Documento de Entrega</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={closeDeliveryCamera}
-                  className="h-8 w-8"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
-                <video
-                  ref={deliveryVideoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <Button
-                onClick={captureDeliveryDoc}
-                className="w-full"
-                size="lg"
-              >
-                <Camera className="mr-2 h-4 w-4" />
-                Capturar Documento
-              </Button>
-            </div>
-            <canvas ref={deliveryCanvasRef} className="hidden" />
-          </DialogContent>
-        </Dialog>
-
       </div>
     </DashboardLayout>
   );
