@@ -66,6 +66,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { name: "Documentos", href: "/dashboard/documents", icon: FileText },
     { name: "Facturas", href: "/dashboard/invoices", icon: Receipt },
     { name: "Mensajes", href: "/dashboard/messages", icon: MessageSquare },
+    ...(!isAdmin ? [
+      { name: "Conteos de Medicamentos", href: "/dashboard/medicine-counter", icon: Camera },
+    ] : []),
     ...(isAdmin ? [
       { name: "Contador de Medicamentos", href: "/dashboard/medicine-counter", icon: Camera },
       { name: "Validación Actas", href: "/dashboard/documents-admin", icon: FileText },
