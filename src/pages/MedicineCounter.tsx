@@ -204,11 +204,20 @@ const MedicineCounter = () => {
       // Use first brand photo as main image_url for backward compatibility
       const mainImageUrl = brandUrls[0];
 
+      // For contador_proveedor, always use parentSupplierId to comply with RLS
+      const effectiveSupplierId = roleData.role === 'contador_proveedor' 
+        ? (await supabase.from("profiles").select("parent_supplier_id").eq("id", user.id).single()).data?.parent_supplier_id
+        : selectedSupplier;
+
+      if (!effectiveSupplierId) {
+        throw new Error("No se pudo determinar el proveedor asociado");
+      }
+
       // Save record
       const { error: insertError } = await supabase
         .from("medicine_counts")
         .insert({
-          supplier_id: selectedSupplier,
+          supplier_id: effectiveSupplierId,
           count: countValue,
           analysis: result.analysis,
           image_url: mainImageUrl,
