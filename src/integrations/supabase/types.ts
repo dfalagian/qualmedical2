@@ -827,6 +827,7 @@ export type Database = {
           full_name: string
           id: string
           last_login_at: string | null
+          parent_supplier_id: string | null
           phone: string | null
           rfc: string | null
           tipo_persona: Database["public"]["Enums"]["tipo_persona"] | null
@@ -842,6 +843,7 @@ export type Database = {
           full_name: string
           id: string
           last_login_at?: string | null
+          parent_supplier_id?: string | null
           phone?: string | null
           rfc?: string | null
           tipo_persona?: Database["public"]["Enums"]["tipo_persona"] | null
@@ -857,13 +859,22 @@ export type Database = {
           full_name?: string
           id?: string
           last_login_at?: string | null
+          parent_supplier_id?: string | null
           phone?: string | null
           rfc?: string | null
           tipo_persona?: Database["public"]["Enums"]["tipo_persona"] | null
           tipo_venta?: Database["public"]["Enums"]["tipo_venta"] | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_parent_supplier_id_fkey"
+            columns: ["parent_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchase_orders: {
         Row: {
@@ -1064,6 +1075,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_parent_supplier_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["user_role"]
@@ -1073,6 +1085,7 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_contador: { Args: { _user_id: string }; Returns: boolean }
+      is_contador_proveedor: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       document_status: "pendiente" | "aprobado" | "rechazado"
@@ -1095,7 +1108,7 @@ export type Database = {
         | "cancelado"
       tipo_persona: "fisica" | "moral"
       tipo_venta: "medicamentos" | "otros"
-      user_role: "admin" | "proveedor" | "contador"
+      user_role: "admin" | "proveedor" | "contador" | "contador_proveedor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1245,7 +1258,7 @@ export const Constants = {
       ],
       tipo_persona: ["fisica", "moral"],
       tipo_venta: ["medicamentos", "otros"],
-      user_role: ["admin", "proveedor", "contador"],
+      user_role: ["admin", "proveedor", "contador", "contador_proveedor"],
     },
   },
 } as const

@@ -3,7 +3,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export type UserRole = "admin" | "proveedor" | "contador";
+export type UserRole = "admin" | "proveedor" | "contador" | "contador_proveedor";
 
 export interface AuthContextValue {
   user: User | null;
@@ -17,6 +17,8 @@ export interface AuthContextValue {
   isAdmin: boolean;
   isSupplier: boolean;
   isContador: boolean;
+  isContadorProveedor: boolean;
+  parentSupplierId: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -28,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [roleLoading, setRoleLoading] = useState(false);
+  const [parentSupplierId, setParentSupplierId] = useState<string | null>(null);
 
   // Evita refetch innecesario del rol por múltiples renders/foco
   const roleFetchedForUserIdRef = useRef<string | null>(null);
@@ -38,19 +41,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setRoleLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch role
+      const { data: roleData, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", userId)
         .maybeSingle();
 
-      if (error) throw error;
+      if (roleError) throw roleError;
 
-      setUserRole((data?.role as UserRole) || null);
+      const role = (roleData?.role as UserRole) || null;
+      setUserRole(role);
+
+      // If contador_proveedor, fetch parent_supplier_id
+      if (role === "contador_proveedor") {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("parent_supplier_id")
+          .eq("id", userId)
+          .single();
+        
+        setParentSupplierId(profileData?.parent_supplier_id || null);
+      } else {
+        setParentSupplierId(null);
+      }
+
       roleFetchedForUserIdRef.current = userId;
     } catch (err) {
       console.error("Error fetching role:", err);
       setUserRole(null);
+      setParentSupplierId(null);
       roleFetchedForUserIdRef.current = null;
     } finally {
       setRoleLoading(false);
@@ -92,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (event === "SIGNED_OUT") {
         setUserRole(null);
+        setParentSupplierId(null);
         roleFetchedForUserIdRef.current = null;
         setRoleLoading(false);
         return;
@@ -117,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setSession(null);
       setUserRole(null);
+      setParentSupplierId(null);
       roleFetchedForUserIdRef.current = null;
 
       try {
@@ -143,6 +165,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAdmin: userRole === "admin",
     isSupplier: userRole === "proveedor",
     isContador: userRole === "contador",
+    isContadorProveedor: userRole === "contador_proveedor",
+    parentSupplierId,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

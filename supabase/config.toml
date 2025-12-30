@@ -38,3 +38,9 @@ verify_jwt = true
 
 [functions.validate-payment-complement]
 verify_jwt = true
+
+[functions.create-supplier-contador]
+verify_jwt = true
+
+[functions.delete-supplier-contador]
+verify_jwt = true
