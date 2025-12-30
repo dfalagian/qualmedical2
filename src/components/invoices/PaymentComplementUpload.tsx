@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getSignedUrl } from "@/lib/storage";
+import { PdfInlineViewer } from "@/components/pdf/PdfInlineViewer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -841,11 +842,9 @@ export function PaymentComplementUpload({
                 </div>
               </div>
             ) : viewingComplementType === 'pdf' ? (
-              <iframe 
-                src={viewingComplementUrl} 
-                className="w-full h-[70vh] rounded-lg"
-                title="Complemento de Pago PDF"
-              />
+              <div className="w-full">
+                <PdfInlineViewer url={viewingComplementUrl} />
+              </div>
             ) : (
               <img 
                 src={viewingComplementUrl} 
