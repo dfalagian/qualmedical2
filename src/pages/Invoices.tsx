@@ -292,10 +292,24 @@ const Invoices = () => {
       const invoiceNumber = validationData.invoiceNumber;
       const amount = validationData.amount;
       const invoiceUuid = validationData.uuid;
+      const tipoComprobante = validationData.tipoComprobante as string | null | undefined;
+
+      const looksLikePaymentCfdi =
+        tipoComprobante === "P" ||
+        (amount === 0 &&
+          Array.isArray(validationData?.conceptos) &&
+          validationData.conceptos.some((c: any) => c?.claveProdServ === "84111506"));
+
+      if (looksLikePaymentCfdi) {
+        throw new Error(
+          'Este XML parece ser un CFDI de tipo P ("Pago"). Por definición puede venir con $0.00. Súbelo como “Complemento de pago”, no como “Factura”.'
+        );
+      }
 
       if (!invoiceNumber || (amount === null || amount === undefined)) {
         throw new Error('No se pudo extraer el número de factura o el monto del XML. Verifica que el archivo XML sea válido.');
       }
+
 
       // Verificar que no exista una factura con el mismo UUID (duplicado)
       if (invoiceUuid) {
