@@ -293,8 +293,8 @@ const Invoices = () => {
       const amount = validationData.amount;
       const invoiceUuid = validationData.uuid;
 
-      if (!invoiceNumber || !amount) {
-        throw new Error('No se pudo extraer el número de factura o el monto del XML');
+      if (!invoiceNumber || (amount === null || amount === undefined)) {
+        throw new Error('No se pudo extraer el número de factura o el monto del XML. Verifica que el archivo XML sea válido.');
       }
 
       // Verificar que no exista una factura con el mismo UUID (duplicado)

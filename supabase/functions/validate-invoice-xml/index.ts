@@ -72,15 +72,32 @@ serve(async (req) => {
     // MetodoPago también es un atributo del elemento Comprobante
     
     // Extraer información del comprobante
+    // Buscar Total primero en el elemento Comprobante (puede tener namespace)
     const formaPagoMatch = xmlText.match(/FormaPago="([^"]+)"/);
     const metodoPagoMatch = xmlText.match(/MetodoPago="([^"]+)"/);
     const folioMatch = xmlText.match(/Folio="([^"]+)"/);
     const serieMatch = xmlText.match(/Serie="([^"]+)"/);
-    const totalMatch = xmlText.match(/Total="([0-9.]+)"/);
-    const subtotalMatch = xmlText.match(/SubTotal="([0-9.]+)"/);
+    
+    // Mejorar extracción de Total - buscar en diferentes formatos posibles
+    // El atributo Total está en el elemento cfdi:Comprobante
+    let totalMatch = xmlText.match(/cfdi:Comprobante[^>]*Total="([0-9.]+)"/);
+    if (!totalMatch) {
+      // Fallback: buscar cualquier Total="..." en el documento
+      totalMatch = xmlText.match(/\bTotal="([0-9.]+)"/);
+    }
+    
+    // Similar para SubTotal
+    let subtotalMatch = xmlText.match(/cfdi:Comprobante[^>]*SubTotal="([0-9.]+)"/);
+    if (!subtotalMatch) {
+      subtotalMatch = xmlText.match(/\bSubTotal="([0-9.]+)"/);
+    }
+    
     const descuentoMatch = xmlText.match(/Descuento="([0-9.]+)"/);
     const fechaMatch = xmlText.match(/Fecha="([^"]+)"/);
     const lugarExpedicionMatch = xmlText.match(/LugarExpedicion="([^"]+)"/);
+    
+    console.log('Total extraído:', totalMatch ? totalMatch[1] : 'NO ENCONTRADO');
+    console.log('SubTotal extraído:', subtotalMatch ? subtotalMatch[1] : 'NO ENCONTRADO');
 
     // Extraer UUID (TimbreFiscalDigital)
     const uuidMatch = xmlText.match(/UUID="([^"]+)"/);
