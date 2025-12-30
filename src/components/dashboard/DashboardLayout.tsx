@@ -27,7 +27,7 @@ interface DashboardLayoutProps {
 }
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
-  const { user, loading, isAdmin, isContador, userRole } = useAuth();
+  const { user, loading, isAdmin, isContador, isContadorProveedor, userRole } = useAuth();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -46,9 +46,15 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     return <Navigate to="/auth" replace />;
   }
 
-  // Navegación para rol Contador - solo acceso a Contador de Medicamentos
+  // Navegación para rol Contador (interno) - solo acceso a Contador de Medicamentos
   const contadorNavigation = [
     { name: "Contador de Medicamentos", href: "/dashboard/medicine-counter", icon: Camera },
+  ];
+
+  // Navegación para Contador Proveedor (sub-usuario) - contador + órdenes de compra
+  const contadorProveedorNavigation = [
+    { name: "Contador de Medicamentos", href: "/dashboard/medicine-counter", icon: Camera },
+    { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
   ];
 
   // Navegación completa para Admin y Proveedor
@@ -75,7 +81,13 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     ] : []),
   ];
 
-  const navigation = isContador ? contadorNavigation : fullNavigation;
+  // Determinar navegación según rol
+  let navigation = fullNavigation;
+  if (isContador) {
+    navigation = contadorNavigation;
+  } else if (isContadorProveedor) {
+    navigation = contadorProveedorNavigation;
+  }
 
   const NavigationItems = ({ onItemClick }: { onItemClick?: () => void }) => (
     <>

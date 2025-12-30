@@ -44,11 +44,12 @@ const MedicineCounter = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const deliveryCanvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
-  const { isAdmin, isContador } = useAuth();
+  const { isAdmin, isContador, isContadorProveedor, parentSupplierId, user } = useAuth();
   const queryClient = useQueryClient();
   const [isSupplierDrawerOpen, setIsSupplierDrawerOpen] = useState(false);
   
-  const canManageRecords = isAdmin || isContador;
+  // Contador proveedor o admin/contador interno pueden gestionar
+  const canManageRecords = isAdmin || isContador || isContadorProveedor;
   
   // Debug log para verificar roles
   console.log('MedicineCounter - Roles:', { isAdmin, isContador, canManageRecords });
@@ -136,7 +137,7 @@ const MedicineCounter = () => {
         throw new Error("Error al verificar permisos: " + roleError.message);
       }
 
-      if (!roleData || (roleData.role !== 'admin' && roleData.role !== 'contador')) {
+      if (!roleData || (roleData.role !== 'admin' && roleData.role !== 'contador' && roleData.role !== 'contador_proveedor')) {
         throw new Error("No tienes permisos para guardar registros");
       }
 

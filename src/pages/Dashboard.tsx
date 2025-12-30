@@ -4,12 +4,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FileText, Receipt, MessageSquare, ShoppingCart } from "lucide-react";
 import { EmailServerStatus } from "@/components/dashboard/EmailServerStatus";
 import { Navigate } from "react-router-dom";
+import { ManageContador } from "@/components/supplier/ManageContador";
 
 const Dashboard = () => {
-  const { user, isAdmin, isContador } = useAuth();
+  const { user, isAdmin, isContador, isContadorProveedor, isSupplier } = useAuth();
 
-  // Redirigir contadores directamente a su página
+  // Redirigir contadores (internos) directamente a su página
   if (isContador) {
+    return <Navigate to="/dashboard/medicine-counter" replace />;
+  }
+
+  // Redirigir contador_proveedor (sub-usuario) directamente al conteo de medicamentos
+  if (isContadorProveedor) {
     return <Navigate to="/dashboard/medicine-counter" replace />;
   }
 
@@ -79,6 +85,11 @@ const Dashboard = () => {
         </div>
 
         {isAdmin && <EmailServerStatus />}
+
+        {/* Sección para que proveedores gestionen su contador */}
+        {isSupplier && (
+          <ManageContador />
+        )}
 
         <Card className="shadow-md">
           <CardHeader className="p-4 md:p-6">
