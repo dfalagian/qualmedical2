@@ -370,21 +370,30 @@ export function PaymentComplementUpload({
   };
 
   // Ver complemento en visor interno
-  const handleViewComplement = async (url: string) => {
+  const handleViewComplement = async (url: string, isPdf: boolean = false) => {
     setLoadingComplementImage(true);
     try {
+      let finalUrl = url;
+      
       if (url.includes('/documents/')) {
         const urlParts = url.split('/documents/');
         if (urlParts.length > 1) {
           const path = urlParts[1];
           const signedUrl = await getSignedUrl('documents', path, 3600);
           if (signedUrl) {
-            setViewingComplementUrl(signedUrl);
-            return;
+            finalUrl = signedUrl;
           }
         }
       }
-      setViewingComplementUrl(url);
+      
+      // Para PDFs, abrir directamente en nueva pestaña para evitar bloqueo del navegador
+      if (isPdf) {
+        window.open(finalUrl, '_blank', 'noopener,noreferrer');
+        setLoadingComplementImage(false);
+        return;
+      }
+      
+      setViewingComplementUrl(finalUrl);
     } catch (error) {
       console.error('Error al obtener URL del complemento:', error);
       toast.error('Error al cargar el complemento');
@@ -644,14 +653,14 @@ export function PaymentComplementUpload({
                       </Badge>
                     </div>
 
-                    {/* Mostrar UUID extraído vs UUID de factura */}
+                    {/* Mostrar que los UUIDs coinciden */}
                     <div className="bg-muted/50 rounded-lg p-3 space-y-2 text-xs">
-                      <div className="font-medium text-sm mb-2 text-muted-foreground">Comparación de UUIDs:</div>
+                      <div className="font-medium text-sm mb-2 text-muted-foreground">UUID Validado:</div>
                       
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-muted-foreground">UUID Factura (Base de datos):</span>
+                        <span className="text-muted-foreground">UUID Factura:</span>
                         <div className="flex items-center gap-1 font-mono bg-background rounded px-2 py-1">
-                          <span className="truncate max-w-[200px]" title={invoiceUUID || 'No disponible'}>
+                          <span className="truncate max-w-[250px]" title={invoiceUUID || 'No disponible'}>
                             {invoiceUUID || 'No disponible'}
                           </span>
                           {invoiceUUID && (
@@ -671,36 +680,10 @@ export function PaymentComplementUpload({
                         </div>
                       </div>
                       
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-muted-foreground">UUID Complemento (Extraído del XML):</span>
-                        <div className="flex items-center gap-1 font-mono bg-background rounded px-2 py-1">
-                          <span className="truncate max-w-[200px]" title={proof.complement?.uuid_cfdi || 'No disponible'}>
-                            {proof.complement?.uuid_cfdi || 'No disponible'}
-                          </span>
-                          {proof.complement?.uuid_cfdi && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-5 w-5"
-                              onClick={() => handleCopyUUID(proof.complement!.uuid_cfdi!)}
-                            >
-                              {copiedUUID === proof.complement.uuid_cfdi ? (
-                                <Check className="h-3 w-3 text-green-600" />
-                              ) : (
-                                <Copy className="h-3 w-3" />
-                              )}
-                            </Button>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-1 text-green-600 mt-1">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span>El UUID del documento relacionado en el complemento coincide con la factura</span>
                       </div>
-                      
-                      {invoiceUUID && proof.complement?.uuid_cfdi && 
-                       invoiceUUID.toUpperCase() === proof.complement.uuid_cfdi.toUpperCase() && (
-                        <div className="flex items-center gap-1 text-green-600 mt-1">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          <span>Los UUIDs coinciden correctamente</span>
-                        </div>
-                      )}
                     </div>
 
                     <div className="flex gap-2 pt-2 border-t border-green-200 dark:border-green-900">
@@ -717,7 +700,11 @@ export function PaymentComplementUpload({
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => handleViewComplement(proof.complement!.pdf_url!)}
+                          onClick={() => {
+                            const url = proof.complement!.pdf_url!;
+                            const isPdf = url.toLowerCase().includes('.pdf');
+                            handleViewComplement(url, isPdf);
+                          }}
                           className="gap-1"
                         >
                           <Eye className="h-3.5 w-3.5" />
