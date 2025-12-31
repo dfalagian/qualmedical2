@@ -1,8 +1,9 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { Eye, ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { getSignedUrls } from "@/lib/storage";
+import { toast } from "sonner";
 
 interface ImageViewerProps {
   fileUrl?: string;
@@ -12,6 +13,7 @@ interface ImageViewerProps {
   triggerSize?: "sm" | "default" | "lg" | "icon";
   triggerVariant?: "default" | "outline" | "ghost" | "destructive";
   bucket?: string;
+  showDownload?: boolean;
 }
 
 export const ImageViewer = ({ 
@@ -21,11 +23,13 @@ export const ImageViewer = ({
   triggerText = "Ver",
   triggerSize = "sm",
   triggerVariant = "outline",
-  bucket = "documents"
+  bucket = "documents",
+  showDownload = true
 }: ImageViewerProps) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [signedUrls, setSignedUrls] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   const rawPaths = useMemo(() => {
     return imageUrls && imageUrls.length > 0 ? imageUrls : fileUrl ? [fileUrl] : [];
@@ -96,6 +100,74 @@ export const ImageViewer = ({
     setCurrentPage((prev) => (prev - 1 + totalPages) % totalPages);
   };
 
+  const downloadCurrentImage = async () => {
+    if (signedUrls.length === 0) return;
+    
+    setIsDownloading(true);
+    try {
+      const response = await fetch(signedUrls[currentPage]);
+      const blob = await response.blob();
+      
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Generar nombre de archivo
+      const extension = signedUrls[currentPage].includes('.png') ? 'png' : 'jpg';
+      const downloadName = hasMultiplePages 
+        ? `${fileName.replace(/\.[^/.]+$/, '')}_pagina_${currentPage + 1}.${extension}`
+        : `${fileName.replace(/\.[^/.]+$/, '')}.${extension}`;
+      
+      a.download = downloadName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success(`Imagen descargada: ${downloadName}`);
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      toast.error('Error al descargar la imagen');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const downloadAllImages = async () => {
+    if (signedUrls.length === 0) return;
+    
+    setIsDownloading(true);
+    try {
+      for (let i = 0; i < signedUrls.length; i++) {
+        const response = await fetch(signedUrls[i]);
+        const blob = await response.blob();
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        const extension = signedUrls[i].includes('.png') ? 'png' : 'jpg';
+        const downloadName = `${fileName.replace(/\.[^/.]+$/, '')}_pagina_${i + 1}.${extension}`;
+        
+        a.download = downloadName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        // Pequeña pausa entre descargas para evitar problemas
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      
+      toast.success(`${signedUrls.length} imágenes descargadas`);
+    } catch (error) {
+      console.error('Error downloading images:', error);
+      toast.error('Error al descargar las imágenes');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -106,10 +178,44 @@ export const ImageViewer = ({
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>
-            {fileName}
-            {hasMultiplePages && ` - Página ${currentPage + 1} de ${totalPages}`}
-          </DialogTitle>
+          <div className="flex items-center justify-between pr-8">
+            <DialogTitle>
+              {fileName}
+              {hasMultiplePages && ` - Página ${currentPage + 1} de ${totalPages}`}
+            </DialogTitle>
+            {showDownload && signedUrls.length > 0 && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={downloadCurrentImage}
+                  disabled={isDownloading}
+                >
+                  {isDownloading ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-1" />
+                  )}
+                  Descargar
+                </Button>
+                {hasMultiplePages && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={downloadAllImages}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-1" />
+                    )}
+                    Descargar Todo ({totalPages})
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         </DialogHeader>
         <div className="relative overflow-auto max-h-[calc(90vh-100px)]">
           {isLoading ? (
@@ -159,7 +265,7 @@ export const ImageViewer = ({
                 key={index}
                 onClick={() => setCurrentPage(index)}
                 className={`w-2 h-2 rounded-full transition-colors ${
-                  index === currentPage ? 'bg-primary' : 'bg-gray-300'
+                  index === currentPage ? 'bg-primary' : 'bg-muted'
                 }`}
                 aria-label={`Ir a página ${index + 1}`}
               />
