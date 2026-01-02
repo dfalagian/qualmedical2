@@ -752,13 +752,14 @@ const Invoices = () => {
 
   const approveEvidenceMutation = useMutation({
     mutationFn: async (invoice: any) => {
-      // Actualizar el estado de la evidencia
+      // Actualizar el estado de la evidencia y cambiar estado de factura a "procesando" (Aprobada)
       const { error } = await supabase
         .from("invoices")
         .update({
           evidence_status: 'approved',
           evidence_reviewed_by: user!.id,
-          evidence_reviewed_at: new Date().toISOString()
+          evidence_reviewed_at: new Date().toISOString(),
+          status: 'procesando' // Cambiar automáticamente a Aprobada cuando se aprueba la evidencia
         } as any)
         .eq("id", invoice.id);
 
@@ -1014,7 +1015,7 @@ const Invoices = () => {
       case "pagado":
         return <Badge className="bg-success">Pagado</Badge>;
       case "procesando":
-        return <Badge className="bg-blue-500">Procesando</Badge>;
+        return <Badge className="bg-blue-500">Aprobada</Badge>;
       case "rechazado":
         return <Badge variant="destructive">Rechazado</Badge>;
       case "cancelado":
