@@ -330,14 +330,14 @@ const Payments = () => {
   };
 
   const handleExportExcel = () => {
-    if (!pagos || pagos.length === 0) {
+    if (!filteredPagos || filteredPagos.length === 0) {
       toast.error("No hay pagos para exportar");
       return;
     }
 
     // Agrupar pagos por invoice_id para calcular acumulados
     const paymentsByInvoice: { [key: string]: any[] } = {};
-    pagos.forEach((pago: any) => {
+    filteredPagos.forEach((pago: any) => {
       const invoiceId = pago.invoice_id;
       if (!paymentsByInvoice[invoiceId]) {
         paymentsByInvoice[invoiceId] = [];
@@ -358,7 +358,7 @@ const Payments = () => {
       });
     });
 
-    const excelData = pagos.map((pago: any) => {
+    const excelData = filteredPagos.map((pago: any) => {
       const totalFactura = parseFloat(pago.invoice_amount || pago.invoices?.amount || 0);
       const importePago = parseFloat(pago.amount || 0);
       
