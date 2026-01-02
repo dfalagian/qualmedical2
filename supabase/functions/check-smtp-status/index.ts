@@ -55,13 +55,17 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Intentar crear conexión SMTP y enviar un email de prueba simple
-    console.log(`Attempting SMTP connection to ${smtpHost}:${smtpPort}...`);
+    const port = parseInt(smtpPort);
+    console.log(`Attempting SMTP connection to ${smtpHost}:${port}...`);
+    
+    // Puerto 465 usa TLS implícito, puerto 587 usa STARTTLS
+    const useTLS = port === 465;
     
     const client = new SMTPClient({
       connection: {
         hostname: smtpHost,
-        port: parseInt(smtpPort),
-        tls: true,
+        port: port,
+        tls: useTLS,
         auth: {
           username: smtpUser,
           password: smtpPassword,
