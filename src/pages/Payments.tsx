@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,7 +15,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, RefreshCw } from "lucide-react";
+import { Download, Loader2, RefreshCw, Filter, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { PaymentProofUpload } from "@/components/payments/PaymentProofUpload";
@@ -23,6 +37,12 @@ import { PaymentProofUpload } from "@/components/payments/PaymentProofUpload";
 const Payments = () => {
   const { loading, isAdmin, user } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Estados para los filtros
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterSupplier, setFilterSupplier] = useState<string>("all");
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
 
   // Query para obtener los comprobantes de pago individuales
   const { data: pagos, isLoading, error: pagosError } = useQuery({
@@ -155,6 +175,63 @@ const Payments = () => {
       );
     },
   });
+
+  // Obtener lista única de proveedores para el filtro
+  const suppliers = useMemo(() => {
+    if (!pagos) return [];
+    const uniqueSuppliers = new Map();
+    pagos.forEach((pago: any) => {
+      const supplierId = pago.supplier_id;
+      const supplierName = pago.profiles?.full_name || pago.profiles?.company_name || "N/A";
+      if (supplierId && !uniqueSuppliers.has(supplierId)) {
+        uniqueSuppliers.set(supplierId, { id: supplierId, name: supplierName });
+      }
+    });
+    return Array.from(uniqueSuppliers.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [pagos]);
+
+  // Filtrar pagos según los filtros seleccionados
+  const filteredPagos = useMemo(() => {
+    if (!pagos) return [];
+    
+    return pagos.filter((pago: any) => {
+      // Filtro por estado
+      if (filterStatus !== "all") {
+        const pagoStatus = pago.is_pending_remainder ? "pendiente" : pago.status;
+        if (pagoStatus !== filterStatus) return false;
+      }
+      
+      // Filtro por proveedor
+      if (filterSupplier !== "all" && pago.supplier_id !== filterSupplier) {
+        return false;
+      }
+      
+      // Filtro por fecha desde
+      if (filterDateFrom) {
+        const pagoDate = pago.fecha_pago ? new Date(pago.fecha_pago) : new Date(pago.created_at);
+        if (pagoDate < filterDateFrom) return false;
+      }
+      
+      // Filtro por fecha hasta
+      if (filterDateTo) {
+        const pagoDate = pago.fecha_pago ? new Date(pago.fecha_pago) : new Date(pago.created_at);
+        const endOfDay = new Date(filterDateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        if (pagoDate > endOfDay) return false;
+      }
+      
+      return true;
+    });
+  }, [pagos, filterStatus, filterSupplier, filterDateFrom, filterDateTo]);
+
+  const clearFilters = () => {
+    setFilterStatus("all");
+    setFilterSupplier("all");
+    setFilterDateFrom(undefined);
+    setFilterDateTo(undefined);
+  };
+
+  const hasActiveFilters = filterStatus !== "all" || filterSupplier !== "all" || filterDateFrom || filterDateTo;
 
   const generatePaymentsMutation = useMutation({
     mutationFn: async () => {
@@ -383,6 +460,114 @@ const Payments = () => {
           </div>
         </div>
 
+        {/* Filtros */}
+        <Card className="mb-4 p-4">
+          <div className="flex flex-wrap gap-4 items-end">
+            {/* Filtro por Estado */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-muted-foreground">Estado</label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="pagado">Pagado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Filtro por Proveedor */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-muted-foreground">Proveedor</label>
+              <Select value={filterSupplier} onValueChange={setFilterSupplier}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los proveedores</SelectItem>
+                  {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Filtro por Fecha Desde */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-muted-foreground">Desde</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-[150px] justify-start text-left font-normal",
+                      !filterDateFrom && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterDateFrom ? format(filterDateFrom, "dd/MM/yyyy") : "Seleccionar"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={filterDateFrom}
+                    onSelect={setFilterDateFrom}
+                    locale={es}
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Filtro por Fecha Hasta */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-muted-foreground">Hasta</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-[150px] justify-start text-left font-normal",
+                      !filterDateTo && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterDateTo ? format(filterDateTo, "dd/MM/yyyy") : "Seleccionar"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={filterDateTo}
+                    onSelect={setFilterDateTo}
+                    locale={es}
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Botón limpiar filtros */}
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-10">
+                <X className="h-4 w-4 mr-1" />
+                Limpiar
+              </Button>
+            )}
+          </div>
+          
+          {hasActiveFilters && (
+            <div className="mt-3 text-sm text-muted-foreground">
+              Mostrando {filteredPagos.length} de {pagos?.length || 0} pagos
+            </div>
+          )}
+        </Card>
+
         <Card>
           <Table>
             <TableHeader>
@@ -407,8 +592,8 @@ const Payments = () => {
                     <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
-              ) : pagos && pagos.length > 0 ? (
-                pagos.map((pago: any) => (
+              ) : filteredPagos && filteredPagos.length > 0 ? (
+                filteredPagos.map((pago: any) => (
                   <TableRow key={pago.id}>
                     <TableCell>
                       <div className="font-medium">
