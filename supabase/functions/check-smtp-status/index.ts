@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import nodemailer from "https://esm.sh/nodemailer@6.9.10";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,7 +25,6 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("SMTP_PASSWORD configured:", !!smtpPassword);
     console.log("SMTP_FROM_EMAIL configured:", !!smtpFromEmail);
 
-    // Verificar que todas las variables estén configuradas
     if (!smtpHost || !smtpPort || !smtpUser || !smtpPassword || !smtpFromEmail) {
       const missing = [];
       if (!smtpHost) missing.push("SMTP_HOST");
@@ -44,8 +43,8 @@ const handler = async (req: Request): Promise<Response> => {
             port: smtpPort || "No configurado",
             user: smtpUser ? "Configurado" : "No configurado",
             password: smtpPassword ? "Configurado" : "No configurado",
-            from: smtpFromEmail || "No configurado"
-          }
+            from: smtpFromEmail || "No configurado",
+          },
         }),
         {
           status: 200,
@@ -54,7 +53,34 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Normalizar SMTP_FROM_EMAIL
+    const port = parseInt(smtpPort);
+    console.log(`Attempting SMTP connection to ${smtpHost}:${port}...`);
+
+    // IMPORTANTE:
+    // - En este runtime, STARTTLS (587) suele fallar de forma no-determinista con librerías SMTP.
+    // - Para pruebas de conectividad, sólo soportamos de forma confiable TLS implícito (465).
+    if (port !== 465) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          status: "warning",
+          message:
+            "La verificación SMTP con STARTTLS (587) no es confiable en este entorno cloud. Para probar SMTP aquí, usa puerto 465 (TLS implícito) o migra a un proveedor HTTP (recomendado) como Resend.",
+          config: {
+            host: smtpHost,
+            port: smtpPort,
+            user: smtpUser ? "Configurado" : "No configurado",
+            from: smtpFromEmail,
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
+    // Normalizar SMTP_FROM_EMAIL: algunos proveedores lo guardan como "Nombre <email@dominio>"
     const rawFrom = smtpFromEmail.trim();
     const match = rawFrom.match(/<([^>]+)>/);
     const fromEmail = (match?.[1] ?? rawFrom).trim();
@@ -65,7 +91,8 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({
           success: false,
           status: "misconfigured",
-          message: "SMTP_FROM_EMAIL no es un correo válido.",
+          message:
+            "SMTP_FROM_EMAIL no es un correo válido. Usa formato email@dominio.com (o Nombre <email@dominio.com>).",
           config: {
             host: smtpHost,
             port: smtpPort,
@@ -80,72 +107,72 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const port = parseInt(smtpPort);
-    console.log(`Attempting SMTP connection to ${smtpHost}:${port} using nodemailer...`);
-    
-    // Configurar nodemailer
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: port,
-      secure: port === 465, // true para 465, false para otros puertos (usará STARTTLS)
-      auth: {
-        user: smtpUser,
-        pass: smtpPassword,
-      },
-      tls: {
-        rejectUnauthorized: false, // Permitir certificados auto-firmados
-      },
-    });
+    let client: SMTPClient | null = null;
+    try {
+      client = new SMTPClient({
+        connection: {
+          hostname: smtpHost,
+          port,
+          tls: true, // 465 = TLS implícito
+          auth: {
+            username: smtpUser,
+            password: smtpPassword,
+          },
+        },
+      });
 
-    // Verificar conexión
-    console.log("Verifying SMTP connection...");
-    await transporter.verify();
-    console.log("SMTP connection verified successfully!");
+      await client.send({
+        from: fromEmail,
+        to: "falagian@gmail.com",
+        subject: "Test de conexión SMTP - QualMedical",
+        content:
+          "Este es un mensaje de prueba para verificar la configuración SMTP (TLS 465).",
+      });
 
-    // Enviar email de prueba
-    console.log("Sending test email...");
-    const info = await transporter.sendMail({
-      from: fromEmail,
-      to: "falagian@gmail.com",
-      subject: "Test de conexión SMTP - QualMedical",
-      text: "Este es un mensaje de prueba para verificar la configuración SMTP. Si recibes este correo, la configuración funciona correctamente.",
-    });
+      console.log("SMTP connection successful!");
 
-    console.log("Email sent successfully:", info.messageId);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        status: "connected",
-        message: "Conexión SMTP exitosa",
-        config: {
-          host: smtpHost,
-          port: smtpPort,
-          user: smtpUser,
-          from: smtpFromEmail
+      return new Response(
+        JSON.stringify({
+          success: true,
+          status: "connected",
+          message: "Conexión SMTP exitosa (TLS 465)",
+          config: {
+            host: smtpHost,
+            port: smtpPort,
+            user: smtpUser,
+            from: smtpFromEmail,
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
         }
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+      );
+    } finally {
+      try {
+        await client?.close();
+      } catch (e) {
+        console.warn("SMTP close warning:", e);
       }
-    );
+    }
   } catch (error: any) {
     console.error("SMTP connection error:", error);
-    
-    let errorMessage = error.message || "Error desconocido";
+
+    const details = error?.message ?? String(error);
+
+    let errorMessage = details;
     let errorType = "connection_error";
 
-    if (errorMessage.includes("authentication") || errorMessage.includes("535") || errorMessage.includes("auth") || errorMessage.includes("Invalid login")) {
+    if (details.includes("authentication") || details.includes("535") || details.includes("auth")) {
       errorType = "auth_error";
       errorMessage = "Error de autenticación SMTP. Verifica el usuario y contraseña.";
-    } else if (errorMessage.includes("timeout") || errorMessage.includes("ETIMEDOUT")) {
+    } else if (details.includes("timeout") || details.includes("ETIMEDOUT")) {
       errorType = "timeout";
       errorMessage = "Tiempo de espera agotado. El servidor SMTP no responde.";
-    } else if (errorMessage.includes("ENOTFOUND") || errorMessage.includes("getaddrinfo")) {
+    } else if (details.includes("ENOTFOUND") || details.includes("getaddrinfo")) {
       errorType = "host_not_found";
       errorMessage = "No se encontró el servidor SMTP. Verifica el host.";
-    } else if (errorMessage.includes("ECONNREFUSED")) {
+    } else if (details.includes("ECONNREFUSED")) {
       errorType = "connection_refused";
       errorMessage = "Conexión rechazada. Verifica el puerto y configuración TLS.";
     }
@@ -154,9 +181,9 @@ const handler = async (req: Request): Promise<Response> => {
       JSON.stringify({
         success: false,
         status: "error",
-        errorType: errorType,
+        errorType,
         message: errorMessage,
-        details: error.message
+        details,
       }),
       {
         status: 200,
