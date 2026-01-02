@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import nodemailer from "https://esm.sh/nodemailer@6.9.10";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,26 +54,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Intentar crear conexión SMTP y enviar un email de prueba simple
-    const port = parseInt(smtpPort);
-    console.log(`Attempting SMTP connection to ${smtpHost}:${port}...`);
-    
-    // Puerto 465 usa TLS implícito, puerto 587 usa STARTTLS
-    const useTLS = port === 465;
-    
-    const client = new SMTPClient({
-      connection: {
-        hostname: smtpHost,
-        port: port,
-        tls: useTLS,
-        auth: {
-          username: smtpUser,
-          password: smtpPassword,
-        },
-      },
-    });
-
-    // Normalizar SMTP_FROM_EMAIL: algunos proveedores lo guardan como "Nombre <email@dominio>"
+    // Normalizar SMTP_FROM_EMAIL
     const rawFrom = smtpFromEmail.trim();
     const match = rawFrom.match(/<([^>]+)>/);
     const fromEmail = (match?.[1] ?? rawFrom).trim();
@@ -84,8 +65,7 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({
           success: false,
           status: "misconfigured",
-          message:
-            "SMTP_FROM_EMAIL no es un correo válido. Usa formato email@dominio.com (o Nombre <email@dominio.com>).",
+          message: "SMTP_FROM_EMAIL no es un correo válido.",
           config: {
             host: smtpHost,
             port: smtpPort,
@@ -100,18 +80,38 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Enviar un email de prueba para verificar la conexión
-    await client.send({
+    const port = parseInt(smtpPort);
+    console.log(`Attempting SMTP connection to ${smtpHost}:${port} using nodemailer...`);
+    
+    // Configurar nodemailer
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: port,
+      secure: port === 465, // true para 465, false para otros puertos (usará STARTTLS)
+      auth: {
+        user: smtpUser,
+        pass: smtpPassword,
+      },
+      tls: {
+        rejectUnauthorized: false, // Permitir certificados auto-firmados
+      },
+    });
+
+    // Verificar conexión
+    console.log("Verifying SMTP connection...");
+    await transporter.verify();
+    console.log("SMTP connection verified successfully!");
+
+    // Enviar email de prueba
+    console.log("Sending test email...");
+    const info = await transporter.sendMail({
       from: fromEmail,
       to: "falagian@gmail.com",
       subject: "Test de conexión SMTP - QualMedical",
-      content:
-        "Este es un mensaje de prueba para verificar la configuración SMTP. Si recibes este correo, la configuración funciona correctamente.",
+      text: "Este es un mensaje de prueba para verificar la configuración SMTP. Si recibes este correo, la configuración funciona correctamente.",
     });
 
-    await client.close();
-
-    console.log("SMTP connection successful!");
+    console.log("Email sent successfully:", info.messageId);
 
     return new Response(
       JSON.stringify({
@@ -136,7 +136,7 @@ const handler = async (req: Request): Promise<Response> => {
     let errorMessage = error.message || "Error desconocido";
     let errorType = "connection_error";
 
-    if (errorMessage.includes("authentication") || errorMessage.includes("535") || errorMessage.includes("auth")) {
+    if (errorMessage.includes("authentication") || errorMessage.includes("535") || errorMessage.includes("auth") || errorMessage.includes("Invalid login")) {
       errorType = "auth_error";
       errorMessage = "Error de autenticación SMTP. Verifica el usuario y contraseña.";
     } else if (errorMessage.includes("timeout") || errorMessage.includes("ETIMEDOUT")) {
