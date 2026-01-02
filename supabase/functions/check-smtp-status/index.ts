@@ -72,9 +72,9 @@ const handler = async (req: Request): Promise<Response> => {
     // Enviar un email de prueba para verificar la conexión
     await client.send({
       from: smtpFromEmail,
-      to: smtpFromEmail, // Enviamos a nosotros mismos
-      subject: "Test de conexión SMTP",
-      content: "Este es un mensaje de prueba para verificar la configuración SMTP.",
+      to: "falagian@gmail.com",
+      subject: "Test de conexión SMTP - QualMedical",
+      content: "Este es un mensaje de prueba para verificar la configuración SMTP. Si recibes este correo, la configuración funciona correctamente.",
     });
 
     await client.close();
