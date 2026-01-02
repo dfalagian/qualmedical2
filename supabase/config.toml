@@ -44,3 +44,6 @@ verify_jwt = true
 
 [functions.delete-supplier-contador]
 verify_jwt = true
+
+[functions.check-smtp-status]
+verify_jwt = true
