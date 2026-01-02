@@ -54,7 +54,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Intentar crear conexión SMTP
+    // Intentar crear conexión SMTP y enviar un email de prueba simple
     console.log(`Attempting SMTP connection to ${smtpHost}:${smtpPort}...`);
     
     const client = new SMTPClient({
@@ -69,7 +69,14 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
 
-    // Intentar cerrar la conexión (esto verifica que la conexión sea válida)
+    // Enviar un email de prueba para verificar la conexión
+    await client.send({
+      from: smtpFromEmail,
+      to: smtpFromEmail, // Enviamos a nosotros mismos
+      subject: "Test de conexión SMTP",
+      content: "Este es un mensaje de prueba para verificar la configuración SMTP.",
+    });
+
     await client.close();
 
     console.log("SMTP connection successful!");
