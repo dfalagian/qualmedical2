@@ -69,12 +69,40 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
 
+    // Normalizar SMTP_FROM_EMAIL: algunos proveedores lo guardan como "Nombre <email@dominio>"
+    const rawFrom = smtpFromEmail.trim();
+    const match = rawFrom.match(/<([^>]+)>/);
+    const fromEmail = (match?.[1] ?? rawFrom).trim();
+
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail);
+    if (!isValidEmail) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          status: "misconfigured",
+          message:
+            "SMTP_FROM_EMAIL no es un correo válido. Usa formato email@dominio.com (o Nombre <email@dominio.com>).",
+          config: {
+            host: smtpHost,
+            port: smtpPort,
+            user: smtpUser ? "Configurado" : "No configurado",
+            from: "Formato inválido",
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
     // Enviar un email de prueba para verificar la conexión
     await client.send({
-      from: smtpFromEmail,
+      from: fromEmail,
       to: "falagian@gmail.com",
       subject: "Test de conexión SMTP - QualMedical",
-      content: "Este es un mensaje de prueba para verificar la configuración SMTP. Si recibes este correo, la configuración funciona correctamente.",
+      content:
+        "Este es un mensaje de prueba para verificar la configuración SMTP. Si recibes este correo, la configuración funciona correctamente.",
     });
 
     await client.close();
