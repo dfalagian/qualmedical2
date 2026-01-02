@@ -19,30 +19,23 @@ export const EmailServerStatus = () => {
     setErrorDetails("");
 
     try {
-      // Intentar hacer una llamada de prueba al edge function
-      const { data, error } = await supabase.functions.invoke("notify-supplier", {
-        body: {
-          supplier_id: "test-connection",
-          type: "test",
-          data: {}
-        }
-      });
+      // Usar la función dedicada para verificar el estado SMTP
+      const { data, error } = await supabase.functions.invoke("check-smtp-status");
 
       if (error) {
-        // Si hay error, verificar el mensaje
-        if (error.message?.includes("timed out") || error.message?.includes("Connection")) {
-          setStatus('error');
-          setErrorDetails("No se puede conectar al servidor SMTP. El servidor de correo no es accesible.");
-        } else if (error.message?.includes("proveedor")) {
-          // Este error es esperado ya que usamos un ID de prueba
+        setStatus('error');
+        setErrorDetails(error.message || "Error al conectar con el servidor.");
+      } else if (data) {
+        if (data.success) {
+          setStatus('success');
+          setErrorDetails(`Conectado a ${data.config?.host}:${data.config?.port}`);
+        } else if (data.status === 'misconfigured') {
           setStatus('warning');
-          setErrorDetails("El servidor SMTP parece estar configurado, pero no se pudo verificar completamente.");
+          setErrorDetails(data.message);
         } else {
           setStatus('error');
-          setErrorDetails(error.message || "Error desconocido al verificar el servidor de correo.");
+          setErrorDetails(data.message || "Error de conexión SMTP.");
         }
-      } else {
-        setStatus('success');
       }
     } catch (err: any) {
       setStatus('error');
