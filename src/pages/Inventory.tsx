@@ -30,8 +30,13 @@ import {
   MapPin,
   ArrowRight,
   Eye,
-  EyeOff
+  EyeOff,
+  Smartphone,
+  Wifi,
+  WifiOff
 } from "lucide-react";
+import { useWebNFC } from "@/hooks/useWebNFC";
+import { NFCScannerCard } from "@/components/inventory/NFCScannerCard";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -985,6 +990,40 @@ export default function Inventory() {
                 </Table>
               </CardContent>
             </Card>
+
+            {/* WebNFC Scanner Section */}
+            <NFCScannerCard 
+              onTagRead={(serialNumber) => {
+                // Buscar si el tag ya existe en el sistema
+                const existingTag = rfidTags.find(t => 
+                  t.epc.toLowerCase() === serialNumber.toLowerCase() ||
+                  t.epc.toLowerCase().includes(serialNumber.toLowerCase().replace(/:/g, ''))
+                );
+                
+                if (existingTag) {
+                  toast({
+                    title: "Tag encontrado",
+                    description: `Tag ${existingTag.epc} - ${existingTag.products?.name || 'Sin producto asignado'}`
+                  });
+                  // Actualizar última lectura
+                  simulateTagRead.mutate({ 
+                    tagId: existingTag.id, 
+                    location: "Lectura NFC Manual" 
+                  });
+                } else {
+                  // Precargar el EPC en el formulario para registrar
+                  setTagForm(prev => ({
+                    ...prev,
+                    epc: serialNumber.replace(/:/g, '').toUpperCase()
+                  }));
+                  setTagDialogOpen(true);
+                  toast({
+                    title: "Nuevo tag detectado",
+                    description: "Se abrió el formulario para registrar el tag."
+                  });
+                }
+              }}
+            />
 
             {/* Simulate RFID Reading Section */}
             {canEdit && rfidTags.length > 0 && (
