@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ interface NFCScannerCardProps {
 export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
   const { isSupported, isScanning, lastRead, error, startScan, stopScan } = useWebNFC();
   const [lastReadTime, setLastReadTime] = useState<Date | null>(null);
+  const lastProcessedSerial = useRef<string | null>(null);
 
   const handleStartScan = async () => {
     await startScan();
@@ -22,11 +23,14 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
     stopScan();
   };
 
-  // Efecto para notificar cuando se lee un tag
-  if (lastRead && (!lastReadTime || new Date() > lastReadTime)) {
-    setLastReadTime(new Date());
-    onTagRead(lastRead.serialNumber, lastRead.records);
-  }
+  // Efecto para notificar cuando se lee un tag - usando useEffect correctamente
+  useEffect(() => {
+    if (lastRead && lastRead.serialNumber !== lastProcessedSerial.current) {
+      lastProcessedSerial.current = lastRead.serialNumber;
+      setLastReadTime(new Date());
+      onTagRead(lastRead.serialNumber, lastRead.records);
+    }
+  }, [lastRead, onTagRead]);
 
   return (
     <Card className="border-2 border-dashed border-primary/30">
