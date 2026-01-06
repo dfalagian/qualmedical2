@@ -36,7 +36,7 @@ import {
   WifiOff
 } from "lucide-react";
 import { useWebNFC } from "@/hooks/useWebNFC";
-import { NFCScannerCard } from "@/components/inventory/NFCScannerCard";
+import { NFCScannerCard, ScanMode } from "@/components/inventory/NFCScannerCard";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -362,6 +362,93 @@ export default function Inventory() {
     onError: (error: Error) => {
       toast({
         title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Procesar movimiento de inventario (Entrada/Salida)
+  const processInventoryMovement = useMutation({
+    mutationFn: async ({ 
+      tagId, 
+      productId, 
+      mode, 
+      productName 
+    }: { 
+      tagId: string; 
+      productId: string; 
+      mode: ScanMode; 
+      productName: string;
+    }) => {
+      // 1. Obtener el producto actual para saber el stock
+      const { data: product, error: productError } = await supabase
+        .from("products")
+        .select("current_stock, name")
+        .eq("id", productId)
+        .single();
+      
+      if (productError) throw productError;
+
+      const previousStock = product.current_stock || 0;
+      const quantity = mode === "entrada" ? 1 : -1;
+      const newStock = previousStock + quantity;
+
+      // 2. Actualizar el stock del producto
+      const { error: updateError } = await supabase
+        .from("products")
+        .update({ 
+          current_stock: Math.max(0, newStock),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", productId);
+      
+      if (updateError) throw updateError;
+
+      // 3. Registrar el movimiento de inventario
+      const { error: movementError } = await supabase
+        .from("inventory_movements")
+        .insert({
+          product_id: productId,
+          rfid_tag_id: tagId,
+          movement_type: mode === "entrada" ? "entry" : "exit",
+          quantity: Math.abs(quantity),
+          previous_stock: previousStock,
+          new_stock: Math.max(0, newStock),
+          location: mode === "entrada" ? "Almacén Principal" : "Zona de Salida",
+          notes: `${mode === "entrada" ? "Entrada" : "Salida"} vía NFC`
+        });
+      
+      if (movementError) throw movementError;
+
+      // 4. Actualizar última lectura del tag
+      const { error: tagError } = await supabase
+        .from("rfid_tags")
+        .update({
+          last_location: mode === "entrada" ? "Almacén Principal" : "Zona de Salida",
+          last_read_at: new Date().toISOString()
+        })
+        .eq("id", tagId);
+      
+      if (tagError) throw tagError;
+
+      return { mode, productName, newStock, previousStock };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["stock_alerts"] });
+      
+      const isEntry = data.mode === "entrada";
+      toast({
+        title: isEntry ? "✅ Entrada registrada" : "📤 Salida registrada",
+        description: `${data.productName}: Stock ${data.previousStock} → ${data.newStock}`,
+        variant: isEntry ? "default" : "default"
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error al procesar movimiento",
         description: error.message,
         variant: "destructive"
       });
@@ -993,7 +1080,7 @@ export default function Inventory() {
 
             {/* WebNFC Scanner Section */}
             <NFCScannerCard 
-              onTagRead={(serialNumber) => {
+              onTagRead={(serialNumber, records, mode) => {
                 // Buscar si el tag ya existe en el sistema
                 const existingTag = rfidTags.find(t => 
                   t.epc.toLowerCase() === serialNumber.toLowerCase() ||
@@ -1001,25 +1088,36 @@ export default function Inventory() {
                 );
                 
                 if (existingTag) {
-                  toast({
-                    title: "Tag encontrado",
-                    description: `Tag ${existingTag.epc} - ${existingTag.products?.name || 'Sin producto asignado'}`
-                  });
-                  // Actualizar última lectura
-                  simulateTagRead.mutate({ 
-                    tagId: existingTag.id, 
-                    location: "Lectura NFC Manual" 
-                  });
+                  // Tag encontrado - procesar movimiento
+                  if (existingTag.product_id && existingTag.products) {
+                    // Tag tiene producto asignado - procesar entrada/salida
+                    processInventoryMovement.mutate({
+                      tagId: existingTag.id,
+                      productId: existingTag.product_id,
+                      mode: mode,
+                      productName: existingTag.products.name
+                    });
+                  } else {
+                    // Tag sin producto asignado
+                    toast({
+                      title: "Tag sin producto",
+                      description: "Este tag no tiene un producto asignado. Asígnelo primero.",
+                      variant: "destructive"
+                    });
+                    handleEditTag(existingTag);
+                  }
                 } else {
-                  // Precargar el EPC en el formulario para registrar
+                  // Tag nuevo - ofrecer registrarlo
                   setTagForm(prev => ({
                     ...prev,
-                    epc: serialNumber.replace(/:/g, '').toUpperCase()
+                    epc: serialNumber.replace(/:/g, '').toUpperCase(),
+                    status: "disponible",
+                    last_location: mode === "entrada" ? "Almacén Principal" : "Zona de Salida"
                   }));
                   setTagDialogOpen(true);
                   toast({
                     title: "Nuevo tag detectado",
-                    description: "Se abrió el formulario para registrar el tag."
+                    description: "Registre el tag y asigne un producto para continuar."
                   });
                 }
               }}
