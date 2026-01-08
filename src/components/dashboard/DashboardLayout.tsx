@@ -14,7 +14,8 @@ import {
   X,
   Database,
   CreditCard,
-  Package
+  Package,
+  Pill
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "react-router-dom";
@@ -78,6 +79,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       { name: "Validación Datos Bancarios", href: "/dashboard/datos-bancarios-admin", icon: FileText },
       { name: "Pagos", href: "/dashboard/payments", icon: CreditCard },
       { name: "Inventario RFID", href: "/dashboard/inventory", icon: Package },
+      { name: "Catálogo CITIO", href: "/dashboard/medications-citio", icon: Pill },
       { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
       { name: "Administración", href: "/dashboard/admin", icon: Settings },
       { name: "Backup BD", href: "/dashboard/database-backup", icon: Database },
