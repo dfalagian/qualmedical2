@@ -47,3 +47,6 @@ verify_jwt = true
 
 [functions.check-smtp-status]
 verify_jwt = true
+
+[functions.get-external-medications]
+verify_jwt = true

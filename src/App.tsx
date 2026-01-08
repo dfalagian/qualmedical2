@@ -24,6 +24,7 @@ import SupplierDocuments from "./pages/SupplierDocuments";
 import DatabaseBackup from "./pages/DatabaseBackup";
 import Payments from "./pages/Payments";
 import Inventory from "./pages/Inventory";
+import MedicationsCatalogCITIO from "./pages/MedicationsCatalogCITIO";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -171,6 +172,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Inventory />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/medications-citio"
+              element={
+                <ProtectedRoute>
+                  <MedicationsCatalogCITIO />
                 </ProtectedRoute>
               }
             />
