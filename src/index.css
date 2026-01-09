@@ -147,34 +147,37 @@ All colors MUST be HSL.
     }
   }
 
-  /* Animación de parpadeo para tags recién leídos */
-  @keyframes tag-blink {
-    0%, 100% {
-      background-color: hsl(142 71% 45% / 0.15);
-      box-shadow: 0 0 0 0 hsl(142 71% 45% / 0.4);
-    }
-    50% {
-      background-color: hsl(142 71% 45% / 0.35);
-      box-shadow: 0 0 8px 2px hsl(142 71% 45% / 0.3);
-    }
-  }
+}
 
-  .animate-tag-blink {
-    animation: tag-blink 1s ease-in-out infinite;
+/* Animación de parpadeo para tags recién leídos - Fuera de @layer para mayor especificidad */
+@keyframes tag-blink {
+  0%, 100% {
+    background-color: hsl(142 71% 45% / 0.2) !important;
+    box-shadow: 0 0 0 0 hsl(142 71% 45% / 0.4);
   }
+  50% {
+    background-color: hsl(142 71% 45% / 0.5) !important;
+    box-shadow: 0 0 12px 4px hsl(142 71% 45% / 0.4);
+  }
+}
 
-  .dark .animate-tag-blink {
-    animation: tag-blink-dark 1s ease-in-out infinite;
+@keyframes tag-blink-dark {
+  0%, 100% {
+    background-color: hsl(142 71% 35% / 0.3) !important;
+    box-shadow: 0 0 0 0 hsl(142 71% 45% / 0.3);
   }
+  50% {
+    background-color: hsl(142 71% 35% / 0.6) !important;
+    box-shadow: 0 0 12px 4px hsl(142 71% 45% / 0.3);
+  }
+}
 
-  @keyframes tag-blink-dark {
-    0%, 100% {
-      background-color: hsl(142 71% 35% / 0.2);
-      box-shadow: 0 0 0 0 hsl(142 71% 45% / 0.3);
-    }
-    50% {
-      background-color: hsl(142 71% 35% / 0.4);
-      box-shadow: 0 0 8px 2px hsl(142 71% 45% / 0.2);
-    }
-  }
+.animate-tag-blink {
+  animation: tag-blink 1s ease-in-out infinite !important;
+  transition: none !important;
+}
+
+.dark .animate-tag-blink,
+:root.dark .animate-tag-blink {
+  animation: tag-blink-dark 1s ease-in-out infinite !important;
 }
