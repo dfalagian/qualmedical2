@@ -773,6 +773,7 @@ export type Database = {
       products: {
         Row: {
           category: string | null
+          citio_id: string | null
           created_at: string | null
           current_stock: number | null
           description: string | null
@@ -788,6 +789,7 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          citio_id?: string | null
           created_at?: string | null
           current_stock?: number | null
           description?: string | null
@@ -803,6 +805,7 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          citio_id?: string | null
           created_at?: string | null
           current_stock?: number | null
           description?: string | null

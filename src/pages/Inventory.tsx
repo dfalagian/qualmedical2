@@ -33,10 +33,13 @@ import {
   EyeOff,
   Smartphone,
   Wifi,
-  WifiOff
+  WifiOff,
+  Download,
+  Pill
 } from "lucide-react";
 import { useWebNFC } from "@/hooks/useWebNFC";
 import { NFCScannerCard, ScanMode } from "@/components/inventory/NFCScannerCard";
+import { CITIOImportDialog } from "@/components/inventory/CITIOImportDialog";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -74,6 +77,7 @@ interface Product {
   supplier_id: string | null;
   is_active: boolean;
   created_at: string;
+  citio_id?: string | null;
 }
 
 interface RfidTag {
@@ -95,6 +99,7 @@ export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
+  const [citioImportDialogOpen, setCitioImportDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingTag, setEditingTag] = useState<RfidTag | null>(null);
 
@@ -246,6 +251,55 @@ export default function Inventory() {
     onError: (error: Error) => {
       toast({
         title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Import from CITIO mutation
+  const importFromCitioMutation = useMutation({
+    mutationFn: async (citioMedication: {
+      id: string;
+      name: string;
+      brand: string;
+      description?: string;
+      presentacion?: string;
+      price_type_1?: number;
+      codigo_sat?: string;
+      medication_families?: { name: string };
+    }) => {
+      // Generate SKU from CITIO ID
+      const sku = `CITIO-${citioMedication.id.slice(0, 8).toUpperCase()}`;
+      
+      const { error } = await supabase
+        .from("products")
+        .insert({
+          sku,
+          name: citioMedication.name,
+          description: `${citioMedication.brand || ''} - ${citioMedication.description || ''} ${citioMedication.presentacion || ''}`.trim(),
+          category: citioMedication.medication_families?.name || "Medicamentos",
+          unit: "pieza",
+          minimum_stock: 5,
+          current_stock: 0,
+          unit_price: citioMedication.price_type_1 || 0,
+          citio_id: citioMedication.id,
+        });
+      
+      if (error) throw error;
+      return citioMedication.name;
+    },
+    onSuccess: (productName) => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      setCitioImportDialogOpen(false);
+      toast({
+        title: "Producto importado",
+        description: `"${productName}" fue agregado al inventario desde CITIO.`
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error al importar",
         description: error.message,
         variant: "destructive"
       });
@@ -546,6 +600,11 @@ export default function Inventory() {
   const assignedTags = rfidTags.filter(t => t.status === "asignado").length;
   const availableTags = rfidTags.filter(t => t.status === "disponible").length;
   const unreadAlerts = alerts.filter(a => !a.is_read).length;
+  
+  // Get existing CITIO IDs to mark them as already imported
+  const existingCitioIds = products
+    .filter(p => p.citio_id)
+    .map(p => p.citio_id as string);
 
   const canEdit = isAdmin || isContador;
 
@@ -654,22 +713,31 @@ export default function Inventory() {
 
           {/* Products Tab */}
           <TabsContent value="products" className="space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <h2 className="text-lg font-semibold">Catálogo de Productos</h2>
               {canEdit && (
-                <Dialog open={productDialogOpen} onOpenChange={(open) => {
-                  setProductDialogOpen(open);
-                  if (!open) {
-                    setEditingProduct(null);
-                    resetProductForm();
-                  }
-                }}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Nuevo Producto
-                    </Button>
-                  </DialogTrigger>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setCitioImportDialogOpen(true)}
+                    className="gap-2"
+                  >
+                    <Pill className="h-4 w-4" />
+                    Importar desde CITIO
+                  </Button>
+                  <Dialog open={productDialogOpen} onOpenChange={(open) => {
+                    setProductDialogOpen(open);
+                    if (!open) {
+                      setEditingProduct(null);
+                      resetProductForm();
+                    }
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Nuevo Producto
+                      </Button>
+                    </DialogTrigger>
                   <DialogContent className="max-w-md">
                     <DialogHeader>
                       <DialogTitle>
@@ -776,6 +844,7 @@ export default function Inventory() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+                </div>
               )}
             </div>
 
@@ -1262,6 +1331,14 @@ export default function Inventory() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* CITIO Import Dialog */}
+        <CITIOImportDialog
+          open={citioImportDialogOpen}
+          onOpenChange={setCitioImportDialogOpen}
+          onImport={(medication) => importFromCitioMutation.mutate(medication)}
+          existingCitioIds={existingCitioIds}
+        />
       </div>
     </DashboardLayout>
   );
