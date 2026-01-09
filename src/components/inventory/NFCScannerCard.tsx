@@ -25,27 +25,46 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
   const { isSupported, isScanning, lastRead, error, startScan, stopScan } = useWebNFC();
   const [lastReadTime, setLastReadTime] = useState<Date | null>(null);
   const [scanMode, setScanMode] = useState<ScanMode>(null);
-  const lastProcessedSerial = useRef<string | null>(null);
+  const [processedCount, setProcessedCount] = useState(0);
+  const lastProcessedKey = useRef<string | null>(null);
 
   const handleStartScan = async (mode: ScanMode) => {
     setScanMode(mode);
-    lastProcessedSerial.current = null; // Reset para permitir releer el mismo tag en diferente modo
+    lastProcessedKey.current = null; // Reset para permitir releer el mismo tag en diferente modo
+    setProcessedCount(0);
     await startScan();
   };
 
   const handleStopScan = () => {
     stopScan();
     setScanMode(null);
+    lastProcessedKey.current = null;
+    setProcessedCount(0);
   };
 
   // Efecto para notificar cuando se lee un tag
+  // Usamos un timestamp para permitir lecturas consecutivas del mismo tag
   useEffect(() => {
-    if (lastRead && scanMode && lastRead.serialNumber !== lastProcessedSerial.current) {
-      lastProcessedSerial.current = lastRead.serialNumber;
-      setLastReadTime(new Date());
-      onTagRead(lastRead.serialNumber, lastRead.records, scanMode);
+    if (lastRead && scanMode) {
+      // Crear una clave única usando serial + timestamp para permitir lecturas repetidas
+      const currentKey = `${lastRead.serialNumber}-${Date.now()}`;
+      
+      // Solo procesar si es una lectura diferente (diferente serial o han pasado >500ms)
+      const lastKey = lastProcessedKey.current;
+      const lastSerial = lastKey?.split('-')[0];
+      const lastTimestamp = lastKey ? parseInt(lastKey.split('-')[1] || '0') : 0;
+      const timeDiff = Date.now() - lastTimestamp;
+      
+      // Permitir procesar si es diferente serial O han pasado más de 500ms
+      if (lastRead.serialNumber !== lastSerial || timeDiff > 500) {
+        lastProcessedKey.current = currentKey;
+        setLastReadTime(new Date());
+        setProcessedCount(prev => prev + 1);
+        onTagRead(lastRead.serialNumber, lastRead.records, scanMode);
+        console.log(`📦 Tag procesado: ${lastRead.serialNumber} (total: ${processedCount + 1})`);
+      }
     }
-  }, [lastRead, onTagRead, scanMode]);
+  }, [lastRead, onTagRead, scanMode, processedCount]);
 
   const getModeLabel = () => {
     if (scanMode === "entrada") return "ENTRADA";
