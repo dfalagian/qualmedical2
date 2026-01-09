@@ -25,13 +25,12 @@ serve(async (req) => {
 
     console.log('Calling external edge function:', externalFunctionUrl);
 
-    // Call the external edge function directly
+    // Call the external edge function directly with x-api-key header
     const response = await fetch(externalFunctionUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': externalApiKey,
-        'Authorization': `Bearer ${externalApiKey}`,
+        'x-api-key': externalApiKey,
       },
     });
 
