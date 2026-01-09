@@ -89,8 +89,7 @@ const MedicationsCatalogCITIO = () => {
   const updateMutation = useMutation({
     mutationFn: async (updateData: Record<string, any>) => {
       const { data, error } = await supabase.functions.invoke('get-external-medications', {
-        method: 'PUT',
-        body: updateData,
+        body: { action: 'PUT', ...updateData },
       });
       
       if (error) throw error;
@@ -110,8 +109,7 @@ const MedicationsCatalogCITIO = () => {
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { data, error } = await supabase.functions.invoke('get-external-medications', {
-        method: 'DELETE',
-        body: { id },
+        body: { action: 'DELETE', id },
       });
       
       if (error) throw error;
