@@ -27,52 +27,72 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
   const [scanMode, setScanMode] = useState<ScanMode>(null);
   const [processedCount, setProcessedCount] = useState(0);
   const lastProcessedKey = useRef<string | null>(null);
+  // CRÍTICO: Guardar referencia al último tag procesado para evitar reprocesamiento
+  const lastProcessedSerial = useRef<string | null>(null);
+  // Timestamp de cuando se activó el modo de escaneo
+  const scanStartTime = useRef<number>(0);
 
   const handleStartScan = async (mode: ScanMode) => {
-    // Limpiar estado antes de iniciar nuevo escaneo
+    // Limpiar TODO el estado antes de iniciar nuevo escaneo
     lastProcessedKey.current = null;
+    lastProcessedSerial.current = null;
+    scanStartTime.current = Date.now();
     setProcessedCount(0);
     setLastReadTime(null);
     setScanMode(mode);
     await startScan();
-    console.log(`🔄 Escaneo iniciado en modo: ${mode} (estado limpio)`);
+    console.log(`🔄 Escaneo iniciado en modo: ${mode} (estado completamente limpio, timestamp: ${scanStartTime.current})`);
   };
 
   const handleStopScan = () => {
     stopScan();
     setScanMode(null);
     lastProcessedKey.current = null;
+    lastProcessedSerial.current = null;
+    scanStartTime.current = 0;
     setProcessedCount(0);
     setLastReadTime(null);
-    console.log('🛑 Escaneo detenido y estado limpiado');
+    console.log('🛑 Escaneo detenido y estado limpiado completamente');
   };
 
-  // Efecto para notificar cuando se lee un tag
-  // Debounce de 3 segundos para el mismo tag, tags diferentes se procesan inmediatamente
+  // Efecto para notificar cuando se lee un tag NUEVO
+  // CRÍTICO: Solo procesa lecturas que ocurren DESPUÉS de iniciar el escaneo
   useEffect(() => {
-    if (lastRead && scanMode) {
-      const now = Date.now();
-      const lastKey = lastProcessedKey.current;
-      const lastSerial = lastKey?.split('-')[0];
-      const lastTimestamp = lastKey ? parseInt(lastKey.split('-')[1] || '0') : 0;
-      const timeDiff = now - lastTimestamp;
-      
-      // MISMO TAG: Solo procesar si han pasado más de 3 segundos (evita lecturas duplicadas)
-      // TAG DIFERENTE: Procesar inmediatamente
-      const isSameTag = lastRead.serialNumber === lastSerial;
-      const debounceTime = 3000; // 3 segundos para el mismo tag
-      
-      if (!isSameTag || timeDiff > debounceTime) {
-        lastProcessedKey.current = `${lastRead.serialNumber}-${now}`;
-        setLastReadTime(new Date());
-        setProcessedCount(prev => prev + 1);
-        onTagRead(lastRead.serialNumber, lastRead.records, scanMode);
-        console.log(`📦 Tag procesado: ${lastRead.serialNumber} (total: ${processedCount + 1})${isSameTag ? ' [mismo tag después de ' + (timeDiff/1000).toFixed(1) + 's]' : ' [tag nuevo]'}`);
-      } else {
-        console.log(`⏳ Tag ignorado (mismo tag, esperar ${((debounceTime - timeDiff)/1000).toFixed(1)}s más): ${lastRead.serialNumber}`);
-      }
+    // Solo procesar si hay una lectura, modo activo, y el escaneo está realmente corriendo
+    if (!lastRead || !scanMode || !isScanning) {
+      return;
     }
-  }, [lastRead, onTagRead, scanMode, processedCount]);
+
+    const now = Date.now();
+    
+    // PROTECCIÓN CRÍTICA: Ignorar lecturas que pudieran ser residuales
+    // Solo procesar si el escaneo inició hace más de 100ms (da tiempo a limpiar)
+    if (scanStartTime.current === 0 || now - scanStartTime.current < 100) {
+      console.log(`⚠️ Lectura ignorada: escaneo muy reciente o no iniciado`);
+      return;
+    }
+
+    const lastKey = lastProcessedKey.current;
+    const lastSerial = lastKey?.split('-')[0];
+    const lastTimestamp = lastKey ? parseInt(lastKey.split('-')[1] || '0') : 0;
+    const timeDiff = now - lastTimestamp;
+    
+    // MISMO TAG: Solo procesar si han pasado más de 3 segundos (evita lecturas duplicadas)
+    // TAG DIFERENTE: Procesar inmediatamente
+    const isSameTag = lastRead.serialNumber === lastSerial;
+    const debounceTime = 3000; // 3 segundos para el mismo tag
+    
+    if (!isSameTag || timeDiff > debounceTime) {
+      lastProcessedKey.current = `${lastRead.serialNumber}-${now}`;
+      lastProcessedSerial.current = lastRead.serialNumber;
+      setLastReadTime(new Date());
+      setProcessedCount(prev => prev + 1);
+      onTagRead(lastRead.serialNumber, lastRead.records, scanMode);
+      console.log(`📦 Tag procesado: ${lastRead.serialNumber} (total: ${processedCount + 1})${isSameTag ? ' [mismo tag después de ' + (timeDiff/1000).toFixed(1) + 's]' : ' [tag nuevo]'}`);
+    } else {
+      console.log(`⏳ Tag ignorado (mismo tag, esperar ${((debounceTime - timeDiff)/1000).toFixed(1)}s más): ${lastRead.serialNumber}`);
+    }
+  }, [lastRead, onTagRead, scanMode, isScanning, processedCount]);
 
   const getModeLabel = () => {
     if (scanMode === "entrada") return "ENTRADA";
