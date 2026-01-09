@@ -448,16 +448,8 @@ export default function Inventory() {
       const quantity = mode === "entrada" ? 1 : -1;
       const newStock = previousStock + quantity;
 
-      // 2. Actualizar el stock del producto
-      const { error: updateError } = await supabase
-        .from("products")
-        .update({ 
-          current_stock: Math.max(0, newStock),
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", productId);
-      
-      if (updateError) throw updateError;
+      // NOTA: El stock se actualiza automáticamente vía trigger en inventory_movements
+      // NO actualizar manualmente aquí para evitar doble conteo
 
       // 3. Registrar el movimiento de inventario
       const { error: movementError } = await supabase
