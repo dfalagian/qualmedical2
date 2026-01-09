@@ -64,7 +64,7 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
     }
 
     const now = Date.now();
-    
+
     // PROTECCIÓN CRÍTICA: Ignorar lecturas que pudieran ser residuales
     // Solo procesar si el escaneo inició hace más de 100ms (da tiempo a limpiar)
     if (scanStartTime.current === 0 || now - scanStartTime.current < 100) {
@@ -76,23 +76,38 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
     const lastSerial = lastKey?.split('-')[0];
     const lastTimestamp = lastKey ? parseInt(lastKey.split('-')[1] || '0') : 0;
     const timeDiff = now - lastTimestamp;
-    
+
     // MISMO TAG: Solo procesar si han pasado más de 3 segundos (evita lecturas duplicadas)
     // TAG DIFERENTE: Procesar inmediatamente
     const isSameTag = lastRead.serialNumber === lastSerial;
     const debounceTime = 3000; // 3 segundos para el mismo tag
-    
+
     if (!isSameTag || timeDiff > debounceTime) {
       lastProcessedKey.current = `${lastRead.serialNumber}-${now}`;
       lastProcessedSerial.current = lastRead.serialNumber;
       setLastReadTime(new Date());
-      setProcessedCount(prev => prev + 1);
+
+      // IMPORTANTE: el procesamiento debe depender SOLO de nuevas lecturas,
+      // no de re-renders (evita “lecturas fantasma” por efectos re-ejecutándose).
+      setProcessedCount((prev) => {
+        const next = prev + 1;
+        console.log(
+          `📦 Tag procesado: ${lastRead.serialNumber} (total: ${next})${
+            isSameTag
+              ? ' [mismo tag después de ' + (timeDiff / 1000).toFixed(1) + 's]'
+              : ' [tag nuevo]'
+          }`
+        );
+        return next;
+      });
+
       onTagRead(lastRead.serialNumber, lastRead.records, scanMode);
-      console.log(`📦 Tag procesado: ${lastRead.serialNumber} (total: ${processedCount + 1})${isSameTag ? ' [mismo tag después de ' + (timeDiff/1000).toFixed(1) + 's]' : ' [tag nuevo]'}`);
     } else {
-      console.log(`⏳ Tag ignorado (mismo tag, esperar ${((debounceTime - timeDiff)/1000).toFixed(1)}s más): ${lastRead.serialNumber}`);
+      console.log(
+        `⏳ Tag ignorado (mismo tag, esperar ${((debounceTime - timeDiff) / 1000).toFixed(1)}s más): ${lastRead.serialNumber}`
+      );
     }
-  }, [lastRead, onTagRead, scanMode, isScanning, processedCount]);
+  }, [lastRead, onTagRead, scanMode, isScanning]);
 
   const getModeLabel = () => {
     if (scanMode === "entrada") return "ENTRADA";
