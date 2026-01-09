@@ -1031,11 +1031,18 @@ export default function Inventory() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">Sin asignar</SelectItem>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.sku} - {product.name}
-                              </SelectItem>
-                            ))}
+                            {products.map((product) => {
+                              const hasTag = rfidTags?.some(tag => tag.product_id === product.id);
+                              return (
+                                <SelectItem 
+                                  key={product.id} 
+                                  value={product.id}
+                                  className={hasTag ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400" : ""}
+                                >
+                                  {hasTag && "✓ "}{product.sku} - {product.name}
+                                </SelectItem>
+                              );
+                            })}
                           </SelectContent>
                         </Select>
                       </div>
