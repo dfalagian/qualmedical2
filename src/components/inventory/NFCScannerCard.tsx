@@ -29,10 +29,13 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
   const lastProcessedKey = useRef<string | null>(null);
 
   const handleStartScan = async (mode: ScanMode) => {
-    setScanMode(mode);
-    lastProcessedKey.current = null; // Reset para permitir releer el mismo tag en diferente modo
+    // Limpiar estado antes de iniciar nuevo escaneo
+    lastProcessedKey.current = null;
     setProcessedCount(0);
+    setLastReadTime(null);
+    setScanMode(mode);
     await startScan();
+    console.log(`🔄 Escaneo iniciado en modo: ${mode} (estado limpio)`);
   };
 
   const handleStopScan = () => {
@@ -40,6 +43,8 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
     setScanMode(null);
     lastProcessedKey.current = null;
     setProcessedCount(0);
+    setLastReadTime(null);
+    console.log('🛑 Escaneo detenido y estado limpiado');
   };
 
   // Efecto para notificar cuando se lee un tag

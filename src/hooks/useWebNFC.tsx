@@ -101,6 +101,11 @@ export function useWebNFC(): UseWebNFCReturn {
     }
   };
 
+  // Función para limpiar el último tag leído
+  const clearLastRead = useCallback(() => {
+    setLastRead(null);
+  }, []);
+
   const startScan = useCallback(async () => {
     if (!isSupported) {
       setError('WebNFC no está soportado en este dispositivo');
@@ -109,6 +114,8 @@ export function useWebNFC(): UseWebNFCReturn {
 
     try {
       setError(null);
+      // IMPORTANTE: Limpiar el último tag leído antes de iniciar nuevo escaneo
+      setLastRead(null);
       setIsScanning(true);
 
       const reader = new window.NDEFReader();
@@ -152,6 +159,8 @@ export function useWebNFC(): UseWebNFCReturn {
 
   const stopScan = useCallback(() => {
     setIsScanning(false);
+    // Limpiar el último tag al detener escaneo
+    setLastRead(null);
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     readerRef.current = null;
