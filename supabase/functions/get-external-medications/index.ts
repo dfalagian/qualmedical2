@@ -23,13 +23,26 @@ serve(async (req) => {
       );
     }
 
-    const method = req.method;
+    // Parse request body to determine action
+    let action = 'GET';
+    let requestBody: any = {};
+    
+    try {
+      const bodyText = await req.text();
+      if (bodyText) {
+        requestBody = JSON.parse(bodyText);
+        action = requestBody.action || 'GET';
+      }
+    } catch {
+      // No body or invalid JSON, default to GET
+    }
+
     let url = externalFunctionUrl;
+    let fetchMethod = 'GET';
     let body: string | undefined;
 
-    // Handle different methods
-    if (method === 'DELETE') {
-      const requestBody = await req.json();
+    // Handle different actions
+    if (action === 'DELETE') {
       const { id } = requestBody;
       if (!id) {
         return new Response(
@@ -38,23 +51,28 @@ serve(async (req) => {
         );
       }
       url = `${externalFunctionUrl}?id=${encodeURIComponent(id)}`;
+      fetchMethod = 'DELETE';
       console.log('Deleting medication:', id);
-    } else if (method === 'PUT') {
-      const requestBody = await req.json();
-      body = JSON.stringify(requestBody);
-      console.log('Updating medication:', requestBody.id);
-    } else if (method === 'POST') {
-      // POST is blocked by external API
-      return new Response(
-        JSON.stringify({ error: 'POST method is not allowed' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    } else if (action === 'PUT') {
+      const { id, ...updateData } = requestBody;
+      if (!id) {
+        return new Response(
+          JSON.stringify({ error: 'ID is required for update' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      body = JSON.stringify({ id, ...updateData });
+      fetchMethod = 'PUT';
+      console.log('Updating medication:', id);
+    } else {
+      fetchMethod = 'GET';
+      console.log('Fetching medications list');
     }
 
-    console.log(`Calling external edge function [${method}]:`, url);
+    console.log(`Calling external edge function [${fetchMethod}]:`, url);
 
     const fetchOptions: RequestInit = {
-      method: method === 'DELETE' ? 'DELETE' : method === 'PUT' ? 'PUT' : 'GET',
+      method: fetchMethod,
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': externalApiKey,
@@ -79,7 +97,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log(`Successfully completed ${method} request`);
+    console.log(`Successfully completed ${fetchMethod} request`);
 
     return new Response(
       JSON.stringify({ data }),
