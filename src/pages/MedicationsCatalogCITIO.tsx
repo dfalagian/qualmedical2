@@ -19,25 +19,23 @@ const MedicationsCatalogCITIO = () => {
       
       if (error) throw error;
       
-      // Handle different response formats from external function
+      // The external function returns: { data: { success, count, medications: [...] } }
       const result = data?.data;
       
-      // If result is an array, use it directly
+      if (result?.medications && Array.isArray(result.medications)) {
+        return result.medications;
+      }
+      
+      // Fallback checks
       if (Array.isArray(result)) {
         return result;
       }
       
-      // If result has a nested data property (e.g., { data: [...] })
       if (result?.data && Array.isArray(result.data)) {
         return result.data;
       }
       
-      // If the external function returns data directly at root level
-      if (Array.isArray(data)) {
-        return data;
-      }
-      
-      console.log('External function response format:', JSON.stringify(data).slice(0, 200));
+      console.log('Unexpected response format:', JSON.stringify(data).slice(0, 300));
       return [];
     },
   });
