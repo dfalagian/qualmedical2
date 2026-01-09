@@ -26,6 +26,9 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
   const [lastReadTime, setLastReadTime] = useState<Date | null>(null);
   const [scanMode, setScanMode] = useState<ScanMode>(null);
   const [processedCount, setProcessedCount] = useState(0);
+  // Estado para recordar el último modo procesado (para mostrar en UI después de detener)
+  const [lastProcessedMode, setLastProcessedMode] = useState<ScanMode>(null);
+  
   const lastProcessedKey = useRef<string | null>(null);
   // CRÍTICO: Guardar referencia al último tag procesado para evitar reprocesamiento
   const lastProcessedSerial = useRef<string | null>(null);
@@ -52,11 +55,12 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
     scanStartTime.current = 0;
     setProcessedCount(0);
     setLastReadTime(null);
-    console.log('🛑 Escaneo detenido y estado limpiado completamente');
+    console.log('🛑 Escaneo detenido manualmente y estado limpiado completamente');
   };
 
   // Efecto para notificar cuando se lee un tag NUEVO
   // CRÍTICO: Solo procesa lecturas que ocurren DESPUÉS de iniciar el escaneo
+  // NUEVO: Después de procesar, detiene el escaneo automáticamente (modo manual seguro)
   useEffect(() => {
     // Solo procesar si hay una lectura, modo activo, y el escaneo está realmente corriendo
     if (!lastRead || !scanMode || !isScanning) {
@@ -83,12 +87,14 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
     const debounceTime = 3000; // 3 segundos para el mismo tag
 
     if (!isSameTag || timeDiff > debounceTime) {
+      // Guardar el modo actual antes de detener (para mostrar en UI)
+      const currentMode = scanMode;
+      
       lastProcessedKey.current = `${lastRead.serialNumber}-${now}`;
       lastProcessedSerial.current = lastRead.serialNumber;
       setLastReadTime(new Date());
+      setLastProcessedMode(currentMode);
 
-      // IMPORTANTE: el procesamiento debe depender SOLO de nuevas lecturas,
-      // no de re-renders (evita “lecturas fantasma” por efectos re-ejecutándose).
       setProcessedCount((prev) => {
         const next = prev + 1;
         console.log(
@@ -101,23 +107,34 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
         return next;
       });
 
-      onTagRead(lastRead.serialNumber, lastRead.records, scanMode);
+      // Llamar al callback con los datos
+      onTagRead(lastRead.serialNumber, lastRead.records, currentMode);
+      
+      // NUEVO: Detener el escaneo automáticamente después de cada lectura exitosa
+      // Esto obliga al usuario a volver a seleccionar Entrada/Salida para la siguiente operación
+      console.log('🛑 Escaneo detenido automáticamente después de lectura exitosa - modo manual seguro');
+      stopScan();
+      setScanMode(null);
+      // Limpiar estado para próxima lectura
+      lastProcessedKey.current = null;
+      lastProcessedSerial.current = null;
+      scanStartTime.current = 0;
     } else {
       console.log(
         `⏳ Tag ignorado (mismo tag, esperar ${((debounceTime - timeDiff) / 1000).toFixed(1)}s más): ${lastRead.serialNumber}`
       );
     }
-  }, [lastRead, onTagRead, scanMode, isScanning]);
+  }, [lastRead, onTagRead, scanMode, isScanning, stopScan]);
 
-  const getModeLabel = () => {
-    if (scanMode === "entrada") return "ENTRADA";
-    if (scanMode === "salida") return "SALIDA";
+  const getModeLabel = (mode: ScanMode) => {
+    if (mode === "entrada") return "ENTRADA";
+    if (mode === "salida") return "SALIDA";
     return "";
   };
 
-  const getModeColor = () => {
-    if (scanMode === "entrada") return "bg-green-500";
-    if (scanMode === "salida") return "bg-orange-500";
+  const getModeColor = (mode: ScanMode) => {
+    if (mode === "entrada") return "bg-green-500";
+    if (mode === "salida") return "bg-orange-500";
     return "";
   };
 
@@ -190,14 +207,14 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
           ) : (
             <div className="space-y-4">
               {/* Indicador de modo activo */}
-              <div className={`p-4 rounded-lg text-white text-center ${getModeColor()}`}>
+              <div className={`p-4 rounded-lg text-white text-center ${getModeColor(scanMode)}`}>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   {scanMode === "entrada" ? (
                     <ArrowDownToLine className="h-6 w-6" />
                   ) : (
                     <ArrowUpFromLine className="h-6 w-6" />
                   )}
-                  <span className="text-2xl font-bold">{getModeLabel()}</span>
+                  <span className="text-2xl font-bold">{getModeLabel(scanMode)}</span>
                 </div>
                 <div className="flex items-center justify-center gap-2">
                   <div className="relative">
@@ -215,24 +232,27 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
                 size="lg"
               >
                 <WifiOff className="h-4 w-4" />
-                Detener Escaneo
+                Cancelar
               </Button>
             </div>
           )}
         </div>
 
-        {/* Último tag leído */}
-        {lastRead && lastReadTime && (
+        {/* Último tag leído - usa lastProcessedMode porque scanMode ya se limpió */}
+        {lastRead && lastReadTime && lastProcessedMode && (
           <div className="mt-4 p-4 bg-muted rounded-lg">
             <h4 className="font-medium mb-2 flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
-              Última operación
+              Última operación completada
             </h4>
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2">
-                <Badge className={scanMode === "entrada" ? "bg-green-500" : "bg-orange-500"}>
-                  {scanMode === "entrada" ? "ENTRADA" : "SALIDA"}
+                <Badge className={getModeColor(lastProcessedMode)}>
+                  {getModeLabel(lastProcessedMode)}
                 </Badge>
+                <span className="text-xs text-muted-foreground">
+                  (Escaneo finalizado - seleccione nueva operación)
+                </span>
               </div>
               <div>
                 <span className="text-muted-foreground">Serial NFC: </span>
@@ -263,13 +283,16 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
 
         {/* Instrucciones */}
         <div className="text-sm text-muted-foreground space-y-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
-          <p className="font-medium text-foreground">📦 Flujo de operación:</p>
+          <p className="font-medium text-foreground">📦 Flujo de operación (modo seguro):</p>
           <ol className="list-decimal list-inside space-y-1 text-xs">
-            <li><strong>ENTRADA:</strong> Para registrar medicamentos que llegan al almacén</li>
-            <li><strong>SALIDA:</strong> Para registrar medicamentos que salen del almacén</li>
-            <li>Seleccione el modo y acerque el tag NFC al dispositivo</li>
-            <li>El sistema actualizará automáticamente el stock y registrará el movimiento</li>
+            <li>Seleccione <strong>ENTRADA</strong> o <strong>SALIDA</strong></li>
+            <li>Acerque el tag NFC al dispositivo</li>
+            <li>El sistema procesará la operación y <strong>se detendrá automáticamente</strong></li>
+            <li>Para otra operación, vuelva a seleccionar el modo</li>
           </ol>
+          <p className="text-xs mt-2 text-amber-600 dark:text-amber-400">
+            ⚠️ Cada lectura requiere seleccionar nuevamente el tipo de operación para evitar errores.
+          </p>
         </div>
 
         <p className="text-xs text-muted-foreground mt-2">
