@@ -465,7 +465,7 @@ export default function Inventory() {
         .insert({
           product_id: productId,
           rfid_tag_id: tagId,
-          movement_type: mode === "entrada" ? "entry" : "exit",
+          movement_type: mode === "entrada" ? "entrada" : "salida",
           quantity: Math.abs(quantity),
           previous_stock: previousStock,
           new_stock: Math.max(0, newStock),
