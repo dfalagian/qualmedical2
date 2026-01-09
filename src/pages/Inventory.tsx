@@ -103,6 +103,7 @@ export default function Inventory() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingTag, setEditingTag] = useState<RfidTag | null>(null);
   const [tagScanActive, setTagScanActive] = useState(false);
+  const [recentlyReadTagId, setRecentlyReadTagId] = useState<string | null>(null);
   
   // Hook NFC para escanear tags al registrar
   const tagNfc = useWebNFC();
@@ -533,17 +534,23 @@ export default function Inventory() {
       
       if (tagError) throw tagError;
 
-      return { mode, productName, newStock, previousStock };
+      return { mode, productName, newStock, previousStock, tagId, epc: rfidTags?.find(t => t.id === tagId)?.epc || '' };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["stock_alerts"] });
       
+      // Activar el efecto de parpadeo por 30 segundos
+      setRecentlyReadTagId(data.tagId);
+      setTimeout(() => {
+        setRecentlyReadTagId(null);
+      }, 30000);
+      
       const isEntry = data.mode === "entrada";
       toast({
         title: isEntry ? "✅ Entrada registrada" : "📤 Salida registrada",
-        description: `${data.productName}: Stock ${data.previousStock} → ${data.newStock}`,
+        description: `${data.productName} (EPC: ${data.epc.substring(0, 12)}...)\nStock ${data.previousStock} → ${data.newStock}`,
         variant: isEntry ? "default" : "default"
       });
     },
@@ -1182,7 +1189,10 @@ export default function Inventory() {
                       </TableRow>
                     ) : (
                       filteredTags.map((tag) => (
-                        <TableRow key={tag.id}>
+                        <TableRow 
+                          key={tag.id}
+                          className={recentlyReadTagId === tag.id ? "animate-tag-blink" : ""}
+                        >
                           <TableCell className="font-mono text-sm">{tag.epc}</TableCell>
                           <TableCell>
                             {tag.products ? (
