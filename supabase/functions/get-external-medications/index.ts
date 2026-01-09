@@ -23,16 +23,49 @@ serve(async (req) => {
       );
     }
 
-    console.log('Calling external edge function:', externalFunctionUrl);
+    const method = req.method;
+    let url = externalFunctionUrl;
+    let body: string | undefined;
 
-    // Call the external edge function directly with x-api-key header
-    const response = await fetch(externalFunctionUrl, {
-      method: 'GET',
+    // Handle different methods
+    if (method === 'DELETE') {
+      const requestBody = await req.json();
+      const { id } = requestBody;
+      if (!id) {
+        return new Response(
+          JSON.stringify({ error: 'ID is required for delete' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      url = `${externalFunctionUrl}?id=${encodeURIComponent(id)}`;
+      console.log('Deleting medication:', id);
+    } else if (method === 'PUT') {
+      const requestBody = await req.json();
+      body = JSON.stringify(requestBody);
+      console.log('Updating medication:', requestBody.id);
+    } else if (method === 'POST') {
+      // POST is blocked by external API
+      return new Response(
+        JSON.stringify({ error: 'POST method is not allowed' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Calling external edge function [${method}]:`, url);
+
+    const fetchOptions: RequestInit = {
+      method: method === 'DELETE' ? 'DELETE' : method === 'PUT' ? 'PUT' : 'GET',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': externalApiKey,
       },
-    });
+    };
+
+    if (body) {
+      fetchOptions.body = body;
+    }
+
+    const response = await fetch(url, fetchOptions);
 
     console.log('External function response status:', response.status);
 
@@ -46,7 +79,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log(`Successfully fetched data from external function`);
+    console.log(`Successfully completed ${method} request`);
 
     return new Response(
       JSON.stringify({ data }),
