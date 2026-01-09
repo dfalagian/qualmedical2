@@ -863,6 +863,7 @@ export default function Inventory() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10">Tag</TableHead>
                       <TableHead>SKU</TableHead>
                       <TableHead>Nombre</TableHead>
                       <TableHead>Categoría</TableHead>
@@ -874,7 +875,7 @@ export default function Inventory() {
                   <TableBody>
                     {loadingProducts ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8">
+                        <TableCell colSpan={7} className="text-center py-8">
                           <div className="flex items-center justify-center gap-2">
                             <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                             Cargando...
@@ -883,13 +884,26 @@ export default function Inventory() {
                       </TableRow>
                     ) : filteredProducts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No hay productos registrados
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredProducts.map((product) => (
-                        <TableRow key={product.id}>
+                      filteredProducts.map((product) => {
+                        const hasTag = rfidTags?.some(tag => tag.product_id === product.id);
+                        return (
+                        <TableRow key={product.id} className={hasTag ? "bg-green-50 dark:bg-green-950/20" : ""}>
+                          <TableCell>
+                            {hasTag ? (
+                              <div className="flex items-center justify-center">
+                                <Tag className="h-4 w-4 text-green-600" />
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center">
+                                <span className="text-muted-foreground text-xs">—</span>
+                              </div>
+                            )}
+                          </TableCell>
                           <TableCell className="font-mono text-sm">{product.sku}</TableCell>
                           <TableCell className="font-medium">{product.name}</TableCell>
                           <TableCell>
@@ -930,7 +944,8 @@ export default function Inventory() {
                             </TableCell>
                           )}
                         </TableRow>
-                      ))
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
