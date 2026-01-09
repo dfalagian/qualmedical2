@@ -73,16 +73,24 @@ const MedicationsCatalogCITIO = () => {
       
       const result = data?.data;
       
+      let meds: Medication[] = [];
+      
       if (result?.medications && Array.isArray(result.medications)) {
-        return result.medications as Medication[];
+        meds = result.medications as Medication[];
+      } else if (Array.isArray(result)) {
+        meds = result as Medication[];
+      } else {
+        console.log('Unexpected response format:', JSON.stringify(data).slice(0, 300));
+        return [] as Medication[];
       }
       
-      if (Array.isArray(result)) {
-        return result as Medication[];
+      // Log available fields to identify family field name
+      if (meds.length > 0) {
+        console.log('Available fields:', Object.keys(meds[0]));
+        console.log('Sample medication:', JSON.stringify(meds[0]));
       }
       
-      console.log('Unexpected response format:', JSON.stringify(data).slice(0, 300));
-      return [] as Medication[];
+      return meds;
     },
   });
 
