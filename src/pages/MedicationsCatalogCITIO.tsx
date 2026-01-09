@@ -18,7 +18,27 @@ const MedicationsCatalogCITIO = () => {
       const { data, error } = await supabase.functions.invoke('get-external-medications');
       
       if (error) throw error;
-      return data.data || [];
+      
+      // Handle different response formats from external function
+      const result = data?.data;
+      
+      // If result is an array, use it directly
+      if (Array.isArray(result)) {
+        return result;
+      }
+      
+      // If result has a nested data property (e.g., { data: [...] })
+      if (result?.data && Array.isArray(result.data)) {
+        return result.data;
+      }
+      
+      // If the external function returns data directly at root level
+      if (Array.isArray(data)) {
+        return data;
+      }
+      
+      console.log('External function response format:', JSON.stringify(data).slice(0, 200));
+      return [];
     },
   });
 
