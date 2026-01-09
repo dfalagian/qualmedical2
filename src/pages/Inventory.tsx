@@ -102,6 +102,10 @@ export default function Inventory() {
   const [citioImportDialogOpen, setCitioImportDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingTag, setEditingTag] = useState<RfidTag | null>(null);
+  const [tagScanActive, setTagScanActive] = useState(false);
+  
+  // Hook NFC para escanear tags al registrar
+  const tagNfc = useWebNFC();
 
   // Form states
   const [productForm, setProductForm] = useState({
@@ -175,6 +179,20 @@ export default function Inventory() {
       return data as StockAlert[];
     }
   });
+
+  // Efecto para capturar EPC cuando se escanea un tag en el formulario
+  useEffect(() => {
+    if (tagScanActive && tagNfc.lastRead?.serialNumber) {
+      const epc = tagNfc.lastRead.serialNumber.replace(/:/g, '').toUpperCase();
+      setTagForm(prev => ({ ...prev, epc }));
+      setTagScanActive(false);
+      tagNfc.stopScan();
+      toast({
+        title: "Tag NFC leído",
+        description: `Código EPC: ${epc}`,
+      });
+    }
+  }, [tagNfc.lastRead, tagScanActive, tagNfc, toast]);
 
   // Realtime subscription for alerts
   useEffect(() => {
@@ -946,15 +964,45 @@ export default function Inventory() {
                     </DialogHeader>
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label>Código EPC *</Label>
-                        <Input
-                          value={tagForm.epc}
-                          onChange={(e) => setTagForm({ ...tagForm, epc: e.target.value })}
-                          placeholder="E2003412..."
-                          className="font-mono"
-                        />
+                        <Label>Código EPC/NFC *</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={tagForm.epc}
+                            onChange={(e) => setTagForm({ ...tagForm, epc: e.target.value })}
+                            placeholder="Escanea o ingresa código..."
+                            className="font-mono flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant={tagScanActive ? "destructive" : "outline"}
+                            size="icon"
+                            onClick={async () => {
+                              if (tagScanActive) {
+                                tagNfc.stopScan();
+                                setTagScanActive(false);
+                              } else {
+                                setTagScanActive(true);
+                                await tagNfc.startScan();
+                              }
+                            }}
+                            disabled={!tagNfc.isSupported}
+                            title={tagNfc.isSupported ? (tagScanActive ? "Detener escaneo" : "Escanear tag NFC") : "NFC no disponible"}
+                          >
+                            {tagScanActive ? <WifiOff className="h-4 w-4" /> : <Wifi className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                        {tagScanActive && (
+                          <p className="text-xs text-blue-600 animate-pulse flex items-center gap-1">
+                            <Radio className="h-3 w-3" /> Acerca el tag NFC al dispositivo...
+                          </p>
+                        )}
+                        {!tagNfc.isSupported && (
+                          <p className="text-xs text-amber-600">
+                            NFC no disponible. Ingresa el código manualmente.
+                          </p>
+                        )}
                         <p className="text-xs text-muted-foreground">
-                          Código único del tag RFID (normalmente 24 caracteres hex)
+                          Código único del tag (serial number NFC)
                         </p>
                       </div>
                       <div className="space-y-2">
