@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,36 +12,42 @@ serve(async (req) => {
   }
 
   try {
-    const externalUrl = Deno.env.get('EXTERNAL_SUPABASE_URL');
-    const externalAnonKey = Deno.env.get('EXTERNAL_SUPABASE_ANON_KEY');
+    const externalFunctionUrl = Deno.env.get('EXTERNAL_SUPABASE_URL');
+    const externalApiKey = Deno.env.get('EXTERNAL_SUPABASE_ANON_KEY');
 
-    if (!externalUrl || !externalAnonKey) {
-      console.error('Missing external Supabase credentials');
+    if (!externalFunctionUrl || !externalApiKey) {
+      console.error('Missing external function credentials');
       return new Response(
-        JSON.stringify({ error: 'External Supabase credentials not configured' }),
+        JSON.stringify({ error: 'External function credentials not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Connecting to external Supabase:', externalUrl);
+    console.log('Calling external edge function:', externalFunctionUrl);
 
-    // Create client for external Supabase
-    const externalSupabase = createClient(externalUrl, externalAnonKey);
+    // Call the external edge function directly
+    const response = await fetch(externalFunctionUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': externalApiKey,
+        'Authorization': `Bearer ${externalApiKey}`,
+      },
+    });
 
-    // Query the medications-catalog table
-    const { data, error } = await externalSupabase
-      .from('medications-catalog')
-      .select('*');
+    console.log('External function response status:', response.status);
 
-    if (error) {
-      console.error('Error fetching medications catalog:', error);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('External function error:', errorText);
       return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: `External function error: ${response.status}`, details: errorText }),
+        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Successfully fetched ${data?.length || 0} medications`);
+    const data = await response.json();
+    console.log(`Successfully fetched data from external function`);
 
     return new Response(
       JSON.stringify({ data }),
