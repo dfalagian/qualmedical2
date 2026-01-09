@@ -105,6 +105,28 @@ export default function Inventory() {
   const [tagScanActive, setTagScanActive] = useState(false);
   const [recentlyReadTagId, setRecentlyReadTagId] = useState<string | null>(null);
   
+  // Suscripción a Supabase Realtime para sincronizar parpadeo entre navegadores
+  useEffect(() => {
+    const channel = supabase.channel('inventory-tag-reads')
+      .on('broadcast', { event: 'tag-read' }, (payload) => {
+        const { tagId } = payload.payload as { tagId: string };
+        console.log('📡 Tag leído en otro navegador:', tagId);
+        
+        // Activar el efecto de parpadeo por 30 segundos
+        setRecentlyReadTagId(tagId);
+        setTimeout(() => {
+          setRecentlyReadTagId(null);
+        }, 30000);
+      })
+      .subscribe((status) => {
+        console.log('📡 Estado del canal realtime:', status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+  
   // Hook NFC para escanear tags al registrar
   const tagNfc = useWebNFC();
 
@@ -541,11 +563,20 @@ export default function Inventory() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["stock_alerts"] });
       
-      // Activar el efecto de parpadeo por 30 segundos
+      // Activar el efecto de parpadeo por 30 segundos (local)
       setRecentlyReadTagId(data.tagId);
       setTimeout(() => {
         setRecentlyReadTagId(null);
       }, 30000);
+      
+      // Broadcast a otros navegadores para sincronizar el parpadeo
+      supabase.channel('inventory-tag-reads').send({
+        type: 'broadcast',
+        event: 'tag-read',
+        payload: { tagId: data.tagId }
+      }).then(() => {
+        console.log('📡 Parpadeo sincronizado a otros navegadores');
+      });
       
       const isEntry = data.mode === "entrada";
       toast({
