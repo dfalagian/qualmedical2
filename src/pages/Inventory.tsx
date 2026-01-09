@@ -349,9 +349,46 @@ export default function Inventory() {
     }
   });
 
+  // Validar duplicados de tags
+  const validateTagDuplicates = (epc: string, productId: string | null, editingTagId?: string): { valid: boolean; error?: string } => {
+    // Validar EPC duplicado (excepto si es el mismo tag que estamos editando)
+    const existingEpc = rfidTags?.find(tag => 
+      tag.epc.toLowerCase() === epc.toLowerCase() && tag.id !== editingTagId
+    );
+    if (existingEpc) {
+      const productName = products.find(p => p.id === existingEpc.product_id)?.name || 'Sin asignar';
+      return { 
+        valid: false, 
+        error: `Este EPC ya está registrado y asignado a: ${productName}` 
+      };
+    }
+
+    // Validar producto ya con tag asignado (excepto si es el mismo tag que estamos editando)
+    if (productId) {
+      const productHasTag = rfidTags?.find(tag => 
+        tag.product_id === productId && tag.id !== editingTagId
+      );
+      if (productHasTag) {
+        const productName = products.find(p => p.id === productId)?.name;
+        return { 
+          valid: false, 
+          error: `El producto "${productName}" ya tiene un tag asignado (EPC: ${productHasTag.epc.substring(0, 12)}...)` 
+        };
+      }
+    }
+
+    return { valid: true };
+  };
+
   // Create/Update RFID tag
   const tagMutation = useMutation({
     mutationFn: async (tag: typeof tagForm & { id?: string }) => {
+      // Validar duplicados antes de guardar
+      const validation = validateTagDuplicates(tag.epc, tag.product_id || null, tag.id);
+      if (!validation.valid) {
+        throw new Error(validation.error);
+      }
+
       if (tag.id) {
         const { error } = await supabase
           .from("rfid_tags")
@@ -391,7 +428,7 @@ export default function Inventory() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: "Error de validación",
         description: error.message,
         variant: "destructive"
       });
