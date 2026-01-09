@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -104,6 +104,7 @@ export default function Inventory() {
   const [editingTag, setEditingTag] = useState<RfidTag | null>(null);
   const [tagScanActive, setTagScanActive] = useState(false);
   const [recentlyReadTagId, setRecentlyReadTagId] = useState<string | null>(null);
+  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   
   // Suscripción a Supabase Realtime para sincronizar parpadeo entre navegadores
   useEffect(() => {
@@ -121,9 +122,13 @@ export default function Inventory() {
       .subscribe((status) => {
         console.log('📡 Estado del canal realtime:', status);
       });
+    
+    // Guardar referencia al canal para usarlo en el broadcast
+    realtimeChannelRef.current = channel;
 
     return () => {
       supabase.removeChannel(channel);
+      realtimeChannelRef.current = null;
     };
   }, []);
   
@@ -569,14 +574,16 @@ export default function Inventory() {
         setRecentlyReadTagId(null);
       }, 30000);
       
-      // Broadcast a otros navegadores para sincronizar el parpadeo
-      supabase.channel('inventory-tag-reads').send({
-        type: 'broadcast',
-        event: 'tag-read',
-        payload: { tagId: data.tagId }
-      }).then(() => {
-        console.log('📡 Parpadeo sincronizado a otros navegadores');
-      });
+      // Broadcast a otros navegadores para sincronizar el parpadeo (usar canal existente)
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'tag-read',
+          payload: { tagId: data.tagId }
+        }).then(() => {
+          console.log('📡 Parpadeo sincronizado a otros navegadores');
+        });
+      }
       
       const isEntry = data.mode === "entrada";
       toast({
