@@ -32,9 +32,16 @@ interface Medication {
   brand: string;
   description: string;
   dosage?: string;
-  lote?: string;
-  family?: string;
-  familia?: string;
+  presentacion?: string;
+  family_id?: string;
+  medication_families?: {
+    id: string;
+    name: string;
+  };
+  price_with_tax?: number;
+  price_without_tax?: number;
+  current_stock?: number;
+  active?: boolean;
   [key: string]: any;
 }
 
@@ -44,13 +51,21 @@ const fieldLabels: Record<string, string> = {
   brand: 'Marca',
   description: 'Descripción',
   dosage: 'Dosis',
-  lote: 'Lote',
-  family: 'Familia',
-  familia: 'Familia',
-  quantity: 'Cantidad',
-  price: 'Precio',
-  expiration: 'Caducidad',
-  expiration_date: 'Fecha Caducidad',
+  presentacion: 'Presentación',
+  medication_families: 'Familia',
+  family_id: 'ID Familia',
+  price_with_tax: 'Precio c/IVA',
+  price_without_tax: 'Precio s/IVA',
+  tax_rate: 'Tasa IVA',
+  price_type_1: 'Precio Tipo 1',
+  price_type_2: 'Precio Tipo 2',
+  price_type_3: 'Precio Tipo 3',
+  price_type_4: 'Precio Tipo 4',
+  price_type_5: 'Precio Tipo 5',
+  codigo_sat: 'Código SAT',
+  clave_unidad: 'Clave Unidad',
+  current_stock: 'Stock Actual',
+  active: 'Activo',
   created_at: 'Creado',
   updated_at: 'Actualizado',
 };
@@ -138,8 +153,10 @@ const MedicationsCatalogCITIO = () => {
     if (!medications || medications.length === 0) return [];
     const cols = Object.keys(medications[0]).filter(col => col !== 'id');
     // Sort to put important columns first
-    const priority = ['name', 'brand', 'description', 'dosage', 'lote', 'family', 'familia'];
-    return cols.sort((a, b) => {
+    const priority = ['name', 'brand', 'presentacion', 'medication_families', 'current_stock', 'price_type_1'];
+    // Filter out family_id since we show medication_families instead
+    const filtered = cols.filter(c => c !== 'family_id' && c !== 'id');
+    return filtered.sort((a, b) => {
       const aIdx = priority.indexOf(a);
       const bIdx = priority.indexOf(b);
       if (aIdx >= 0 && bIdx >= 0) return aIdx - bIdx;
@@ -163,13 +180,19 @@ const MedicationsCatalogCITIO = () => {
     );
   }, [medications, searchTerm]);
 
+  // Helper to get family name from medication
+  const getFamilyName = (med: Medication): string => {
+    if (med.medication_families?.name) return med.medication_families.name;
+    return 'Sin Familia';
+  };
+
   // Group medications by family
   const groupedMedications = useMemo(() => {
     if (!groupByFamily) return null;
     
     const groups: Record<string, Medication[]> = {};
     filteredMedications.forEach(med => {
-      const familyKey = med.family || med.familia || 'Sin Familia';
+      const familyKey = getFamilyName(med);
       if (!groups[familyKey]) {
         groups[familyKey] = [];
       }
@@ -185,8 +208,8 @@ const MedicationsCatalogCITIO = () => {
     if (!medications) return [];
     const familySet = new Set<string>();
     medications.forEach(med => {
-      const family = med.family || med.familia;
-      if (family) familySet.add(family);
+      const family = getFamilyName(med);
+      if (family && family !== 'Sin Familia') familySet.add(family);
     });
     return Array.from(familySet).sort();
   }, [medications]);
@@ -241,13 +264,25 @@ const MedicationsCatalogCITIO = () => {
     return fieldLabels[field] || field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, ' ');
   };
 
+  // Helper to get display value for a field
+  const getDisplayValue = (med: Medication, col: string): string => {
+    if (col === 'medication_families') {
+      return med.medication_families?.name || '-';
+    }
+    if (col === 'active') {
+      return med.active ? 'Sí' : 'No';
+    }
+    const value = med[col];
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  };
+
   const renderMedicationRow = (med: Medication) => (
     <TableRow key={med.id}>
       {displayColumns.map((col) => (
-        <TableCell key={col} className="max-w-xs truncate" title={String(med[col] || '')}>
-          {med[col] !== null && med[col] !== undefined 
-            ? String(med[col]) 
-            : '-'}
+        <TableCell key={col} className="max-w-xs truncate" title={getDisplayValue(med, col)}>
+          {getDisplayValue(med, col)}
         </TableCell>
       ))}
       <TableCell className="text-right">
