@@ -93,17 +93,22 @@ interface RfidTag {
 }
 
 export default function Inventory() {
+  // Hooks de librerías - siempre primero y en orden fijo
   const { toast } = useToast();
   const { isAdmin, isContador } = useAuth();
   const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [productDialogOpen, setProductDialogOpen] = useState(false);
-  const [tagDialogOpen, setTagDialogOpen] = useState(false);
-  const [citioImportDialogOpen, setCitioImportDialogOpen] = useState(false);
+  
+  // Estados del componente - orden fijo
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [productDialogOpen, setProductDialogOpen] = useState<boolean>(false);
+  const [tagDialogOpen, setTagDialogOpen] = useState<boolean>(false);
+  const [citioImportDialogOpen, setCitioImportDialogOpen] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingTag, setEditingTag] = useState<RfidTag | null>(null);
-  const [tagScanActive, setTagScanActive] = useState(false);
+  const [tagScanActive, setTagScanActive] = useState<boolean>(false);
   const [recentlyReadTagId, setRecentlyReadTagId] = useState<string | null>(null);
+  
+  // Refs - después de los estados
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   
   // Suscripción a Supabase Realtime para sincronizar parpadeo entre navegadores
