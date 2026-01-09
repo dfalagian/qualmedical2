@@ -43,25 +43,28 @@ export function NFCScannerCard({ onTagRead }: NFCScannerCardProps) {
   };
 
   // Efecto para notificar cuando se lee un tag
-  // Usamos un timestamp para permitir lecturas consecutivas del mismo tag
+  // Debounce de 3 segundos para el mismo tag, tags diferentes se procesan inmediatamente
   useEffect(() => {
     if (lastRead && scanMode) {
-      // Crear una clave única usando serial + timestamp para permitir lecturas repetidas
-      const currentKey = `${lastRead.serialNumber}-${Date.now()}`;
-      
-      // Solo procesar si es una lectura diferente (diferente serial o han pasado >500ms)
+      const now = Date.now();
       const lastKey = lastProcessedKey.current;
       const lastSerial = lastKey?.split('-')[0];
       const lastTimestamp = lastKey ? parseInt(lastKey.split('-')[1] || '0') : 0;
-      const timeDiff = Date.now() - lastTimestamp;
+      const timeDiff = now - lastTimestamp;
       
-      // Permitir procesar si es diferente serial O han pasado más de 500ms
-      if (lastRead.serialNumber !== lastSerial || timeDiff > 500) {
-        lastProcessedKey.current = currentKey;
+      // MISMO TAG: Solo procesar si han pasado más de 3 segundos (evita lecturas duplicadas)
+      // TAG DIFERENTE: Procesar inmediatamente
+      const isSameTag = lastRead.serialNumber === lastSerial;
+      const debounceTime = 3000; // 3 segundos para el mismo tag
+      
+      if (!isSameTag || timeDiff > debounceTime) {
+        lastProcessedKey.current = `${lastRead.serialNumber}-${now}`;
         setLastReadTime(new Date());
         setProcessedCount(prev => prev + 1);
         onTagRead(lastRead.serialNumber, lastRead.records, scanMode);
-        console.log(`📦 Tag procesado: ${lastRead.serialNumber} (total: ${processedCount + 1})`);
+        console.log(`📦 Tag procesado: ${lastRead.serialNumber} (total: ${processedCount + 1})${isSameTag ? ' [mismo tag después de ' + (timeDiff/1000).toFixed(1) + 's]' : ' [tag nuevo]'}`);
+      } else {
+        console.log(`⏳ Tag ignorado (mismo tag, esperar ${((debounceTime - timeDiff)/1000).toFixed(1)}s más): ${lastRead.serialNumber}`);
       }
     }
   }, [lastRead, onTagRead, scanMode, processedCount]);
