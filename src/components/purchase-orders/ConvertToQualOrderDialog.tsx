@@ -120,7 +120,7 @@ export const ConvertToQualOrderDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-md sm:max-w-lg z-50">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ArrowRight className="h-5 w-5 text-green-600" />
@@ -131,11 +131,11 @@ export const ConvertToQualOrderDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 py-2">
           {/* Source order info */}
           <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
             <p className="text-xs font-semibold text-blue-600 mb-1">Orden CITIO origen</p>
-            <p className="font-medium">{citioOrder?.order_number}</p>
+            <p className="font-semibold text-base">{citioOrder?.order_number}</p>
             <p className="text-sm text-muted-foreground">
               Monto: ${citioOrder?.amount?.toLocaleString('es-MX', { minimumFractionDigits: 2 })} {citioOrder?.currency || 'MXN'}
             </p>
@@ -144,19 +144,19 @@ export const ConvertToQualOrderDialog = ({
           {/* Products preview */}
           {citioOrder?.purchase_order_items && citioOrder.purchase_order_items.length > 0 && (
             <div className="space-y-2">
-              <Label className="flex items-center gap-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
                 <Package className="h-4 w-4" />
                 Productos a incluir ({citioOrder.purchase_order_items.length})
               </Label>
-              <div className="border rounded-lg bg-muted/20 overflow-hidden">
-                <ScrollArea className="h-28">
-                  <div className="divide-y">
+              <div className="border rounded-lg bg-muted/30 overflow-hidden">
+                <ScrollArea className="max-h-32">
+                  <div className="divide-y divide-border">
                     {citioOrder.purchase_order_items.map((item: any) => (
-                      <div key={item.id} className="flex items-center justify-between text-sm py-2 px-3">
-                        <span className="truncate flex-1 pr-2">{item.products?.name || 'Producto'}</span>
-                        <span className="text-xs font-medium text-muted-foreground whitespace-nowrap bg-background px-2 py-0.5 rounded border">
+                      <div key={item.id} className="flex items-center justify-between text-sm py-2.5 px-3 hover:bg-muted/50">
+                        <span className="truncate flex-1 pr-3">{item.products?.name || 'Producto'}</span>
+                        <Badge variant="secondary" className="text-xs shrink-0">
                           {item.quantity_ordered} uds
-                        </span>
+                        </Badge>
                       </div>
                     ))}
                   </div>
@@ -166,16 +166,16 @@ export const ConvertToQualOrderDialog = ({
           )}
 
           {/* New order details */}
-          <div className="p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg space-y-3">
-            <p className="text-xs font-semibold text-green-600">Nueva Orden QualMedical</p>
+          <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg space-y-4">
+            <p className="text-sm font-semibold text-green-700 dark:text-green-400">Nueva Orden QualMedical</p>
             
             <div className="space-y-2">
-              <Label>Proveedor destino *</Label>
+              <Label htmlFor="supplier-select">Proveedor destino *</Label>
               <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-                <SelectTrigger>
+                <SelectTrigger id="supplier-select" className="bg-background">
                   <SelectValue placeholder="Selecciona el proveedor" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[100]">
                   {suppliers?.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.company_name || s.full_name}
@@ -186,18 +186,18 @@ export const ConvertToQualOrderDialog = ({
             </div>
 
             <div className="space-y-2">
-              <Label>Número de Orden *</Label>
+              <Label htmlFor="order-number">Número de Orden *</Label>
               <div className="flex gap-2">
                 <Input
+                  id="order-number"
                   value={newOrderNumber}
                   onChange={(e) => setNewOrderNumber(e.target.value)}
                   placeholder="QM-2024-001"
-                  className="flex-1"
+                  className="flex-1 bg-background"
                 />
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   onClick={() => setNewOrderNumber(suggestOrderNumber())}
                 >
                   Generar
@@ -207,14 +207,14 @@ export const ConvertToQualOrderDialog = ({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-4">
+        <div className="flex justify-end gap-3 pt-2 border-t mt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
           <Button
             onClick={() => convertOrderMutation.mutate()}
             disabled={convertOrderMutation.isPending || !selectedSupplier || !newOrderNumber}
-            className="bg-green-600 hover:bg-green-700"
+            className="bg-green-600 hover:bg-green-700 text-white"
           >
             {convertOrderMutation.isPending ? "Convirtiendo..." : "Convertir Orden"}
           </Button>
