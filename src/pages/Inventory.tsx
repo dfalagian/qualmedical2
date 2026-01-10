@@ -35,7 +35,8 @@ import {
   Wifi,
   WifiOff,
   Download,
-  Pill
+  Pill,
+  ScanSearch
 } from "lucide-react";
 import { useWebNFC } from "@/hooks/useWebNFC";
 import { NFCScannerCard, ScanMode } from "@/components/inventory/NFCScannerCard";
@@ -110,6 +111,8 @@ export default function Inventory() {
   const [recentlyReadTagId, setRecentlyReadTagId] = useState<string | null>(null);
   const [nfcConfirmationOpen, setNfcConfirmationOpen] = useState<boolean>(false);
   const [nfcMovementResult, setNfcMovementResult] = useState<NFCMovementResult | null>(null);
+  const [consultaScanActive, setConsultaScanActive] = useState<boolean>(false);
+  
   // Refs - después de los estados
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   
@@ -141,6 +144,9 @@ export default function Inventory() {
   
   // Hook NFC para escanear tags al registrar
   const tagNfc = useWebNFC();
+  
+  // Hook NFC separado para consulta de artículos
+  const consultaNfc = useWebNFC();
 
   // Form states
   const [productForm, setProductForm] = useState({
@@ -228,6 +234,56 @@ export default function Inventory() {
       });
     }
   }, [tagNfc.lastRead, tagScanActive, tagNfc, toast]);
+
+  // Efecto para consulta de artículos vía NFC (solo lectura, sin modificar stock)
+  useEffect(() => {
+    if (consultaScanActive && consultaNfc.lastRead?.serialNumber) {
+      const epc = consultaNfc.lastRead.serialNumber.replace(/:/g, '').toUpperCase();
+      
+      // Buscar el tag en la base de datos
+      const tag = rfidTags?.find(t => t.epc.toUpperCase() === epc);
+      
+      if (tag && tag.product_id) {
+        const product = products.find(p => p.id === tag.product_id);
+        
+        if (product) {
+          // Mostrar modal de consulta
+          setNfcMovementResult({
+            mode: "consulta",
+            productName: product.name,
+            productSku: product.sku,
+            previousStock: product.current_stock,
+            newStock: product.current_stock, // Sin cambio
+            epc: epc,
+            timestamp: new Date()
+          });
+          setNfcConfirmationOpen(true);
+        } else {
+          toast({
+            title: "Producto no encontrado",
+            description: `El tag ${epc} no tiene un producto asociado válido.`,
+            variant: "destructive"
+          });
+        }
+      } else if (tag) {
+        toast({
+          title: "Tag sin producto",
+          description: `El tag ${epc} no tiene un producto asignado.`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Tag no registrado",
+          description: `El tag ${epc} no está registrado en el sistema.`,
+          variant: "destructive"
+        });
+      }
+      
+      // Detener el escaneo
+      setConsultaScanActive(false);
+      consultaNfc.stopScan();
+    }
+  }, [consultaNfc.lastRead, consultaScanActive, consultaNfc, rfidTags, products, toast]);
 
   // Realtime subscription for alerts
   useEffect(() => {
@@ -1059,7 +1115,36 @@ export default function Inventory() {
           <TabsContent value="tags" className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold">Tags RFID</h2>
-              {canEdit && (
+              <div className="flex items-center gap-2">
+                {/* Botón Consultar Artículo */}
+                <Button 
+                  variant={consultaScanActive ? "destructive" : "default"}
+                  className={consultaScanActive ? "" : "bg-blue-600 hover:bg-blue-700"}
+                  onClick={async () => {
+                    if (consultaScanActive) {
+                      setConsultaScanActive(false);
+                      consultaNfc.stopScan();
+                    } else {
+                      setConsultaScanActive(true);
+                      await consultaNfc.startScan();
+                    }
+                  }}
+                  disabled={!consultaNfc.isSupported}
+                >
+                  {consultaScanActive ? (
+                    <>
+                      <WifiOff className="h-4 w-4 mr-2" />
+                      Cancelar
+                    </>
+                  ) : (
+                    <>
+                      <ScanSearch className="h-4 w-4 mr-2" />
+                      Consultar Artículo
+                    </>
+                  )}
+                </Button>
+                
+                {canEdit && (
                 <Dialog open={tagDialogOpen} onOpenChange={(open) => {
                   setTagDialogOpen(open);
                   if (!open) {
@@ -1213,7 +1298,8 @@ export default function Inventory() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-              )}
+                )}
+              </div>
             </div>
 
             <Card>

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useWebNFC } from "@/hooks/useWebNFC";
 
-export type ScanMode = "entrada" | "salida" | null;
+export type ScanMode = "entrada" | "salida" | "consulta" | null;
 
 interface NFCScannerCardProps {
   onTagRead: (serialNumber: string, records: Array<{ recordType: string; data: string }>, mode: ScanMode) => void;
