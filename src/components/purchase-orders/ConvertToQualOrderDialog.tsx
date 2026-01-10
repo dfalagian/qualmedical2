@@ -120,10 +120,10 @@ export const ConvertToQualOrderDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md sm:max-w-lg z-50">
+      <DialogContent className="max-w-md sm:max-w-lg max-h-[85vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ArrowRight className="h-5 w-5 text-green-600" />
+            <ArrowRight className="h-5 w-5 text-qual" />
             Convertir a Orden QualMedical
           </DialogTitle>
           <DialogDescription>
@@ -131,11 +131,11 @@ export const ConvertToQualOrderDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2 overflow-y-auto pr-1 -mr-1 max-h-[60vh]">
           {/* Source order info */}
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-xs font-semibold text-blue-600 mb-1">Orden CITIO origen</p>
-            <p className="font-semibold text-base">{citioOrder?.order_number}</p>
+          <div className="p-3 bg-citio-soft border border-citio-border rounded-lg w-full min-w-0">
+            <p className="text-xs font-semibold text-citio mb-1">Orden CITIO origen</p>
+            <p className="font-semibold text-base break-all">{citioOrder?.order_number}</p>
             <p className="text-sm text-muted-foreground">
               Monto: ${citioOrder?.amount?.toLocaleString('es-MX', { minimumFractionDigits: 2 })} {citioOrder?.currency || 'MXN'}
             </p>
@@ -166,16 +166,16 @@ export const ConvertToQualOrderDialog = ({
           )}
 
           {/* New order details */}
-          <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg space-y-4">
-            <p className="text-sm font-semibold text-green-700 dark:text-green-400">Nueva Orden QualMedical</p>
-            
+          <div className="p-4 bg-qual-soft border border-qual-border rounded-lg space-y-4 w-full min-w-0">
+            <p className="text-sm font-semibold text-qual">Nueva Orden QualMedical</p>
+
             <div className="space-y-2">
               <Label htmlFor="supplier-select">Proveedor destino *</Label>
               <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
                 <SelectTrigger id="supplier-select" className="bg-background">
                   <SelectValue placeholder="Selecciona el proveedor" />
                 </SelectTrigger>
-                <SelectContent className="z-[100]">
+                <SelectContent>
                   {suppliers?.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.company_name || s.full_name}
@@ -195,11 +195,7 @@ export const ConvertToQualOrderDialog = ({
                   placeholder="QM-2024-001"
                   className="flex-1 bg-background"
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setNewOrderNumber(suggestOrderNumber())}
-                >
+                <Button type="button" variant="outline" onClick={() => setNewOrderNumber(suggestOrderNumber())}>
                   Generar
                 </Button>
               </div>
@@ -214,7 +210,7 @@ export const ConvertToQualOrderDialog = ({
           <Button
             onClick={() => convertOrderMutation.mutate()}
             disabled={convertOrderMutation.isPending || !selectedSupplier || !newOrderNumber}
-            className="bg-green-600 hover:bg-green-700 text-white"
+            className="bg-qual text-qual-foreground hover:bg-qual/90"
           >
             {convertOrderMutation.isPending ? "Convirtiendo..." : "Convertir Orden"}
           </Button>
