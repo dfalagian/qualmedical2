@@ -379,6 +379,20 @@ export default function Inventory() {
       codigo_sat?: string;
       medication_families?: { name: string };
     }) => {
+      // First check if product already exists by citio_id
+      const { data: existingProduct, error: searchError } = await supabase
+        .from("products")
+        .select("id, name")
+        .eq("citio_id", citioMedication.id)
+        .maybeSingle();
+      
+      if (searchError) throw searchError;
+      
+      if (existingProduct) {
+        // Product already exists, return its name
+        return { name: existingProduct.name, existed: true };
+      }
+      
       // Generate SKU from CITIO ID
       const sku = `CITIO-${citioMedication.id.slice(0, 8).toUpperCase()}`;
       
@@ -397,15 +411,22 @@ export default function Inventory() {
         });
       
       if (error) throw error;
-      return citioMedication.name;
+      return { name: citioMedication.name, existed: false };
     },
-    onSuccess: (productName) => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setCitioImportDialogOpen(false);
-      toast({
-        title: "Producto importado",
-        description: `"${productName}" fue agregado al inventario desde CITIO.`
-      });
+      if (result.existed) {
+        toast({
+          title: "Producto ya existe",
+          description: `"${result.name}" ya está en el inventario.`
+        });
+      } else {
+        toast({
+          title: "Producto importado",
+          description: `"${result.name}" fue agregado al inventario desde CITIO.`
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
