@@ -108,26 +108,56 @@ const PurchaseOrders = () => {
           throw new Error(`No se encontró proveedor local para "${extOrder.suppliers?.name || extOrder.supplier_name}". Orden: ${extOrder.order_number}`);
         }
 
-        // Insert the purchase order
-        const { data: newOrder, error: orderError } = await supabase
-          .from("purchase_orders")
-          .insert({
-            order_number: extOrder.order_number,
-            supplier_id: supplierId,
-            amount: extOrder.total_amount || 0,
-            description: `Importado desde CITIO`,
-            created_by: user.id,
-            status: extOrder.status || 'pendiente',
-          })
-          .select()
-          .single();
+        // Insert (or reuse) the purchase order. Some orders may already exist (unique by order_number).
+        let orderId: string;
 
-        if (orderError) throw orderError;
+        const { data: existingOrder, error: existingOrderError } = await supabase
+          .from("purchase_orders")
+          .select("id")
+          .eq("order_number", extOrder.order_number)
+          .maybeSingle();
+
+        if (existingOrderError) throw existingOrderError;
+
+        if (existingOrder?.id) {
+          orderId = existingOrder.id;
+        } else {
+          const { data: newOrder, error: orderError } = await supabase
+            .from("purchase_orders")
+            .insert({
+              order_number: extOrder.order_number,
+              supplier_id: supplierId,
+              amount: extOrder.total_amount || 0,
+              description: `Importado desde CITIO`,
+              created_by: user.id,
+              status: extOrder.status || 'pendiente',
+            })
+            .select("id")
+            .single();
+
+          if (orderError) {
+            // If a concurrent import created it, reuse it
+            if ((orderError as any)?.code === "23505") {
+              const { data: concurrentOrder, error: concurrentError } = await supabase
+                .from("purchase_orders")
+                .select("id")
+                .eq("order_number", extOrder.order_number)
+                .maybeSingle();
+              if (concurrentError) throw concurrentError;
+              if (!concurrentOrder?.id) throw orderError;
+              orderId = concurrentOrder.id;
+            } else {
+              throw orderError;
+            }
+          } else {
+            orderId = newOrder.id;
+          }
+        }
 
         // Insert order items - product_id from CITIO matches local products table
         if (extOrder.items && extOrder.items.length > 0) {
           const itemsToInsert = extOrder.items.map((item: any) => ({
-            purchase_order_id: newOrder.id,
+            purchase_order_id: orderId,
             product_id: item.product_id,
             quantity_ordered: item.quantity,
             unit_price: item.unit_price,
