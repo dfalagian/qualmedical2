@@ -33,6 +33,7 @@ import {
   EyeOff,
   Smartphone,
   Wifi,
+  Unlink,
   WifiOff,
   Download,
   Pill,
@@ -613,16 +614,33 @@ export default function Inventory() {
       
       if (movementError) throw movementError;
 
-      // 4. Actualizar última lectura del tag
-      const { error: tagError } = await supabase
-        .from("rfid_tags")
-        .update({
-          last_location: mode === "entrada" ? "Almacén Principal" : "Zona de Salida",
-          last_read_at: new Date().toISOString()
-        })
-        .eq("id", tagId);
-      
-      if (tagError) throw tagError;
+      // 4. Actualizar tag - En SALIDA: desvincular automáticamente para reutilización
+      if (mode === "salida") {
+        // Desvincular el tag del producto para que esté disponible
+        const { error: tagError } = await supabase
+          .from("rfid_tags")
+          .update({
+            product_id: null,
+            status: "disponible",
+            last_location: "Zona de Salida",
+            last_read_at: new Date().toISOString(),
+            notes: `Desvinculado automáticamente por salida el ${new Date().toLocaleString()}`
+          })
+          .eq("id", tagId);
+        
+        if (tagError) throw tagError;
+      } else {
+        // En entrada solo actualizar ubicación
+        const { error: tagError } = await supabase
+          .from("rfid_tags")
+          .update({
+            last_location: "Almacén Principal",
+            last_read_at: new Date().toISOString()
+          })
+          .eq("id", tagId);
+        
+        if (tagError) throw tagError;
+      }
 
       return { 
         mode, 
@@ -691,6 +709,36 @@ export default function Inventory() {
       toast({
         title: "Tag eliminado",
         description: "El tag fue eliminado correctamente."
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Unlink tag from product (make it available for reuse)
+  const unlinkTagMutation = useMutation({
+    mutationFn: async (tagId: string) => {
+      const { error } = await supabase
+        .from("rfid_tags")
+        .update({
+          product_id: null,
+          status: "disponible",
+          last_location: null,
+          notes: `Desvinculado el ${new Date().toLocaleString()}`
+        })
+        .eq("id", tagId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
+      toast({
+        title: "Tag desvinculado",
+        description: "El tag está disponible para reutilizar."
       });
     },
     onError: (error: Error) => {
@@ -1373,6 +1421,18 @@ export default function Inventory() {
                           {canEdit && (
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
+                                {/* Botón Desvincular - solo si tiene producto asignado */}
+                                {tag.product_id && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon"
+                                    onClick={() => unlinkTagMutation.mutate(tag.id)}
+                                    disabled={unlinkTagMutation.isPending}
+                                    title="Desvincular tag del producto"
+                                  >
+                                    <Unlink className="h-4 w-4 text-orange-500" />
+                                  </Button>
+                                )}
                                 <Button 
                                   variant="ghost" 
                                   size="icon"
