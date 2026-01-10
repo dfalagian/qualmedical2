@@ -396,14 +396,25 @@ const PurchaseOrders = () => {
               <p className="text-center py-8 text-muted-foreground">Cargando órdenes...</p>
             ) : orders && orders.length > 0 ? (
               <div className="space-y-4">
-                {orders.map((order: any) => (
+                {orders.map((order: any) => {
+                  const isCitioOrder = order.description?.includes('CITIO');
+                  return (
                   <div
                     key={order.id}
                     onClick={() => handleViewDetail(order)}
-                    className="p-4 border rounded-lg hover:bg-accent/5 transition-colors cursor-pointer group"
+                    className={`p-4 border-l-4 rounded-lg hover:bg-accent/5 transition-colors cursor-pointer group ${
+                      isCitioOrder 
+                        ? 'bg-blue-50 border-l-blue-500 dark:bg-blue-950/30' 
+                        : 'bg-green-50 border-l-green-500 dark:bg-green-950/30'
+                    }`}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div>
+                        <p className={`text-xs font-semibold mb-1 ${
+                          isCitioOrder ? 'text-blue-600' : 'text-green-600'
+                        }`}>
+                          {isCitioOrder ? 'Orden de Compra CITIO' : 'Orden de Compra QualMedical'}
+                        </p>
                         <div className="flex items-center gap-3 mb-2">
                           <h4 className="font-semibold text-lg">{order.order_number}</h4>
                           {getStatusBadge(order.status)}
@@ -502,7 +513,8 @@ const PurchaseOrders = () => {
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-center py-8 text-muted-foreground">
