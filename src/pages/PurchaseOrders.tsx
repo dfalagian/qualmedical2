@@ -10,9 +10,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShoppingCart, Plus, DollarSign } from "lucide-react";
+import { ShoppingCart, Plus, DollarSign, Download, Package } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PurchaseOrderImportDialog } from "@/components/purchase-orders/PurchaseOrderImportDialog";
 
 const PurchaseOrders = () => {
   const { user, isAdmin } = useAuth();
@@ -21,13 +22,21 @@ const PurchaseOrders = () => {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState("");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ["purchase_orders"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchase_orders")
-        .select("*, profiles(full_name, company_name)")
+        .select(`
+          *,
+          profiles(full_name, company_name),
+          purchase_order_items(
+            id, product_id, quantity_ordered, quantity_received, unit_price,
+            products(id, name, sku)
+          )
+        `)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -45,6 +54,75 @@ const PurchaseOrders = () => {
 
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Get existing order numbers to prevent duplicate imports
+  const existingOrderNumbers = orders?.map(o => o.order_number) || [];
+
+  // Import mutation for external orders
+  const importOrdersMutation = useMutation({
+    mutationFn: async (externalOrders: any[]) => {
+      if (!user) throw new Error("Usuario no autenticado");
+      
+      for (const extOrder of externalOrders) {
+        // Find supplier by name if possible, or use the first supplier
+        let supplierId = extOrder.supplier_id;
+        
+        if (!supplierId && suppliers && suppliers.length > 0) {
+          const matchingSupplier = suppliers.find(
+            (s: any) => s.company_name?.toLowerCase() === extOrder.supplier_name?.toLowerCase() ||
+                 s.full_name?.toLowerCase() === extOrder.supplier_name?.toLowerCase()
+          );
+          supplierId = matchingSupplier?.id || suppliers[0].id;
+        }
+
+        if (!supplierId) {
+          throw new Error(`No se encontró proveedor para la orden ${extOrder.order_number}`);
+        }
+
+        // Insert the purchase order
+        const { data: newOrder, error: orderError } = await supabase
+          .from("purchase_orders")
+          .insert({
+            order_number: extOrder.order_number,
+            supplier_id: supplierId,
+            amount: extOrder.total_amount || 0,
+            description: `Importado desde CITIO`,
+            created_by: user.id,
+            status: extOrder.status || 'pendiente',
+          })
+          .select()
+          .single();
+
+        if (orderError) throw orderError;
+
+        // Insert order items if available
+        if (extOrder.items && extOrder.items.length > 0) {
+          const itemsToInsert = extOrder.items.map((item: any) => ({
+            purchase_order_id: newOrder.id,
+            product_id: item.product_id,
+            quantity_ordered: item.quantity,
+            unit_price: item.unit_price,
+          }));
+
+          const { error: itemsError } = await supabase
+            .from("purchase_order_items")
+            .insert(itemsToInsert);
+
+          if (itemsError) {
+            console.error("Error inserting items:", itemsError);
+          }
+        }
+      }
+    },
+    onSuccess: (_, variables) => {
+      toast.success(`${variables.length} orden(es) importada(s) correctamente`);
+      queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
+      setImportDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al importar órdenes");
     },
   });
 
@@ -133,11 +211,19 @@ const PurchaseOrders = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Órdenes de Compra</h2>
-          <p className="text-muted-foreground">
-            {isAdmin ? "Gestiona las órdenes de compra" : "Consulta tus órdenes de compra"}
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Órdenes de Compra</h2>
+            <p className="text-muted-foreground">
+              {isAdmin ? "Gestiona las órdenes de compra" : "Consulta tus órdenes de compra"}
+            </p>
+          </div>
+          {isAdmin && (
+            <Button onClick={() => setImportDialogOpen(true)} variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Importar desde CITIO
+            </Button>
+          )}
         </div>
 
         {isAdmin && (
@@ -255,6 +341,33 @@ const PurchaseOrders = () => {
                       </div>
                     </div>
 
+                    {/* Show order items if available */}
+                    {order.purchase_order_items && order.purchase_order_items.length > 0 && (
+                      <div className="mb-3 p-2 bg-muted/30 rounded-md">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">
+                            {order.purchase_order_items.length} producto(s)
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {order.purchase_order_items.slice(0, 4).map((item: any) => (
+                            <Badge key={item.id} variant="outline" className="text-xs">
+                              {item.products?.name || 'Producto'} 
+                              <span className="ml-1 text-muted-foreground">
+                                ({item.quantity_received || 0}/{item.quantity_ordered})
+                              </span>
+                            </Badge>
+                          ))}
+                          {order.purchase_order_items.length > 4 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{order.purchase_order_items.length - 4} más
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {order.description && (
                       <p className="text-sm mb-2 text-muted-foreground">{order.description}</p>
                     )}
@@ -294,6 +407,14 @@ const PurchaseOrders = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Import Dialog */}
+      <PurchaseOrderImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImport={(orders) => importOrdersMutation.mutate(orders)}
+        existingOrderNumbers={existingOrderNumbers}
+      />
     </DashboardLayout>
   );
 };
