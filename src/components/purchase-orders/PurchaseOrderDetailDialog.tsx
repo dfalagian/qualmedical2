@@ -81,7 +81,7 @@ export function PurchaseOrderDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
@@ -178,62 +178,77 @@ export function PurchaseOrderDetailDialog({
               </h4>
               
               {order.purchase_order_items && order.purchase_order_items.length > 0 ? (
-                <div className="space-y-2">
-                  {order.purchase_order_items.map((item) => {
-                    const itemProgress = item.quantity_ordered > 0
-                      ? Math.round(((item.quantity_received || 0) / item.quantity_ordered) * 100)
-                      : 0;
-                    
-                    return (
-                      <div 
-                        key={item.id} 
-                        className="p-3 border rounded-lg bg-muted/20"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">
-                              {item.products?.name || 'Producto no encontrado'}
-                            </p>
-                            {item.products?.sku && (
-                              <p className="text-xs text-muted-foreground">
-                                SKU: {item.products.sku}
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left p-3 font-medium">Producto</th>
+                        <th className="text-right p-3 font-medium w-28">Precio Unit.</th>
+                        <th className="text-center p-3 font-medium w-32">Cantidad</th>
+                        <th className="text-right p-3 font-medium w-28">Subtotal</th>
+                        <th className="text-center p-3 font-medium w-24">Progreso</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {order.purchase_order_items.map((item) => {
+                        const itemProgress = item.quantity_ordered > 0
+                          ? Math.round(((item.quantity_received || 0) / item.quantity_ordered) * 100)
+                          : 0;
+                        const subtotal = (item.unit_price || 0) * item.quantity_ordered;
+
+                        return (
+                          <tr key={item.id} className="hover:bg-muted/20">
+                            <td className="p-3">
+                              <p className="font-medium">
+                                {item.products?.name || 'Producto no encontrado'}
                               </p>
-                            )}
-                          </div>
-                          <div className="text-right shrink-0">
-                            {item.unit_price && (
-                              <p className="text-sm font-medium">
-                                ${item.unit_price.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="mt-2 flex items-center gap-3">
-                          <div className="flex-1">
-                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full transition-all duration-300 ${
-                                  itemProgress === 100 ? 'bg-success' : 
-                                  itemProgress > 0 ? 'bg-warning' : 'bg-muted-foreground/30'
-                                }`}
-                                style={{ width: `${itemProgress}%` }}
-                              />
-                            </div>
-                          </div>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {item.quantity_received || 0} / {item.quantity_ordered}
-                          </span>
-                          <Badge 
-                            variant={itemProgress === 100 ? "default" : "secondary"}
-                            className="text-xs"
-                          >
-                            {itemProgress}%
-                          </Badge>
-                        </div>
-                      </div>
-                    );
-                  })}
+                              {item.products?.sku && (
+                                <p className="text-xs text-muted-foreground">
+                                  SKU: {item.products.sku}
+                                </p>
+                              )}
+                            </td>
+                            <td className="p-3 text-right">
+                              {item.unit_price != null ? (
+                                <span>${item.unit_price.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className="text-muted-foreground">
+                                {item.quantity_received || 0}
+                              </span>
+                              <span className="mx-1">/</span>
+                              <span className="font-medium">{item.quantity_ordered}</span>
+                            </td>
+                            <td className="p-3 text-right font-medium">
+                              ${subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center justify-center gap-2">
+                                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-12">
+                                  <div 
+                                    className={`h-full transition-all duration-300 ${
+                                      itemProgress === 100 ? 'bg-success' : 
+                                      itemProgress > 0 ? 'bg-warning' : 'bg-muted-foreground/30'
+                                    }`}
+                                    style={{ width: `${itemProgress}%` }}
+                                  />
+                                </div>
+                                <Badge 
+                                  variant={itemProgress === 100 ? "default" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {itemProgress}%
+                                </Badge>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">
