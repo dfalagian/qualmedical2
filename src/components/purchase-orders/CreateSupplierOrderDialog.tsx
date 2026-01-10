@@ -260,8 +260,8 @@ export const CreateSupplierOrderDialog = ({
           </div>
 
           {/* Product List */}
-          <ScrollArea className="flex-1 border rounded-md">
-            <div className="p-2 space-y-1">
+          <ScrollArea className="h-48 border rounded-md">
+            <div className="divide-y">
               {filteredProducts.map((product) => {
                 const isSelected = selectedProducts.some(
                   (p) => p.id === product.id
@@ -269,26 +269,27 @@ export const CreateSupplierOrderDialog = ({
                 return (
                   <div
                     key={product.id}
-                    className={`flex items-center gap-3 p-2 rounded-md cursor-pointer hover:bg-muted/50 ${
+                    className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted/50 ${
                       isSelected ? "bg-primary/10" : ""
                     }`}
                     onClick={() => toggleProduct(product)}
                   >
-                    <Checkbox checked={isSelected} />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{product.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        SKU: {product.sku} | Stock: {product.current_stock || 0}
-                      </p>
-                    </div>
-                    <p className="text-sm font-medium">
+                    <Checkbox checked={isSelected} className="h-4 w-4" />
+                    <span className="flex-1 text-sm truncate">{product.name}</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      SKU: {product.sku}
+                    </span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      Stock: {product.current_stock || 0}
+                    </span>
+                    <span className="text-sm font-medium w-16 text-right">
                       ${(product.unit_price || 0).toFixed(2)}
-                    </p>
+                    </span>
                   </div>
                 );
               })}
               {filteredProducts.length === 0 && (
-                <p className="text-center py-4 text-muted-foreground">
+                <p className="text-center py-4 text-muted-foreground text-sm">
                   No se encontraron productos
                 </p>
               )}
