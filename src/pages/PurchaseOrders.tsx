@@ -154,16 +154,82 @@ const PurchaseOrders = () => {
           }
         }
 
-        // Insert order items - product_id from CITIO matches local products table
+        // Insert order items. CITIO uses medication_id; we align by ensuring local products.id = medication_id.
         if (extOrder.items && extOrder.items.length > 0) {
           const itemsToInsert = extOrder.items
             .filter((item: any) => item.medication_id || item.product_id)
             .map((item: any) => ({
               purchase_order_id: orderId,
-              product_id: item.medication_id || item.product_id,
+              product_id: String(item.medication_id || item.product_id),
               quantity_ordered: item.quantity,
               unit_price: item.unit_price,
             }));
+
+          if (itemsToInsert.length === 0) continue;
+
+          // Ensure referenced products exist locally (FK purchase_order_items.product_id -> products.id)
+          const productIds: string[] = Array.from(
+            new Set(itemsToInsert.map((i) => String(i.product_id)))
+          );
+          const { data: existingProducts, error: existingProductsError } = await supabase
+            .from("products")
+            .select("id")
+            .in("id", productIds);
+
+          if (existingProductsError) throw existingProductsError;
+
+          const existingIds = new Set<string>((existingProducts || []).map((p: any) => String(p.id)));
+          const missingIds = productIds.filter((id) => !existingIds.has(id));
+
+          if (missingIds.length > 0) {
+            // Build products from external item payload
+            const productPayloadById = new Map<string, any>();
+            for (const item of extOrder.items) {
+              const idRaw = item.medication_id || item.product_id;
+              const id = idRaw ? String(idRaw) : "";
+              if (!id || productPayloadById.has(id)) continue;
+
+              const name =
+                item.medications?.name ||
+                item.medication_name ||
+                item.products?.name ||
+                "Medicamento";
+
+              const satCode = item.medications?.codigo_sat || item.products?.codigo_sat;
+              const sku = satCode
+                ? `SAT-${satCode}-${id.slice(0, 6)}`
+                : `MED-${id.slice(0, 8)}`;
+
+              productPayloadById.set(id, {
+                id,
+                name,
+                sku,
+                citio_id: id,
+                supplier_id: supplierId,
+                unit_price: item.unit_price ?? null,
+                is_active: true,
+              });
+            }
+
+            const productsToUpsert = missingIds
+              .map((id) => productPayloadById.get(id))
+              .filter(Boolean);
+
+            if (productsToUpsert.length > 0) {
+              const { error: upsertError } = await supabase
+                .from("products")
+                .upsert(productsToUpsert, { onConflict: "id" });
+
+              if (upsertError) throw upsertError;
+            }
+          }
+
+          // Replace items on re-import to avoid duplicates
+          const { error: deleteExistingItemsError } = await supabase
+            .from("purchase_order_items")
+            .delete()
+            .eq("purchase_order_id", orderId);
+          if (deleteExistingItemsError) throw deleteExistingItemsError;
 
           const { error: itemsError } = await supabase
             .from("purchase_order_items")
