@@ -156,12 +156,14 @@ const PurchaseOrders = () => {
 
         // Insert order items - product_id from CITIO matches local products table
         if (extOrder.items && extOrder.items.length > 0) {
-          const itemsToInsert = extOrder.items.map((item: any) => ({
-            purchase_order_id: orderId,
-            product_id: item.product_id,
-            quantity_ordered: item.quantity,
-            unit_price: item.unit_price,
-          }));
+          const itemsToInsert = extOrder.items
+            .filter((item: any) => item.medication_id || item.product_id)
+            .map((item: any) => ({
+              purchase_order_id: orderId,
+              product_id: item.medication_id || item.product_id,
+              quantity_ordered: item.quantity,
+              unit_price: item.unit_price,
+            }));
 
           const { error: itemsError } = await supabase
             .from("purchase_order_items")
