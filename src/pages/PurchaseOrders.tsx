@@ -14,7 +14,7 @@ import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye } from "
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PurchaseOrderImportDialog } from "@/components/purchase-orders/PurchaseOrderImportDialog";
-
+import { CreateSupplierOrderDialog } from "@/components/purchase-orders/CreateSupplierOrderDialog";
 import { PurchaseOrderDetailDialog } from "@/components/purchase-orders/PurchaseOrderDetailDialog";
 import {
   AlertDialog,
@@ -30,16 +30,12 @@ import {
 const PurchaseOrders = () => {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
-  const [orderNumber, setOrderNumber] = useState("");
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [selectedSupplier, setSelectedSupplier] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [createOrderDialogOpen, setCreateOrderDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<any>(null);
-  
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ["purchase_orders"],
@@ -280,36 +276,6 @@ const PurchaseOrders = () => {
     },
   });
 
-  const createOrderMutation = useMutation({
-    mutationFn: async () => {
-      if (!orderNumber || !amount || !selectedSupplier || !user) {
-        throw new Error("Todos los campos son obligatorios");
-      }
-
-      const { error } = await supabase
-        .from("purchase_orders")
-        .insert([{
-          order_number: orderNumber,
-          supplier_id: selectedSupplier,
-          amount: parseFloat(amount),
-          description: description || null,
-          created_by: user.id,
-        }]);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Orden de compra creada");
-      queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
-      setOrderNumber("");
-      setAmount("");
-      setDescription("");
-      setSelectedSupplier("");
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al crear orden");
-    },
-  });
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -404,91 +370,19 @@ const PurchaseOrders = () => {
             </p>
           </div>
           {isAdmin && (
-            <Button onClick={() => setImportDialogOpen(true)} variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Importar desde CITIO
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setCreateOrderDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Orden a Proveedor
+              </Button>
+              <Button onClick={() => setImportDialogOpen(true)} variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Importar desde CITIO
+              </Button>
+            </div>
           )}
         </div>
 
-        {isAdmin && (
-          <Card className="shadow-md border-primary/20">
-            <CardHeader className="bg-gradient-primary/10">
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Nueva Orden de Compra
-              </CardTitle>
-              <CardDescription>Crea una nueva orden para un proveedor</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  createOrderMutation.mutate();
-                }}
-                className="space-y-4"
-              >
-                <div className="space-y-2">
-                  <Label htmlFor="supplier">Proveedor *</Label>
-                  <Select value={selectedSupplier} onValueChange={setSelectedSupplier} required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un proveedor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers?.map((supplier: any) => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.company_name || supplier.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="orderNumber">Número de Orden *</Label>
-                    <Input
-                      id="orderNumber"
-                      value={orderNumber}
-                      onChange={(e) => setOrderNumber(e.target.value)}
-                      placeholder="OC-12345"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="amount">Monto (MXN) *</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      step="0.01"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="10000.00"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Descripción</Label>
-                  <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Descripción de la orden..."
-                    rows={3}
-                  />
-                </div>
-
-                <Button type="submit" className="w-full">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Orden
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        )}
 
         <Card className="shadow-md">
           <CardHeader>
@@ -656,6 +550,10 @@ const PurchaseOrders = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      <CreateSupplierOrderDialog
+        open={createOrderDialogOpen}
+        onOpenChange={setCreateOrderDialogOpen}
+      />
     </DashboardLayout>
   );
 };
