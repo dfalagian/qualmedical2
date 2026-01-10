@@ -10,10 +10,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShoppingCart, Plus, DollarSign, Download, Package } from "lucide-react";
+import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PurchaseOrderImportDialog } from "@/components/purchase-orders/PurchaseOrderImportDialog";
+import { PurchaseOrderDetailDialog } from "@/components/purchase-orders/PurchaseOrderDetailDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const PurchaseOrders = () => {
   const { user, isAdmin } = useAuth();
@@ -23,6 +34,10 @@ const PurchaseOrders = () => {
   const [description, setDescription] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<any>(null);
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ["purchase_orders"],
@@ -187,6 +202,37 @@ const PurchaseOrders = () => {
     },
   });
 
+  const deleteOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const { error } = await supabase
+        .from("purchase_orders")
+        .delete()
+        .eq("id", orderId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Orden eliminada correctamente");
+      queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
+      setDeleteDialogOpen(false);
+      setOrderToDelete(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar orden");
+    },
+  });
+
+  const handleViewDetail = (order: any) => {
+    setSelectedOrder(order);
+    setDetailDialogOpen(true);
+  };
+
+  const handleDeleteClick = (order: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOrderToDelete(order);
+    setDeleteDialogOpen(true);
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "completada":
@@ -332,7 +378,8 @@ const PurchaseOrders = () => {
                 {orders.map((order: any) => (
                   <div
                     key={order.id}
-                    className="p-4 border rounded-lg hover:bg-accent/5 transition-colors"
+                    onClick={() => handleViewDetail(order)}
+                    className="p-4 border rounded-lg hover:bg-accent/5 transition-colors cursor-pointer group"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div>
@@ -344,12 +391,37 @@ const PurchaseOrders = () => {
                           Proveedor: {formatSupplierName(order.profiles)}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-primary flex items-center gap-1">
-                          <DollarSign className="h-5 w-5" />
-                          {order.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{order.currency}</p>
+                      <div className="flex items-start gap-3">
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-primary flex items-center gap-1">
+                            <DollarSign className="h-5 w-5" />
+                            {order.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{order.currency}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewDetail(order);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                              onClick={(e) => handleDeleteClick(order, e)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -396,7 +468,7 @@ const PurchaseOrders = () => {
                             updateStatusMutation.mutate({ id: order.id, status: value })
                           }
                         >
-                          <SelectTrigger className="w-36">
+                          <SelectTrigger className="w-36" onClick={(e) => e.stopPropagation()}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -427,6 +499,35 @@ const PurchaseOrders = () => {
         onImport={(orders) => importOrdersMutation.mutate(orders)}
         existingOrderNumbers={existingOrderNumbers}
       />
+
+      {/* Detail Dialog */}
+      <PurchaseOrderDetailDialog
+        order={selectedOrder}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar orden de compra?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar la orden <strong>{orderToDelete?.order_number}</strong>. 
+              Esta acción no se puede deshacer y también eliminará todos los items asociados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => orderToDelete && deleteOrderMutation.mutate(orderToDelete.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
