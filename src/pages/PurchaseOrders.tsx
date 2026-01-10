@@ -14,6 +14,7 @@ import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye } from "
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PurchaseOrderImportDialog } from "@/components/purchase-orders/PurchaseOrderImportDialog";
+import { CreateSupplierOrderDialog } from "@/components/purchase-orders/CreateSupplierOrderDialog";
 import { PurchaseOrderDetailDialog } from "@/components/purchase-orders/PurchaseOrderDetailDialog";
 import {
   AlertDialog,
@@ -38,6 +39,7 @@ const PurchaseOrders = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<any>(null);
+  const [createOrderDialogOpen, setCreateOrderDialogOpen] = useState(false);
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ["purchase_orders"],
@@ -402,10 +404,16 @@ const PurchaseOrders = () => {
             </p>
           </div>
           {isAdmin && (
-            <Button onClick={() => setImportDialogOpen(true)} variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Importar desde CITIO
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setCreateOrderDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Orden a Proveedor
+              </Button>
+              <Button onClick={() => setImportDialogOpen(true)} variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Importar desde CITIO
+              </Button>
+            </div>
           )}
         </div>
 
@@ -653,6 +661,12 @@ const PurchaseOrders = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog para crear orden a proveedor externo */}
+      <CreateSupplierOrderDialog
+        open={createOrderDialogOpen}
+        onOpenChange={setCreateOrderDialogOpen}
+      />
     </DashboardLayout>
   );
 };
