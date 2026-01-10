@@ -10,11 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye } from "lucide-react";
+import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye, ArrowRight } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PurchaseOrderImportDialog } from "@/components/purchase-orders/PurchaseOrderImportDialog";
 import { CreateSupplierOrderDialog } from "@/components/purchase-orders/CreateSupplierOrderDialog";
+import { ConvertToQualOrderDialog } from "@/components/purchase-orders/ConvertToQualOrderDialog";
 import { PurchaseOrderDetailDialog } from "@/components/purchase-orders/PurchaseOrderDetailDialog";
 import {
   AlertDialog,
@@ -36,6 +37,8 @@ const PurchaseOrders = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<any>(null);
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [orderToConvert, setOrderToConvert] = useState<any>(null);
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ["purchase_orders"],
@@ -443,6 +446,21 @@ const PurchaseOrders = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
+                          {isAdmin && isCitioOrder && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-green-600 hover:text-green-700 hover:bg-green-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOrderToConvert(order);
+                                setConvertDialogOpen(true);
+                              }}
+                              title="Convertir a Orden QualMedical"
+                            >
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          )}
                           {isAdmin && (
                             <Button
                               variant="ghost"
@@ -565,6 +583,12 @@ const PurchaseOrders = () => {
       <CreateSupplierOrderDialog
         open={createOrderDialogOpen}
         onOpenChange={setCreateOrderDialogOpen}
+      />
+
+      <ConvertToQualOrderDialog
+        open={convertDialogOpen}
+        onOpenChange={setConvertDialogOpen}
+        citioOrder={orderToConvert}
       />
     </DashboardLayout>
   );
