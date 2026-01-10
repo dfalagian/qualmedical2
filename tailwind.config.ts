@@ -43,6 +43,18 @@ export default {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
         },
+        qual: {
+          DEFAULT: "hsl(var(--qual))",
+          foreground: "hsl(var(--qual-foreground))",
+          soft: "hsl(var(--qual-soft))",
+          border: "hsl(var(--qual-border))",
+        },
+        citio: {
+          DEFAULT: "hsl(var(--citio))",
+          foreground: "hsl(var(--citio-foreground))",
+          soft: "hsl(var(--citio-soft))",
+          border: "hsl(var(--citio-border))",
+        },
         warning: {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",

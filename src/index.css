@@ -34,6 +34,18 @@ All colors MUST be HSL.
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
 
+    /* CITIO */
+    --citio: 210 90% 45%;
+    --citio-foreground: 0 0% 100%;
+    --citio-soft: 210 90% 96%;
+    --citio-border: 210 75% 85%;
+
+    /* QualMedical (órdenes internas) */
+    --qual: 142 71% 45%;
+    --qual-foreground: 0 0% 100%;
+    --qual-soft: 142 55% 95%;
+    --qual-border: 142 40% 82%;
+
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
@@ -91,6 +103,18 @@ All colors MUST be HSL.
 
     --success: 142 71% 55%;
     --success-foreground: 0 0% 100%;
+
+    /* CITIO */
+    --citio: 210 90% 60%;
+    --citio-foreground: 0 0% 100%;
+    --citio-soft: 210 35% 16%;
+    --citio-border: 210 30% 22%;
+
+    /* QualMedical (órdenes internas) */
+    --qual: 142 71% 55%;
+    --qual-foreground: 0 0% 100%;
+    --qual-soft: 142 30% 16%;
+    --qual-border: 142 28% 22%;
 
     --warning: 38 92% 60%;
     --warning-foreground: 0 0% 100%;
