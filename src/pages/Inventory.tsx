@@ -40,6 +40,7 @@ import {
 import { useWebNFC } from "@/hooks/useWebNFC";
 import { NFCScannerCard, ScanMode } from "@/components/inventory/NFCScannerCard";
 import { CITIOImportDialog } from "@/components/inventory/CITIOImportDialog";
+import { NFCConfirmationModal, NFCMovementResult } from "@/components/inventory/NFCConfirmationModal";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -107,7 +108,8 @@ export default function Inventory() {
   const [editingTag, setEditingTag] = useState<RfidTag | null>(null);
   const [tagScanActive, setTagScanActive] = useState<boolean>(false);
   const [recentlyReadTagId, setRecentlyReadTagId] = useState<string | null>(null);
-  
+  const [nfcConfirmationOpen, setNfcConfirmationOpen] = useState<boolean>(false);
+  const [nfcMovementResult, setNfcMovementResult] = useState<NFCMovementResult | null>(null);
   // Refs - después de los estados
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   
@@ -566,7 +568,15 @@ export default function Inventory() {
       
       if (tagError) throw tagError;
 
-      return { mode, productName, newStock, previousStock, tagId, epc: rfidTags?.find(t => t.id === tagId)?.epc || '' };
+      return { 
+        mode, 
+        productName, 
+        productSku: rfidTags?.find(t => t.id === tagId)?.products?.sku || '',
+        newStock: Math.max(0, newStock), 
+        previousStock, 
+        tagId, 
+        epc: rfidTags?.find(t => t.id === tagId)?.epc || '' 
+      };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
@@ -590,12 +600,17 @@ export default function Inventory() {
         });
       }
       
-      const isEntry = data.mode === "entrada";
-      toast({
-        title: isEntry ? "✅ Entrada registrada" : "📤 Salida registrada",
-        description: `${data.productName} (EPC: ${data.epc.substring(0, 12)}...)\nStock ${data.previousStock} → ${data.newStock}`,
-        variant: isEntry ? "default" : "default"
+      // Mostrar modal de confirmación llamativo
+      setNfcMovementResult({
+        mode: data.mode,
+        productName: data.productName,
+        productSku: data.productSku,
+        previousStock: data.previousStock,
+        newStock: data.newStock,
+        epc: data.epc,
+        timestamp: new Date()
       });
+      setNfcConfirmationOpen(true);
     },
     onError: (error: Error) => {
       toast({
@@ -1490,6 +1505,13 @@ export default function Inventory() {
           onOpenChange={setCitioImportDialogOpen}
           onImport={(medication) => importFromCitioMutation.mutate(medication)}
           existingCitioIds={existingCitioIds}
+        />
+
+        {/* NFC Confirmation Modal */}
+        <NFCConfirmationModal
+          open={nfcConfirmationOpen}
+          onClose={() => setNfcConfirmationOpen(false)}
+          result={nfcMovementResult}
         />
       </div>
     </DashboardLayout>
