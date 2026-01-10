@@ -64,21 +64,25 @@ const PurchaseOrders = () => {
   const importOrdersMutation = useMutation({
     mutationFn: async (externalOrders: any[]) => {
       if (!user) throw new Error("Usuario no autenticado");
+      if (!suppliers || suppliers.length === 0) throw new Error("No hay proveedores disponibles");
       
       for (const extOrder of externalOrders) {
-        // Find supplier by name if possible, or use the first supplier
-        let supplierId = extOrder.supplier_id;
+        // Always search for local supplier by name - external IDs don't match local IDs
+        const externalSupplierName = extOrder.suppliers?.name?.toLowerCase() || 
+                                     extOrder.supplier_name?.toLowerCase() || '';
         
-        if (!supplierId && suppliers && suppliers.length > 0) {
-          const matchingSupplier = suppliers.find(
-            (s: any) => s.company_name?.toLowerCase() === extOrder.supplier_name?.toLowerCase() ||
-                 s.full_name?.toLowerCase() === extOrder.supplier_name?.toLowerCase()
-          );
-          supplierId = matchingSupplier?.id || suppliers[0].id;
-        }
+        const matchingSupplier = suppliers.find(
+          (s: any) => 
+            s.company_name?.toLowerCase().includes(externalSupplierName) ||
+            externalSupplierName.includes(s.company_name?.toLowerCase() || '') ||
+            s.full_name?.toLowerCase().includes(externalSupplierName) ||
+            externalSupplierName.includes(s.full_name?.toLowerCase() || '')
+        );
+        
+        const supplierId = matchingSupplier?.id;
 
         if (!supplierId) {
-          throw new Error(`No se encontró proveedor para la orden ${extOrder.order_number}`);
+          throw new Error(`No se encontró proveedor local para "${extOrder.suppliers?.name || extOrder.supplier_name}". Orden: ${extOrder.order_number}`);
         }
 
         // Insert the purchase order
