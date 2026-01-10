@@ -148,18 +148,20 @@ export const ConvertToQualOrderDialog = ({
                 <Package className="h-4 w-4" />
                 Productos a incluir ({citioOrder.purchase_order_items.length})
               </Label>
-              <ScrollArea className="h-32 border rounded-md">
-                <div className="p-2 space-y-1">
-                  {citioOrder.purchase_order_items.map((item: any) => (
-                    <div key={item.id} className="flex justify-between items-center text-sm py-1 px-2 hover:bg-muted/50 rounded">
-                      <span className="truncate flex-1">{item.products?.name || 'Producto'}</span>
-                      <Badge variant="outline" className="ml-2">
-                        {item.quantity_ordered} uds
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+              <div className="border rounded-lg bg-muted/20 overflow-hidden">
+                <ScrollArea className="h-28">
+                  <div className="divide-y">
+                    {citioOrder.purchase_order_items.map((item: any) => (
+                      <div key={item.id} className="flex items-center justify-between text-sm py-2 px-3">
+                        <span className="truncate flex-1 pr-2">{item.products?.name || 'Producto'}</span>
+                        <span className="text-xs font-medium text-muted-foreground whitespace-nowrap bg-background px-2 py-0.5 rounded border">
+                          {item.quantity_ordered} uds
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
             </div>
           )}
 
