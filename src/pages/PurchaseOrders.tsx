@@ -68,16 +68,24 @@ const PurchaseOrders = () => {
       
       for (const extOrder of externalOrders) {
         // Always search for local supplier by name - external IDs don't match local IDs
-        const externalSupplierName = extOrder.suppliers?.name?.toLowerCase() || 
-                                     extOrder.supplier_name?.toLowerCase() || '';
+        const externalSupplierName = (extOrder.suppliers?.name || extOrder.supplier_name || '').toLowerCase().trim();
         
-        const matchingSupplier = suppliers.find(
-          (s: any) => 
-            s.company_name?.toLowerCase().includes(externalSupplierName) ||
-            externalSupplierName.includes(s.company_name?.toLowerCase() || '') ||
-            s.full_name?.toLowerCase().includes(externalSupplierName) ||
-            externalSupplierName.includes(s.full_name?.toLowerCase() || '')
-        );
+        if (!externalSupplierName) {
+          throw new Error(`La orden ${extOrder.order_number} no tiene nombre de proveedor`);
+        }
+        
+        const matchingSupplier = suppliers.find((s: any) => {
+          const companyName = (s.company_name || '').toLowerCase().trim();
+          const fullName = (s.full_name || '').toLowerCase().trim();
+          
+          // Only match if there's actual content to compare
+          if (companyName && companyName.includes(externalSupplierName)) return true;
+          if (companyName && externalSupplierName.includes(companyName)) return true;
+          if (fullName && fullName.includes(externalSupplierName)) return true;
+          if (fullName && externalSupplierName.includes(fullName)) return true;
+          
+          return false;
+        });
         
         const supplierId = matchingSupplier?.id;
 
