@@ -126,7 +126,7 @@ export function CITIOImportDialog({
           />
         </div>
 
-        <ScrollArea className="flex-1 min-h-[300px] max-h-[400px] border rounded-md">
+        <ScrollArea className="h-[350px] border rounded-md">
           {isLoading ? (
             <div className="p-4 space-y-3">
               {[...Array(5)].map((_, i) => (
