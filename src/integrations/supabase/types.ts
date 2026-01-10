@@ -437,6 +437,8 @@ export type Database = {
           is_partial_delivery: boolean | null
           lot_expiry_image_urls: string[] | null
           notes: string | null
+          product_id: string | null
+          purchase_order_id: string | null
           purchase_order_number: string | null
           receipt_acknowledgment_url: string | null
           supplier_id: string
@@ -454,6 +456,8 @@ export type Database = {
           is_partial_delivery?: boolean | null
           lot_expiry_image_urls?: string[] | null
           notes?: string | null
+          product_id?: string | null
+          purchase_order_id?: string | null
           purchase_order_number?: string | null
           receipt_acknowledgment_url?: string | null
           supplier_id: string
@@ -471,11 +475,27 @@ export type Database = {
           is_partial_delivery?: boolean | null
           lot_expiry_image_urls?: string[] | null
           notes?: string | null
+          product_id?: string | null
+          purchase_order_id?: string | null
           purchase_order_number?: string | null
           receipt_acknowledgment_url?: string | null
           supplier_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "medicine_counts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medicine_counts_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "medicine_counts_supplier_id_fkey"
             columns: ["supplier_id"]
@@ -884,6 +904,54 @@ export type Database = {
             columns: ["parent_supplier_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_order_items: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          purchase_order_id: string
+          quantity_ordered: number
+          quantity_received: number | null
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          purchase_order_id: string
+          quantity_ordered: number
+          quantity_received?: number | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          purchase_order_id?: string
+          quantity_ordered?: number
+          quantity_received?: number | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
           },
         ]
