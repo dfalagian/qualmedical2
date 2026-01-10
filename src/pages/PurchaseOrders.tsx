@@ -75,6 +75,20 @@ const PurchaseOrders = () => {
   // Get existing order numbers to prevent duplicate imports
   const existingOrderNumbers = orders?.map(o => o.order_number) || [];
 
+  // Fetch local products for mapping
+  const { data: localProducts } = useQuery({
+    queryKey: ["products_for_import"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, sku, citio_id");
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Import mutation for external orders
   const importOrdersMutation = useMutation({
     mutationFn: async (externalOrders: any[]) => {
@@ -124,21 +138,76 @@ const PurchaseOrders = () => {
 
         if (orderError) throw orderError;
 
-        // Insert order items if available
-        if (extOrder.items && extOrder.items.length > 0) {
-          const itemsToInsert = extOrder.items.map((item: any) => ({
-            purchase_order_id: newOrder.id,
-            product_id: item.product_id,
-            quantity_ordered: item.quantity,
-            unit_price: item.unit_price,
-          }));
+        // Insert order items if available - map products by name/sku/citio_id
+        if (extOrder.items && extOrder.items.length > 0 && localProducts) {
+          const itemsToInsert: any[] = [];
+          
+          for (const item of extOrder.items) {
+            // Try to find local product by citio_id, name, or SKU
+            const externalProductName = (item.products?.name || '').toLowerCase().trim();
+            const externalProductSku = (item.products?.sku || item.sku || '').toLowerCase().trim();
+            const externalProductId = item.product_id;
+            
+            let localProduct = localProducts.find((p: any) => 
+              p.citio_id === externalProductId
+            );
+            
+            if (!localProduct && externalProductName) {
+              localProduct = localProducts.find((p: any) => 
+                p.name?.toLowerCase().trim() === externalProductName
+              );
+            }
+            
+            if (!localProduct && externalProductSku) {
+              localProduct = localProducts.find((p: any) => 
+                p.sku?.toLowerCase().trim() === externalProductSku
+              );
+            }
+            
+            // If no local product found, create one
+            if (!localProduct) {
+              const productName = item.products?.name || `Producto CITIO ${externalProductId}`;
+              const productSku = item.products?.sku || `CITIO-${externalProductId.substring(0, 8)}`;
+              
+              const { data: newProduct, error: productError } = await supabase
+                .from("products")
+                .insert({
+                  name: productName,
+                  sku: productSku,
+                  citio_id: externalProductId,
+                  supplier_id: supplierId,
+                  unit_price: item.unit_price,
+                  is_active: true,
+                })
+                .select()
+                .single();
+                
+              if (productError) {
+                console.error("Error creating product:", productError);
+                continue;
+              }
+              
+              localProduct = newProduct;
+            }
+            
+            if (localProduct) {
+              itemsToInsert.push({
+                purchase_order_id: newOrder.id,
+                product_id: localProduct.id,
+                quantity_ordered: item.quantity,
+                unit_price: item.unit_price,
+              });
+            }
+          }
 
-          const { error: itemsError } = await supabase
-            .from("purchase_order_items")
-            .insert(itemsToInsert);
+          if (itemsToInsert.length > 0) {
+            const { error: itemsError } = await supabase
+              .from("purchase_order_items")
+              .insert(itemsToInsert);
 
-          if (itemsError) {
-            console.error("Error inserting items:", itemsError);
+            if (itemsError) {
+              console.error("Error inserting items:", itemsError);
+            }
           }
         }
       }
@@ -146,6 +215,7 @@ const PurchaseOrders = () => {
     onSuccess: (_, variables) => {
       toast.success(`${variables.length} orden(es) importada(s) correctamente`);
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
+      queryClient.invalidateQueries({ queryKey: ["products_for_import"] });
       setImportDialogOpen(false);
     },
     onError: (error: any) => {
