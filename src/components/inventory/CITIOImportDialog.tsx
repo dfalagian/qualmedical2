@@ -148,7 +148,7 @@ export function CITIOImportDialog({
                   <div className="px-2 py-1 text-sm font-semibold text-muted-foreground bg-muted/50 rounded mb-2">
                     {family} ({meds.length})
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {meds.map((med) => {
                       const imported = isAlreadyImported(med.id);
                       const isSelected = selectedMedication?.id === med.id;
@@ -159,7 +159,7 @@ export function CITIOImportDialog({
                           onClick={() => !imported && setSelectedMedication(med)}
                           disabled={imported}
                           className={cn(
-                            "w-full text-left p-3 rounded-lg border transition-all",
+                            "w-full text-left px-2 py-1.5 rounded border transition-all text-sm",
                             imported
                               ? "bg-muted/30 opacity-60 cursor-not-allowed"
                               : isSelected
@@ -167,32 +167,27 @@ export function CITIOImportDialog({
                               : "hover:bg-accent hover:border-accent-foreground/20"
                           )}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{med.name}</div>
-                              <div className="text-sm text-muted-foreground flex flex-wrap gap-2 mt-1">
-                                <span>{med.brand}</span>
-                                {med.presentacion && (
-                                  <>
-                                    <span>•</span>
-                                    <span>{med.presentacion}</span>
-                                  </>
-                                )}
-                              </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                              <span className="font-medium truncate">{med.name}</span>
+                              <span className="text-muted-foreground text-xs truncate">
+                                {med.brand}
+                                {med.presentacion && ` • ${med.presentacion}`}
+                              </span>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 shrink-0">
                               {med.price_type_1 && (
-                                <Badge variant="secondary">
+                                <Badge variant="secondary" className="text-xs px-1.5 py-0">
                                   ${med.price_type_1.toFixed(2)}
                                 </Badge>
                               )}
                               {imported ? (
-                                <Badge variant="outline" className="text-green-600">
-                                  <Check className="h-3 w-3 mr-1" />
-                                  Importado
+                                <Badge variant="outline" className="text-green-600 text-xs px-1.5 py-0">
+                                  <Check className="h-3 w-3 mr-0.5" />
+                                  Imp.
                                 </Badge>
                               ) : isSelected ? (
-                                <Check className="h-5 w-5 text-primary" />
+                                <Check className="h-4 w-4 text-primary" />
                               ) : null}
                             </div>
                           </div>
