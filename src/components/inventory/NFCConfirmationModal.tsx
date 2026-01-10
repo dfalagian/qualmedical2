@@ -80,7 +80,7 @@ export function NFCConfirmationModal({ open, onClose, result }: NFCConfirmationM
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Anterior</p>
                 <p className="text-2xl font-bold text-muted-foreground">
-                  {result.previousStock}
+                  {Math.max(0, result.previousStock)}
                 </p>
               </div>
               
@@ -99,7 +99,7 @@ export function NFCConfirmationModal({ open, onClose, result }: NFCConfirmationM
                 <p className={`text-3xl font-bold ${
                   isEntry ? "text-green-600" : "text-orange-600"
                 }`}>
-                  {result.newStock}
+                  {Math.max(0, result.newStock)}
                 </p>
               </div>
             </div>
