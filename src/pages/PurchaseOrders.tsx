@@ -31,7 +31,7 @@ const PurchaseOrders = () => {
         .from("purchase_orders")
         .select(`
           *,
-          profiles(full_name, company_name),
+          profiles!purchase_orders_supplier_id_fkey(full_name, company_name),
           purchase_order_items(
             id, product_id, quantity_ordered, quantity_received, unit_price,
             products(id, name, sku)

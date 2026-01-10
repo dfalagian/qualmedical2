@@ -68,14 +68,18 @@ export function PurchaseOrderImportDialog({
       
       if (error) throw error;
       
+      // The external API returns { data: { success, count, orders: [...] } }
       const result = data?.data;
       
-      if (result?.purchase_orders && Array.isArray(result.purchase_orders)) {
+      if (result?.orders && Array.isArray(result.orders)) {
+        return result.orders as ExternalPurchaseOrder[];
+      } else if (result?.purchase_orders && Array.isArray(result.purchase_orders)) {
         return result.purchase_orders as ExternalPurchaseOrder[];
       } else if (Array.isArray(result)) {
         return result as ExternalPurchaseOrder[];
       }
       
+      console.log('External orders response:', data);
       return [] as ExternalPurchaseOrder[];
     },
     enabled: open,
