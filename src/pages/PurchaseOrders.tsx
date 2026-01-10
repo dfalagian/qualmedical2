@@ -167,27 +167,36 @@ const PurchaseOrders = () => {
 
           if (itemsToInsert.length === 0) continue;
 
-          // Ensure referenced products exist locally (FK purchase_order_items.product_id -> products.id)
-          const productIds: string[] = Array.from(
+          // Ensure referenced products exist locally by citio_id (not by id)
+          // First, check which products already exist by citio_id
+          const citioIds: string[] = Array.from(
             new Set(itemsToInsert.map((i) => String(i.product_id)))
           );
+          
           const { data: existingProducts, error: existingProductsError } = await supabase
             .from("products")
-            .select("id")
-            .in("id", productIds);
+            .select("id, citio_id")
+            .in("citio_id", citioIds);
 
           if (existingProductsError) throw existingProductsError;
 
-          const existingIds = new Set<string>((existingProducts || []).map((p: any) => String(p.id)));
-          const missingIds = productIds.filter((id) => !existingIds.has(id));
+          // Create a map of citio_id -> local product id
+          const citioToLocalId = new Map<string, string>();
+          for (const p of existingProducts || []) {
+            if (p.citio_id) {
+              citioToLocalId.set(p.citio_id, p.id);
+            }
+          }
 
-          if (missingIds.length > 0) {
-            // Build products from external item payload
+          const missingCitioIds = citioIds.filter((id) => !citioToLocalId.has(id));
+
+          if (missingCitioIds.length > 0) {
+            // Build products from external item payload for missing ones
             const productPayloadById = new Map<string, any>();
             for (const item of extOrder.items) {
-              const idRaw = item.medication_id || item.product_id;
-              const id = idRaw ? String(idRaw) : "";
-              if (!id || productPayloadById.has(id)) continue;
+              const citioId = item.medication_id || item.product_id;
+              const citioIdStr = citioId ? String(citioId) : "";
+              if (!citioIdStr || productPayloadById.has(citioIdStr) || citioToLocalId.has(citioIdStr)) continue;
 
               const name =
                 item.medications?.name ||
@@ -197,30 +206,47 @@ const PurchaseOrders = () => {
 
               const satCode = item.medications?.codigo_sat || item.products?.codigo_sat;
               const sku = satCode
-                ? `SAT-${satCode}-${id.slice(0, 6)}`
-                : `MED-${id.slice(0, 8)}`;
+                ? `SAT-${satCode}-${citioIdStr.slice(0, 6)}`
+                : `CITIO-${citioIdStr.slice(0, 8).toUpperCase()}`;
 
-              productPayloadById.set(id, {
-                id,
+              productPayloadById.set(citioIdStr, {
+                // Let Supabase auto-generate the id (don't use citio_id as id)
                 name,
                 sku,
-                citio_id: id,
+                citio_id: citioIdStr,
                 supplier_id: supplierId,
                 unit_price: item.unit_price ?? null,
                 is_active: true,
               });
             }
 
-            const productsToUpsert = missingIds
+            const productsToInsert = missingCitioIds
               .map((id) => productPayloadById.get(id))
               .filter(Boolean);
 
-            if (productsToUpsert.length > 0) {
-              const { error: upsertError } = await supabase
+            if (productsToInsert.length > 0) {
+              const { data: newProducts, error: insertError } = await supabase
                 .from("products")
-                .upsert(productsToUpsert, { onConflict: "id" });
+                .insert(productsToInsert)
+                .select("id, citio_id");
 
-              if (upsertError) throw upsertError;
+              if (insertError) throw insertError;
+              
+              // Add new products to the map
+              for (const p of newProducts || []) {
+                if (p.citio_id) {
+                  citioToLocalId.set(p.citio_id, p.id);
+                }
+              }
+            }
+          }
+          
+          // Update itemsToInsert to use local product IDs instead of citio_ids
+          for (const item of itemsToInsert) {
+            const citioId = String(item.product_id);
+            const localId = citioToLocalId.get(citioId);
+            if (localId) {
+              item.product_id = localId;
             }
           }
 
