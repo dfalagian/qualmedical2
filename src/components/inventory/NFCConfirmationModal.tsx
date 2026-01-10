@@ -7,7 +7,8 @@ import {
   ArrowUpFromLine, 
   Package,
   TrendingDown,
-  TrendingUp
+  TrendingUp,
+  AlertTriangle
 } from "lucide-react";
 import { ScanMode } from "./NFCScannerCard";
 
@@ -109,6 +110,19 @@ export function NFCConfirmationModal({ open, onClose, result }: NFCConfirmationM
             }`}>
               {isEntry ? "+1 unidad" : "-1 unidad"}
             </p>
+
+            {/* Alerta de stock agotado */}
+            {result.newStock <= 0 && !isEntry && (
+              <div className="mt-4 p-3 bg-red-100 dark:bg-red-950/50 border border-red-300 dark:border-red-800 rounded-lg text-center">
+                <p className="text-red-600 dark:text-red-400 font-bold flex items-center justify-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  ⚠️ STOCK AGOTADO
+                </p>
+                <p className="text-red-500 dark:text-red-400 text-sm mt-1">
+                  Este producto ya no tiene unidades disponibles
+                </p>
+              </div>
+            )}
           </div>
 
           {/* EPC del tag */}
