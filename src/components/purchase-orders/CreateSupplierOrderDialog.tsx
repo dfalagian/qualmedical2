@@ -196,7 +196,7 @@ export const CreateSupplierOrderDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
@@ -207,9 +207,9 @@ export const CreateSupplierOrderDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-          {/* Supplier and Order Number */}
-          <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-6 flex-1 overflow-hidden">
+          {/* Left column - Form */}
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label>Proveedor *</Label>
               <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
@@ -225,6 +225,7 @@ export const CreateSupplierOrderDialog = ({
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <Label>Número de Orden *</Label>
               <Input
@@ -233,133 +234,141 @@ export const CreateSupplierOrderDialog = ({
                 placeholder="OC-2024-001"
               />
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label>Descripción</Label>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Notas adicionales..."
-              rows={2}
-            />
-          </div>
-
-          {/* Product Search */}
-          <div className="space-y-2">
-            <Label>Buscar Productos</Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar por nombre o SKU..."
-                className="pl-10"
+            <div className="space-y-2">
+              <Label>Descripción</Label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Notas adicionales..."
+                rows={2}
               />
             </div>
+
+            {/* Selected Products Summary */}
+            {selectedProducts.length > 0 && (
+              <div className="border rounded-lg p-3 bg-muted/30 space-y-3">
+                <p className="font-semibold text-sm">
+                  Productos seleccionados ({selectedProducts.length})
+                </p>
+                <ScrollArea className="h-40">
+                  <div className="space-y-2 pr-3">
+                    {selectedProducts.map((product) => (
+                      <div
+                        key={product.id}
+                        className="flex items-center gap-2 text-sm bg-background rounded-md p-2 border"
+                      >
+                        <span className="flex-1 truncate text-xs">{product.name}</span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => updateQuantity(product.id, -1)}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-6 text-center text-xs">{product.quantity}</span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => updateQuantity(product.id, 1)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <span className="text-muted-foreground text-xs">×</span>
+                        <Input
+                          type="number"
+                          value={product.unit_price}
+                          onChange={(e) =>
+                            updatePrice(product.id, parseFloat(e.target.value) || 0)
+                          }
+                          className="w-16 h-6 text-xs"
+                        />
+                        <span className="w-16 text-right font-medium text-xs">
+                          ${(product.quantity * product.unit_price).toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+                <div className="flex justify-between pt-2 border-t font-semibold">
+                  <span>Total:</span>
+                  <span className="text-primary">${totalAmount.toFixed(2)} MXN</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Product List */}
-          <ScrollArea className="h-48 border rounded-md">
-            <div className="divide-y">
-              {filteredProducts.map((product) => {
-                const isSelected = selectedProducts.some(
-                  (p) => p.id === product.id
-                );
-                return (
-                  <div
-                    key={product.id}
-                    className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted/50 ${
-                      isSelected ? "bg-primary/10" : ""
-                    }`}
-                    onClick={() => toggleProduct(product)}
-                  >
-                    <Checkbox checked={isSelected} className="h-4 w-4" />
-                    <span className="flex-1 text-sm truncate">{product.name}</span>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      SKU: {product.sku}
-                    </span>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      Stock: {product.current_stock || 0}
-                    </span>
-                    <span className="text-sm font-medium w-16 text-right">
-                      ${(product.unit_price || 0).toFixed(2)}
-                    </span>
-                  </div>
-                );
-              })}
-              {filteredProducts.length === 0 && (
-                <p className="text-center py-4 text-muted-foreground text-sm">
-                  No se encontraron productos
-                </p>
-              )}
+          {/* Right column - Product List */}
+          <div className="flex flex-col space-y-2 overflow-hidden">
+            <div className="space-y-2">
+              <Label>Buscar Productos</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar por nombre o SKU..."
+                  className="pl-10"
+                />
+              </div>
             </div>
-          </ScrollArea>
 
-          {/* Selected Products Summary */}
-          {selectedProducts.length > 0 && (
-            <div className="border rounded-md p-3 bg-muted/30 space-y-2">
-              <p className="font-medium text-sm">
-                Productos seleccionados ({selectedProducts.length})
-              </p>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {selectedProducts.map((product) => (
-                  <div
-                    key={product.id}
-                    className="flex items-center gap-2 text-sm"
-                  >
-                    <span className="flex-1 truncate">{product.name}</span>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => updateQuantity(product.id, -1)}
+            <div className="flex-1 border rounded-lg overflow-hidden bg-background">
+              <ScrollArea className="h-[350px]">
+                <div className="divide-y">
+                  {filteredProducts.map((product) => {
+                    const isSelected = selectedProducts.some(
+                      (p) => p.id === product.id
+                    );
+                    return (
+                      <div
+                        key={product.id}
+                        className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-muted/50 ${
+                          isSelected ? "bg-primary/10 border-l-2 border-l-primary" : ""
+                        }`}
+                        onClick={() => toggleProduct(product)}
                       >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-8 text-center">{product.quantity}</span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => updateQuantity(product.id, 1)}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
+                        <Checkbox checked={isSelected} className="h-4 w-4" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{product.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            SKU: {product.sku} · Stock: {product.current_stock || 0}
+                          </p>
+                        </div>
+                        <span className="text-sm font-semibold text-primary whitespace-nowrap">
+                          ${(product.unit_price || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {filteredProducts.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <Package className="h-8 w-8 mb-2 opacity-50" />
+                      <p className="text-sm">No se encontraron productos</p>
                     </div>
-                    <span className="text-muted-foreground">×</span>
-                    <Input
-                      type="number"
-                      value={product.unit_price}
-                      onChange={(e) =>
-                        updatePrice(product.id, parseFloat(e.target.value) || 0)
-                      }
-                      className="w-20 h-6 text-sm"
-                    />
-                    <span className="w-20 text-right font-medium">
-                      ${(product.quantity * product.unit_price).toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-between pt-2 border-t font-medium">
-                <span>Total:</span>
-                <span>${totalAmount.toFixed(2)} MXN</span>
-              </div>
+                  )}
+                </div>
+              </ScrollArea>
             </div>
-          )}
+            <p className="text-xs text-muted-foreground">
+              {filteredProducts.length} productos disponibles
+            </p>
+          </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-4">
+        <div className="flex justify-end gap-2 pt-4 border-t mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
           <Button
             onClick={() => createOrderMutation.mutate()}
-            disabled={createOrderMutation.isPending}
+            disabled={createOrderMutation.isPending || selectedProducts.length === 0}
           >
             {createOrderMutation.isPending ? "Creando..." : "Crear Orden"}
           </Button>
