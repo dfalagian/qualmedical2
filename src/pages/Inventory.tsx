@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -37,7 +38,8 @@ import {
   WifiOff,
   Download,
   Pill,
-  ScanSearch
+  ScanSearch,
+  TrendingDown
 } from "lucide-react";
 import { useWebNFC } from "@/hooks/useWebNFC";
 import { NFCScannerCard, ScanMode } from "@/components/inventory/NFCScannerCard";
@@ -113,6 +115,7 @@ export default function Inventory() {
   const [nfcConfirmationOpen, setNfcConfirmationOpen] = useState<boolean>(false);
   const [nfcMovementResult, setNfcMovementResult] = useState<NFCMovementResult | null>(null);
   const [consultaScanActive, setConsultaScanActive] = useState<boolean>(false);
+  const [lowStockDialogOpen, setLowStockDialogOpen] = useState<boolean>(false);
   
   // Refs - después de los estados
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -883,7 +886,10 @@ export default function Inventory() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card 
+            className="cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] border-l-4 border-l-warning"
+            onClick={() => setLowStockDialogOpen(true)}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-orange-500/10 rounded-lg">
@@ -1680,6 +1686,92 @@ export default function Inventory() {
           onClose={() => setNfcConfirmationOpen(false)}
           result={nfcMovementResult}
         />
+
+        {/* Low Stock Dialog */}
+        <Dialog open={lowStockDialogOpen} onOpenChange={setLowStockDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-warning" />
+                Productos con Stock Bajo
+              </DialogTitle>
+              <DialogDescription>
+                {lowStockProducts.length} productos requieren reabastecimiento
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid grid-cols-2 gap-3 py-2">
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-center">
+                <p className="text-2xl font-bold text-destructive">
+                  {lowStockProducts.filter(p => p.current_stock === 0).length}
+                </p>
+                <p className="text-xs text-muted-foreground">Sin stock</p>
+              </div>
+              <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg text-center">
+                <p className="text-2xl font-bold text-warning">
+                  {lowStockProducts.filter(p => p.current_stock > 0).length}
+                </p>
+                <p className="text-xs text-muted-foreground">Stock bajo</p>
+              </div>
+            </div>
+
+            <ScrollArea className="max-h-[50vh] pr-2">
+              <div className="space-y-2">
+                {lowStockProducts.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <TrendingDown className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No hay productos con stock bajo</p>
+                  </div>
+                ) : (
+                  lowStockProducts.map((product) => {
+                    const current = product.current_stock ?? 0;
+                    const minimum = product.minimum_stock ?? 0;
+                    const percentage = minimum === 0 ? 100 : Math.min(100, Math.max(0, (current / minimum) * 100));
+                    const colorClass = current === 0 ? "bg-destructive" : percentage <= 50 ? "bg-warning" : "bg-success";
+                    
+                    return (
+                      <div
+                        key={product.id}
+                        className="p-3 border rounded-lg bg-card hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm truncate">{product.name}</p>
+                            <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
+                          </div>
+                          <Badge 
+                            variant={current === 0 ? "destructive" : "secondary"}
+                            className="shrink-0"
+                          >
+                            {current === 0 ? "Agotado" : "Bajo"}
+                          </Badge>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span>Stock actual: <strong>{current}</strong> {product.unit || "uds"}</span>
+                            <span className="text-muted-foreground">Mín: {minimum}</span>
+                          </div>
+                          <Progress 
+                            value={percentage} 
+                            className="h-2"
+                            indicatorClassName={colorClass}
+                          />
+                        </div>
+
+                        {product.category && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Categoría: {product.category}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
