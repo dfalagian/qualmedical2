@@ -5,6 +5,7 @@ import { FileText, Receipt, MessageSquare, ShoppingCart } from "lucide-react";
 import { EmailServerStatus } from "@/components/dashboard/EmailServerStatus";
 import { Navigate } from "react-router-dom";
 import { ManageContador } from "@/components/supplier/ManageContador";
+import { LowStockCard } from "@/components/dashboard/LowStockCard";
 
 const Dashboard = () => {
   const { user, isAdmin, isContador, isContadorProveedor, isSupplier } = useAuth();
@@ -62,7 +63,7 @@ const Dashboard = () => {
           </p>
         </div>
 
-        <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-5">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
@@ -82,6 +83,9 @@ const Dashboard = () => {
               </Card>
             );
           })}
+
+          {/* Tarjeta de Stock Bajo - Solo para admin */}
+          {isAdmin && <LowStockCard />}
         </div>
 
         {isAdmin && <EmailServerStatus />}
