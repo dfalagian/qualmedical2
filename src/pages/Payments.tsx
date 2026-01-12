@@ -473,6 +473,7 @@ const Payments = () => {
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="procesando">Procesando</SelectItem>
                   <SelectItem value="pagado">Pagado</SelectItem>
                 </SelectContent>
               </Select>
