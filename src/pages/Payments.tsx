@@ -254,9 +254,9 @@ const Payments = () => {
       for (const bankDoc of approvedBankDocs) {
         const { data: invoices, error: invoicesError } = await supabase
           .from("invoices")
-          .select("id, amount")
+          .select("id, amount, status")
           .eq("supplier_id", bankDoc.supplier_id)
-          .eq("status", "pendiente");
+          .in("status", ["pendiente", "procesando"]);
 
         if (invoicesError) throw invoicesError;
 
