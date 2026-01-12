@@ -623,18 +623,6 @@ const Admin = () => {
                           </DialogContent>
                         </Dialog>
 
-                        <Button
-                          variant={isUserAdmin ? "destructive" : "default"}
-                          size="sm"
-                          onClick={() =>
-                            toggleAdminMutation.mutate({
-                              userId: user.id,
-                              currentRole: userRole,
-                            })
-                          }
-                        >
-                          {isUserAdmin ? "Quitar Admin" : "Hacer Admin"}
-                        </Button>
 
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
