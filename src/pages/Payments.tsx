@@ -196,10 +196,10 @@ const Payments = () => {
     if (!pagos) return [];
     
     return pagos.filter((pago: any) => {
-      // Filtro por estado (ESTADO DE LA FACTURA)
+      // Filtro por estado (ESTADO DEL PAGO)
       if (filterStatus !== "all") {
-        const invoiceStatus = pago.invoice_status || pago.invoices?.status || null;
-        if (invoiceStatus !== filterStatus) return false;
+        const pagoStatus = pago.is_pending_remainder ? "pendiente" : pago.status;
+        if (pagoStatus !== filterStatus) return false;
       }
 
       // Filtro por proveedor
