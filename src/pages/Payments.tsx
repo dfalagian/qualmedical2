@@ -82,10 +82,10 @@ const Payments = () => {
           .eq("id", pago.datos_bancarios_id)
           .single();
 
-        // Obtener factura
+        // Obtener factura (incluye status para poder filtrar por estado de la factura)
         const { data: invoice } = await supabase
           .from("invoices")
-          .select("invoice_number, amount, fecha_emision")
+          .select("invoice_number, amount, fecha_emision, status")
           .eq("id", pago.invoice_id)
           .single();
 
@@ -112,6 +112,7 @@ const Payments = () => {
           profiles: profile,
           datos_bancarios: bankData,
           invoices: invoice,
+          invoice_status: invoice?.status || null,
           regimen_fiscal: constanciaFiscal?.regimen_fiscal || null,
           supplier_id: pago.supplier_id,
           datos_bancarios_id: pago.datos_bancarios_id,
@@ -195,12 +196,12 @@ const Payments = () => {
     if (!pagos) return [];
     
     return pagos.filter((pago: any) => {
-      // Filtro por estado
+      // Filtro por estado (ESTADO DE LA FACTURA)
       if (filterStatus !== "all") {
-        const pagoStatus = pago.is_pending_remainder ? "pendiente" : pago.status;
-        if (pagoStatus !== filterStatus) return false;
+        const invoiceStatus = pago.invoice_status || pago.invoices?.status || null;
+        if (invoiceStatus !== filterStatus) return false;
       }
-      
+
       // Filtro por proveedor
       if (filterSupplier !== "all" && pago.supplier_id !== filterSupplier) {
         return false;
