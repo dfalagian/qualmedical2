@@ -261,20 +261,39 @@ const Payments = () => {
         if (invoicesError) throw invoicesError;
 
         if (invoices && invoices.length > 0) {
-          // Crear registros de pago para facturas que no tengan pago aún
-          const pagos = invoices.map(invoice => ({
+          // Crear/actualizar registros de pago para facturas pendientes o en procesamiento
+          const pagos = invoices.map((invoice: any) => ({
             supplier_id: bankDoc.supplier_id,
             datos_bancarios_id: bankDoc.id,
             invoice_id: invoice.id,
             amount: invoice.amount,
-            status: "pendiente",
+            // Mantener alineado el estado del pago con el estado de la factura (pendiente/procesando)
+            status: invoice.status === "procesando" ? "procesando" : "pendiente",
             nombre_banco: bankDoc.nombre_banco || null,
             created_by: user?.id,
           }));
 
           const { error: pagosError } = await supabase
             .from("pagos")
-            .upsert(pagos, { onConflict: 'invoice_id', ignoreDuplicates: true });
+            .upsert(pagos, { onConflict: "invoice_id", ignoreDuplicates: true });
+
+          // Si ya existía el registro de pago, el upsert con ignoreDuplicates no actualiza.
+          // Aseguramos que los pagos existentes se marquen como "procesando" cuando la factura esté en ese estado.
+          const processingInvoiceIds = invoices
+            .filter((inv: any) => inv.status === "procesando")
+            .map((inv: any) => inv.id);
+
+          if (processingInvoiceIds.length > 0) {
+            const { error: updateErr } = await supabase
+              .from("pagos")
+              .update({ status: "procesando" })
+              .in("invoice_id", processingInvoiceIds)
+              .neq("status", "pagado");
+
+            if (updateErr) {
+              console.error("Error actualizando pagos a procesando:", updateErr);
+            }
+          }
 
           if (pagosError && !pagosError.message.includes("duplicate")) {
             console.error("Error creando pagos:", pagosError);
@@ -292,7 +311,7 @@ const Payments = () => {
       } else {
         toast.info("No hay nuevos pagos para generar");
       }
-      queryClient.invalidateQueries({ queryKey: ["pagos"] });
+      queryClient.invalidateQueries({ queryKey: ["pagos-con-comprobantes"] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al generar pagos");
