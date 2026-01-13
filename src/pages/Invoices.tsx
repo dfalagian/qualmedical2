@@ -1282,12 +1282,17 @@ const Invoices = () => {
                           <DollarSign className="h-3 w-3" />
                           ${calculateInvoiceTotal(invoice).toLocaleString('es-MX', { minimumFractionDigits: 2 })} {invoice.currency}
                         </span>
-                        <span>
-                          {new Date(invoice.created_at).toLocaleDateString('es-MX')}
-                        </span>
-                        {invoice.payment_date && (
+                        {invoice.payment_date ? (
                           <span className="text-success">
-                            Pagado: {new Date(invoice.payment_date).toLocaleDateString('es-MX')}
+                            {new Date(invoice.payment_date).toLocaleDateString('es-MX')}
+                          </span>
+                        ) : invoice.fecha_emision ? (
+                          <span>
+                            {new Date(invoice.fecha_emision).toLocaleDateString('es-MX')}
+                          </span>
+                        ) : (
+                          <span>
+                            {new Date(invoice.created_at).toLocaleDateString('es-MX')}
                           </span>
                         )}
                       </div>
