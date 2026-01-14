@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText } from "lucide-react";
+import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText, KeyRound, Copy, Check } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
@@ -47,6 +47,10 @@ const Admin = () => {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [recoveryLink, setRecoveryLink] = useState<string | null>(null);
+  const [recoveryDialogOpen, setRecoveryDialogOpen] = useState(false);
+  const [recoveryUserEmail, setRecoveryUserEmail] = useState<string>("");
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
@@ -224,6 +228,42 @@ const Admin = () => {
       toast.error(errorMessage);
     },
   });
+
+  const generateRecoveryLinkMutation = useMutation({
+    mutationFn: async ({ userId, email }: { userId: string; email: string }) => {
+      const response = await supabase.functions.invoke("generate-recovery-link", {
+        body: { userId, email },
+      });
+
+      if (response.error) throw response.error;
+      if (response.data?.error) throw new Error(response.data.error);
+      
+      return response.data;
+    },
+    onSuccess: (data) => {
+      setRecoveryLink(data.recoveryLink);
+      setRecoveryDialogOpen(true);
+      toast.success("Enlace de recuperación generado");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al generar enlace de recuperación");
+    },
+  });
+
+  const handleGenerateRecoveryLink = (user: any) => {
+    setRecoveryUserEmail(user.email);
+    setLinkCopied(false);
+    generateRecoveryLinkMutation.mutate({ userId: user.id, email: user.email });
+  };
+
+  const handleCopyLink = async () => {
+    if (recoveryLink) {
+      await navigator.clipboard.writeText(recoveryLink);
+      setLinkCopied(true);
+      toast.success("Enlace copiado al portapapeles");
+      setTimeout(() => setLinkCopied(false), 3000);
+    }
+  };
 
   const handleEditUser = (user: any) => {
     setEditingUser(user);
@@ -512,6 +552,15 @@ const Admin = () => {
                       </div>
 
                       <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGenerateRecoveryLink(user)}
+                          disabled={generateRecoveryLinkMutation.isPending}
+                          title="Generar enlace de recuperación de contraseña"
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
                         <Dialog open={dialogOpen && editingUser?.id === user.id} onOpenChange={(open) => {
                           setDialogOpen(open);
                           if (!open) {
@@ -694,6 +743,81 @@ const Admin = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Recovery Link Dialog */}
+        <Dialog open={recoveryDialogOpen} onOpenChange={(open) => {
+          setRecoveryDialogOpen(open);
+          if (!open) {
+            setRecoveryLink(null);
+            setLinkCopied(false);
+          }
+        }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <KeyRound className="h-5 w-5" />
+                Enlace de Recuperación de Contraseña
+              </DialogTitle>
+              <DialogDescription>
+                Comparte este enlace con el usuario <strong>{recoveryUserEmail}</strong> por WhatsApp, llamada u otro medio seguro.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground mb-2">Enlace de recuperación:</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs break-all bg-background p-2 rounded border">
+                    {recoveryLink}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCopyLink}
+                    className="shrink-0"
+                  >
+                    {linkCopied ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>⚠️ Importante:</strong> Este enlace expira en 24 horas y solo puede usarse una vez.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setRecoveryDialogOpen(false);
+                    setRecoveryLink(null);
+                  }}
+                >
+                  Cerrar
+                </Button>
+                <Button onClick={handleCopyLink}>
+                  {linkCopied ? (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Copiado
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copiar Enlace
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
