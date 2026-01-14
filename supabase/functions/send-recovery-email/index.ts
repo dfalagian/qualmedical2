@@ -195,15 +195,44 @@ const handler = async (req: Request): Promise<Response> => {
 </html>
     `;
 
-    await client.send({
-      from: smtpFromEmail,
-      to: email,
-      subject: "🔐 Recupera tu contraseña - QualMedical",
-      content: `Hola ${userName}, haz clic en este enlace para restablecer tu contraseña: ${recoveryLink}`,
-      html: emailHtml,
-    });
+    if (!recoveryLink) {
+      throw new Error("No se pudo generar el enlace de recuperación");
+    }
 
-    await client.close();
+    try {
+      await client.send({
+        from: smtpFromEmail,
+        to: email,
+        subject: "🔐 Recupera tu contraseña - QualMedical",
+        content: `Hola ${userName}, haz clic en este enlace para restablecer tu contraseña: ${recoveryLink}`,
+        html: emailHtml,
+      });
+    } catch (smtpError: any) {
+      const msg = String(smtpError?.message || smtpError);
+      console.error("SMTP send failed:", msg);
+
+      // 535 auth failed
+      if (msg.includes("535") || msg.toLowerCase().includes("authentication failed")) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "Credenciales SMTP inválidas. Verifica SMTP_USER/SMTP_PASSWORD (muchas veces es una contraseña de aplicación).",
+          }),
+          { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ error: "No se pudo enviar el correo por SMTP. Revisa la configuración." }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    } finally {
+      try {
+        await client.close();
+      } catch {
+        // ignore
+      }
+    }
 
     console.log("Recovery email sent successfully to:", email);
 
