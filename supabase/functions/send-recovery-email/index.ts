@@ -29,6 +29,33 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Processing password recovery for:", email);
 
+    // Validate SMTP configuration
+    const smtpHost = Deno.env.get("SMTP_HOST");
+    const smtpPort = Deno.env.get("SMTP_PORT");
+    const smtpUser = Deno.env.get("SMTP_USER");
+    const smtpPassword = Deno.env.get("SMTP_PASSWORD");
+    const smtpFromEmail = Deno.env.get("SMTP_FROM_EMAIL");
+
+    console.log("SMTP Config - Host:", smtpHost, "Port:", smtpPort, "User:", smtpUser, "From:", smtpFromEmail);
+
+    if (!smtpHost || !smtpUser || !smtpPassword || !smtpFromEmail) {
+      console.error("Missing SMTP configuration");
+      return new Response(
+        JSON.stringify({ error: "Configuración de correo incompleta. Contacta al administrador." }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Validate from email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(smtpFromEmail)) {
+      console.error("Invalid SMTP_FROM_EMAIL format:", smtpFromEmail);
+      return new Response(
+        JSON.stringify({ error: "Formato de correo remitente inválido. Contacta al administrador." }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     // Create admin client to generate recovery link
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -70,12 +97,12 @@ const handler = async (req: Request): Promise<Response> => {
     // Send email using SMTP
     const client = new SMTPClient({
       connection: {
-        hostname: Deno.env.get("SMTP_HOST")!,
-        port: parseInt(Deno.env.get("SMTP_PORT") || "465"),
+        hostname: smtpHost,
+        port: parseInt(smtpPort || "465"),
         tls: true,
         auth: {
-          username: Deno.env.get("SMTP_USER")!,
-          password: Deno.env.get("SMTP_PASSWORD")!,
+          username: smtpUser,
+          password: smtpPassword,
         },
       },
     });
@@ -169,7 +196,7 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     await client.send({
-      from: Deno.env.get("SMTP_FROM_EMAIL")!,
+      from: smtpFromEmail,
       to: email,
       subject: "🔐 Recupera tu contraseña - QualMedical",
       content: `Hola ${userName}, haz clic en este enlace para restablecer tu contraseña: ${recoveryLink}`,
