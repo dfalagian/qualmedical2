@@ -136,8 +136,12 @@ export const AuthForm = () => {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/auth?reset=true`,
+      // Use custom edge function with SMTP
+      const { data, error } = await supabase.functions.invoke("send-recovery-email", {
+        body: {
+          email: resetEmail.trim().toLowerCase(),
+          redirectTo: `${window.location.origin}/auth?reset=true`,
+        },
       });
 
       if (error) throw error;

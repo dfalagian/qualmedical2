@@ -53,3 +53,6 @@ verify_jwt = true
 
 [functions.get-external-purchase-orders]
 verify_jwt = true
+
+[functions.send-recovery-email]
+verify_jwt = false
