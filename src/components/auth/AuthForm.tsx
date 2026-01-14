@@ -342,17 +342,6 @@ export const AuthForm = () => {
                   Iniciar Sesión
                 </Button>
 
-                <div className="text-center">
-                  <button
-                    type="button"
-                    onClick={() => setIsForgotPassword(true)}
-                    className="text-sm text-muted-foreground hover:text-primary hover:underline"
-                    disabled={isLoading}
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </button>
-                </div>
-
                 <div className="text-center text-sm text-muted-foreground">
                   ¿No tienes cuenta?{" "}
                   <button
