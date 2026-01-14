@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText, KeyRound, Copy, Check } from "lucide-react";
+import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText, KeyRound } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
@@ -38,8 +38,17 @@ const createUserFormSchema = z.object({
   phone: z.string().optional(),
 });
 
+const changePasswordSchema = z.object({
+  newPassword: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  confirmPassword: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Las contraseñas no coinciden",
+  path: ["confirmPassword"],
+});
+
 type UserFormValues = z.infer<typeof userFormSchema>;
 type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
+type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
 const Admin = () => {
   const { isAdmin, loading } = useAuth();
@@ -47,10 +56,8 @@ const Admin = () => {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [recoveryLink, setRecoveryLink] = useState<string | null>(null);
-  const [recoveryDialogOpen, setRecoveryDialogOpen] = useState(false);
-  const [recoveryUserEmail, setRecoveryUserEmail] = useState<string>("");
-  const [linkCopied, setLinkCopied] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordChangeUser, setPasswordChangeUser] = useState<any>(null);
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
@@ -73,6 +80,14 @@ const Admin = () => {
       company_name: "",
       rfc: "",
       phone: "",
+    },
+  });
+
+  const passwordForm = useForm<ChangePasswordValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: {
+      newPassword: "",
+      confirmPassword: "",
     },
   });
 
@@ -229,10 +244,10 @@ const Admin = () => {
     },
   });
 
-  const generateRecoveryLinkMutation = useMutation({
-    mutationFn: async ({ userId, email }: { userId: string; email: string }) => {
-      const response = await supabase.functions.invoke("generate-recovery-link", {
-        body: { userId, email },
+  const changePasswordMutation = useMutation({
+    mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
+      const response = await supabase.functions.invoke("change-user-password", {
+        body: { userId, newPassword },
       });
 
       if (response.error) throw response.error;
@@ -240,28 +255,29 @@ const Admin = () => {
       
       return response.data;
     },
-    onSuccess: (data) => {
-      setRecoveryLink(data.recoveryLink);
-      setRecoveryDialogOpen(true);
-      toast.success("Enlace de recuperación generado");
+    onSuccess: () => {
+      toast.success("Contraseña cambiada exitosamente");
+      setPasswordDialogOpen(false);
+      setPasswordChangeUser(null);
+      passwordForm.reset();
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al generar enlace de recuperación");
+      toast.error(error.message || "Error al cambiar contraseña");
     },
   });
 
-  const handleGenerateRecoveryLink = (user: any) => {
-    setRecoveryUserEmail(user.email);
-    setLinkCopied(false);
-    generateRecoveryLinkMutation.mutate({ userId: user.id, email: user.email });
+  const handleOpenPasswordDialog = (user: any) => {
+    setPasswordChangeUser(user);
+    passwordForm.reset();
+    setPasswordDialogOpen(true);
   };
 
-  const handleCopyLink = async () => {
-    if (recoveryLink) {
-      await navigator.clipboard.writeText(recoveryLink);
-      setLinkCopied(true);
-      toast.success("Enlace copiado al portapapeles");
-      setTimeout(() => setLinkCopied(false), 3000);
+  const onPasswordSubmit = (data: ChangePasswordValues) => {
+    if (passwordChangeUser) {
+      changePasswordMutation.mutate({ 
+        userId: passwordChangeUser.id, 
+        newPassword: data.newPassword 
+      });
     }
   };
 
@@ -555,9 +571,9 @@ const Admin = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleGenerateRecoveryLink(user)}
-                          disabled={generateRecoveryLinkMutation.isPending}
-                          title="Generar enlace de recuperación de contraseña"
+                          onClick={() => handleOpenPasswordDialog(user)}
+                          disabled={changePasswordMutation.isPending}
+                          title="Cambiar contraseña del usuario"
                         >
                           <KeyRound className="h-4 w-4" />
                         </Button>
@@ -744,78 +760,72 @@ const Admin = () => {
           </CardContent>
         </Card>
 
-        {/* Recovery Link Dialog */}
-        <Dialog open={recoveryDialogOpen} onOpenChange={(open) => {
-          setRecoveryDialogOpen(open);
+        {/* Change Password Dialog */}
+        <Dialog open={passwordDialogOpen} onOpenChange={(open) => {
+          setPasswordDialogOpen(open);
           if (!open) {
-            setRecoveryLink(null);
-            setLinkCopied(false);
+            setPasswordChangeUser(null);
+            passwordForm.reset();
           }
         }}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <KeyRound className="h-5 w-5" />
-                Enlace de Recuperación de Contraseña
+                Cambiar Contraseña
               </DialogTitle>
               <DialogDescription>
-                Comparte este enlace con el usuario <strong>{recoveryUserEmail}</strong> por WhatsApp, llamada u otro medio seguro.
+                Establece una nueva contraseña para <strong>{passwordChangeUser?.email}</strong>
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4">
-              <div className="p-4 bg-muted rounded-lg">
-                <p className="text-xs text-muted-foreground mb-2">Enlace de recuperación:</p>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 text-xs break-all bg-background p-2 rounded border">
-                    {recoveryLink}
-                  </code>
+            <Form {...passwordForm}>
+              <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+                <FormField
+                  control={passwordForm.control}
+                  name="newPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nueva Contraseña</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="password" placeholder="Mínimo 6 caracteres" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={passwordForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Repetir Contraseña</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="password" placeholder="Repite la contraseña" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex justify-end gap-2 pt-2">
                   <Button
-                    size="sm"
+                    type="button"
                     variant="outline"
-                    onClick={handleCopyLink}
-                    className="shrink-0"
+                    onClick={() => {
+                      setPasswordDialogOpen(false);
+                      setPasswordChangeUser(null);
+                      passwordForm.reset();
+                    }}
                   >
-                    {linkCopied ? (
-                      <Check className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={changePasswordMutation.isPending}>
+                    {changePasswordMutation.isPending ? "Cambiando..." : "Cambiar Contraseña"}
                   </Button>
                 </div>
-              </div>
-              
-              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                <p className="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>⚠️ Importante:</strong> Este enlace expira en 24 horas y solo puede usarse una vez.
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setRecoveryDialogOpen(false);
-                    setRecoveryLink(null);
-                  }}
-                >
-                  Cerrar
-                </Button>
-                <Button onClick={handleCopyLink}>
-                  {linkCopied ? (
-                    <>
-                      <Check className="h-4 w-4 mr-2" />
-                      Copiado
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copiar Enlace
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>

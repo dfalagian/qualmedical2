@@ -1,5 +1,8 @@
 project_id = "cjhmbqmhfbspgirnkjkm"
 
+[functions.change-user-password]
+verify_jwt = true
+
 [functions.extract-document-info]
 verify_jwt = true
 
