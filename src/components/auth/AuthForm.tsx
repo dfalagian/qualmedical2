@@ -63,6 +63,8 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 export const AuthForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
   const navigate = useNavigate();
 
   const loginForm = useForm<LoginFormValues>({
@@ -120,6 +122,31 @@ export const AuthForm = () => {
       navigate("/dashboard");
     } catch (error: any) {
       toast.error(error.message || "Error al iniciar sesión");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) {
+      toast.error("Ingresa tu correo electrónico");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/auth?reset=true`,
+      });
+
+      if (error) throw error;
+
+      toast.success("Se ha enviado un enlace de recuperación a tu correo");
+      setIsForgotPassword(false);
+      setResetEmail("");
+    } catch (error: any) {
+      toast.error(error.message || "Error al enviar el correo de recuperación");
     } finally {
       setIsLoading(false);
     }
@@ -199,17 +226,67 @@ export const AuthForm = () => {
             />
           </div>
           <CardTitle className="text-2xl font-bold">
-            {isSignUp ? "Crear Cuenta" : "Iniciar Sesión"}
+            {isForgotPassword 
+              ? "Recuperar Contraseña" 
+              : isSignUp 
+                ? "Crear Cuenta" 
+                : "Iniciar Sesión"
+            }
           </CardTitle>
           <CardDescription>
-            {isSignUp 
-              ? "Regístrate como proveedor en el sistema" 
-              : "Ingresa tus credenciales para acceder al sistema"
+            {isForgotPassword
+              ? "Ingresa tu correo para recibir un enlace de recuperación"
+              : isSignUp 
+                ? "Regístrate como proveedor en el sistema" 
+                : "Ingresa tus credenciales para acceder al sistema"
             }
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!isSignUp ? (
+          {isForgotPassword ? (
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="reset-email" className="text-sm font-medium">
+                  Correo Electrónico
+                </label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  placeholder="tu@email.com"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  disabled={isLoading}
+                  autoComplete="email"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Te enviaremos un enlace para restablecer tu contraseña
+                </p>
+              </div>
+
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Enviar Enlace de Recuperación
+              </Button>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotPassword(false);
+                    setResetEmail("");
+                  }}
+                  className="text-sm text-muted-foreground hover:text-primary hover:underline"
+                  disabled={isLoading}
+                >
+                  Volver a Iniciar Sesión
+                </button>
+              </div>
+            </form>
+          ) : !isSignUp ? (
             <Form {...loginForm} key="login-form">
               <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
                 <FormField
@@ -260,6 +337,17 @@ export const AuthForm = () => {
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Iniciar Sesión
                 </Button>
+
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotPassword(true)}
+                    className="text-sm text-muted-foreground hover:text-primary hover:underline"
+                    disabled={isLoading}
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </div>
 
                 <div className="text-center text-sm text-muted-foreground">
                   ¿No tienes cuenta?{" "}
