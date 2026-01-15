@@ -28,23 +28,39 @@ interface DashboardLayoutProps {
 }
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
-  const { user, loading, isAdmin, isContador, isContadorProveedor, isInventarioRfid, userRole } = useAuth();
+  const {
+    user,
+    session,
+    loading,
+    roleLoading,
+    isAdmin,
+    isContador,
+    isContadorProveedor,
+    userRole,
+  } = useAuth();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  if (loading) {
+  if (loading || (roleLoading && !userRole)) {
+    const message = loading ? "Cargando..." : "Cargando permisos...";
+
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Cargando...</p>
+          <p className="text-muted-foreground">{message}</p>
         </div>
       </div>
     );
   }
 
-  if (!user) {
+  if (!user || !session) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Para rol inventario_rfid, forzamos que solo pueda estar en Inventario RFID
+  if (userRole === "inventario_rfid" && location.pathname !== "/dashboard/inventory") {
+    return <Navigate to="/dashboard/inventory" replace />;
   }
 
   // Navegación para rol Contador (interno) - solo acceso a Contador de Medicamentos
@@ -93,12 +109,18 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   // Determinar navegación según rol
   let navigation = fullNavigation;
-  if (isContador) {
-    navigation = contadorNavigation;
-  } else if (isContadorProveedor) {
-    navigation = contadorProveedorNavigation;
-  } else if (isInventarioRfid) {
-    navigation = inventarioRfidNavigation;
+  switch (userRole) {
+    case "contador":
+      navigation = contadorNavigation;
+      break;
+    case "contador_proveedor":
+      navigation = contadorProveedorNavigation;
+      break;
+    case "inventario_rfid":
+      navigation = inventarioRfidNavigation;
+      break;
+    default:
+      navigation = fullNavigation;
   }
 
   const NavigationItems = ({ onItemClick }: { onItemClick?: () => void }) => (
