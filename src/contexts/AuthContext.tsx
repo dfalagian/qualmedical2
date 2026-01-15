@@ -51,7 +51,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (roleError) throw roleError;
 
+      console.log("AuthContext - Role fetched for user:", userId, "roleData:", roleData);
+      
       const role = (roleData?.role as UserRole) || null;
+      console.log("AuthContext - Parsed role:", role);
       setUserRole(role);
 
       // If contador_proveedor, fetch parent_supplier_id
