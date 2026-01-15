@@ -41,7 +41,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  if (loading || (roleLoading && !userRole)) {
+  // Esperar a que termine la carga inicial Y que tengamos el rol definido
+  // Esto evita el race condition donde el componente se renderiza antes de tener el rol
+  if (loading || roleLoading || !userRole) {
     const message = loading ? "Cargando..." : "Cargando permisos...";
 
     return (
