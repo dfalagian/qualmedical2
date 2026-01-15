@@ -1166,6 +1166,7 @@ export type Database = {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_contador: { Args: { _user_id: string }; Returns: boolean }
       is_contador_proveedor: { Args: { _user_id: string }; Returns: boolean }
+      is_inventario_rfid: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       document_status: "pendiente" | "aprobado" | "rechazado"
@@ -1188,7 +1189,12 @@ export type Database = {
         | "cancelado"
       tipo_persona: "fisica" | "moral"
       tipo_venta: "medicamentos" | "otros"
-      user_role: "admin" | "proveedor" | "contador" | "contador_proveedor"
+      user_role:
+        | "admin"
+        | "proveedor"
+        | "contador"
+        | "contador_proveedor"
+        | "inventario_rfid"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1338,7 +1344,13 @@ export const Constants = {
       ],
       tipo_persona: ["fisica", "moral"],
       tipo_venta: ["medicamentos", "otros"],
-      user_role: ["admin", "proveedor", "contador", "contador_proveedor"],
+      user_role: [
+        "admin",
+        "proveedor",
+        "contador",
+        "contador_proveedor",
+        "inventario_rfid",
+      ],
     },
   },
 } as const

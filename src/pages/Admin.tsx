@@ -32,7 +32,7 @@ const createUserFormSchema = z.object({
   full_name: z.string().min(1, "El nombre es requerido"),
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
-  role: z.enum(["admin", "proveedor", "contador"], { required_error: "Selecciona un rol" }),
+  role: z.enum(["admin", "proveedor", "contador", "contador_proveedor", "inventario_rfid"], { required_error: "Selecciona un rol" }),
   company_name: z.string().optional(),
   rfc: z.string().optional(),
   phone: z.string().optional(),
@@ -410,6 +410,8 @@ const Admin = () => {
                               <SelectContent>
                                 <SelectItem value="proveedor">Proveedor</SelectItem>
                                 <SelectItem value="contador">Contador</SelectItem>
+                                <SelectItem value="contador_proveedor">Contador Proveedor</SelectItem>
+                                <SelectItem value="inventario_rfid">Inventario RFID</SelectItem>
                                 <SelectItem value="admin">Administrador</SelectItem>
                               </SelectContent>
                             </Select>
