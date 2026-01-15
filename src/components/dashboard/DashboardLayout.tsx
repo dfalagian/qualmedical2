@@ -28,7 +28,7 @@ interface DashboardLayoutProps {
 }
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
-  const { user, loading, isAdmin, isContador, isContadorProveedor, userRole } = useAuth();
+  const { user, loading, isAdmin, isContador, isContadorProveedor, isInventarioRfid, userRole } = useAuth();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -56,6 +56,11 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const contadorProveedorNavigation = [
     { name: "Contador de Medicamentos", href: "/dashboard/medicine-counter", icon: Camera },
     { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
+  ];
+
+  // Navegación para rol Inventario RFID - solo acceso a Inventario
+  const inventarioRfidNavigation = [
+    { name: "Inventario RFID", href: "/dashboard/inventory", icon: Package },
   ];
 
   // Navegación completa para Admin y Proveedor
@@ -92,6 +97,8 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     navigation = contadorNavigation;
   } else if (isContadorProveedor) {
     navigation = contadorProveedorNavigation;
+  } else if (isInventarioRfid) {
+    navigation = inventarioRfidNavigation;
   }
 
   const NavigationItems = ({ onItemClick }: { onItemClick?: () => void }) => (
