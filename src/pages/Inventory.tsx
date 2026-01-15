@@ -100,7 +100,7 @@ interface RfidTag {
 export default function Inventory() {
   // Hooks de librerías - siempre primero y en orden fijo
   const { toast } = useToast();
-  const { isAdmin, isContador } = useAuth();
+  const { isAdmin, isContador, isInventarioRfid } = useAuth();
   const queryClient = useQueryClient();
   
   // Estados del componente - orden fijo
@@ -846,7 +846,7 @@ export default function Inventory() {
     .filter(p => p.citio_id)
     .map(p => p.citio_id as string);
 
-  const canEdit = isAdmin || isContador;
+  const canEdit = isAdmin || isContador || isInventarioRfid;
 
   return (
     <DashboardLayout>
