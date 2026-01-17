@@ -420,7 +420,7 @@ export default function Inventory() {
       presentacion?: string;
       price_type_1?: number;
       codigo_sat?: string;
-      codigo_medicamento?: string;
+      medication_code?: string;
       medication_families?: { name: string };
     }) => {
       // First check if product already exists by citio_id
@@ -437,9 +437,9 @@ export default function Inventory() {
         return { name: existingProduct.name, existed: true };
       }
       
-      // Generate SKU from CITIO ID or use codigo_medicamento if available
-      const sku = citioMedication.codigo_medicamento 
-        ? citioMedication.codigo_medicamento 
+      // Generate SKU from CITIO ID or use medication_code if available
+      const sku = citioMedication.medication_code 
+        ? citioMedication.medication_code 
         : `CITIO-${citioMedication.id.slice(0, 8).toUpperCase()}`;
       
       // Build description including barcode info
@@ -464,7 +464,7 @@ export default function Inventory() {
         });
       
       if (error) throw error;
-      return { name: citioMedication.name, existed: false, barcode: citioMedication.codigo_medicamento };
+      return { name: citioMedication.name, existed: false, barcode: citioMedication.medication_code };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
