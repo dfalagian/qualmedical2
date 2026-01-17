@@ -1244,7 +1244,7 @@ export default function Inventory() {
                                 >
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                {isAdmin && (
+                                {(isAdmin || isInventarioRfid) && (
                                   <Button 
                                     variant="ghost" 
                                     size="icon"
