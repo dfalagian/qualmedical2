@@ -31,7 +31,7 @@ interface CITIOMedication {
   current_stock?: number;
   codigo_sat?: string;
   clave_unidad?: string;
-  codigo_medicamento?: string;
+  medication_code?: string;
 }
 
 interface CITIOImportDialogProps {
@@ -80,7 +80,7 @@ export function CITIOImportDialog({
         med.brand?.toLowerCase().includes(term) ||
         med.description?.toLowerCase().includes(term) ||
         med.medication_families?.name?.toLowerCase().includes(term) ||
-        med.codigo_medicamento?.toLowerCase().includes(term)
+        med.medication_code?.toLowerCase().includes(term)
     );
   }, [medications, searchTerm]);
 
@@ -194,9 +194,9 @@ export function CITIOImportDialog({
                                   ) : null}
                                 </div>
                               </div>
-                              {med.codigo_medicamento && (
+                              {med.medication_code && (
                                 <div className="text-xs text-muted-foreground">
-                                  <span className="font-mono bg-muted px-1 rounded">CB: {med.codigo_medicamento}</span>
+                                  <span className="font-mono bg-muted px-1 rounded">CB: {med.medication_code}</span>
                                 </div>
                               )}
                             </div>
@@ -218,9 +218,9 @@ export function CITIOImportDialog({
               <span className="font-semibold">{selectedMedication.name}</span>
               <span className="text-muted-foreground">- {selectedMedication.brand}</span>
             </div>
-            {selectedMedication.codigo_medicamento && (
+            {selectedMedication.medication_code && (
               <div className="mt-1 text-xs text-muted-foreground">
-                Código de barras: <span className="font-mono bg-muted px-1 rounded">{selectedMedication.codigo_medicamento}</span>
+                Código de barras: <span className="font-mono bg-muted px-1 rounded">{selectedMedication.medication_code}</span>
               </div>
             )}
           </div>
