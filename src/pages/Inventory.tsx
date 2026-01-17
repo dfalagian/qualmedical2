@@ -420,6 +420,7 @@ export default function Inventory() {
       presentacion?: string;
       price_type_1?: number;
       codigo_sat?: string;
+      codigo_medicamento?: string;
       medication_families?: { name: string };
     }) => {
       // First check if product already exists by citio_id
@@ -436,15 +437,24 @@ export default function Inventory() {
         return { name: existingProduct.name, existed: true };
       }
       
-      // Generate SKU from CITIO ID
-      const sku = `CITIO-${citioMedication.id.slice(0, 8).toUpperCase()}`;
+      // Generate SKU from CITIO ID or use codigo_medicamento if available
+      const sku = citioMedication.codigo_medicamento 
+        ? citioMedication.codigo_medicamento 
+        : `CITIO-${citioMedication.id.slice(0, 8).toUpperCase()}`;
+      
+      // Build description including barcode info
+      const descParts = [
+        citioMedication.brand || '',
+        citioMedication.description || '',
+        citioMedication.presentacion || ''
+      ].filter(Boolean).join(' - ');
       
       const { error } = await supabase
         .from("products")
         .insert({
           sku,
           name: citioMedication.name,
-          description: `${citioMedication.brand || ''} - ${citioMedication.description || ''} ${citioMedication.presentacion || ''}`.trim(),
+          description: descParts || null,
           category: citioMedication.medication_families?.name || "Medicamentos",
           unit: "pieza",
           minimum_stock: 5,
@@ -454,7 +464,7 @@ export default function Inventory() {
         });
       
       if (error) throw error;
-      return { name: citioMedication.name, existed: false };
+      return { name: citioMedication.name, existed: false, barcode: citioMedication.codigo_medicamento };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -465,9 +475,10 @@ export default function Inventory() {
           description: `"${result.name}" ya está en el inventario.`
         });
       } else {
+        const barcodeInfo = result.barcode ? ` (Código: ${result.barcode})` : '';
         toast({
           title: "Producto importado",
-          description: `"${result.name}" fue agregado al inventario desde CITIO.`
+          description: `"${result.name}"${barcodeInfo} fue agregado al inventario desde CITIO.`
         });
       }
     },
