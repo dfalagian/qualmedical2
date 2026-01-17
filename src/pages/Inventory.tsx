@@ -701,10 +701,19 @@ export default function Inventory() {
       mode: ScanMode; 
       productName: string;
     }) => {
-      // 1. Obtener el producto actual para saber el stock
+      // 1. Obtener el tag para saber si tiene lote asignado
+      const { data: tag, error: tagFetchError } = await supabase
+        .from("rfid_tags")
+        .select("batch_id, epc")
+        .eq("id", tagId)
+        .single();
+      
+      if (tagFetchError) throw tagFetchError;
+
+      // 2. Obtener el producto actual para saber el stock
       const { data: product, error: productError } = await supabase
         .from("products")
-        .select("current_stock, name")
+        .select("current_stock, name, sku")
         .eq("id", productId)
         .single();
       
@@ -714,10 +723,48 @@ export default function Inventory() {
       const quantity = mode === "entrada" ? 1 : -1;
       const newStock = previousStock + quantity;
 
-      // NOTA: El stock se actualiza automáticamente vía trigger en inventory_movements
-      // NO actualizar manualmente aquí para evitar doble conteo
+      // 3. Si hay lote asignado, actualizar el current_quantity del lote
+      let batchNumber: string | null = null;
+      if (tag.batch_id) {
+        // Obtener el lote
+        const { data: batch, error: batchFetchError } = await supabase
+          .from("product_batches")
+          .select("current_quantity, batch_number")
+          .eq("id", tag.batch_id)
+          .single();
+        
+        if (batchFetchError) throw batchFetchError;
+        
+        batchNumber = batch.batch_number;
+        const batchPreviousQty = batch.current_quantity || 0;
+        const batchNewQty = Math.max(0, batchPreviousQty + quantity);
+        
+        // Actualizar el lote
+        const { error: batchUpdateError } = await supabase
+          .from("product_batches")
+          .update({ 
+            current_quantity: batchNewQty,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", tag.batch_id);
+        
+        if (batchUpdateError) throw batchUpdateError;
+        
+        console.log(`📦 Lote ${batch.batch_number}: ${batchPreviousQty} → ${batchNewQty}`);
+      }
 
-      // 3. Registrar el movimiento de inventario
+      // 4. Actualizar el stock del producto
+      const { error: productUpdateError } = await supabase
+        .from("products")
+        .update({ 
+          current_stock: Math.max(0, newStock),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", productId);
+      
+      if (productUpdateError) throw productUpdateError;
+
+      // 5. Registrar el movimiento de inventario
       const { error: movementError } = await supabase
         .from("inventory_movements")
         .insert({
@@ -728,18 +775,19 @@ export default function Inventory() {
           previous_stock: previousStock,
           new_stock: Math.max(0, newStock),
           location: mode === "entrada" ? "Almacén Principal" : "Zona de Salida",
-          notes: `${mode === "entrada" ? "Entrada" : "Salida"} vía NFC`
+          notes: `${mode === "entrada" ? "Entrada" : "Salida"} vía NFC${batchNumber ? ` - Lote: ${batchNumber}` : ''}`
         });
       
       if (movementError) throw movementError;
 
-      // 4. Actualizar tag - En SALIDA: desvincular automáticamente para reutilización
+      // 6. Actualizar tag - En SALIDA: desvincular automáticamente para reutilización
       if (mode === "salida") {
-        // Desvincular el tag del producto para que esté disponible
+        // Desvincular el tag del producto y lote para que esté disponible
         const { error: tagError } = await supabase
           .from("rfid_tags")
           .update({
             product_id: null,
+            batch_id: null,
             status: "disponible",
             last_location: "Zona de Salida",
             last_read_at: new Date().toISOString(),
@@ -764,16 +812,18 @@ export default function Inventory() {
       return { 
         mode, 
         productName, 
-        productSku: rfidTags?.find(t => t.id === tagId)?.products?.sku || '',
+        productSku: product.sku || '',
         newStock: Math.max(0, newStock), 
         previousStock, 
         tagId, 
-        epc: rfidTags?.find(t => t.id === tagId)?.epc || '' 
+        epc: tag.epc || '',
+        batchNumber
       };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["product_batches"] });
       queryClient.invalidateQueries({ queryKey: ["stock_alerts"] });
       
       // Activar el efecto de parpadeo por 30 segundos (local)
@@ -804,6 +854,14 @@ export default function Inventory() {
         timestamp: new Date()
       });
       setNfcConfirmationOpen(true);
+      
+      // Toast adicional si hay lote
+      if (data.batchNumber) {
+        toast({
+          title: `${data.mode === "entrada" ? "Entrada" : "Salida"} registrada`,
+          description: `Lote ${data.batchNumber} actualizado correctamente.`
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
