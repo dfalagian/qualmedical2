@@ -123,6 +123,17 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
   const batchMutation = useMutation({
     mutationFn: async (batch: typeof batchForm & { id?: string }) => {
       if (batch.id) {
+        // Obtener el lote actual para calcular la diferencia de stock
+        const { data: currentBatch, error: fetchError } = await supabase
+          .from("product_batches")
+          .select("initial_quantity, product_id")
+          .eq("id", batch.id)
+          .single();
+        
+        if (fetchError) throw fetchError;
+        
+        const quantityDifference = batch.initial_quantity - (currentBatch?.initial_quantity || 0);
+        
         const { error } = await supabase
           .from("product_batches")
           .update({
@@ -131,12 +142,36 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
             barcode: batch.barcode,
             expiration_date: batch.expiration_date,
             initial_quantity: batch.initial_quantity,
-            current_quantity: batch.initial_quantity, // Solo en creación
+            current_quantity: batch.initial_quantity,
             notes: batch.notes || null
           })
           .eq("id", batch.id);
         if (error) throw error;
+
+        // Si cambió la cantidad, actualizar el stock del producto
+        if (quantityDifference !== 0) {
+          const { data: product, error: productFetchError } = await supabase
+            .from("products")
+            .select("current_stock")
+            .eq("id", batch.product_id)
+            .single();
+          
+          if (productFetchError) throw productFetchError;
+          
+          const newStock = Math.max(0, (product?.current_stock || 0) + quantityDifference);
+          
+          const { error: productError } = await supabase
+            .from("products")
+            .update({ 
+              current_stock: newStock,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", batch.product_id);
+          
+          if (productError) throw productError;
+        }
       } else {
+        // Crear nuevo lote
         const { error } = await supabase
           .from("product_batches")
           .insert({
@@ -149,16 +184,40 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
             notes: batch.notes || null
           });
         if (error) throw error;
+
+        // Actualizar el stock del producto sumando la cantidad del nuevo lote
+        const { data: product, error: productFetchError } = await supabase
+          .from("products")
+          .select("current_stock")
+          .eq("id", batch.product_id)
+          .single();
+        
+        if (productFetchError) throw productFetchError;
+        
+        const newStock = (product?.current_stock || 0) + batch.initial_quantity;
+        
+        const { error: productError } = await supabase
+          .from("products")
+          .update({ 
+            current_stock: newStock,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", batch.product_id);
+        
+        if (productError) throw productError;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["product_batches"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       setDialogOpen(false);
       setEditingBatch(null);
       resetForm();
       toast({
         title: editingBatch ? "Lote actualizado" : "Lote creado",
-        description: "Los cambios se guardaron correctamente."
+        description: editingBatch 
+          ? "Los cambios se guardaron correctamente."
+          : "El lote fue creado y el stock del producto fue actualizado."
       });
     },
     onError: (error: Error) => {
