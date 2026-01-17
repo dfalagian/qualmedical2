@@ -504,9 +504,9 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Código Barras</TableHead>
                 <TableHead>Producto</TableHead>
                 <TableHead>Nº Lote</TableHead>
-                <TableHead>Código Barras</TableHead>
                 <TableHead className="text-center">Caducidad</TableHead>
                 <TableHead className="text-center">Cantidad</TableHead>
                 <TableHead className="text-center">Tags</TableHead>
@@ -540,6 +540,12 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
                       className={expStatus.status === "expired" ? "bg-destructive/5" : ""}
                     >
                       <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Barcode className="h-3 w-3 text-muted-foreground" />
+                          <span className="font-mono text-sm">{batch.barcode}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <div className="flex flex-col">
                           <span className="font-medium">{batch.products?.name}</span>
                           <span className="text-xs text-muted-foreground font-mono">
@@ -548,12 +554,6 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
                         </div>
                       </TableCell>
                       <TableCell className="font-mono">{batch.batch_number}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Barcode className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-mono text-sm">{batch.barcode}</span>
-                        </div>
-                      </TableCell>
                       <TableCell className="text-center">
                         <div className="flex flex-col items-center gap-1">
                           <span className="text-sm">
