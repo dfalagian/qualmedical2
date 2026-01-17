@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { OldBatchesWarningModal } from "./OldBatchesWarningModal";
+import { BatchTraceabilityModal } from "./BatchTraceabilityModal";
 import { 
   Plus, 
   Edit, 
@@ -248,20 +250,24 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
             Gestión por número de lote, código de barras y fecha de caducidad
           </p>
         </div>
-        {canEdit && (
-          <Dialog open={dialogOpen} onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) {
-              setEditingBatch(null);
-              resetForm();
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Lote
-              </Button>
-            </DialogTrigger>
+        <div className="flex flex-wrap gap-2">
+          <OldBatchesWarningModal />
+          <BatchTraceabilityModal />
+          
+          {canEdit && (
+            <Dialog open={dialogOpen} onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) {
+                setEditingBatch(null);
+                resetForm();
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuevo Lote
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>
@@ -368,7 +374,8 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Stats Cards */}
