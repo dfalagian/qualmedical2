@@ -278,8 +278,8 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
                       setBatchForm({ 
                         ...batchForm, 
                         product_id: value,
-                        // Usar el barcode del producto (código de barras original)
-                        barcode: selectedProduct?.barcode || batchForm.barcode
+                        // Usar el barcode del producto, o el SKU como fallback si barcode es null
+                        barcode: selectedProduct?.barcode || selectedProduct?.sku || batchForm.barcode
                       });
                     }}
                   >
