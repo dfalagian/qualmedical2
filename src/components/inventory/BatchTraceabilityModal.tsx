@@ -232,12 +232,12 @@ export function BatchTraceabilityModal() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs">Producto</Label>
-                  <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                  <Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val === "all" ? "" : val)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todos los productos" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="all">Todos</SelectItem>
                       {products.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.sku} - {p.name}
@@ -249,12 +249,12 @@ export function BatchTraceabilityModal() {
 
                 <div className="space-y-2">
                   <Label className="text-xs">Lote</Label>
-                  <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+                  <Select value={selectedBatch} onValueChange={(val) => setSelectedBatch(val === "all" ? "" : val)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todos los lotes" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="all">Todos</SelectItem>
                       {batches.map((b) => (
                         <SelectItem key={b.id} value={b.id}>
                           {b.batch_number} - {b.products?.name}
