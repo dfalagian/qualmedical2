@@ -39,12 +39,14 @@ import {
   Download,
   Pill,
   ScanSearch,
-  TrendingDown
+  TrendingDown,
+  Boxes
 } from "lucide-react";
 import { useWebNFC } from "@/hooks/useWebNFC";
 import { NFCScannerCard, ScanMode } from "@/components/inventory/NFCScannerCard";
 import { CITIOImportDialog } from "@/components/inventory/CITIOImportDialog";
 import { NFCConfirmationModal, NFCMovementResult } from "@/components/inventory/NFCConfirmationModal";
+import { BatchManagement } from "@/components/inventory/BatchManagement";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -89,11 +91,24 @@ interface RfidTag {
   id: string;
   epc: string;
   product_id: string | null;
+  batch_id: string | null;
   status: string;
   last_read_at: string | null;
   last_location: string | null;
   notes: string | null;
   created_at: string;
+  products?: { name: string; sku: string } | null;
+  product_batches?: { batch_number: string; barcode: string; expiration_date: string; products: { name: string; sku: string } | null } | null;
+}
+
+interface ProductBatch {
+  id: string;
+  product_id: string;
+  batch_number: string;
+  barcode: string;
+  expiration_date: string;
+  initial_quantity: number;
+  current_quantity: number;
   products?: { name: string; sku: string } | null;
 }
 
@@ -167,6 +182,7 @@ export default function Inventory() {
   const [tagForm, setTagForm] = useState({
     epc: "",
     product_id: "",
+    batch_id: "",
     status: "disponible",
     last_location: "",
     notes: ""
@@ -186,7 +202,7 @@ export default function Inventory() {
     }
   });
 
-  // Fetch RFID tags
+  // Fetch RFID tags with batch info
   const { data: rfidTags = [], isLoading: loadingTags } = useQuery({
     queryKey: ["rfid_tags"],
     queryFn: async () => {
@@ -194,12 +210,36 @@ export default function Inventory() {
         .from("rfid_tags")
         .select(`
           *,
-          products:product_id (name, sku)
+          products:product_id (name, sku),
+          product_batches:batch_id (
+            batch_number, 
+            barcode, 
+            expiration_date,
+            products:product_id (name, sku)
+          )
         `)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data as RfidTag[];
+    }
+  });
+
+  // Fetch batches for tag assignment
+  const { data: batches = [] } = useQuery({
+    queryKey: ["product_batches"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("product_batches")
+        .select(`
+          *,
+          products:product_id (name, sku)
+        `)
+        .eq("is_active", true)
+        .order("expiration_date", { ascending: true });
+
+      if (error) throw error;
+      return data as ProductBatch[];
     }
   });
 
@@ -505,13 +545,23 @@ export default function Inventory() {
         throw new Error(validation.error);
       }
 
+      // Si se selecciona un lote, obtener el product_id del lote
+      let productIdToUse = tag.product_id || null;
+      if (tag.batch_id) {
+        const batch = batches.find(b => b.id === tag.batch_id);
+        if (batch) {
+          productIdToUse = batch.product_id;
+        }
+      }
+
       if (tag.id) {
         const { error } = await supabase
           .from("rfid_tags")
           .update({
             epc: tag.epc,
-            product_id: tag.product_id || null,
-            status: tag.status,
+            product_id: productIdToUse,
+            batch_id: tag.batch_id || null,
+            status: tag.batch_id ? "asignado" : (tag.status || "disponible"),
             last_location: tag.last_location || null,
             notes: tag.notes || null,
             last_read_at: tag.last_location ? new Date().toISOString() : undefined
@@ -523,8 +573,9 @@ export default function Inventory() {
           .from("rfid_tags")
           .insert({
             epc: tag.epc,
-            product_id: tag.product_id || null,
-            status: tag.status,
+            product_id: productIdToUse,
+            batch_id: tag.batch_id || null,
+            status: tag.batch_id ? "asignado" : (tag.status || "disponible"),
             last_location: tag.last_location || null,
             notes: tag.notes || null,
             last_read_at: tag.last_location ? new Date().toISOString() : null
@@ -534,6 +585,8 @@ export default function Inventory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
+      queryClient.invalidateQueries({ queryKey: ["product_batches"] });
+      queryClient.invalidateQueries({ queryKey: ["tags_per_batch"] });
       setTagDialogOpen(false);
       setEditingTag(null);
       resetTagForm();
@@ -791,6 +844,7 @@ export default function Inventory() {
     setTagForm({
       epc: "",
       product_id: "",
+      batch_id: "",
       status: "disponible",
       last_location: "",
       notes: ""
@@ -817,6 +871,7 @@ export default function Inventory() {
     setTagForm({
       epc: tag.epc,
       product_id: tag.product_id || "",
+      batch_id: tag.batch_id || "",
       status: tag.status,
       last_location: tag.last_location || "",
       notes: tag.notes || ""
@@ -933,8 +988,12 @@ export default function Inventory() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="products" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 max-w-lg">
+        <Tabs defaultValue="batches" className="w-full">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+            <TabsTrigger value="batches" className="flex items-center gap-2">
+              <Boxes className="h-4 w-4" />
+              Lotes
+            </TabsTrigger>
             <TabsTrigger value="products" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
               Productos
@@ -953,6 +1012,16 @@ export default function Inventory() {
               )}
             </TabsTrigger>
           </TabsList>
+
+          {/* Batches Tab */}
+          <TabsContent value="batches" className="space-y-4">
+            <BatchManagement 
+              searchTerm={searchTerm}
+              canEdit={canEdit}
+              isAdmin={isAdmin}
+              products={products}
+            />
+          </TabsContent>
 
           {/* Products Tab */}
           <TabsContent value="products" className="space-y-4">
@@ -1283,30 +1352,41 @@ export default function Inventory() {
                         </p>
                       </div>
                       <div className="space-y-2">
-                        <Label>Producto asociado</Label>
+                        <Label>Lote de Medicamento *</Label>
                         <Select
-                          value={tagForm.product_id || "none"}
-                          onValueChange={(value) => setTagForm({ ...tagForm, product_id: value === "none" ? "" : value })}
+                          value={tagForm.batch_id || "none"}
+                          onValueChange={(value) => {
+                            const batch = batches.find(b => b.id === value);
+                            setTagForm({ 
+                              ...tagForm, 
+                              batch_id: value === "none" ? "" : value,
+                              product_id: batch?.product_id || ""
+                            });
+                          }}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar producto..." />
+                            <SelectValue placeholder="Seleccionar lote..." />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">Sin asignar</SelectItem>
-                            {products.map((product) => {
-                              const hasTag = rfidTags?.some(tag => tag.product_id === product.id);
-                              return (
-                                <SelectItem 
-                                  key={product.id} 
-                                  value={product.id}
-                                  className={hasTag ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400" : ""}
-                                >
-                                  {hasTag && "✓ "}{product.sku} - {product.name}
-                                </SelectItem>
-                              );
-                            })}
+                            {batches.map((batch) => (
+                              <SelectItem 
+                                key={batch.id} 
+                                value={batch.id}
+                              >
+                                <div className="flex flex-col">
+                                  <span>{batch.products?.name} - Lote: {batch.batch_number}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Cód: {batch.barcode} | Cad: {new Date(batch.expiration_date).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Asigna este tag a un lote específico de medicamento
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <Label>Estado</Label>
@@ -1383,7 +1463,8 @@ export default function Inventory() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>EPC</TableHead>
-                      <TableHead>Producto</TableHead>
+                      <TableHead>Lote / Producto</TableHead>
+                      <TableHead>Código Barras</TableHead>
                       <TableHead>Ubicación</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Última lectura</TableHead>
@@ -1393,7 +1474,7 @@ export default function Inventory() {
                   <TableBody>
                     {loadingTags ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8">
+                        <TableCell colSpan={7} className="text-center py-8">
                           <div className="flex items-center justify-center gap-2">
                             <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                             Cargando...
@@ -1402,7 +1483,7 @@ export default function Inventory() {
                       </TableRow>
                     ) : filteredTags.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No hay tags RFID registrados
                         </TableCell>
                       </TableRow>
@@ -1414,11 +1495,21 @@ export default function Inventory() {
                         >
                           <TableCell className="font-mono text-sm">{tag.epc}</TableCell>
                           <TableCell>
-                            {tag.products ? (
+                            {tag.product_batches ? (
+                              <div className="flex flex-col">
+                                <span className="font-medium">{tag.product_batches.products?.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  Lote: {tag.product_batches.batch_number}
+                                </span>
+                              </div>
+                            ) : tag.products ? (
                               <span>{tag.products.sku} - {tag.products.name}</span>
                             ) : (
                               <span className="text-muted-foreground">Sin asignar</span>
                             )}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {tag.product_batches?.barcode || "-"}
                           </TableCell>
                           <TableCell>
                             {tag.last_location ? (

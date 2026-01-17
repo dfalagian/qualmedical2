@@ -790,6 +790,59 @@ export type Database = {
           },
         ]
       }
+      product_batches: {
+        Row: {
+          barcode: string
+          batch_number: string
+          created_at: string
+          current_quantity: number
+          expiration_date: string
+          id: string
+          initial_quantity: number
+          is_active: boolean
+          notes: string | null
+          product_id: string
+          received_at: string
+          updated_at: string
+        }
+        Insert: {
+          barcode: string
+          batch_number: string
+          created_at?: string
+          current_quantity?: number
+          expiration_date: string
+          id?: string
+          initial_quantity?: number
+          is_active?: boolean
+          notes?: string | null
+          product_id: string
+          received_at?: string
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string
+          batch_number?: string
+          created_at?: string
+          current_quantity?: number
+          expiration_date?: string
+          id?: string
+          initial_quantity?: number
+          is_active?: boolean
+          notes?: string | null
+          product_id?: string
+          received_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category: string | null
@@ -1012,6 +1065,7 @@ export type Database = {
       }
       rfid_tags: {
         Row: {
+          batch_id: string | null
           created_at: string | null
           epc: string
           id: string
@@ -1023,6 +1077,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          batch_id?: string | null
           created_at?: string | null
           epc: string
           id?: string
@@ -1034,6 +1089,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          batch_id?: string | null
           created_at?: string | null
           epc?: string
           id?: string
@@ -1045,6 +1101,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "rfid_tags_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "rfid_tags_product_id_fkey"
             columns: ["product_id"]
