@@ -1690,6 +1690,17 @@ export default function Inventory() {
                 if (existingTag) {
                   // Tag encontrado - procesar movimiento
                   if (existingTag.product_id && existingTag.products) {
+                    // Si es una ENTRADA y el tag ya tiene lote asignado, mostrar advertencia
+                    if (mode === "entrada" && existingTag.batch_id && existingTag.product_batches) {
+                      // Mostrar advertencia pero permitir continuar
+                      toast({
+                        title: "⚠️ Advertencia: Tag ya vinculado",
+                        description: `Esta entrada incrementará el stock del Lote "${existingTag.product_batches.batch_number}" para el producto "${existingTag.product_batches.products?.name || existingTag.products.name}".`,
+                        variant: "default",
+                        duration: 5000
+                      });
+                    }
+                    
                     // Tag tiene producto asignado - procesar entrada/salida
                     processInventoryMovement.mutate({
                       tagId: existingTag.id,
