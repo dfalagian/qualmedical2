@@ -31,6 +31,7 @@ interface CITIOMedication {
   current_stock?: number;
   codigo_sat?: string;
   clave_unidad?: string;
+  codigo_medicamento?: string;
 }
 
 interface CITIOImportDialogProps {
@@ -78,7 +79,8 @@ export function CITIOImportDialog({
         med.name?.toLowerCase().includes(term) ||
         med.brand?.toLowerCase().includes(term) ||
         med.description?.toLowerCase().includes(term) ||
-        med.medication_families?.name?.toLowerCase().includes(term)
+        med.medication_families?.name?.toLowerCase().includes(term) ||
+        med.codigo_medicamento?.toLowerCase().includes(term)
     );
   }, [medications, searchTerm]);
 
@@ -167,30 +169,37 @@ export function CITIOImportDialog({
                               : "hover:bg-accent hover:border-accent-foreground/20"
                           )}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex-1 min-w-0 flex items-center gap-2">
-                              <span className="font-medium truncate">{med.name}</span>
-                              <span className="text-muted-foreground text-xs truncate">
-                                {med.brand}
-                                {med.presentacion && ` • ${med.presentacion}`}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {med.price_type_1 && (
-                                <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                                  ${med.price_type_1.toFixed(2)}
-                                </Badge>
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex-1 min-w-0 flex items-center gap-2">
+                                  <span className="font-medium truncate">{med.name}</span>
+                                  <span className="text-muted-foreground text-xs truncate">
+                                    {med.brand}
+                                    {med.presentacion && ` • ${med.presentacion}`}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {med.price_type_1 && (
+                                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                                      ${med.price_type_1.toFixed(2)}
+                                    </Badge>
+                                  )}
+                                  {imported ? (
+                                    <Badge variant="outline" className="text-green-600 text-xs px-1.5 py-0">
+                                      <Check className="h-3 w-3 mr-0.5" />
+                                      Imp.
+                                    </Badge>
+                                  ) : isSelected ? (
+                                    <Check className="h-4 w-4 text-primary" />
+                                  ) : null}
+                                </div>
+                              </div>
+                              {med.codigo_medicamento && (
+                                <div className="text-xs text-muted-foreground">
+                                  <span className="font-mono bg-muted px-1 rounded">CB: {med.codigo_medicamento}</span>
+                                </div>
                               )}
-                              {imported ? (
-                                <Badge variant="outline" className="text-green-600 text-xs px-1.5 py-0">
-                                  <Check className="h-3 w-3 mr-0.5" />
-                                  Imp.
-                                </Badge>
-                              ) : isSelected ? (
-                                <Check className="h-4 w-4 text-primary" />
-                              ) : null}
                             </div>
-                          </div>
                         </button>
                       );
                     })}
@@ -209,6 +218,11 @@ export function CITIOImportDialog({
               <span className="font-semibold">{selectedMedication.name}</span>
               <span className="text-muted-foreground">- {selectedMedication.brand}</span>
             </div>
+            {selectedMedication.codigo_medicamento && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                Código de barras: <span className="font-mono bg-muted px-1 rounded">{selectedMedication.codigo_medicamento}</span>
+              </div>
+            )}
           </div>
         )}
 
