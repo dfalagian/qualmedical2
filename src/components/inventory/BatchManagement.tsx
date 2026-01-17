@@ -28,6 +28,7 @@ import { es } from "date-fns/locale";
 interface Product {
   id: string;
   sku: string;
+  barcode: string | null;
   name: string;
   category: string | null;
 }
@@ -277,7 +278,8 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
                       setBatchForm({ 
                         ...batchForm, 
                         product_id: value,
-                        barcode: selectedProduct?.sku || batchForm.barcode
+                        // Usar el barcode del producto (código de barras original)
+                        barcode: selectedProduct?.barcode || batchForm.barcode
                       });
                     }}
                   >

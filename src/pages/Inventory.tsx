@@ -74,6 +74,7 @@ interface StockAlert {
 interface Product {
   id: string;
   sku: string;
+  barcode: string | null;
   name: string;
   description: string | null;
   category: string | null;
@@ -410,6 +411,32 @@ export default function Inventory() {
     }
   });
 
+  // Helper function to generate next QUAL sequence number
+  const generateNextQualSequence = async (): Promise<string> => {
+    // Get the highest QUAL number from existing products
+    const { data: existingProducts, error } = await supabase
+      .from("products")
+      .select("sku")
+      .like("sku", "%-QUAL-%")
+      .order("created_at", { ascending: false });
+    
+    if (error) throw error;
+    
+    let maxNumber = 0;
+    if (existingProducts && existingProducts.length > 0) {
+      for (const product of existingProducts) {
+        const match = product.sku.match(/-QUAL-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNumber) maxNumber = num;
+        }
+      }
+    }
+    
+    const nextNumber = maxNumber + 1;
+    return `QUAL-${nextNumber.toString().padStart(4, '0')}`;
+  };
+
   // Import from CITIO mutation
   const importFromCitioMutation = useMutation({
     mutationFn: async (citioMedication: {
@@ -437,10 +464,12 @@ export default function Inventory() {
         return { name: existingProduct.name, existed: true };
       }
       
-      // Generate SKU from CITIO ID or use medication_code if available
-      const sku = citioMedication.medication_code 
-        ? citioMedication.medication_code 
-        : `CITIO-${citioMedication.id.slice(0, 8).toUpperCase()}`;
+      // Get barcode (medication_code) from CITIO
+      const barcode = citioMedication.medication_code || '';
+      
+      // Generate unique SKU: {barcode}-QUAL-XXXX
+      const qualSequence = await generateNextQualSequence();
+      const sku = barcode ? `${barcode}-${qualSequence}` : qualSequence;
       
       // Build description including barcode info
       const descParts = [
@@ -453,6 +482,7 @@ export default function Inventory() {
         .from("products")
         .insert({
           sku,
+          barcode: barcode || null,
           name: citioMedication.name,
           description: descParts || null,
           category: citioMedication.medication_families?.name || "Medicamentos",
@@ -464,7 +494,7 @@ export default function Inventory() {
         });
       
       if (error) throw error;
-      return { name: citioMedication.name, existed: false, barcode: citioMedication.medication_code };
+      return { name: citioMedication.name, existed: false, barcode, sku };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -475,10 +505,11 @@ export default function Inventory() {
           description: `"${result.name}" ya está en el inventario.`
         });
       } else {
-        const barcodeInfo = result.barcode ? ` (Código: ${result.barcode})` : '';
+        const skuInfo = result.sku ? ` SKU: ${result.sku}` : '';
+        const barcodeInfo = result.barcode ? ` | CB: ${result.barcode}` : '';
         toast({
           title: "Producto importado",
-          description: `"${result.name}"${barcodeInfo} fue agregado al inventario desde CITIO.`
+          description: `"${result.name}"${skuInfo}${barcodeInfo} fue agregado al inventario desde CITIO.`
         });
       }
     },
