@@ -272,7 +272,14 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
                   <Label>Producto *</Label>
                   <Select
                     value={batchForm.product_id}
-                    onValueChange={(value) => setBatchForm({ ...batchForm, product_id: value })}
+                    onValueChange={(value) => {
+                      const selectedProduct = products.find(p => p.id === value);
+                      setBatchForm({ 
+                        ...batchForm, 
+                        product_id: value,
+                        barcode: selectedProduct?.sku || batchForm.barcode
+                      });
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar producto..." />
