@@ -48,6 +48,7 @@ import { MassRFIDScanner, MassScanMode } from "@/components/inventory/MassRFIDSc
 import { CITIOImportDialog } from "@/components/inventory/CITIOImportDialog";
 import { NFCConfirmationModal, NFCMovementResult } from "@/components/inventory/NFCConfirmationModal";
 import { BatchManagement } from "@/components/inventory/BatchManagement";
+import { VirginTagAssignment } from "@/components/inventory/VirginTagAssignment";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -134,6 +135,7 @@ export default function Inventory() {
   const [consultaScanActive, setConsultaScanActive] = useState<boolean>(false);
   const [lowStockDialogOpen, setLowStockDialogOpen] = useState<boolean>(false);
   const [massRfidScannerOpen, setMassRfidScannerOpen] = useState<boolean>(false);
+  const [virginTagAssignmentOpen, setVirginTagAssignmentOpen] = useState<boolean>(false);
   
   // Refs - después de los estados
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -1117,8 +1119,16 @@ export default function Inventory() {
 
           {/* Batches Tab */}
           <TabsContent value="batches" className="space-y-4">
-            {/* Botón de escaneo masivo */}
-            <div className="flex justify-end">
+            {/* Botones de escaneo masivo y asignación */}
+            <div className="flex justify-end gap-2">
+              <Button 
+                onClick={() => setVirginTagAssignmentOpen(true)}
+                className="gap-2"
+                variant="outline"
+              >
+                <Tag className="h-4 w-4" />
+                Asignar Tags Vírgenes
+              </Button>
               <Button 
                 onClick={() => setMassRfidScannerOpen(true)}
                 className="gap-2"
@@ -2006,10 +2016,20 @@ export default function Inventory() {
               description: `${scannedTags.length} tags escaneados: ${found} encontrados, ${notFound} no registrados, ${noProduct} sin producto.`
             });
             
-            // Si es inventario, solo mostramos el resumen
-            // Para entrada/salida masiva, se podría procesar cada tag automáticamente
+            // Modo REGISTRO: refrescar queries y mostrar botón de asignación
+            if (mode === "registro") {
+              const registeredCount = scannedTags.filter(t => t.status === "registered").length;
+              queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
+              toast({
+                title: "Tags vírgenes registrados",
+                description: `${registeredCount} tags guardados. Use 'Asignar Tags Vírgenes' para vincularlos.`
+              });
+              setMassRfidScannerOpen(false);
+              return;
+            }
+            
+            // Para entrada/salida masiva, procesar cada tag
             if (mode === "entrada" || mode === "salida") {
-              // Procesar cada tag encontrado
               const validTags = scannedTags.filter(t => t.status === "found" && t.tagId && t.productId);
               
               if (validTags.length > 0) {
@@ -2018,7 +2038,6 @@ export default function Inventory() {
                   description: `${validTags.length} tags válidos serán procesados.`
                 });
                 
-                // Procesar cada tag secuencialmente
                 validTags.forEach((tag, index) => {
                   setTimeout(() => {
                     if (tag.tagId && tag.productId) {
@@ -2029,13 +2048,19 @@ export default function Inventory() {
                         productName: tag.productName || "Producto"
                       });
                     }
-                  }, index * 500); // 500ms entre cada operación para evitar sobrecarga
+                  }, index * 500);
                 });
               }
             }
             
             setMassRfidScannerOpen(false);
           }}
+        />
+
+        {/* Modal de asignación de tags vírgenes */}
+        <VirginTagAssignment
+          open={virginTagAssignmentOpen}
+          onOpenChange={setVirginTagAssignmentOpen}
         />
       </div>
     </DashboardLayout>
