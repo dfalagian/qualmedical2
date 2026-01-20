@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { useWebNFC } from "@/hooks/useWebNFC";
 import { RFIDScannerCard, ScanMode } from "@/components/inventory/RFIDScannerCard";
+import { MassRFIDScanner, MassScanMode } from "@/components/inventory/MassRFIDScanner";
 import { CITIOImportDialog } from "@/components/inventory/CITIOImportDialog";
 import { NFCConfirmationModal, NFCMovementResult } from "@/components/inventory/NFCConfirmationModal";
 import { BatchManagement } from "@/components/inventory/BatchManagement";
@@ -132,6 +133,7 @@ export default function Inventory() {
   const [nfcMovementResult, setNfcMovementResult] = useState<NFCMovementResult | null>(null);
   const [consultaScanActive, setConsultaScanActive] = useState<boolean>(false);
   const [lowStockDialogOpen, setLowStockDialogOpen] = useState<boolean>(false);
+  const [massRfidScannerOpen, setMassRfidScannerOpen] = useState<boolean>(false);
   
   // Refs - después de los estados
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -1115,6 +1117,18 @@ export default function Inventory() {
 
           {/* Batches Tab */}
           <TabsContent value="batches" className="space-y-4">
+            {/* Botón de escaneo masivo */}
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => setMassRfidScannerOpen(true)}
+                className="gap-2"
+                variant="outline"
+              >
+                <Radio className="h-4 w-4" />
+                Escaneo Masivo RFID
+              </Button>
+            </div>
+            
             <BatchManagement 
               searchTerm={searchTerm}
               canEdit={canEdit}
@@ -1974,6 +1988,55 @@ export default function Inventory() {
             </ScrollArea>
           </DialogContent>
         </Dialog>
+
+        {/* Mass RFID Scanner */}
+        <MassRFIDScanner
+          open={massRfidScannerOpen}
+          onOpenChange={setMassRfidScannerOpen}
+          onComplete={(scannedTags, mode) => {
+            console.log(`✅ Escaneo masivo completado: ${scannedTags.length} tags en modo ${mode}`);
+            
+            // Mostrar resumen
+            const found = scannedTags.filter(t => t.status === "found").length;
+            const notFound = scannedTags.filter(t => t.status === "not_found").length;
+            const noProduct = scannedTags.filter(t => t.status === "no_product").length;
+            
+            toast({
+              title: `Escaneo masivo completado`,
+              description: `${scannedTags.length} tags escaneados: ${found} encontrados, ${notFound} no registrados, ${noProduct} sin producto.`
+            });
+            
+            // Si es inventario, solo mostramos el resumen
+            // Para entrada/salida masiva, se podría procesar cada tag automáticamente
+            if (mode === "entrada" || mode === "salida") {
+              // Procesar cada tag encontrado
+              const validTags = scannedTags.filter(t => t.status === "found" && t.tagId && t.productId);
+              
+              if (validTags.length > 0) {
+                toast({
+                  title: `Procesando ${mode === "entrada" ? "entradas" : "salidas"}`,
+                  description: `${validTags.length} tags válidos serán procesados.`
+                });
+                
+                // Procesar cada tag secuencialmente
+                validTags.forEach((tag, index) => {
+                  setTimeout(() => {
+                    if (tag.tagId && tag.productId) {
+                      processInventoryMovement.mutate({
+                        tagId: tag.tagId,
+                        productId: tag.productId,
+                        mode: mode as ScanMode,
+                        productName: tag.productName || "Producto"
+                      });
+                    }
+                  }, index * 500); // 500ms entre cada operación para evitar sobrecarga
+                });
+              }
+            }
+            
+            setMassRfidScannerOpen(false);
+          }}
+        />
       </div>
     </DashboardLayout>
   );
