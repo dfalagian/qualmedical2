@@ -24,7 +24,7 @@ import {
   StopCircle
 } from "lucide-react";
 
-export type MassScanMode = "inventario" | "entrada" | "salida" | null;
+export type MassScanMode = "inventario" | "entrada" | "salida" | "registro" | null;
 
 interface ScannedTag {
   epc: string;
@@ -33,7 +33,7 @@ interface ScannedTag {
   productSku: string | null;
   batchNumber: string | null;
   expirationDate: string | null;
-  status: "found" | "not_found" | "no_product";
+  status: "found" | "not_found" | "no_product" | "registered";
   tagId: string | null;
   productId: string | null;
   batchId: string | null;
@@ -44,6 +44,37 @@ interface MassRFIDScannerProps {
   onOpenChange: (open: boolean) => void;
   onComplete: (scannedTags: ScannedTag[], mode: MassScanMode) => void;
 }
+
+// Helper to register virgin tags
+const registerVirginTag = async (epc: string): Promise<{ id: string; isNew: boolean }> => {
+  // Check if tag already exists
+  const { data: existing, error: checkError } = await supabase
+    .from("rfid_tags")
+    .select("id")
+    .eq("epc", epc)
+    .maybeSingle();
+
+  if (checkError) throw checkError;
+
+  if (existing) {
+    return { id: existing.id, isNew: false };
+  }
+
+  // Insert new virgin tag
+  const { data: newTag, error: insertError } = await supabase
+    .from("rfid_tags")
+    .insert({
+      epc,
+      status: "disponible",
+      notes: `Registrado masivamente el ${new Date().toLocaleString()}`
+    })
+    .select("id")
+    .single();
+
+  if (insertError) throw insertError;
+
+  return { id: newTag.id, isNew: true };
+};
 
 export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScannerProps) {
   const { toast } = useToast();
@@ -178,8 +209,44 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
     // Marcar como procesado
     processedEpcsRef.current.add(cleanEpc);
 
-    // Buscar información del tag
-    const tagInfo = await lookupTag(cleanEpc);
+    let tagInfo: ScannedTag;
+
+    // Si estamos en modo registro, registrar el tag virgen en la BD
+    if (scanMode === "registro") {
+      try {
+        const result = await registerVirginTag(cleanEpc);
+        tagInfo = {
+          epc: cleanEpc,
+          timestamp: new Date(),
+          productName: null,
+          productSku: null,
+          batchNumber: null,
+          expirationDate: null,
+          status: "registered",
+          tagId: result.id,
+          productId: null,
+          batchId: null
+        };
+        console.log(`✅ Tag ${result.isNew ? 'registrado' : 'ya existía'}: ${cleanEpc}`);
+      } catch (error) {
+        console.error("Error registering virgin tag:", error);
+        tagInfo = {
+          epc: cleanEpc,
+          timestamp: new Date(),
+          productName: null,
+          productSku: null,
+          batchNumber: null,
+          expirationDate: null,
+          status: "not_found",
+          tagId: null,
+          productId: null,
+          batchId: null
+        };
+      }
+    } else {
+      // Buscar información del tag (modo normal)
+      tagInfo = await lookupTag(cleanEpc);
+    }
 
     // Agregar a la lista
     setScannedTags(prev => [tagInfo, ...prev]);
@@ -188,7 +255,7 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
     setEpcInput("");
 
     console.log(`📦 Tag escaneado: ${cleanEpc} - Status: ${tagInfo.status}`);
-  }, [isScanning, lookupTag]);
+  }, [isScanning, lookupTag, scanMode]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -234,6 +301,7 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
     if (mode === "entrada") return "ENTRADA MASIVA";
     if (mode === "salida") return "SALIDA MASIVA";
     if (mode === "inventario") return "INVENTARIO/AUDITORÍA";
+    if (mode === "registro") return "REGISTRO DE TAGS VÍRGENES";
     return "";
   };
 
@@ -241,6 +309,7 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
     if (mode === "entrada") return <ArrowDownToLine className="h-5 w-5" />;
     if (mode === "salida") return <ArrowUpFromLine className="h-5 w-5" />;
     if (mode === "inventario") return <ClipboardCheck className="h-5 w-5" />;
+    if (mode === "registro") return <Radio className="h-5 w-5" />;
     return null;
   };
 
@@ -248,6 +317,7 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
     if (mode === "entrada") return "bg-green-600";
     if (mode === "salida") return "bg-orange-600";
     if (mode === "inventario") return "bg-blue-600";
+    if (mode === "registro") return "bg-purple-600";
     return "";
   };
 
@@ -259,6 +329,8 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
         return <Badge variant="destructive"><AlertTriangle className="h-3 w-3 mr-1" />No registrado</Badge>;
       case "no_product":
         return <Badge variant="secondary"><Package className="h-3 w-3 mr-1" />Sin producto</Badge>;
+      case "registered":
+        return <Badge className="bg-purple-500"><CheckCircle className="h-3 w-3 mr-1" />Registrado</Badge>;
     }
   };
 
@@ -282,6 +354,7 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
   const foundTags = scannedTags.filter(t => t.status === "found").length;
   const notFoundTags = scannedTags.filter(t => t.status === "not_found").length;
   const noProductTags = scannedTags.filter(t => t.status === "no_product").length;
+  const registeredTags = scannedTags.filter(t => t.status === "registered").length;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -300,7 +373,17 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
           // Selección de modo
           <div className="py-6 space-y-4">
             <p className="text-center text-muted-foreground mb-4">Seleccione el tipo de operación:</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Button 
+                onClick={() => handleStartScan("registro")}
+                className="h-24 flex flex-col gap-2 bg-purple-600 hover:bg-purple-700"
+                size="lg"
+              >
+                <Radio className="h-8 w-8" />
+                <span className="text-lg font-bold">REGISTRO</span>
+                <span className="text-xs opacity-80">Tags vírgenes</span>
+              </Button>
+              
               <Button 
                 onClick={() => handleStartScan("inventario")}
                 className="h-24 flex flex-col gap-2 bg-blue-600 hover:bg-blue-700"
