@@ -43,7 +43,7 @@ import {
   Boxes
 } from "lucide-react";
 import { useWebNFC } from "@/hooks/useWebNFC";
-import { NFCScannerCard, ScanMode } from "@/components/inventory/NFCScannerCard";
+import { RFIDScannerCard, ScanMode } from "@/components/inventory/RFIDScannerCard";
 import { CITIOImportDialog } from "@/components/inventory/CITIOImportDialog";
 import { NFCConfirmationModal, NFCMovementResult } from "@/components/inventory/NFCConfirmationModal";
 import { BatchManagement } from "@/components/inventory/BatchManagement";
@@ -1678,13 +1678,13 @@ export default function Inventory() {
               </CardContent>
             </Card>
 
-            {/* WebNFC Scanner Section */}
-            <NFCScannerCard 
-              onTagRead={(serialNumber, records, mode) => {
-                // Buscar si el tag ya existe en el sistema
+            {/* RFID USB Scanner Section */}
+            <RFIDScannerCard 
+              onTagRead={(epc, records, mode) => {
+                // Buscar si el tag ya existe en el sistema (comparar EPC exacto)
+                const cleanEpc = epc.replace(/:/g, '').toUpperCase();
                 const existingTag = rfidTags.find(t => 
-                  t.epc.toLowerCase() === serialNumber.toLowerCase() ||
-                  t.epc.toLowerCase().includes(serialNumber.toLowerCase().replace(/:/g, ''))
+                  t.epc.toUpperCase() === cleanEpc
                 );
                 
                 if (existingTag) {
@@ -1721,7 +1721,7 @@ export default function Inventory() {
                   // Tag nuevo - ofrecer registrarlo
                   setTagForm(prev => ({
                     ...prev,
-                    epc: serialNumber.replace(/:/g, '').toUpperCase(),
+                    epc: cleanEpc,
                     status: "disponible",
                     last_location: mode === "entrada" ? "Almacén Principal" : "Zona de Salida"
                   }));
