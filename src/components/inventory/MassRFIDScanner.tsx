@@ -195,19 +195,25 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
     }
   }, []);
 
+  // Ref adicional para bloquear procesamiento mientras se está procesando un EPC
+  const isProcessingRef = useRef<boolean>(false);
+
   const processEpc = useCallback(async (epc: string) => {
     const cleanEpc = epc.trim().toUpperCase();
     if (!cleanEpc || !isScanning) return;
 
-    // Verificar si ya fue procesado en esta sesión
+    // Verificar si ya fue procesado en esta sesión - ANTES de cualquier async
     if (processedEpcsRef.current.has(cleanEpc)) {
-      console.log(`⏳ EPC ya escaneado en esta sesión: ${cleanEpc}`);
+      console.log(`⏳ EPC duplicado ignorado: ${cleanEpc}`);
       setEpcInput("");
       return;
     }
 
-    // Marcar como procesado
+    // Marcar como procesado INMEDIATAMENTE para evitar race conditions
     processedEpcsRef.current.add(cleanEpc);
+    
+    // Limpiar input inmediatamente para preparar siguiente lectura
+    setEpcInput("");
 
     let tagInfo: ScannedTag;
 
@@ -251,10 +257,7 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
     // Agregar a la lista
     setScannedTags(prev => [tagInfo, ...prev]);
 
-    // Clear input
-    setEpcInput("");
-
-    console.log(`📦 Tag escaneado: ${cleanEpc} - Status: ${tagInfo.status}`);
+    console.log(`📦 Tag único escaneado: ${cleanEpc} - Status: ${tagInfo.status}`);
   }, [isScanning, lookupTag, scanMode]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
