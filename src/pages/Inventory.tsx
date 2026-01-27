@@ -830,6 +830,31 @@ export default function Inventory() {
     }
   });
 
+  // Delete all available RFID tags
+  const deleteAvailableTagsMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("rfid_tags")
+        .delete()
+        .eq("status", "disponible");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
+      toast({
+        title: "Tags eliminados",
+        description: "Todos los tags en estado Disponible fueron eliminados."
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
   // Unlink tag from product (make it available for reuse)
   const unlinkTagMutation = useMutation({
     mutationFn: async (tagId: string) => {
@@ -1311,8 +1336,47 @@ export default function Inventory() {
           {/* Tags Tab */}
           <TabsContent value="tags" className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold">Tags RFID</h2>
+              <div>
+                <h2 className="text-lg font-semibold">Tags RFID</h2>
+                <p className="text-sm text-muted-foreground">
+                  {availableTags} disponibles | {assignedTags} asignados
+                </p>
+              </div>
               <div className="flex items-center gap-2">
+                {/* Botón Eliminar Tags Disponibles */}
+                {isAdmin && availableTags > 0 && (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="destructive" className="gap-2">
+                        <Trash2 className="h-4 w-4" />
+                        Eliminar Tags
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Eliminar Tags Disponibles</DialogTitle>
+                        <DialogDescription className="pt-2">
+                          Se eliminarán <span className="font-bold text-destructive">{availableTags}</span> tags en estado "Disponible".
+                          <br /><br />
+                          Esta acción no se puede deshacer.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter className="gap-2 sm:gap-0">
+                        <DialogClose asChild>
+                          <Button variant="outline">Cancelar</Button>
+                        </DialogClose>
+                        <Button 
+                          variant="destructive"
+                          onClick={() => deleteAvailableTagsMutation.mutate()}
+                          disabled={deleteAvailableTagsMutation.isPending}
+                        >
+                          {deleteAvailableTagsMutation.isPending ? "Eliminando..." : `Eliminar ${availableTags} tags`}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+                
                 {/* Botón Consultar Artículo */}
                 <Button 
                   onClick={() => setConsultaDialogOpen(true)}
