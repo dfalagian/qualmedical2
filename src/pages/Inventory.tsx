@@ -34,8 +34,8 @@ import {
   EyeOff,
   Smartphone,
   Wifi,
-  Unlink,
   WifiOff,
+  Unlink,
   Download,
   Pill,
   ScanSearch,
@@ -49,6 +49,7 @@ import { CITIOImportDialog } from "@/components/inventory/CITIOImportDialog";
 import { NFCConfirmationModal, NFCMovementResult } from "@/components/inventory/NFCConfirmationModal";
 import { BatchManagement } from "@/components/inventory/BatchManagement";
 import { VirginTagAssignment } from "@/components/inventory/VirginTagAssignment";
+import { RFIDConsultaDialog } from "@/components/inventory/RFIDConsultaDialog";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -132,7 +133,7 @@ export default function Inventory() {
   const [recentlyReadTagId, setRecentlyReadTagId] = useState<string | null>(null);
   const [nfcConfirmationOpen, setNfcConfirmationOpen] = useState<boolean>(false);
   const [nfcMovementResult, setNfcMovementResult] = useState<NFCMovementResult | null>(null);
-  const [consultaScanActive, setConsultaScanActive] = useState<boolean>(false);
+  const [consultaDialogOpen, setConsultaDialogOpen] = useState<boolean>(false);
   const [lowStockDialogOpen, setLowStockDialogOpen] = useState<boolean>(false);
   const [massRfidScannerOpen, setMassRfidScannerOpen] = useState<boolean>(false);
   const [virginTagAssignmentOpen, setVirginTagAssignmentOpen] = useState<boolean>(false);
@@ -169,8 +170,6 @@ export default function Inventory() {
   // Hook NFC para escanear tags al registrar
   const tagNfc = useWebNFC();
   
-  // Hook NFC separado para consulta de artículos
-  const consultaNfc = useWebNFC();
 
   // Form states
   const [productForm, setProductForm] = useState({
@@ -284,55 +283,6 @@ export default function Inventory() {
     }
   }, [tagNfc.lastRead, tagScanActive, tagNfc, toast]);
 
-  // Efecto para consulta de artículos vía NFC (solo lectura, sin modificar stock)
-  useEffect(() => {
-    if (consultaScanActive && consultaNfc.lastRead?.serialNumber) {
-      const epc = consultaNfc.lastRead.serialNumber.replace(/:/g, '').toUpperCase();
-      
-      // Buscar el tag en la base de datos
-      const tag = rfidTags?.find(t => t.epc.toUpperCase() === epc);
-      
-      if (tag && tag.product_id) {
-        const product = products.find(p => p.id === tag.product_id);
-        
-        if (product) {
-          // Mostrar modal de consulta
-          setNfcMovementResult({
-            mode: "consulta",
-            productName: product.name,
-            productSku: product.sku,
-            previousStock: product.current_stock,
-            newStock: product.current_stock, // Sin cambio
-            epc: epc,
-            timestamp: new Date()
-          });
-          setNfcConfirmationOpen(true);
-        } else {
-          toast({
-            title: "Producto no encontrado",
-            description: `El tag ${epc} no tiene un producto asociado válido.`,
-            variant: "destructive"
-          });
-        }
-      } else if (tag) {
-        toast({
-          title: "Tag sin producto",
-          description: `El tag ${epc} no tiene un producto asignado.`,
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Tag no registrado",
-          description: `El tag ${epc} no está registrado en el sistema.`,
-          variant: "destructive"
-        });
-      }
-      
-      // Detener el escaneo
-      setConsultaScanActive(false);
-      consultaNfc.stopScan();
-    }
-  }, [consultaNfc.lastRead, consultaScanActive, consultaNfc, rfidTags, products, toast]);
 
   // Realtime subscription for alerts
   useEffect(() => {
@@ -1386,30 +1336,11 @@ export default function Inventory() {
               <div className="flex items-center gap-2">
                 {/* Botón Consultar Artículo */}
                 <Button 
-                  variant={consultaScanActive ? "destructive" : "default"}
-                  className={consultaScanActive ? "" : "bg-blue-600 hover:bg-blue-700"}
-                  onClick={async () => {
-                    if (consultaScanActive) {
-                      setConsultaScanActive(false);
-                      consultaNfc.stopScan();
-                    } else {
-                      setConsultaScanActive(true);
-                      await consultaNfc.startScan();
-                    }
-                  }}
-                  disabled={!consultaNfc.isSupported}
+                  onClick={() => setConsultaDialogOpen(true)}
+                  className="bg-blue-600 hover:bg-blue-700"
                 >
-                  {consultaScanActive ? (
-                    <>
-                      <WifiOff className="h-4 w-4 mr-2" />
-                      Cancelar
-                    </>
-                  ) : (
-                    <>
-                      <ScanSearch className="h-4 w-4 mr-2" />
-                      Consultar Artículo
-                    </>
-                  )}
+                  <ScanSearch className="h-4 w-4 mr-2" />
+                  Consultar Artículo
                 </Button>
                 
                 {canEdit && (
@@ -2061,6 +1992,12 @@ export default function Inventory() {
         <VirginTagAssignment
           open={virginTagAssignmentOpen}
           onOpenChange={setVirginTagAssignmentOpen}
+        />
+
+        {/* Modal de consulta RFID */}
+        <RFIDConsultaDialog
+          open={consultaDialogOpen}
+          onOpenChange={setConsultaDialogOpen}
         />
       </div>
     </DashboardLayout>
