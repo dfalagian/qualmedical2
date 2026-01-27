@@ -12,7 +12,7 @@ import {
   Search,
   Info
 } from "lucide-react";
-import { ScanMode } from "./NFCScannerCard";
+import { ScanMode } from "./RFIDScannerCard";
 
 export interface NFCMovementResult {
   mode: ScanMode;
@@ -168,7 +168,7 @@ export function NFCConfirmationModal({ open, onClose, result }: NFCConfirmationM
 
           {/* EPC del tag */}
           <div className="text-center text-sm text-muted-foreground">
-            <span>Tag NFC: </span>
+            <span>Tag RFID: </span>
             <code className="bg-muted px-2 py-1 rounded font-mono text-xs">
               {result.epc}
             </code>
