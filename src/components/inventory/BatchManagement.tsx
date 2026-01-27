@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { OldBatchesWarningModal } from "./OldBatchesWarningModal";
 import { BatchTraceabilityModal } from "./BatchTraceabilityModal";
+import { BatchTagsDialog } from "./BatchTagsDialog";
 import { 
   Plus, 
   Edit, 
@@ -71,6 +72,11 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<ProductBatch | null>(null);
+  const [selectedBatchForTags, setSelectedBatchForTags] = useState<{
+    id: string;
+    batchNumber: string;
+    productName: string;
+  } | null>(null);
   
   const [batchForm, setBatchForm] = useState({
     product_id: "",
@@ -570,7 +576,15 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="secondary">
+                        <Badge 
+                          variant="secondary" 
+                          className="cursor-pointer hover:bg-secondary/80 transition-colors"
+                          onClick={() => setSelectedBatchForTags({
+                            id: batch.id,
+                            batchNumber: batch.batch_number,
+                            productName: batch.products?.name || "Producto"
+                          })}
+                        >
                           <Tag className="h-3 w-3 mr-1" />
                           {tagCount}
                         </Badge>
@@ -605,6 +619,17 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
           </Table>
         </CardContent>
       </Card>
+
+      {/* Dialog para ver tags del lote */}
+      {selectedBatchForTags && (
+        <BatchTagsDialog
+          open={!!selectedBatchForTags}
+          onOpenChange={(open) => !open && setSelectedBatchForTags(null)}
+          batchId={selectedBatchForTags.id}
+          batchNumber={selectedBatchForTags.batchNumber}
+          productName={selectedBatchForTags.productName}
+        />
+      )}
     </div>
   );
 }
