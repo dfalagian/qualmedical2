@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-
+import { NewBatchModal } from "./NewBatchModal";
 interface EntryItem {
   id: string;
   productId: string;
@@ -57,6 +57,9 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
 
   // Estado para el combobox de lotes
   const [batchSearchOpen, setBatchSearchOpen] = useState(false);
+
+  // Estado para el modal de nuevo lote
+  const [newBatchModalOpen, setNewBatchModalOpen] = useState(false);
 
   // Lista de items ingresados
   const [items, setItems] = useState<EntryItem[]>([]);
@@ -141,13 +144,9 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
   // Manejar selección de lote existente
   const handleSelectBatch = (batchId: string) => {
     if (batchId === "new") {
-      setFormData(prev => ({
-        ...prev,
-        selectedBatchId: "",
-        lote: "",
-        caducidad: "",
-        isExistingBatch: false
-      }));
+      // Abrir modal para crear nuevo lote
+      setBatchSearchOpen(false);
+      setNewBatchModalOpen(true);
     } else {
       const batch = productBatches.find(b => b.id === batchId);
       if (batch) {
@@ -159,8 +158,19 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
           isExistingBatch: true
         }));
       }
+      setBatchSearchOpen(false);
     }
-    setBatchSearchOpen(false);
+  };
+
+  // Manejar confirmación del nuevo lote desde el modal
+  const handleNewBatchConfirm = (batchNumber: string, expirationDate: string) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedBatchId: "",
+      lote: batchNumber,
+      caducidad: expirationDate,
+      isExistingBatch: false
+    }));
   };
 
   const handleAddItem = () => {
@@ -393,31 +403,9 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
                 </PopoverTrigger>
                 <PopoverContent className="w-[280px] p-0 bg-popover" align="start">
                   <Command>
-                    <CommandInput 
-                      placeholder="Buscar o escribir nuevo..." 
-                      value={formData.isExistingBatch ? "" : formData.lote}
-                      onValueChange={(value) => {
-                        if (!formData.isExistingBatch) {
-                          setFormData(prev => ({ ...prev, lote: value.toUpperCase() }));
-                        }
-                      }}
-                    />
+                    <CommandInput placeholder="Buscar lote..." />
                     <CommandList>
-                      <CommandEmpty>
-                        {formData.lote ? (
-                          <button
-                            className="w-full px-2 py-2 text-left text-sm hover:bg-accent"
-                            onClick={() => {
-                              setFormData(prev => ({ ...prev, isExistingBatch: false, selectedBatchId: "" }));
-                              setBatchSearchOpen(false);
-                            }}
-                          >
-                            Crear nuevo lote: <strong>{formData.lote}</strong>
-                          </button>
-                        ) : (
-                          "Escribe un número de lote"
-                        )}
-                      </CommandEmpty>
+                      <CommandEmpty>No se encontraron lotes</CommandEmpty>
                       <CommandGroup heading="Lotes existentes">
                         {productBatches.map((batch) => (
                           <CommandItem
@@ -577,6 +565,14 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
           </div>
         </div>
       </DialogContent>
+
+      {/* Modal para crear nuevo lote */}
+      <NewBatchModal
+        open={newBatchModalOpen}
+        onOpenChange={setNewBatchModalOpen}
+        productName={formData.producto}
+        onConfirm={handleNewBatchConfirm}
+      />
     </Dialog>
   );
 }
