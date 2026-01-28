@@ -23,7 +23,8 @@ import {
   Calendar,
   Boxes,
   AlertTriangle,
-  Tag
+  Tag,
+  Search
 } from "lucide-react";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -66,12 +67,13 @@ interface BatchManagementProps {
   products: Product[];
 }
 
-export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: BatchManagementProps) {
+export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdmin, products }: BatchManagementProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<ProductBatch | null>(null);
+  const [localSearchTerm, setLocalSearchTerm] = useState("");
   const [selectedBatchForTags, setSelectedBatchForTags] = useState<{
     id: string;
     batchNumber: string;
@@ -86,6 +88,9 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
     initial_quantity: 0,
     notes: ""
   });
+
+  // Combine external and local search terms
+  const searchTerm = localSearchTerm || externalSearchTerm;
 
   // Fetch batches
   const { data: batches = [], isLoading } = useQuery({
@@ -309,11 +314,20 @@ export function BatchManagement({ searchTerm, canEdit, isAdmin, products }: Batc
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
+        <div className="flex-1 w-full sm:w-auto">
           <h2 className="text-lg font-semibold">Lotes de Medicamentos</h2>
           <p className="text-sm text-muted-foreground">
             Gestión por número de lote, código de barras y fecha de caducidad
           </p>
+          <div className="relative mt-2 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por producto, lote o código..."
+              value={localSearchTerm}
+              onChange={(e) => setLocalSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <OldBatchesWarningModal />
