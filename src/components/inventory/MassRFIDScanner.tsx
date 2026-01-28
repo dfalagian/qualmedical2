@@ -45,13 +45,15 @@ interface MassRFIDScannerProps {
   onComplete: (scannedTags: ScannedTag[], mode: MassScanMode) => void;
 }
 
-// Helper to register virgin tags
+// Helper to register virgin tags - always trim EPC to prevent whitespace issues
 const registerVirginTag = async (epc: string): Promise<{ id: string; isNew: boolean }> => {
+  const cleanEpc = epc.trim();
+  
   // Check if tag already exists
   const { data: existing, error: checkError } = await supabase
     .from("rfid_tags")
     .select("id")
-    .eq("epc", epc)
+    .eq("epc", cleanEpc)
     .maybeSingle();
 
   if (checkError) throw checkError;
@@ -60,11 +62,11 @@ const registerVirginTag = async (epc: string): Promise<{ id: string; isNew: bool
     return { id: existing.id, isNew: false };
   }
 
-  // Insert new virgin tag
+  // Insert new virgin tag with cleaned EPC
   const { data: newTag, error: insertError } = await supabase
     .from("rfid_tags")
     .insert({
-      epc,
+      epc: cleanEpc,
       status: "disponible",
       notes: `Registrado masivamente el ${new Date().toLocaleString()}`
     })
