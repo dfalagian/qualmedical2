@@ -529,11 +529,14 @@ export default function Inventory() {
         }
       }
 
+      // Always trim EPC to prevent whitespace issues from RFID readers
+      const cleanEpc = tag.epc.trim();
+      
       if (tag.id) {
         const { error } = await supabase
           .from("rfid_tags")
           .update({
-            epc: tag.epc,
+            epc: cleanEpc,
             product_id: productIdToUse,
             batch_id: tag.batch_id || null,
             status: tag.batch_id ? "asignado" : (tag.status || "disponible"),
@@ -547,7 +550,7 @@ export default function Inventory() {
         const { error } = await supabase
           .from("rfid_tags")
           .insert({
-            epc: tag.epc,
+            epc: cleanEpc,
             product_id: productIdToUse,
             batch_id: tag.batch_id || null,
             status: tag.batch_id ? "asignado" : (tag.status || "disponible"),
