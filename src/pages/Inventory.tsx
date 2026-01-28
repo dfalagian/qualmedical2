@@ -48,6 +48,7 @@ import { NFCConfirmationModal, NFCMovementResult } from "@/components/inventory/
 import { BatchManagement } from "@/components/inventory/BatchManagement";
 import { VirginTagAssignment } from "@/components/inventory/VirginTagAssignment";
 import { RFIDConsultaDialog } from "@/components/inventory/RFIDConsultaDialog";
+import { ProductEntryDialog } from "@/components/inventory/ProductEntryDialog";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -136,6 +137,7 @@ export default function Inventory() {
   const [massRfidScannerOpen, setMassRfidScannerOpen] = useState<boolean>(false);
   const [virginTagAssignmentOpen, setVirginTagAssignmentOpen] = useState<boolean>(false);
   const [tagSearchTerm, setTagSearchTerm] = useState<string>("");
+  const [productEntryDialogOpen, setProductEntryDialogOpen] = useState<boolean>(false);
   
   // Refs - después de los estados
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -1135,125 +1137,10 @@ export default function Inventory() {
                     <Pill className="h-4 w-4" />
                     Importar desde CITIO
                   </Button>
-                  <Dialog open={productDialogOpen} onOpenChange={(open) => {
-                    setProductDialogOpen(open);
-                    if (!open) {
-                      setEditingProduct(null);
-                      resetProductForm();
-                    }
-                  }}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Nuevo Producto
-                      </Button>
-                    </DialogTrigger>
-                  <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>
-                        {editingProduct ? "Editar Producto" : "Nuevo Producto"}
-                      </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>SKU *</Label>
-                          <Input
-                            value={productForm.sku}
-                            onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
-                            placeholder="SKU-001"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Categoría</Label>
-                          <Input
-                            value={productForm.category}
-                            onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
-                            placeholder="Medicamentos"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Nombre *</Label>
-                        <Input
-                          value={productForm.name}
-                          onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                          placeholder="Nombre del producto"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Descripción</Label>
-                        <Textarea
-                          value={productForm.description}
-                          onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                          placeholder="Descripción del producto..."
-                          rows={2}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Unidad</Label>
-                          <Select
-                            value={productForm.unit}
-                            onValueChange={(value) => setProductForm({ ...productForm, unit: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pieza">Pieza</SelectItem>
-                              <SelectItem value="caja">Caja</SelectItem>
-                              <SelectItem value="paquete">Paquete</SelectItem>
-                              <SelectItem value="kg">Kilogramo</SelectItem>
-                              <SelectItem value="litro">Litro</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Precio unitario</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={productForm.unit_price}
-                            onChange={(e) => setProductForm({ ...productForm, unit_price: parseFloat(e.target.value) || 0 })}
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Stock actual</Label>
-                          <Input
-                            type="number"
-                            value={productForm.current_stock}
-                            onChange={(e) => setProductForm({ ...productForm, current_stock: parseInt(e.target.value) || 0 })}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Stock mínimo</Label>
-                          <Input
-                            type="number"
-                            value={productForm.minimum_stock}
-                            onChange={(e) => setProductForm({ ...productForm, minimum_stock: parseInt(e.target.value) || 0 })}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button variant="outline">Cancelar</Button>
-                      </DialogClose>
-                      <Button 
-                        onClick={() => productMutation.mutate({ 
-                          ...productForm, 
-                          id: editingProduct?.id 
-                        })}
-                        disabled={!productForm.sku || !productForm.name || productMutation.isPending}
-                      >
-                        {productMutation.isPending ? "Guardando..." : "Guardar"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                  <Button onClick={() => setProductEntryDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nuevo Producto
+                  </Button>
                 </div>
               )}
             </div>
@@ -2041,6 +1928,12 @@ export default function Inventory() {
         <RFIDConsultaDialog
           open={consultaDialogOpen}
           onOpenChange={setConsultaDialogOpen}
+        />
+
+        {/* Modal de ingreso de productos */}
+        <ProductEntryDialog
+          open={productEntryDialogOpen}
+          onOpenChange={setProductEntryDialogOpen}
         />
       </div>
     </DashboardLayout>
