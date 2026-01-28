@@ -49,6 +49,7 @@ import { BatchManagement } from "@/components/inventory/BatchManagement";
 import { VirginTagAssignment } from "@/components/inventory/VirginTagAssignment";
 import { RFIDConsultaDialog } from "@/components/inventory/RFIDConsultaDialog";
 import { ProductEntryDialog } from "@/components/inventory/ProductEntryDialog";
+import { ProductRowWithBatches } from "@/components/inventory/ProductRowWithBatches";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -1179,58 +1180,16 @@ export default function Inventory() {
                       filteredProducts.map((product) => {
                         const hasTag = rfidTags?.some(tag => tag.product_id === product.id);
                         return (
-                        <TableRow key={product.id} className={hasTag ? "bg-green-50 dark:bg-green-950/20" : ""}>
-                          <TableCell>
-                            {hasTag ? (
-                              <div className="flex items-center justify-center">
-                                <Tag className="h-4 w-4 text-green-600" />
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center">
-                                <span className="text-muted-foreground text-xs">—</span>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">{product.sku}</TableCell>
-                          <TableCell className="font-medium">{product.name}</TableCell>
-                          <TableCell>
-                            {product.category && (
-                              <Badge variant="secondary">{product.category}</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge 
-                              variant={product.current_stock <= product.minimum_stock ? "destructive" : "default"}
-                            >
-                              {product.current_stock} / {product.minimum_stock}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {product.unit_price ? `$${product.unit_price.toFixed(2)}` : "-"}
-                          </TableCell>
-                          {canEdit && (
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon"
-                                  onClick={() => handleEditProduct(product)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                {(isAdmin || isInventarioRfid) && (
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    onClick={() => deleteProductMutation.mutate(product.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          )}
-                        </TableRow>
+                          <ProductRowWithBatches
+                            key={product.id}
+                            product={product}
+                            hasTag={hasTag}
+                            canEdit={canEdit}
+                            isAdmin={isAdmin}
+                            isInventarioRfid={isInventarioRfid}
+                            onEdit={handleEditProduct}
+                            onDelete={(id) => deleteProductMutation.mutate(id)}
+                          />
                         );
                       })
                     )}
