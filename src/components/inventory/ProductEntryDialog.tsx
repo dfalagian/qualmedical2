@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,13 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Plus } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Trash2, Plus, ChevronsUpDown, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 interface EntryItem {
   id: string;
+  productId: string;
   codigo: string;
   producto: string;
   lote: string;
@@ -33,6 +37,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
 
   // Form state para la línea de ingreso
   const [formData, setFormData] = useState({
+    selectedProductId: "",
     codigo: "",
     producto: "",
     lote: "",
@@ -41,6 +46,10 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
     numeroFactura: "",
     proveedor: ""
   });
+
+  // Estado para el combobox de productos
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
 
   // Lista de items ingresados
   const [items, setItems] = useState<EntryItem[]>([]);
@@ -74,11 +83,37 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
     }
   });
 
+  // Filtrar productos según búsqueda
+  const filteredProducts = useMemo(() => {
+    if (!productSearch) return productos;
+    const search = productSearch.toLowerCase();
+    return productos.filter(p => 
+      p.name.toLowerCase().includes(search) ||
+      p.sku.toLowerCase().includes(search) ||
+      (p.barcode && p.barcode.toLowerCase().includes(search))
+    );
+  }, [productos, productSearch]);
+
+  // Manejar selección de producto
+  const handleSelectProduct = (productId: string) => {
+    const product = productos.find(p => p.id === productId);
+    if (product) {
+      setFormData(prev => ({
+        ...prev,
+        selectedProductId: product.id,
+        codigo: product.barcode || product.sku,
+        producto: product.name
+      }));
+    }
+    setProductSearchOpen(false);
+    setProductSearch("");
+  };
+
   const handleAddItem = () => {
-    if (!formData.codigo || !formData.producto || !formData.lote || !formData.caducidad || formData.cantidad <= 0) {
+    if (!formData.selectedProductId || !formData.lote || !formData.caducidad || formData.cantidad <= 0) {
       toast({
         title: "Campos incompletos",
-        description: "Por favor completa Código, Producto, Lote, Caducidad y Cantidad",
+        description: "Por favor selecciona un Producto y completa Lote, Caducidad y Cantidad",
         variant: "destructive"
       });
       return;
@@ -86,6 +121,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
 
     const newItem: EntryItem = {
       id: crypto.randomUUID(),
+      productId: formData.selectedProductId,
       codigo: formData.codigo,
       producto: formData.producto,
       lote: formData.lote,
@@ -98,6 +134,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
     // Limpiar campos de producto pero mantener factura y proveedor
     setFormData(prev => ({
       ...prev,
+      selectedProductId: "",
       codigo: "",
       producto: "",
       lote: "",
@@ -122,40 +159,13 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
         throw new Error("No hay productos para guardar");
       }
 
-      // Por cada item, crear o actualizar el lote correspondiente
+      // Por cada item, crear el lote correspondiente (producto ya existe)
       for (const item of items) {
-        // Buscar producto por código/barcode
-        const { data: existingProduct } = await supabase
-          .from("products")
-          .select("id")
-          .or(`barcode.eq.${item.codigo},sku.eq.${item.codigo}`)
-          .single();
-
-        let productId = existingProduct?.id;
-
-        // Si no existe el producto, crearlo
-        if (!productId) {
-          const { data: newProduct, error: productError } = await supabase
-            .from("products")
-            .insert({
-              sku: item.codigo,
-              name: item.producto,
-              barcode: item.codigo,
-              current_stock: item.cantidad,
-              supplier_id: formData.proveedor || null
-            })
-            .select("id")
-            .single();
-
-          if (productError) throw productError;
-          productId = newProduct.id;
-        }
-
         // Crear el lote
         const { error: batchError } = await supabase
           .from("product_batches")
           .insert({
-            product_id: productId,
+            product_id: item.productId,
             batch_number: item.lote,
             barcode: item.codigo,
             expiration_date: item.caducidad,
@@ -170,7 +180,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
         const { data: currentProduct } = await supabase
           .from("products")
           .select("current_stock")
-          .eq("id", productId)
+          .eq("id", item.productId)
           .single();
 
         await supabase
@@ -178,7 +188,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
           .update({
             current_stock: (currentProduct?.current_stock || 0) + item.cantidad
           })
-          .eq("id", productId);
+          .eq("id", item.productId);
       }
     },
     onSuccess: () => {
@@ -201,6 +211,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
 
   const handleClose = () => {
     setFormData({
+      selectedProductId: "",
       codigo: "",
       producto: "",
       lote: "",
@@ -222,26 +233,71 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Primera fila: Código, Producto, Lote, Caducidad, Cantidad */}
+          {/* Primera fila: Producto (combobox), Código (readonly), Lote, Caducidad, Cantidad */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            {/* Selector de Producto con búsqueda */}
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="text-xs">Producto</Label>
+              <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={productSearchOpen}
+                    className="w-full h-9 justify-between font-normal"
+                  >
+                    {formData.producto || "Buscar producto..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput 
+                      placeholder="Buscar por nombre, código o SKU..." 
+                      value={productSearch}
+                      onValueChange={setProductSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                      <CommandGroup className="max-h-[200px] overflow-auto">
+                        {filteredProducts.map((product) => (
+                          <CommandItem
+                            key={product.id}
+                            value={product.id}
+                            onSelect={handleSelectProduct}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                formData.selectedProductId === product.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span className="font-medium">{product.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {product.barcode || product.sku}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Código - solo lectura, se llena automáticamente */}
             <div className="space-y-1">
               <Label className="text-xs">Código</Label>
               <Input
                 value={formData.codigo}
-                onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
+                readOnly
                 placeholder="Código"
-                className="h-9"
+                className="h-9 bg-muted"
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Producto</Label>
-              <Input
-                value={formData.producto}
-                onChange={(e) => setFormData({ ...formData, producto: e.target.value })}
-                placeholder="Nombre producto"
-                className="h-9"
-              />
-            </div>
+
             <div className="space-y-1">
               <Label className="text-xs">Lote</Label>
               <Input
@@ -260,6 +316,10 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
                 className="h-9"
               />
             </div>
+          </div>
+
+          {/* Segunda fila: Cantidad, Nº Factura, Proveedor, botón Ingresar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
             <div className="space-y-1">
               <Label className="text-xs">Cantidad</Label>
               <Input
@@ -272,7 +332,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
             </div>
           </div>
 
-          {/* Segunda fila: Nº Factura, Proveedor, botón Ingresar */}
+          {/* Tercera fila: Nº Factura, Proveedor, botón Ingresar */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
             <div className="space-y-1">
               <Label className="text-xs">Nº Factura</Label>
