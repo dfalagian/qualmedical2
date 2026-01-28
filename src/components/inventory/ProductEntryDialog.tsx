@@ -18,11 +18,13 @@ import { cn } from "@/lib/utils";
 interface EntryItem {
   id: string;
   productId: string;
+  batchId?: string; // Si es lote existente
   codigo: string;
   producto: string;
   lote: string;
   caducidad: string;
   cantidad: number;
+  isExistingBatch: boolean;
 }
 
 interface ProductEntryDialogProps {
@@ -38,18 +40,23 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
   // Form state para la línea de ingreso
   const [formData, setFormData] = useState({
     selectedProductId: "",
+    selectedBatchId: "",
     codigo: "",
     producto: "",
     lote: "",
     caducidad: "",
     cantidad: 1,
     numeroFactura: "",
-    proveedor: ""
+    proveedor: "",
+    isExistingBatch: false
   });
 
   // Estado para el combobox de productos
   const [productSearchOpen, setProductSearchOpen] = useState(false);
   const [productSearch, setProductSearch] = useState("");
+
+  // Estado para el combobox de lotes
+  const [batchSearchOpen, setBatchSearchOpen] = useState(false);
 
   // Lista de items ingresados
   const [items, setItems] = useState<EntryItem[]>([]);
@@ -94,6 +101,24 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
     );
   }, [productos, productSearch]);
 
+  // Fetch lotes del producto seleccionado
+  const { data: productBatches = [] } = useQuery({
+    queryKey: ["product-batches", formData.selectedProductId],
+    queryFn: async () => {
+      if (!formData.selectedProductId) return [];
+      const { data, error } = await supabase
+        .from("product_batches")
+        .select("id, batch_number, expiration_date, current_quantity")
+        .eq("product_id", formData.selectedProductId)
+        .eq("is_active", true)
+        .order("expiration_date", { ascending: true });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!formData.selectedProductId
+  });
+
   // Manejar selección de producto
   const handleSelectProduct = (productId: string) => {
     const product = productos.find(p => p.id === productId);
@@ -101,12 +126,41 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       setFormData(prev => ({
         ...prev,
         selectedProductId: product.id,
+        selectedBatchId: "",
         codigo: product.barcode || product.sku,
-        producto: product.name
+        producto: product.name,
+        lote: "",
+        caducidad: "",
+        isExistingBatch: false
       }));
     }
     setProductSearchOpen(false);
     setProductSearch("");
+  };
+
+  // Manejar selección de lote existente
+  const handleSelectBatch = (batchId: string) => {
+    if (batchId === "new") {
+      setFormData(prev => ({
+        ...prev,
+        selectedBatchId: "",
+        lote: "",
+        caducidad: "",
+        isExistingBatch: false
+      }));
+    } else {
+      const batch = productBatches.find(b => b.id === batchId);
+      if (batch) {
+        setFormData(prev => ({
+          ...prev,
+          selectedBatchId: batch.id,
+          lote: batch.batch_number,
+          caducidad: batch.expiration_date,
+          isExistingBatch: true
+        }));
+      }
+    }
+    setBatchSearchOpen(false);
   };
 
   const handleAddItem = () => {
@@ -122,11 +176,13 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
     const newItem: EntryItem = {
       id: crypto.randomUUID(),
       productId: formData.selectedProductId,
+      batchId: formData.isExistingBatch ? formData.selectedBatchId : undefined,
       codigo: formData.codigo,
       producto: formData.producto,
       lote: formData.lote,
       caducidad: formData.caducidad,
-      cantidad: formData.cantidad
+      cantidad: formData.cantidad,
+      isExistingBatch: formData.isExistingBatch
     };
 
     setItems([...items, newItem]);
@@ -135,11 +191,13 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
     setFormData(prev => ({
       ...prev,
       selectedProductId: "",
+      selectedBatchId: "",
       codigo: "",
       producto: "",
       lote: "",
       caducidad: "",
-      cantidad: 1
+      cantidad: 1,
+      isExistingBatch: false
     }));
 
     toast({
@@ -159,22 +217,38 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
         throw new Error("No hay productos para guardar");
       }
 
-      // Por cada item, crear el lote correspondiente (producto ya existe)
       for (const item of items) {
-        // Crear el lote
-        const { error: batchError } = await supabase
-          .from("product_batches")
-          .insert({
-            product_id: item.productId,
-            batch_number: item.lote,
-            barcode: item.codigo,
-            expiration_date: item.caducidad,
-            initial_quantity: item.cantidad,
-            current_quantity: item.cantidad,
-            notes: formData.numeroFactura ? `Factura: ${formData.numeroFactura}` : null
-          });
+        if (item.isExistingBatch && item.batchId) {
+          // Si es lote existente, solo actualizar cantidad
+          const { data: currentBatch } = await supabase
+            .from("product_batches")
+            .select("current_quantity, initial_quantity")
+            .eq("id", item.batchId)
+            .single();
 
-        if (batchError) throw batchError;
+          await supabase
+            .from("product_batches")
+            .update({
+              current_quantity: (currentBatch?.current_quantity || 0) + item.cantidad,
+              initial_quantity: (currentBatch?.initial_quantity || 0) + item.cantidad
+            })
+            .eq("id", item.batchId);
+        } else {
+          // Crear nuevo lote
+          const { error: batchError } = await supabase
+            .from("product_batches")
+            .insert({
+              product_id: item.productId,
+              batch_number: item.lote,
+              barcode: item.codigo,
+              expiration_date: item.caducidad,
+              initial_quantity: item.cantidad,
+              current_quantity: item.cantidad,
+              notes: formData.numeroFactura ? `Factura: ${formData.numeroFactura}` : null
+            });
+
+          if (batchError) throw batchError;
+        }
 
         // Actualizar stock del producto
         const { data: currentProduct } = await supabase
@@ -198,6 +272,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["product-batches"] });
       handleClose();
     },
     onError: (error: any) => {
@@ -212,13 +287,15 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
   const handleClose = () => {
     setFormData({
       selectedProductId: "",
+      selectedBatchId: "",
       codigo: "",
       producto: "",
       lote: "",
       caducidad: "",
       cantidad: 1,
       numeroFactura: "",
-      proveedor: ""
+      proveedor: "",
+      isExistingBatch: false
     });
     setItems([]);
     onOpenChange(false);
@@ -298,15 +375,86 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
               />
             </div>
 
+            {/* Selector de Lote con opción de nuevo o existente */}
             <div className="space-y-1">
               <Label className="text-xs">Lote</Label>
-              <Input
-                value={formData.lote}
-                onChange={(e) => setFormData({ ...formData, lote: e.target.value.toUpperCase() })}
-                placeholder="Nº Lote"
-                className="h-9"
-              />
+              <Popover open={batchSearchOpen} onOpenChange={setBatchSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={batchSearchOpen}
+                    className="w-full h-9 justify-between font-normal"
+                    disabled={!formData.selectedProductId}
+                  >
+                    {formData.lote || "Seleccionar lote..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[280px] p-0 bg-popover" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Buscar o escribir nuevo..." 
+                      value={formData.isExistingBatch ? "" : formData.lote}
+                      onValueChange={(value) => {
+                        if (!formData.isExistingBatch) {
+                          setFormData(prev => ({ ...prev, lote: value.toUpperCase() }));
+                        }
+                      }}
+                    />
+                    <CommandList>
+                      <CommandEmpty>
+                        {formData.lote ? (
+                          <button
+                            className="w-full px-2 py-2 text-left text-sm hover:bg-accent"
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, isExistingBatch: false, selectedBatchId: "" }));
+                              setBatchSearchOpen(false);
+                            }}
+                          >
+                            Crear nuevo lote: <strong>{formData.lote}</strong>
+                          </button>
+                        ) : (
+                          "Escribe un número de lote"
+                        )}
+                      </CommandEmpty>
+                      <CommandGroup heading="Lotes existentes">
+                        {productBatches.map((batch) => (
+                          <CommandItem
+                            key={batch.id}
+                            value={batch.id}
+                            onSelect={handleSelectBatch}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                formData.selectedBatchId === batch.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col flex-1">
+                              <span className="font-medium">{batch.batch_number}</span>
+                              <span className="text-xs text-muted-foreground">
+                                Cad: {batch.expiration_date} | Stock: {batch.current_quantity}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                      <CommandGroup>
+                        <CommandItem
+                          value="new"
+                          onSelect={handleSelectBatch}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Crear lote nuevo
+                        </CommandItem>
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
+
             <div className="space-y-1">
               <Label className="text-xs">Caducidad</Label>
               <Input
@@ -314,6 +462,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
                 value={formData.caducidad}
                 onChange={(e) => setFormData({ ...formData, caducidad: e.target.value })}
                 className="h-9"
+                disabled={formData.isExistingBatch}
               />
             </div>
           </div>
