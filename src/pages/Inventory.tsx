@@ -1104,7 +1104,18 @@ export default function Inventory() {
           {/* Products Tab */}
           <TabsContent value="products" className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-lg font-semibold">Catálogo de Productos</h2>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-1">
+                <h2 className="text-lg font-semibold whitespace-nowrap">Catálogo de Productos</h2>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nombre o SKU..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
               {canEdit && (
                 <div className="flex items-center gap-2">
                   <Button 
