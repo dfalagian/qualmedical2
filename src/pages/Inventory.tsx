@@ -135,6 +135,7 @@ export default function Inventory() {
   const [lowStockDialogOpen, setLowStockDialogOpen] = useState<boolean>(false);
   const [massRfidScannerOpen, setMassRfidScannerOpen] = useState<boolean>(false);
   const [virginTagAssignmentOpen, setVirginTagAssignmentOpen] = useState<boolean>(false);
+  const [tagSearchTerm, setTagSearchTerm] = useState<string>("");
   
   // Refs - después de los estados
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -946,9 +947,14 @@ export default function Inventory() {
     (p.category?.toLowerCase() || "").includes(searchTerm.toLowerCase())
   );
 
+  // Use local tag search term if available, otherwise use global search
+  const effectiveTagSearch = tagSearchTerm || searchTerm;
   const filteredTags = rfidTags.filter(t =>
-    t.epc.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (t.products?.name?.toLowerCase() || "").includes(searchTerm.toLowerCase())
+    t.epc.toLowerCase().includes(effectiveTagSearch.toLowerCase()) ||
+    (t.products?.name?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
+    (t.products?.sku?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
+    (t.product_batches?.batch_number?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
+    (t.product_batches?.products?.name?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase())
   );
 
   // Stats
@@ -1349,12 +1355,21 @@ export default function Inventory() {
 
           {/* Tags Tab */}
           <TabsContent value="tags" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div className="flex-1 w-full sm:w-auto">
                 <h2 className="text-lg font-semibold">Tags RFID</h2>
                 <p className="text-sm text-muted-foreground">
                   {availableTags} disponibles | {assignedTags} asignados
                 </p>
+                <div className="relative mt-2 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por EPC, producto o lote..."
+                    value={tagSearchTerm}
+                    onChange={(e) => setTagSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {/* Botón Eliminar Tags Disponibles */}
