@@ -1905,6 +1905,130 @@ export default function Inventory() {
           open={productEntryDialogOpen}
           onOpenChange={setProductEntryDialogOpen}
         />
+
+        {/* Modal de edición de productos */}
+        <Dialog open={productDialogOpen} onOpenChange={(open) => {
+          setProductDialogOpen(open);
+          if (!open) {
+            setEditingProduct(null);
+            resetProductForm();
+          }
+        }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
+                {editingProduct ? "Editar Producto" : "Nuevo Producto"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingProduct 
+                  ? "Modifica los datos del producto seleccionado."
+                  : "Completa los datos para crear un nuevo producto."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="sku" className="text-right">SKU</Label>
+                <Input
+                  id="sku"
+                  value={productForm.sku}
+                  onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
+                  className="col-span-3"
+                  disabled={!!editingProduct}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">Nombre</Label>
+                <Input
+                  id="name"
+                  value={productForm.name}
+                  onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="description" className="text-right">Descripción</Label>
+                <Textarea
+                  id="description"
+                  value={productForm.description}
+                  onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="category" className="text-right">Categoría</Label>
+                <Input
+                  id="category"
+                  value={productForm.category}
+                  onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="unit" className="text-right">Unidad</Label>
+                <Select
+                  value={productForm.unit}
+                  onValueChange={(value) => setProductForm({ ...productForm, unit: value })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pieza">Pieza</SelectItem>
+                    <SelectItem value="caja">Caja</SelectItem>
+                    <SelectItem value="frasco">Frasco</SelectItem>
+                    <SelectItem value="ampolleta">Ampolleta</SelectItem>
+                    <SelectItem value="sobre">Sobre</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="minimum_stock" className="text-right">Stock Mínimo</Label>
+                <Input
+                  id="minimum_stock"
+                  type="number"
+                  value={productForm.minimum_stock}
+                  onChange={(e) => setProductForm({ ...productForm, minimum_stock: parseInt(e.target.value) || 0 })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="current_stock" className="text-right">Stock Actual</Label>
+                <Input
+                  id="current_stock"
+                  type="number"
+                  value={productForm.current_stock}
+                  onChange={(e) => setProductForm({ ...productForm, current_stock: parseInt(e.target.value) || 0 })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="unit_price" className="text-right">Precio Unitario</Label>
+                <Input
+                  id="unit_price"
+                  type="number"
+                  step="0.01"
+                  value={productForm.unit_price}
+                  onChange={(e) => setProductForm({ ...productForm, unit_price: parseFloat(e.target.value) || 0 })}
+                  className="col-span-3"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline">Cancelar</Button>
+              </DialogClose>
+              <Button
+                onClick={() => productMutation.mutate({
+                  ...productForm,
+                  id: editingProduct?.id
+                })}
+                disabled={!productForm.sku || !productForm.name || productMutation.isPending}
+              >
+                {productMutation.isPending ? "Guardando..." : "Guardar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
