@@ -9,12 +9,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Trash2, Plus, ChevronsUpDown, Check } from "lucide-react";
+import { Trash2, Plus, ChevronsUpDown, Check, Link2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { NewBatchModal } from "./NewBatchModal";
+import { QuickTagAssignment } from "./QuickTagAssignment";
 interface EntryItem {
   id: string;
   productId: string;
@@ -60,6 +61,10 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
 
   // Estado para el modal de nuevo lote
   const [newBatchModalOpen, setNewBatchModalOpen] = useState(false);
+
+  // Estado para el modal de asignación de tag
+  const [tagAssignmentOpen, setTagAssignmentOpen] = useState(false);
+  const [tagAssignmentItem, setTagAssignmentItem] = useState<EntryItem | null>(null);
 
   // Lista de items ingresados
   const [items, setItems] = useState<EntryItem[]>([]);
@@ -535,14 +540,28 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
                       <TableCell>{item.caducidad}</TableCell>
                       <TableCell className="text-right font-medium">{item.cantidad}</TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => handleRemoveItem(item.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="Asignar Tag RFID"
+                            onClick={() => {
+                              setTagAssignmentItem(item);
+                              setTagAssignmentOpen(true);
+                            }}
+                          >
+                            <Link2 className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => handleRemoveItem(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -573,6 +592,22 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
         productName={formData.producto}
         onConfirm={handleNewBatchConfirm}
       />
+
+      {/* Modal para asignar tag RFID */}
+      {tagAssignmentItem && (
+        <QuickTagAssignment
+          open={tagAssignmentOpen}
+          onOpenChange={(open) => {
+            setTagAssignmentOpen(open);
+            if (!open) setTagAssignmentItem(null);
+          }}
+          productId={tagAssignmentItem.productId}
+          productName={tagAssignmentItem.producto}
+          batchId={tagAssignmentItem.batchId}
+          batchNumber={tagAssignmentItem.lote}
+          mode="product-entry"
+        />
+      )}
     </Dialog>
   );
 }

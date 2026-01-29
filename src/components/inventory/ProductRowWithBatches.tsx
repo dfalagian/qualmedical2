@@ -12,11 +12,13 @@ import {
   ChevronRight,
   Package,
   Calendar,
-  Boxes
+  Boxes,
+  Link2
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { QuickTagAssignment } from "./QuickTagAssignment";
 
 interface Product {
   id: string;
@@ -66,6 +68,7 @@ export function ProductRowWithBatches({
   onDelete,
 }: ProductRowWithBatchesProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [tagAssignmentOpen, setTagAssignmentOpen] = useState(false);
 
   // Fetch batches for this product when expanded
   const { data: batches = [], isLoading: loadingBatches } = useQuery({
@@ -152,6 +155,17 @@ export function ProductRowWithBatches({
         {canEdit && (
           <TableCell className="text-right">
             <div className="flex justify-end gap-1">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                title="Asignar Tag RFID"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setTagAssignmentOpen(true);
+                }}
+              >
+                <Link2 className="h-4 w-4 text-primary" />
+              </Button>
               <Button 
                 variant="ghost" 
                 size="icon"
@@ -257,6 +271,14 @@ export function ProductRowWithBatches({
           </TableCell>
         </TableRow>
       )}
+      {/* Quick Tag Assignment Modal */}
+      <QuickTagAssignment
+        open={tagAssignmentOpen}
+        onOpenChange={setTagAssignmentOpen}
+        productId={product.id}
+        productName={product.name}
+        mode="product-list"
+      />
     </>
   );
 }
