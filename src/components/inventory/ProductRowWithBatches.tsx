@@ -13,7 +13,8 @@ import {
   Package,
   Calendar,
   Boxes,
-  Link2
+  Link2,
+  Cpu
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -85,6 +86,30 @@ export function ProductRowWithBatches({
     },
     enabled: isExpanded,
   });
+
+  // Fetch tags for this product when expanded
+  const { data: productTags = [] } = useQuery({
+    queryKey: ["product_rfid_tags", product.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("rfid_tags")
+        .select("id, epc, batch_id, status")
+        .eq("product_id", product.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: isExpanded,
+  });
+
+  // Group tags by batch_id
+  const tagsByBatch = productTags.reduce((acc, tag) => {
+    const batchId = tag.batch_id || "unassigned";
+    if (!acc[batchId]) acc[batchId] = [];
+    acc[batchId].push(tag);
+    return acc;
+  }, {} as Record<string, typeof productTags>);
 
   const colSpan = canEdit ? 7 : 6;
 
@@ -262,6 +287,29 @@ export function ProductRowWithBatches({
                             <span className="text-muted-foreground">/{batch.initial_quantity}</span>
                           </div>
                         </div>
+
+                        {/* RFID Tags for this batch */}
+                        {tagsByBatch[batch.id] && tagsByBatch[batch.id].length > 0 && (
+                          <div className="w-full mt-3 pt-3 border-t border-border/50">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Cpu className="h-3 w-3 text-primary" />
+                              <span className="text-xs font-medium text-muted-foreground">
+                                Tags RFID asignados ({tagsByBatch[batch.id].length})
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {tagsByBatch[batch.id].map((tag) => (
+                                <Badge 
+                                  key={tag.id} 
+                                  variant="outline" 
+                                  className="font-mono text-xs bg-muted/50"
+                                >
+                                  {tag.epc}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
