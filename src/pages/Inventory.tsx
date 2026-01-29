@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,10 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 import { 
   Package, 
   Tag, 
@@ -38,7 +43,9 @@ import {
   Pill,
   ScanSearch,
   TrendingDown,
-  Boxes
+  Boxes,
+  CalendarIcon,
+  X
 } from "lucide-react";
 
 import { RFIDScannerCard, ScanMode } from "@/components/inventory/RFIDScannerCard";
@@ -138,6 +145,8 @@ export default function Inventory() {
   const [massRfidScannerOpen, setMassRfidScannerOpen] = useState<boolean>(false);
   const [virginTagAssignmentOpen, setVirginTagAssignmentOpen] = useState<boolean>(false);
   const [tagSearchTerm, setTagSearchTerm] = useState<string>("");
+  const [tagStatusFilter, setTagStatusFilter] = useState<string>("all");
+  const [tagDateFilter, setTagDateFilter] = useState<Date | undefined>(undefined);
   const [productEntryDialogOpen, setProductEntryDialogOpen] = useState<boolean>(false);
   
   // Refs - después de los estados
@@ -962,14 +971,27 @@ export default function Inventory() {
 
   // Use local tag search term if available, otherwise use global search
   const effectiveTagSearch = tagSearchTerm || searchTerm;
-  const filteredTags = rfidTags.filter(t =>
-    t.epc.toLowerCase().includes(effectiveTagSearch.toLowerCase()) ||
-    (t.products?.name?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
-    (t.products?.sku?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
-    (t.product_batches?.batch_number?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
-    (t.product_batches?.products?.name?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
-    (t.product_batches?.barcode?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase())
-  );
+  const filteredTags = rfidTags.filter(t => {
+    // Text search filter
+    const matchesSearch = 
+      t.epc.toLowerCase().includes(effectiveTagSearch.toLowerCase()) ||
+      (t.products?.name?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
+      (t.products?.sku?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
+      (t.product_batches?.batch_number?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
+      (t.product_batches?.products?.name?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
+      (t.product_batches?.barcode?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase());
+    
+    // Status filter
+    const matchesStatus = tagStatusFilter === "all" || t.status === tagStatusFilter;
+    
+    // Date filter (matches created_at date)
+    const matchesDate = !tagDateFilter || (
+      t.created_at && 
+      new Date(t.created_at).toDateString() === tagDateFilter.toDateString()
+    );
+    
+    return matchesSearch && matchesStatus && matchesDate;
+  });
 
   // Stats
   const lowStockProducts = products.filter(p => p.current_stock <= p.minimum_stock);
@@ -1212,204 +1234,282 @@ export default function Inventory() {
 
           {/* Tags Tab */}
           <TabsContent value="tags" className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <div className="flex-1 w-full sm:w-auto">
-                <h2 className="text-lg font-semibold">Tags RFID</h2>
-                <p className="text-sm text-muted-foreground">
-                  {availableTags} disponibles | {assignedTags} asignados
-                </p>
-                <div className="relative mt-2 max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por EPC, producto o lote..."
-                    value={tagSearchTerm}
-                    onChange={(e) => setTagSearchTerm(e.target.value)}
-                    className="pl-9"
-                  />
+            <div className="flex flex-col gap-4">
+              {/* Header with title and action buttons */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex-1 w-full sm:w-auto">
+                  <h2 className="text-lg font-semibold">Tags RFID</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {availableTags} disponibles | {assignedTags} asignados | {filteredTags.length} mostrados
+                  </p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Botón Eliminar Tags Disponibles */}
-                {isAdmin && availableTags > 0 && (
-                  <Dialog>
+                <div className="flex items-center gap-2">
+                  {/* Botón Eliminar Tags Disponibles */}
+                  {isAdmin && availableTags > 0 && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="destructive" className="gap-2">
+                          <Trash2 className="h-4 w-4" />
+                          Eliminar Tags
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Eliminar Tags Disponibles</DialogTitle>
+                          <DialogDescription className="pt-2">
+                            Se eliminarán <span className="font-bold text-destructive">{availableTags}</span> tags en estado "Disponible".
+                            <br /><br />
+                            Esta acción no se puede deshacer.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="gap-2 sm:gap-0">
+                          <DialogClose asChild>
+                            <Button variant="outline">Cancelar</Button>
+                          </DialogClose>
+                          <Button 
+                            variant="destructive"
+                            onClick={() => deleteAvailableTagsMutation.mutate()}
+                            disabled={deleteAvailableTagsMutation.isPending}
+                          >
+                            {deleteAvailableTagsMutation.isPending ? "Eliminando..." : `Eliminar ${availableTags} tags`}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                  
+                  {/* Botón Consultar Artículo */}
+                  <Button 
+                    onClick={() => setConsultaDialogOpen(true)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <ScanSearch className="h-4 w-4 mr-2" />
+                    Consultar Artículo
+                  </Button>
+                  
+                  {canEdit && (
+                  <Dialog open={tagDialogOpen} onOpenChange={(open) => {
+                    setTagDialogOpen(open);
+                    if (!open) {
+                      setEditingTag(null);
+                      resetTagForm();
+                    }
+                  }}>
                     <DialogTrigger asChild>
-                      <Button variant="destructive" className="gap-2">
-                        <Trash2 className="h-4 w-4" />
-                        Eliminar Tags
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Nuevo Tag
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-w-md">
                       <DialogHeader>
-                        <DialogTitle>Eliminar Tags Disponibles</DialogTitle>
-                        <DialogDescription className="pt-2">
-                          Se eliminarán <span className="font-bold text-destructive">{availableTags}</span> tags en estado "Disponible".
-                          <br /><br />
-                          Esta acción no se puede deshacer.
-                        </DialogDescription>
+                        <DialogTitle>
+                          {editingTag ? "Editar Tag RFID" : "Registrar Tag RFID"}
+                        </DialogTitle>
                       </DialogHeader>
-                      <DialogFooter className="gap-2 sm:gap-0">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Código EPC *</Label>
+                          <Input
+                            value={tagForm.epc}
+                            onChange={(e) => setTagForm({ ...tagForm, epc: e.target.value.toUpperCase() })}
+                            placeholder="Pase el tag por el lector RFID o ingrese manualmente..."
+                            className="font-mono"
+                            autoComplete="off"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            El lector RFID USB escribirá automáticamente el EPC en este campo
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Lote de Medicamento *</Label>
+                          <Select
+                            value={tagForm.batch_id || "none"}
+                            onValueChange={(value) => {
+                              const batch = batches.find(b => b.id === value);
+                              setTagForm({ 
+                                ...tagForm, 
+                                batch_id: value === "none" ? "" : value,
+                                product_id: batch?.product_id || ""
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar lote..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Sin asignar</SelectItem>
+                              {batches.map((batch) => (
+                                <SelectItem 
+                                  key={batch.id} 
+                                  value={batch.id}
+                                >
+                                  <div className="flex flex-col">
+                                    <span>{batch.products?.name} - Lote: {batch.batch_number}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      Cód: {batch.barcode} | Cad: {new Date(batch.expiration_date).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Asigna este tag a un lote específico de medicamento
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Estado</Label>
+                          <Select
+                            value={tagForm.status}
+                            onValueChange={(value) => setTagForm({ ...tagForm, status: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="disponible">Disponible</SelectItem>
+                              <SelectItem value="asignado">Asignado</SelectItem>
+                              <SelectItem value="dañado">Dañado</SelectItem>
+                              <SelectItem value="perdido">Perdido</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Ubicación actual</Label>
+                          <Select
+                            value={tagForm.last_location || "none"}
+                            onValueChange={(value) => setTagForm({ ...tagForm, last_location: value === "none" ? "" : value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar ubicación..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Sin ubicación</SelectItem>
+                              {ANTENNA_LOCATIONS.map((loc) => (
+                                <SelectItem key={loc.id} value={loc.name}>
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className="h-3 w-3" />
+                                    {loc.name}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Notas</Label>
+                          <Textarea
+                            value={tagForm.notes}
+                            onChange={(e) => setTagForm({ ...tagForm, notes: e.target.value })}
+                            placeholder="Observaciones..."
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
                         <DialogClose asChild>
                           <Button variant="outline">Cancelar</Button>
                         </DialogClose>
                         <Button 
-                          variant="destructive"
-                          onClick={() => deleteAvailableTagsMutation.mutate()}
-                          disabled={deleteAvailableTagsMutation.isPending}
+                          onClick={() => tagMutation.mutate({ 
+                            ...tagForm, 
+                            id: editingTag?.id 
+                          })}
+                          disabled={!tagForm.epc || tagMutation.isPending}
                         >
-                          {deleteAvailableTagsMutation.isPending ? "Eliminando..." : `Eliminar ${availableTags} tags`}
+                          {tagMutation.isPending ? "Guardando..." : "Guardar"}
                         </Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
-                )}
-                
-                {/* Botón Consultar Artículo */}
-                <Button 
-                  onClick={() => setConsultaDialogOpen(true)}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <ScanSearch className="h-4 w-4 mr-2" />
-                  Consultar Artículo
-                </Button>
-                
-                {canEdit && (
-                <Dialog open={tagDialogOpen} onOpenChange={(open) => {
-                  setTagDialogOpen(open);
-                  if (!open) {
-                    setEditingTag(null);
-                    resetTagForm();
-                  }
-                }}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Nuevo Tag
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>
-                        {editingTag ? "Editar Tag RFID" : "Registrar Tag RFID"}
-                      </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Código EPC *</Label>
-                        <Input
-                          value={tagForm.epc}
-                          onChange={(e) => setTagForm({ ...tagForm, epc: e.target.value.toUpperCase() })}
-                          placeholder="Pase el tag por el lector RFID o ingrese manualmente..."
-                          className="font-mono"
-                          autoComplete="off"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          El lector RFID USB escribirá automáticamente el EPC en este campo
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Lote de Medicamento *</Label>
-                        <Select
-                          value={tagForm.batch_id || "none"}
-                          onValueChange={(value) => {
-                            const batch = batches.find(b => b.id === value);
-                            setTagForm({ 
-                              ...tagForm, 
-                              batch_id: value === "none" ? "" : value,
-                              product_id: batch?.product_id || ""
-                            });
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar lote..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Sin asignar</SelectItem>
-                            {batches.map((batch) => (
-                              <SelectItem 
-                                key={batch.id} 
-                                value={batch.id}
-                              >
-                                <div className="flex flex-col">
-                                  <span>{batch.products?.name} - Lote: {batch.batch_number}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    Cód: {batch.barcode} | Cad: {new Date(batch.expiration_date).toLocaleDateString()}
-                                  </span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                          Asigna este tag a un lote específico de medicamento
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Estado</Label>
-                        <Select
-                          value={tagForm.status}
-                          onValueChange={(value) => setTagForm({ ...tagForm, status: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="disponible">Disponible</SelectItem>
-                            <SelectItem value="asignado">Asignado</SelectItem>
-                            <SelectItem value="dañado">Dañado</SelectItem>
-                            <SelectItem value="perdido">Perdido</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Ubicación actual</Label>
-                        <Select
-                          value={tagForm.last_location || "none"}
-                          onValueChange={(value) => setTagForm({ ...tagForm, last_location: value === "none" ? "" : value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar ubicación..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Sin ubicación</SelectItem>
-                            {ANTENNA_LOCATIONS.map((loc) => (
-                              <SelectItem key={loc.id} value={loc.name}>
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="h-3 w-3" />
-                                  {loc.name}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Notas</Label>
-                        <Textarea
-                          value={tagForm.notes}
-                          onChange={(e) => setTagForm({ ...tagForm, notes: e.target.value })}
-                          placeholder="Observaciones..."
-                          rows={2}
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button variant="outline">Cancelar</Button>
-                      </DialogClose>
-                      <Button 
-                        onClick={() => tagMutation.mutate({ 
-                          ...tagForm, 
-                          id: editingTag?.id 
-                        })}
-                        disabled={!tagForm.epc || tagMutation.isPending}
-                      >
-                        {tagMutation.isPending ? "Guardando..." : "Guardar"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-                )}
+                  )}
+                </div>
               </div>
+
+              {/* Filters Section */}
+              <Card className="p-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+                  {/* Search */}
+                  <div className="flex-1 w-full sm:max-w-xs">
+                    <Label className="text-xs text-muted-foreground mb-1.5 block">Buscar</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="EPC, producto o lote..."
+                        value={tagSearchTerm}
+                        onChange={(e) => setTagSearchTerm(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Status Filter */}
+                  <div className="w-full sm:w-40">
+                    <Label className="text-xs text-muted-foreground mb-1.5 block">Estado</Label>
+                    <Select
+                      value={tagStatusFilter}
+                      onValueChange={setTagStatusFilter}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="disponible">Disponible</SelectItem>
+                        <SelectItem value="asignado">Asignado</SelectItem>
+                        <SelectItem value="dañado">Dañado</SelectItem>
+                        <SelectItem value="perdido">Perdido</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Date Filter */}
+                  <div className="w-full sm:w-auto">
+                    <Label className="text-xs text-muted-foreground mb-1.5 block">Fecha de Registro</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full sm:w-[200px] justify-start text-left font-normal",
+                            !tagDateFilter && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {tagDateFilter ? format(tagDateFilter, "PPP", { locale: es }) : "Seleccionar fecha"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={tagDateFilter}
+                          onSelect={setTagDateFilter}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  
+                  {/* Clear Filters Button */}
+                  {(tagSearchTerm || tagStatusFilter !== "all" || tagDateFilter) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setTagSearchTerm("");
+                        setTagStatusFilter("all");
+                        setTagDateFilter(undefined);
+                      }}
+                      className="gap-1"
+                    >
+                      <X className="h-4 w-4" />
+                      Limpiar
+                    </Button>
+                  )}
+                </div>
+              </Card>
             </div>
 
             <Card>
