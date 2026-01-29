@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,8 @@ import {
   Link2,
   Loader2,
   Radio,
-  Trash2
+  Trash2,
+  ScanSearch
 } from "lucide-react";
 
 interface VirginTagAssignmentProps {
@@ -62,6 +63,16 @@ export function VirginTagAssignment({ open, onOpenChange }: VirginTagAssignmentP
   const [assignmentMode, setAssignmentMode] = useState<"individual" | "batch">("individual");
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
   const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus search input when dialog opens for RFID reader capture
+  useEffect(() => {
+    if (open && searchInputRef.current) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+    }
+  }, [open]);
 
   // Fetch available (virgin) tags
   const { data: availableTags = [], isLoading: loadingTags } = useQuery({
@@ -304,11 +315,48 @@ export function VirginTagAssignment({ open, onOpenChange }: VirginTagAssignmentP
             </div>
             
             <div className="relative mb-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <ScanSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar EPC..."
+                ref={searchInputRef}
+                placeholder="Escanear o buscar EPC..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.trim();
+                  setSearchTerm(value);
+                }}
+                onKeyDown={(e) => {
+                  // When Enter is pressed (RFID reader sends Enter after EPC)
+                  if (e.key === "Enter" && searchTerm) {
+                    e.preventDefault();
+                    const cleanSearch = searchTerm.trim().toUpperCase();
+                    
+                    // Find exact match or partial match
+                    const matchingTag = availableTags.find(
+                      tag => tag.epc.toUpperCase() === cleanSearch || 
+                             tag.epc.toUpperCase().includes(cleanSearch)
+                    );
+                    
+                    if (matchingTag) {
+                      // Clear previous selection and select only the matching tag
+                      setSelectedTags(new Set([matchingTag.id]));
+                      toast({
+                        title: "Tag encontrado",
+                        description: `EPC: ${matchingTag.epc}`,
+                      });
+                    } else {
+                      toast({
+                        title: "Tag no encontrado",
+                        description: "Este EPC no está en la lista de tags disponibles.",
+                        variant: "destructive"
+                      });
+                    }
+                    
+                    // Clear search to show full list but keep selection
+                    setSearchTerm("");
+                    // Refocus for next scan
+                    setTimeout(() => searchInputRef.current?.focus(), 100);
+                  }
+                }}
                 className="pl-9"
               />
             </div>
