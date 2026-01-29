@@ -21,7 +21,8 @@ import {
   Search,
   Link2,
   Loader2,
-  Radio
+  Radio,
+  Trash2
 } from "lucide-react";
 
 interface VirginTagAssignmentProps {
@@ -210,6 +211,40 @@ export function VirginTagAssignment({ open, onOpenChange }: VirginTagAssignmentP
     }
   };
 
+  const deleteTagMutation = useMutation({
+    mutationFn: async (tagId: string) => {
+      const { error } = await supabase
+        .from("rfid_tags")
+        .delete()
+        .eq("id", tagId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["available_tags"] });
+      toast({
+        title: "Tag eliminado",
+        description: "El tag ha sido eliminado del sistema."
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error al eliminar",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleDeleteTag = (e: React.MouseEvent, tagId: string) => {
+    e.stopPropagation();
+    setSelectedTags(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(tagId);
+      return newSet;
+    });
+    deleteTagMutation.mutate(tagId);
+  };
+
   const handleAssign = () => {
     if (selectedTags.size === 0) {
       toast({
@@ -312,8 +347,17 @@ export function VirginTagAssignment({ open, onOpenChange }: VirginTagAssignmentP
                         </p>
                       </div>
                       {selectedTags.has(tag.id) && (
-                        <CheckCircle className="h-4 w-4 text-primary" />
+                        <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
                       )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => handleDeleteTag(e, tag.id)}
+                        disabled={deleteTagMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   ))}
                 </div>
