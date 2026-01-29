@@ -944,10 +944,20 @@ export default function Inventory() {
     setTagDialogOpen(true);
   };
 
+  // Helper: find product IDs that have tags matching the search term (EPC search)
+  const productIdsWithMatchingTags = searchTerm
+    ? rfidTags
+        .filter(t => t.epc.toLowerCase().includes(searchTerm.toLowerCase()))
+        .map(t => t.product_id)
+        .filter((id): id is string => id !== null)
+    : [];
+
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.category?.toLowerCase() || "").includes(searchTerm.toLowerCase())
+    (p.category?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+    // Include products that have tags matching the EPC search
+    productIdsWithMatchingTags.includes(p.id)
   );
 
   // Use local tag search term if available, otherwise use global search
@@ -957,7 +967,8 @@ export default function Inventory() {
     (t.products?.name?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
     (t.products?.sku?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
     (t.product_batches?.batch_number?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
-    (t.product_batches?.products?.name?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase())
+    (t.product_batches?.products?.name?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase()) ||
+    (t.product_batches?.barcode?.toLowerCase() || "").includes(effectiveTagSearch.toLowerCase())
   );
 
   // Stats
