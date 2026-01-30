@@ -26,6 +26,7 @@ interface EntryItem {
   caducidad: string;
   cantidad: number;
   isExistingBatch: boolean;
+  assignedTagsCount?: number; // Contador de tags asignados
 }
 
 interface ProductEntryDialogProps {
@@ -606,6 +607,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
           batchId={tagAssignmentItem.batchId}
           batchNumber={tagAssignmentItem.lote}
           mode="product-entry"
+          quantity={tagAssignmentItem.cantidad}
         />
       )}
     </Dialog>
