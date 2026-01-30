@@ -35,6 +35,7 @@ import {
   Bell,
   MapPin,
   ArrowRight,
+  ArrowRightLeft,
   Eye,
   EyeOff,
   Smartphone,
@@ -59,6 +60,8 @@ import { RFIDConsultaDialog } from "@/components/inventory/RFIDConsultaDialog";
 import { ProductEntryDialog } from "@/components/inventory/ProductEntryDialog";
 import { ProductRowWithBatches } from "@/components/inventory/ProductRowWithBatches";
 import { StockAdjustmentDialog } from "@/components/inventory/StockAdjustmentDialog";
+import { WarehouseTransferDialog } from "@/components/inventory/WarehouseTransferDialog";
+import { WarehouseFilter } from "@/components/inventory/WarehouseFilter";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -98,6 +101,7 @@ interface Product {
   is_active: boolean;
   created_at: string;
   citio_id?: string | null;
+  warehouse_id?: string | null;
 }
 
 interface RfidTag {
@@ -110,8 +114,10 @@ interface RfidTag {
   last_location: string | null;
   notes: string | null;
   created_at: string;
+  warehouse_id?: string | null;
   products?: { name: string; sku: string } | null;
   product_batches?: { batch_number: string; barcode: string; expiration_date: string; products: { name: string; sku: string } | null } | null;
+  warehouses?: { name: string; code: string } | null;
 }
 
 interface ProductBatch {
@@ -151,6 +157,8 @@ export default function Inventory() {
   const [tagDateFilter, setTagDateFilter] = useState<Date | undefined>(undefined);
   const [productEntryDialogOpen, setProductEntryDialogOpen] = useState<boolean>(false);
   const [stockAdjustmentDialogOpen, setStockAdjustmentDialogOpen] = useState<boolean>(false);
+  const [warehouseTransferDialogOpen, setWarehouseTransferDialogOpen] = useState<boolean>(false);
+  const [warehouseFilter, setWarehouseFilter] = useState<string>("all");
   
   // Refs - después de los estados
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -216,7 +224,7 @@ export default function Inventory() {
     }
   });
 
-  // Fetch RFID tags with batch info
+  // Fetch RFID tags with batch info and warehouse
   const { data: rfidTags = [], isLoading: loadingTags } = useQuery({
     queryKey: ["rfid_tags"],
     queryFn: async () => {
@@ -230,7 +238,8 @@ export default function Inventory() {
             barcode, 
             expiration_date,
             products:product_id (name, sku)
-          )
+          ),
+          warehouses:warehouse_id (name, code)
         `)
         .order("created_at", { ascending: false });
 
@@ -964,13 +973,17 @@ export default function Inventory() {
         .filter((id): id is string => id !== null)
     : [];
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.category?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-    // Include products that have tags matching the EPC search
-    productIdsWithMatchingTags.includes(p.id)
-  );
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.category?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+      productIdsWithMatchingTags.includes(p.id);
+    
+    // Warehouse filter
+    const matchesWarehouse = warehouseFilter === "all" || p.warehouse_id === warehouseFilter;
+    
+    return matchesSearch && matchesWarehouse;
+  });
 
   // Use local tag search term if available, otherwise use global search
   const effectiveTagSearch = tagSearchTerm || searchTerm;
@@ -993,7 +1006,10 @@ export default function Inventory() {
       new Date(t.created_at).toDateString() === tagDateFilter.toDateString()
     );
     
-    return matchesSearch && matchesStatus && matchesDate;
+    // Warehouse filter
+    const matchesWarehouse = warehouseFilter === "all" || t.warehouse_id === warehouseFilter;
+    
+    return matchesSearch && matchesStatus && matchesDate && matchesWarehouse;
   });
 
   // Stats
@@ -1018,7 +1034,22 @@ export default function Inventory() {
             <h1 className="text-2xl md:text-3xl font-bold">Inventario RFID</h1>
             <p className="text-muted-foreground">Gestión de productos y tags RFID</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <WarehouseFilter
+              value={warehouseFilter}
+              onChange={setWarehouseFilter}
+              className="w-[180px]"
+            />
+            {canEdit && (
+              <Button 
+                variant="outline" 
+                onClick={() => setWarehouseTransferDialogOpen(true)}
+                className="gap-2"
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+                Transferir
+              </Button>
+            )}
             <div className="relative flex-1 md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -2145,6 +2176,12 @@ export default function Inventory() {
         <StockAdjustmentDialog
           open={stockAdjustmentDialogOpen}
           onOpenChange={setStockAdjustmentDialogOpen}
+        />
+
+        {/* Warehouse Transfer Dialog */}
+        <WarehouseTransferDialog
+          open={warehouseTransferDialogOpen}
+          onOpenChange={setWarehouseTransferDialogOpen}
         />
       </div>
     </DashboardLayout>
