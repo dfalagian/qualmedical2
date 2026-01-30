@@ -14,12 +14,14 @@ import {
   Calendar,
   Boxes,
   Link2,
-  Cpu
+  Cpu,
+  ScanBarcode
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { QuickTagAssignment } from "./QuickTagAssignment";
+import { QuickStockButtons } from "./QuickStockButtons";
 
 interface Product {
   id: string;
@@ -54,6 +56,7 @@ interface ProductRowWithBatchesProps {
   hasTag: boolean;
   canEdit: boolean;
   isAdmin: boolean;
+  showQuickStock?: boolean;
   isInventarioRfid: boolean;
   onEdit: (product: Product) => void;
   onDelete: (id: string) => void;
@@ -67,6 +70,7 @@ export function ProductRowWithBatches({
   isInventarioRfid,
   onEdit,
   onDelete,
+  showQuickStock = true,
 }: ProductRowWithBatchesProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [tagAssignmentOpen, setTagAssignmentOpen] = useState(false);
@@ -168,11 +172,20 @@ export function ProductRowWithBatches({
           )}
         </TableCell>
         <TableCell className="text-center">
-          <Badge 
-            variant={product.current_stock <= product.minimum_stock ? "destructive" : "default"}
-          >
-            {product.current_stock} / {product.minimum_stock}
-          </Badge>
+          <div className="flex items-center justify-center gap-2">
+            {showQuickStock && canEdit && (
+              <QuickStockButtons
+                productId={product.id}
+                productName={product.name}
+                currentStock={product.current_stock}
+              />
+            )}
+            <Badge 
+              variant={product.current_stock <= product.minimum_stock ? "destructive" : "default"}
+            >
+              {product.current_stock} / {product.minimum_stock}
+            </Badge>
+          </div>
         </TableCell>
         <TableCell className="text-right">
           {product.unit_price ? `$${product.unit_price.toFixed(2)}` : "-"}

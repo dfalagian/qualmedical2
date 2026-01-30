@@ -45,7 +45,8 @@ import {
   TrendingDown,
   Boxes,
   CalendarIcon,
-  X
+  X,
+  ScanBarcode
 } from "lucide-react";
 
 import { RFIDScannerCard, ScanMode } from "@/components/inventory/RFIDScannerCard";
@@ -57,6 +58,7 @@ import { VirginTagAssignment } from "@/components/inventory/VirginTagAssignment"
 import { RFIDConsultaDialog } from "@/components/inventory/RFIDConsultaDialog";
 import { ProductEntryDialog } from "@/components/inventory/ProductEntryDialog";
 import { ProductRowWithBatches } from "@/components/inventory/ProductRowWithBatches";
+import { StockAdjustmentDialog } from "@/components/inventory/StockAdjustmentDialog";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -148,6 +150,7 @@ export default function Inventory() {
   const [tagStatusFilter, setTagStatusFilter] = useState<string>("all");
   const [tagDateFilter, setTagDateFilter] = useState<Date | undefined>(undefined);
   const [productEntryDialogOpen, setProductEntryDialogOpen] = useState<boolean>(false);
+  const [stockAdjustmentDialogOpen, setStockAdjustmentDialogOpen] = useState<boolean>(false);
   
   // Refs - después de los estados
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -1165,6 +1168,14 @@ export default function Inventory() {
                 <div className="flex items-center gap-2">
                   <Button 
                     variant="outline" 
+                    onClick={() => setStockAdjustmentDialogOpen(true)}
+                    className="gap-2"
+                  >
+                    <ScanBarcode className="h-4 w-4" />
+                    Ajuste Manual
+                  </Button>
+                  <Button 
+                    variant="outline" 
                     onClick={() => setCitioImportDialogOpen(true)}
                     className="gap-2"
                   >
@@ -2129,6 +2140,12 @@ export default function Inventory() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Stock Adjustment Dialog */}
+        <StockAdjustmentDialog
+          open={stockAdjustmentDialogOpen}
+          onOpenChange={setStockAdjustmentDialogOpen}
+        />
       </div>
     </DashboardLayout>
   );
