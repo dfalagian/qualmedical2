@@ -860,6 +860,7 @@ export type Database = {
           unit: string | null
           unit_price: number | null
           updated_at: string | null
+          warehouse_id: string | null
         }
         Insert: {
           barcode?: string | null
@@ -877,6 +878,7 @@ export type Database = {
           unit?: string | null
           unit_price?: number | null
           updated_at?: string | null
+          warehouse_id?: string | null
         }
         Update: {
           barcode?: string | null
@@ -894,6 +896,7 @@ export type Database = {
           unit?: string | null
           unit_price?: number | null
           updated_at?: string | null
+          warehouse_id?: string | null
         }
         Relationships: [
           {
@@ -901,6 +904,13 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
             referencedColumns: ["id"]
           },
         ]
@@ -1078,6 +1088,7 @@ export type Database = {
           product_id: string | null
           status: string | null
           updated_at: string | null
+          warehouse_id: string | null
         }
         Insert: {
           batch_id?: string | null
@@ -1090,6 +1101,7 @@ export type Database = {
           product_id?: string | null
           status?: string | null
           updated_at?: string | null
+          warehouse_id?: string | null
         }
         Update: {
           batch_id?: string | null
@@ -1102,6 +1114,7 @@ export type Database = {
           product_id?: string | null
           status?: string | null
           updated_at?: string | null
+          warehouse_id?: string | null
         }
         Relationships: [
           {
@@ -1116,6 +1129,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfid_tags_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
             referencedColumns: ["id"]
           },
         ]
@@ -1215,6 +1235,121 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      warehouse_transfers: {
+        Row: {
+          batch_id: string | null
+          created_at: string
+          created_by: string | null
+          from_warehouse_id: string
+          id: string
+          notes: string | null
+          product_id: string | null
+          quantity: number | null
+          rfid_tag_id: string | null
+          to_warehouse_id: string
+          transfer_type: string
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          from_warehouse_id: string
+          id?: string
+          notes?: string | null
+          product_id?: string | null
+          quantity?: number | null
+          rfid_tag_id?: string | null
+          to_warehouse_id: string
+          transfer_type: string
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          from_warehouse_id?: string
+          id?: string
+          notes?: string | null
+          product_id?: string | null
+          quantity?: number | null
+          rfid_tag_id?: string | null
+          to_warehouse_id?: string
+          transfer_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_transfers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_transfers_from_warehouse_id_fkey"
+            columns: ["from_warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_transfers_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_transfers_rfid_tag_id_fkey"
+            columns: ["rfid_tag_id"]
+            isOneToOne: false
+            referencedRelation: "rfid_tags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_transfers_to_warehouse_id_fkey"
+            columns: ["to_warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouses: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {
