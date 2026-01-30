@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +20,7 @@ import {
   Link2,
   Loader2,
   Package,
-  Boxes
+  Trash2
 } from "lucide-react";
 
 interface QuickTagAssignmentProps {
@@ -32,6 +33,8 @@ interface QuickTagAssignmentProps {
   batchNumber?: string;
   // Modo 2: Desde listado de productos - solo producto seleccionado
   mode?: "product-entry" | "product-list";
+  // Cantidad de tags a asignar (para multi-tag assignment)
+  quantity?: number;
 }
 
 interface ExistingTag {
@@ -45,6 +48,13 @@ interface ExistingTag {
     batch_number: string; 
     products: { name: string } | null 
   } | null;
+}
+
+interface ScannedTagInfo {
+  epc: string;
+  existingTag: ExistingTag | null;
+  canAssign: boolean;
+  errorMessage?: string;
 }
 
 interface ProductBatch {
@@ -61,19 +71,23 @@ export function QuickTagAssignment({
   productName,
   batchId,
   batchNumber,
-  mode = "product-list"
+  mode = "product-list",
+  quantity = 1
 }: QuickTagAssignmentProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
   const [epcInput, setEpcInput] = useState("");
-  const [scannedEpc, setScannedEpc] = useState<string | null>(null);
-  const [existingTag, setExistingTag] = useState<ExistingTag | null>(null);
-  const [isScanning, setIsScanning] = useState(true);
+  const [scannedTags, setScannedTags] = useState<ScannedTagInfo[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState(batchId || "");
   const [checkingTag, setCheckingTag] = useState(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
+  const processedEpcsRef = useRef<Set<string>>(new Set());
+
+  const targetQuantity = quantity || 1;
+  const remainingTags = targetQuantity - scannedTags.length;
+  const allTagsScanned = scannedTags.length >= targetQuantity;
 
   // Fetch batches for product (when in product-list mode)
   const { data: productBatches = [] } = useQuery({
@@ -97,10 +111,9 @@ export function QuickTagAssignment({
   useEffect(() => {
     if (open) {
       setEpcInput("");
-      setScannedEpc(null);
-      setExistingTag(null);
-      setIsScanning(true);
+      setScannedTags([]);
       setSelectedBatchId(batchId || "");
+      processedEpcsRef.current.clear();
       // Focus input after a small delay
       setTimeout(() => {
         inputRef.current?.focus();
@@ -110,7 +123,7 @@ export function QuickTagAssignment({
 
   // Auto-focus input periodically when scanning
   useEffect(() => {
-    if (!open || !isScanning) return;
+    if (!open || allTagsScanned) return;
     
     const focusInterval = setInterval(() => {
       if (inputRef.current && document.activeElement !== inputRef.current) {
@@ -119,7 +132,7 @@ export function QuickTagAssignment({
     }, 500);
     
     return () => clearInterval(focusInterval);
-  }, [open, isScanning]);
+  }, [open, allTagsScanned]);
 
   // Check if tag exists in database
   const checkTagInDatabase = useCallback(async (epc: string) => {
@@ -140,9 +153,32 @@ export function QuickTagAssignment({
       
       if (error) throw error;
       
-      setScannedEpc(epc);
-      setExistingTag(data);
-      setIsScanning(false);
+      // Determine if tag can be assigned
+      const isAlreadyAssignedToOther = data && data.product_id && data.product_id !== productId;
+      
+      const tagInfo: ScannedTagInfo = {
+        epc,
+        existingTag: data,
+        canAssign: !isAlreadyAssignedToOther,
+        errorMessage: isAlreadyAssignedToOther 
+          ? `Ya asignado a: ${data?.products?.name || 'otro producto'}`
+          : undefined
+      };
+      
+      setScannedTags(prev => [...prev, tagInfo]);
+      
+      if (isAlreadyAssignedToOther) {
+        toast({
+          title: "Tag ya asignado",
+          description: `EPC ${epc} ya está asignado a otro producto`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Tag escaneado",
+          description: `EPC ${epc} listo para asignar (${scannedTags.length + 1}/${targetQuantity})`
+        });
+      }
     } catch (error) {
       console.error("Error checking tag:", error);
       toast({
@@ -153,7 +189,7 @@ export function QuickTagAssignment({
     } finally {
       setCheckingTag(false);
     }
-  }, [toast]);
+  }, [toast, productId, scannedTags.length, targetQuantity]);
 
   // Process EPC input
   const processEpc = useCallback((epc: string) => {
@@ -161,9 +197,22 @@ export function QuickTagAssignment({
     const cleanEpc = epc.trim().toUpperCase();
     if (cleanEpc.length < 10) return;
     
+    // Check for duplicates within this session
+    if (processedEpcsRef.current.has(cleanEpc)) {
+      toast({
+        title: "Tag duplicado",
+        description: "Este tag ya fue escaneado en esta sesión",
+        variant: "destructive"
+      });
+      setEpcInput("");
+      return;
+    }
+    
+    // Mark as processed immediately
+    processedEpcsRef.current.add(cleanEpc);
     setEpcInput("");
     checkTagInDatabase(cleanEpc);
-  }, [checkTagInDatabase]);
+  }, [checkTagInDatabase, toast]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -172,69 +221,73 @@ export function QuickTagAssignment({
     }
   };
 
-  // Mutation to assign tag
-  const assignTagMutation = useMutation({
+  const handleRemoveTag = (epc: string) => {
+    setScannedTags(prev => prev.filter(t => t.epc !== epc));
+    processedEpcsRef.current.delete(epc);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  // Mutation to assign all tags
+  const assignTagsMutation = useMutation({
     mutationFn: async () => {
-      if (!scannedEpc || !productId) {
-        throw new Error("Faltan datos para asignar el tag");
+      if (!productId) {
+        throw new Error("Faltan datos para asignar los tags");
+      }
+
+      const tagsToAssign = scannedTags.filter(t => t.canAssign);
+      if (tagsToAssign.length === 0) {
+        throw new Error("No hay tags válidos para asignar");
       }
 
       const targetBatchId = selectedBatchId || batchId || null;
 
-      if (existingTag) {
-        // Tag exists - update it
-        if (existingTag.product_id && existingTag.product_id !== productId) {
-          throw new Error("Este tag ya está asignado a otro producto");
+      for (const tagInfo of tagsToAssign) {
+        if (tagInfo.existingTag) {
+          // Tag exists - update it
+          const { error } = await supabase
+            .from("rfid_tags")
+            .update({
+              product_id: productId,
+              batch_id: targetBatchId,
+              status: "asignado",
+              notes: `Asignado a ${productName}${batchNumber ? ` - Lote ${batchNumber}` : ""} el ${new Date().toLocaleString()}`,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", tagInfo.existingTag.id);
+
+          if (error) throw error;
+        } else {
+          // Tag doesn't exist - create it
+          const { error } = await supabase
+            .from("rfid_tags")
+            .insert({
+              epc: tagInfo.epc,
+              product_id: productId,
+              batch_id: targetBatchId,
+              status: "asignado",
+              notes: `Asignado a ${productName}${batchNumber ? ` - Lote ${batchNumber}` : ""} el ${new Date().toLocaleString()}`
+            });
+
+          if (error) throw error;
         }
-
-        const { error } = await supabase
-          .from("rfid_tags")
-          .update({
-            product_id: productId,
-            batch_id: targetBatchId,
-            status: "asignado",
-            notes: `Asignado a ${productName}${batchNumber ? ` - Lote ${batchNumber}` : ""} el ${new Date().toLocaleString()}`,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", existingTag.id);
-
-        if (error) throw error;
-      } else {
-        // Tag doesn't exist - create it
-        const { error } = await supabase
-          .from("rfid_tags")
-          .insert({
-            epc: scannedEpc,
-            product_id: productId,
-            batch_id: targetBatchId,
-            status: "asignado",
-            notes: `Asignado a ${productName}${batchNumber ? ` - Lote ${batchNumber}` : ""} el ${new Date().toLocaleString()}`
-          });
-
-        if (error) throw error;
       }
 
-      return { epc: scannedEpc, isNew: !existingTag };
+      return { count: tagsToAssign.length };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
       queryClient.invalidateQueries({ queryKey: ["available_tags"] });
       
       toast({
-        title: "Tag asignado correctamente",
-        description: `EPC ${data.epc} fue ${data.isNew ? "registrado y " : ""}asignado a ${productName}`
+        title: "Tags asignados correctamente",
+        description: `${data.count} tag(s) asignados a ${productName}`
       });
       
-      // Reset for next scan
-      setScannedEpc(null);
-      setExistingTag(null);
-      setIsScanning(true);
-      setEpcInput("");
-      setTimeout(() => inputRef.current?.focus(), 100);
+      handleClose();
     },
     onError: (error: Error) => {
       toast({
-        title: "Error al asignar tag",
+        title: "Error al asignar tags",
         description: error.message,
         variant: "destructive"
       });
@@ -243,49 +296,35 @@ export function QuickTagAssignment({
 
   const handleClose = () => {
     setEpcInput("");
-    setScannedEpc(null);
-    setExistingTag(null);
-    setIsScanning(true);
+    setScannedTags([]);
+    processedEpcsRef.current.clear();
     onOpenChange(false);
   };
 
-  const handleRetry = () => {
-    setScannedEpc(null);
-    setExistingTag(null);
-    setIsScanning(true);
-    setEpcInput("");
-    setTimeout(() => inputRef.current?.focus(), 100);
-  };
-
-  // Determine if tag can be assigned
-  const canAssign = scannedEpc && productId && (
-    !existingTag || // New tag
-    !existingTag.product_id || // Tag exists but not assigned
-    existingTag.product_id === productId // Tag already assigned to this product (update batch)
-  );
-
-  const isAlreadyAssignedToOther = existingTag && existingTag.product_id && existingTag.product_id !== productId;
+  const validTagsCount = scannedTags.filter(t => t.canAssign).length;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5 text-primary" />
-            Asignar Tag RFID
+            Asignar Tags RFID
           </DialogTitle>
           <DialogDescription>
-            Escanee un tag para asignarlo a este producto
+            {targetQuantity > 1 
+              ? `Escanee ${targetQuantity} tags para asignarlos a este producto`
+              : "Escanee un tag para asignarlo a este producto"}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 flex-1 min-h-0">
           {/* Product info */}
           <Card className="bg-muted/50">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <Package className="h-8 w-8 text-primary" />
-                <div>
+                <div className="flex-1">
                   <p className="font-medium">{productName}</p>
                   {(batchNumber || selectedBatchId) && (
                     <p className="text-sm text-muted-foreground">
@@ -293,6 +332,9 @@ export function QuickTagAssignment({
                     </p>
                   )}
                 </div>
+                <Badge variant="outline" className="text-lg px-3">
+                  {scannedTags.length} / {targetQuantity}
+                </Badge>
               </div>
             </CardContent>
           </Card>
@@ -318,12 +360,16 @@ export function QuickTagAssignment({
           )}
 
           {/* Scanning area */}
-          {isScanning ? (
+          {!allTagsScanned && (
             <div className="space-y-3">
               <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
                 <div className="flex items-center justify-center gap-2 text-primary mb-2">
                   <Scan className="h-5 w-5 animate-pulse" />
-                  <span className="font-medium">Esperando lectura RFID...</span>
+                  <span className="font-medium">
+                    {remainingTags > 1 
+                      ? `Esperando ${remainingTags} tags más...`
+                      : "Esperando lectura RFID..."}
+                  </span>
                 </div>
                 <Input
                   ref={inputRef}
@@ -346,104 +392,94 @@ export function QuickTagAssignment({
                 Pase el tag por el lector RFID USB
               </p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {/* Tag result */}
-              <Card className={isAlreadyAssignedToOther ? "border-destructive" : "border-green-500"}>
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    {isAlreadyAssignedToOther ? (
-                      <AlertTriangle className="h-5 w-5 text-destructive" />
-                    ) : (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    )}
-                    <span className="font-medium">Tag detectado</span>
-                    {existingTag ? (
-                      <Badge variant="secondary">Registrado</Badge>
-                    ) : (
-                      <Badge variant="outline">Nuevo</Badge>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">EPC</Label>
-                    <code className="block bg-muted px-3 py-2 rounded font-mono text-sm">
-                      {scannedEpc}
-                    </code>
-                  </div>
+          )}
 
-                  {isAlreadyAssignedToOther && (
-                    <div className="p-3 bg-destructive/10 rounded-lg">
-                      <p className="text-sm text-destructive font-medium">
-                        ⚠️ Este tag ya está asignado a:
-                      </p>
-                      <p className="text-sm mt-1">
-                        {existingTag?.products?.name}
-                        {existingTag?.product_batches && (
-                          <span className="text-muted-foreground">
-                            {" "}(Lote: {existingTag.product_batches.batch_number})
-                          </span>
+          {/* Scanned tags list */}
+          {scannedTags.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm">Tags escaneados</Label>
+              <ScrollArea className="max-h-[200px] border rounded-lg">
+                <div className="p-2 space-y-2">
+                  {scannedTags.map((tagInfo, index) => (
+                    <div
+                      key={tagInfo.epc}
+                      className={`flex items-center gap-2 p-2 rounded-lg ${
+                        tagInfo.canAssign 
+                          ? "bg-primary/10 border border-primary/30" 
+                          : "bg-destructive/10 border border-destructive/30"
+                      }`}
+                    >
+                      {tagInfo.canAssign ? (
+                        <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <code className="text-xs font-mono truncate block">{tagInfo.epc}</code>
+                        {tagInfo.errorMessage && (
+                          <p className="text-xs text-destructive truncate">{tagInfo.errorMessage}</p>
                         )}
-                      </p>
+                        {!tagInfo.existingTag && tagInfo.canAssign && (
+                          <p className="text-xs text-muted-foreground">Nuevo tag</p>
+                        )}
+                      </div>
+                      <Badge variant="outline" className="text-xs flex-shrink-0">
+                        #{index + 1}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 flex-shrink-0"
+                        onClick={() => handleRemoveTag(tagInfo.epc)}
+                      >
+                        <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                      </Button>
                     </div>
-                  )}
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
 
-                  {!existingTag && (
-                    <p className="text-sm text-muted-foreground">
-                      Este tag no está registrado. Se creará y asignará automáticamente.
-                    </p>
-                  )}
-
-                  {existingTag && !existingTag.product_id && (
-                    <p className="text-sm text-muted-foreground">
-                      Este tag está disponible para asignación.
-                    </p>
-                  )}
-
-                  {existingTag && existingTag.product_id === productId && (
-                    <p className="text-sm text-green-600">
-                      Este tag ya está asignado a este producto. Puede actualizar el lote si es necesario.
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
+          {/* Summary when all tags scanned */}
+          {allTagsScanned && (
+            <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg">
+              <div className="flex items-center gap-2 text-primary">
+                <CheckCircle className="h-5 w-5" />
+                <span className="font-medium">
+                  {validTagsCount === targetQuantity 
+                    ? "Todos los tags listos para asignar"
+                    : `${validTagsCount} de ${targetQuantity} tags válidos`}
+                </span>
+              </div>
             </div>
           )}
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-shrink-0">
           <Button variant="outline" onClick={handleClose}>
             <X className="h-4 w-4 mr-2" />
             Cerrar
           </Button>
           
-          {!isScanning && (
-            <>
-              <Button variant="secondary" onClick={handleRetry}>
-                <Radio className="h-4 w-4 mr-2" />
-                Escanear otro
-              </Button>
-              
-              {canAssign && (
-                <Button 
-                  onClick={() => assignTagMutation.mutate()}
-                  disabled={assignTagMutation.isPending}
-                  className="gap-2"
-                >
-                  {assignTagMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Asignando...
-                    </>
-                  ) : (
-                    <>
-                      <Tag className="h-4 w-4" />
-                      Asignar Tag
-                    </>
-                  )}
-                </Button>
+          {validTagsCount > 0 && (
+            <Button 
+              onClick={() => assignTagsMutation.mutate()}
+              disabled={assignTagsMutation.isPending}
+              className="gap-2"
+            >
+              {assignTagsMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Asignando...
+                </>
+              ) : (
+                <>
+                  <Tag className="h-4 w-4" />
+                  Asignar {validTagsCount} Tag{validTagsCount > 1 ? "s" : ""}
+                </>
               )}
-            </>
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>
