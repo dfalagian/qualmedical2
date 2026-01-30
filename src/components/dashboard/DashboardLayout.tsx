@@ -78,7 +78,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   // Navegación para rol Inventario RFID - solo acceso a Inventario
   const inventarioRfidNavigation = [
-    { name: "Inventario RFID", href: "/dashboard/inventory", icon: Package },
+    { name: "Inventario", href: "/dashboard/inventory", icon: Package },
   ];
 
   // Navegación completa para Admin y Proveedor
@@ -101,8 +101,8 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       { name: "Validación Avisos", href: "/dashboard/aviso-funcionamiento-admin", icon: FileText },
       { name: "Validación Datos Bancarios", href: "/dashboard/datos-bancarios-admin", icon: FileText },
       { name: "Pagos", href: "/dashboard/payments", icon: CreditCard },
-      { name: "Inventario RFID", href: "/dashboard/inventory", icon: Package },
-      { name: "Catálogo CITIO", href: "/dashboard/medications-citio", icon: Pill },
+      { name: "Inventario", href: "/dashboard/inventory", icon: Package },
+      { name: "Catálogo", href: "/dashboard/medications-citio", icon: Pill },
       { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
       { name: "Administración", href: "/dashboard/admin", icon: Settings },
       { name: "Backup BD", href: "/dashboard/database-backup", icon: Database },
