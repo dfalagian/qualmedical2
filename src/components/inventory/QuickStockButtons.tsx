@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -24,8 +24,14 @@ export function QuickStockButtons({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isPending, setIsPending] = useState(false);
+  const isProcessingRef = useRef(false);
 
-  const adjustStock = async (mode: "increment" | "decrement") => {
+  const adjustStock = useCallback(async (mode: "increment" | "decrement") => {
+    // Prevent double-fires using ref
+    if (isProcessingRef.current) {
+      return;
+    }
+
     if (mode === "decrement" && currentStock <= 0) {
       toast({
         title: "Sin stock",
@@ -35,7 +41,9 @@ export function QuickStockButtons({
       return;
     }
 
+    isProcessingRef.current = true;
     setIsPending(true);
+
     try {
       const quantity = 1;
       const newStock = mode === "increment" 
@@ -70,8 +78,8 @@ export function QuickStockButtons({
       if (movementError) throw movementError;
 
       // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["product_batches"] });
+      await queryClient.invalidateQueries({ queryKey: ["products"] });
+      await queryClient.invalidateQueries({ queryKey: ["product_batches"] });
 
       toast({
         title: mode === "increment" ? "+1" : "-1",
@@ -88,36 +96,48 @@ export function QuickStockButtons({
       });
     } finally {
       setIsPending(false);
+      // Small delay before allowing next click to prevent rapid double-fires
+      setTimeout(() => {
+        isProcessingRef.current = false;
+      }, 300);
     }
-  };
+  }, [productId, productName, currentStock, queryClient, toast, onAdjustmentComplete]);
+
+  const handleDecrement = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    adjustStock("decrement");
+  }, [adjustStock]);
+
+  const handleIncrement = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    adjustStock("increment");
+  }, [adjustStock]);
 
   return (
     <div className={cn("flex items-center gap-1", className)}>
       <Button
+        type="button"
         variant="ghost"
         size="icon"
         className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100"
-        onClick={(e) => {
-          e.stopPropagation();
-          adjustStock("decrement");
-        }}
+        onClick={handleDecrement}
         disabled={isPending || currentStock <= 0}
         title="Retirar 1 unidad"
       >
-        <Minus className="h-3.5 w-3.5" />
+        <Minus className="h-3.5 w-3.5 pointer-events-none" />
       </Button>
       <Button
+        type="button"
         variant="ghost"
         size="icon"
         className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-100"
-        onClick={(e) => {
-          e.stopPropagation();
-          adjustStock("increment");
-        }}
+        onClick={handleIncrement}
         disabled={isPending}
         title="Agregar 1 unidad"
       >
-        <Plus className="h-3.5 w-3.5" />
+        <Plus className="h-3.5 w-3.5 pointer-events-none" />
       </Button>
     </div>
   );
