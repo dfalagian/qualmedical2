@@ -50,14 +50,6 @@ export function QuickStockButtons({
         ? currentStock + quantity
         : Math.max(0, currentStock - quantity);
 
-      // Update product stock
-      const { error: productError } = await supabase
-        .from("products")
-        .update({ current_stock: newStock })
-        .eq("id", productId);
-
-      if (productError) throw productError;
-
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -67,7 +59,9 @@ export function QuickStockButtons({
         .insert({
           product_id: productId,
           movement_type: mode === "increment" ? "entrada" : "salida",
-          quantity: mode === "increment" ? quantity : -quantity,
+          // IMPORTANT: quantity is always POSITIVE; direction is defined by movement_type.
+          // This matches backend logic that updates stock based on movement_type.
+          quantity,
           previous_stock: currentStock,
           new_stock: newStock,
           notes: `Ajuste rápido (${mode === "increment" ? "+1" : "-1"})`,
@@ -77,13 +71,23 @@ export function QuickStockButtons({
 
       if (movementError) throw movementError;
 
+      // Read actual stock after backend processing (prevents +2 / -0 mismatches)
+      const { data: updatedProduct, error: readError } = await supabase
+        .from("products")
+        .select("current_stock")
+        .eq("id", productId)
+        .maybeSingle();
+
+      if (readError) throw readError;
+      const actualStock = updatedProduct?.current_stock ?? newStock;
+
       // Invalidate queries
       await queryClient.invalidateQueries({ queryKey: ["products"] });
       await queryClient.invalidateQueries({ queryKey: ["product_batches"] });
 
       toast({
         title: mode === "increment" ? "+1" : "-1",
-        description: `${productName}: ${newStock}`,
+        description: `${productName}: ${actualStock}`,
       });
 
       onAdjustmentComplete?.();
@@ -121,7 +125,7 @@ export function QuickStockButtons({
         type="button"
         variant="ghost"
         size="icon"
-        className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100"
+        className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
         onClick={handleDecrement}
         disabled={isPending || currentStock <= 0}
         title="Retirar 1 unidad"
@@ -132,7 +136,7 @@ export function QuickStockButtons({
         type="button"
         variant="ghost"
         size="icon"
-        className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-100"
+        className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
         onClick={handleIncrement}
         disabled={isPending}
         title="Agregar 1 unidad"
