@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { Calendar } from "@/components/ui/calendar";
@@ -102,6 +103,7 @@ interface Product {
   created_at: string;
   citio_id?: string | null;
   warehouse_id?: string | null;
+  rfid_required?: boolean;
 }
 
 interface RfidTag {
@@ -198,7 +200,8 @@ export default function Inventory() {
     unit: "pieza",
     minimum_stock: 0,
     current_stock: 0,
-    unit_price: 0
+    unit_price: 0,
+    rfid_required: false
   });
 
   const [tagForm, setTagForm] = useState({
@@ -330,7 +333,8 @@ export default function Inventory() {
             unit: product.unit,
             minimum_stock: product.minimum_stock,
             current_stock: product.current_stock,
-            unit_price: product.unit_price || null
+            unit_price: product.unit_price || null,
+            rfid_required: product.rfid_required
           })
           .eq("id", product.id);
         if (error) throw error;
@@ -345,7 +349,8 @@ export default function Inventory() {
             unit: product.unit,
             minimum_stock: product.minimum_stock,
             current_stock: product.current_stock,
-            unit_price: product.unit_price || null
+            unit_price: product.unit_price || null,
+            rfid_required: product.rfid_required
           });
         if (error) throw error;
       }
@@ -922,7 +927,8 @@ export default function Inventory() {
       unit: "pieza",
       minimum_stock: 0,
       current_stock: 0,
-      unit_price: 0
+      unit_price: 0,
+      rfid_required: false
     });
   };
 
@@ -947,7 +953,8 @@ export default function Inventory() {
       unit: product.unit,
       minimum_stock: product.minimum_stock,
       current_stock: product.current_stock,
-      unit_price: product.unit_price || 0
+      unit_price: product.unit_price || 0,
+      rfid_required: product.rfid_required || false
     });
     setProductDialogOpen(true);
   };
@@ -2153,6 +2160,28 @@ export default function Inventory() {
                   onChange={(e) => setProductForm({ ...productForm, unit_price: parseFloat(e.target.value) || 0 })}
                   className="col-span-3"
                 />
+              </div>
+              
+              {/* Checkbox RFID - con explicación clara para usuarios no técnicos */}
+              <div className="flex items-start space-x-3 p-4 bg-muted/50 rounded-lg border">
+                <Checkbox
+                  id="rfid_required"
+                  checked={productForm.rfid_required}
+                  onCheckedChange={(checked) => setProductForm({ ...productForm, rfid_required: checked === true })}
+                  className="mt-0.5"
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <Label 
+                    htmlFor="rfid_required" 
+                    className="text-sm font-medium cursor-pointer"
+                  >
+                    Solo movimientos con lector RFID
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Cuando está activado, no se podrán usar los botones +/- para ajustar el stock manualmente. 
+                    Solo se permitirá mover este producto escaneando sus etiquetas RFID con el lector.
+                  </p>
+                </div>
               </div>
             </div>
             <DialogFooter>
