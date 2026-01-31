@@ -21,6 +21,7 @@ import { InvoicePaymentProofUpload } from "@/components/invoices/InvoicePaymentP
 import { PaymentComplementUpload } from "@/components/invoices/PaymentComplementUpload";
 import { getSignedUrl } from "@/lib/storage";
 import { formatSupplierName } from "@/lib/formatters";
+import { calculateInvoiceTotal } from "@/lib/invoiceTotals";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
@@ -33,33 +34,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-// Helper para calcular el total real de una factura
-const calculateInvoiceTotal = (invoice: any): number => {
-  const subtotal = invoice.subtotal || invoice.amount || 0;
-  const descuento = invoice.descuento || 0;
-  
-  // Calcular traslados (IVA a favor)
-  let totalTraslados = 0;
-  // Calcular retenciones (deducciones)
-  let totalRetenciones = 0;
-  
-  if (invoice.impuestos_detalle) {
-    const impuestos = typeof invoice.impuestos_detalle === 'string' 
-      ? JSON.parse(invoice.impuestos_detalle) 
-      : invoice.impuestos_detalle;
-    
-    if (impuestos.traslados && Array.isArray(impuestos.traslados)) {
-      totalTraslados = impuestos.traslados.reduce((sum: number, t: any) => sum + (parseFloat(t.importe) || 0), 0);
-    }
-    if (impuestos.retenciones && Array.isArray(impuestos.retenciones)) {
-      totalRetenciones = impuestos.retenciones.reduce((sum: number, r: any) => sum + (parseFloat(r.importe) || 0), 0);
-    }
-  }
-  
-  // Total = Subtotal - Descuento + Traslados - Retenciones
-  return subtotal - descuento + totalTraslados - totalRetenciones;
-};
 
 const Invoices = () => {
   const { user, isAdmin } = useAuth();
@@ -452,6 +426,7 @@ const Invoices = () => {
       }
       
       if (status === "pagado") {
+        const invoiceTotal = calculateInvoiceTotal(invoice);
         updates.payment_date = new Date().toISOString().split('T')[0];
         
         // Verificar si ya existe un registro de pago para esta factura
@@ -487,7 +462,8 @@ const Invoices = () => {
               supplier_id: invoice.supplier_id,
               datos_bancarios_id: datosBancarios.id,
               invoice_id: invoice.id,
-              amount: invoice.amount,
+              amount: invoiceTotal,
+              original_amount: invoiceTotal,
               fecha_pago: new Date().toISOString().split('T')[0],
               status: "pendiente",
               nombre_banco: datosBancarios.nombre_banco,
@@ -513,9 +489,10 @@ const Invoices = () => {
 
       // Enviar notificación por email según el estado
       let notificationType: string | null = null;
+      const invoiceTotalForEmail = calculateInvoiceTotal(invoice);
       let notificationData: any = {
         invoice_number: invoice.invoice_number,
-        invoice_amount: invoice.amount,
+        invoice_amount: invoiceTotalForEmail,
         invoice_date: invoice.fecha_emision
       };
 
@@ -752,6 +729,7 @@ const Invoices = () => {
 
   const approveEvidenceMutation = useMutation({
     mutationFn: async (invoice: any) => {
+      const invoiceTotal = calculateInvoiceTotal(invoice);
       // Actualizar el estado de la evidencia y cambiar estado de factura a "procesando" (Aprobada)
       const { error } = await supabase
         .from("invoices")
@@ -795,7 +773,8 @@ const Invoices = () => {
               supplier_id: invoice.supplier_id,
               datos_bancarios_id: datosBancarios.id,
               invoice_id: invoice.id,
-              amount: invoice.amount,
+              amount: invoiceTotal,
+              original_amount: invoiceTotal,
               fecha_pago: new Date().toISOString().split('T')[0],
               status: "pendiente",
               nombre_banco: datosBancarios.nombre_banco,
@@ -820,7 +799,7 @@ const Invoices = () => {
           type: 'evidence_approved',
           data: {
             invoice_number: invoice.invoice_number,
-            invoice_amount: invoice.amount
+            invoice_amount: invoiceTotal
           }
         }
       });
@@ -837,6 +816,7 @@ const Invoices = () => {
 
   const rejectEvidenceMutation = useMutation({
     mutationFn: async ({ invoice, reason }: { invoice: any; reason: string }) => {
+      const invoiceTotal = calculateInvoiceTotal(invoice);
       const { error } = await supabase
         .from("invoices")
         .update({
@@ -856,7 +836,7 @@ const Invoices = () => {
           type: 'evidence_rejected',
           data: {
             invoice_number: invoice.invoice_number,
-            invoice_amount: invoice.amount,
+            invoice_amount: invoiceTotal,
             rejection_reason: reason
           }
         }
@@ -1522,7 +1502,7 @@ const Invoices = () => {
                           supplierId={invoice.supplier_id}
                           hasProof={!!invoice.comprobante_pago_url}
                           proofUrl={invoice.comprobante_pago_url}
-                          invoiceAmount={invoice.amount}
+                          invoiceAmount={calculateInvoiceTotal(invoice)}
                           paidAmount={invoice.paid_amount || 0}
                         />
                       )}
@@ -2004,7 +1984,7 @@ const Invoices = () => {
             <div className="py-2">
               <PaymentProofsHistory
                 pagoId={paymentHistoryInvoice.pago_id}
-                invoiceAmount={paymentHistoryInvoice.amount}
+                invoiceAmount={calculateInvoiceTotal(paymentHistoryInvoice)}
                 paidAmount={paymentHistoryInvoice.paid_amount || 0}
                 status={paymentHistoryInvoice.pago_status || paymentHistoryInvoice.status}
                 defaultOpen={true}
