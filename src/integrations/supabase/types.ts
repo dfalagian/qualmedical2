@@ -855,6 +855,7 @@ export type Database = {
           is_active: boolean | null
           minimum_stock: number | null
           name: string
+          rfid_required: boolean
           sku: string
           supplier_id: string | null
           unit: string | null
@@ -873,6 +874,7 @@ export type Database = {
           is_active?: boolean | null
           minimum_stock?: number | null
           name: string
+          rfid_required?: boolean
           sku: string
           supplier_id?: string | null
           unit?: string | null
@@ -891,6 +893,7 @@ export type Database = {
           is_active?: boolean | null
           minimum_stock?: number | null
           name?: string
+          rfid_required?: boolean
           sku?: string
           supplier_id?: string | null
           unit?: string | null

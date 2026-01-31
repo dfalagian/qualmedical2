@@ -38,6 +38,7 @@ interface Product {
   is_active: boolean;
   created_at: string;
   citio_id?: string | null;
+  rfid_required?: boolean;
 }
 
 interface ProductBatch {
@@ -178,6 +179,7 @@ export function ProductRowWithBatches({
                 productId={product.id}
                 productName={product.name}
                 currentStock={product.current_stock}
+                rfidRequired={product.rfid_required}
               />
             )}
             <Badge 
