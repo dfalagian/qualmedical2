@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp, CheckCircle, Clock, Receipt } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ChevronDown, ChevronUp, CheckCircle, Clock, Receipt, Trash2, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { getSignedUrl } from "@/lib/storage";
-import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 interface PaymentProofsHistoryProps {
   pagoId: string;
@@ -37,6 +39,10 @@ export function PaymentProofsHistory({
   const [selectedProofUrl, setSelectedProofUrl] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [proofToDelete, setProofToDelete] = useState<PaymentProof | null>(null);
+  const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
 
   const { data: proofs, isLoading } = useQuery({
     queryKey: ["payment-proofs", pagoId],
@@ -51,6 +57,80 @@ export function PaymentProofsHistory({
       return data as PaymentProof[];
     },
     enabled: !!pagoId,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (proof: PaymentProof) => {
+      // Eliminar el comprobante
+      const { error: deleteError } = await supabase
+        .from("payment_proofs")
+        .delete()
+        .eq("id", proof.id);
+
+      if (deleteError) throw deleteError;
+
+      // Actualizar el paid_amount en pagos
+      const { data: currentPago, error: pagoError } = await supabase
+        .from("pagos")
+        .select("paid_amount, original_amount")
+        .eq("id", pagoId)
+        .single();
+
+      if (pagoError) throw pagoError;
+
+      const newPaidAmount = Math.max(0, (currentPago.paid_amount || 0) - Number(proof.amount));
+      const newStatus = newPaidAmount <= 0 ? "pendiente" : 
+                        newPaidAmount >= (currentPago.original_amount || 0) ? "pagado" : "parcial";
+
+      const { error: updateError } = await supabase
+        .from("pagos")
+        .update({ 
+          paid_amount: newPaidAmount,
+          status: newStatus
+        })
+        .eq("id", pagoId);
+
+      if (updateError) throw updateError;
+
+      // Actualizar status de la factura si es necesario
+      const { data: invoice } = await supabase
+        .from("invoices")
+        .select("id")
+        .eq("id", proof.id)
+        .maybeSingle();
+
+      // Obtener invoice_id desde payment_proofs o pagos
+      const { data: proofData } = await supabase
+        .from("payment_proofs")
+        .select("invoice_id")
+        .eq("pago_id", pagoId)
+        .limit(1)
+        .maybeSingle();
+
+      if (proofData?.invoice_id || !proofData) {
+        // Actualizar estado de factura basado en nuevo paid_amount
+        const invoiceStatus = newPaidAmount <= 0 ? "pendiente" : 
+                             newPaidAmount >= (currentPago.original_amount || 0) ? "pagado" : "procesando";
+        
+        await supabase
+          .from("invoices")
+          .update({ status: invoiceStatus })
+          .eq("id", proofData?.invoice_id);
+      }
+
+      return { newPaidAmount };
+    },
+    onSuccess: () => {
+      toast.success("Comprobante eliminado correctamente");
+      queryClient.invalidateQueries({ queryKey: ["payment-proofs"] });
+      queryClient.invalidateQueries({ queryKey: ["pagos"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      setDeleteDialogOpen(false);
+      setProofToDelete(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar el comprobante");
+    },
   });
 
   const remainingAmount = invoiceAmount - paidAmount;
@@ -69,6 +149,12 @@ export function PaymentProofsHistory({
     } finally {
       setLoadingImage(false);
     }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, proof: PaymentProof) => {
+    e.stopPropagation();
+    setProofToDelete(proof);
+    setDeleteDialogOpen(true);
   };
 
   if (isLoading || !proofs || proofs.length === 0) {
@@ -110,7 +196,7 @@ export function PaymentProofsHistory({
           {proofs.map((proof) => (
             <div 
               key={proof.id} 
-              className="flex justify-between items-center text-sm py-1 hover:bg-muted/80 px-2 rounded cursor-pointer"
+              className="flex justify-between items-center text-sm py-1 hover:bg-muted/80 px-2 rounded cursor-pointer group"
               onClick={() => handleViewProof(proof.comprobante_url)}
             >
               <div className="flex items-center gap-2">
@@ -123,9 +209,22 @@ export function PaymentProofsHistory({
                   </span>
                 )}
               </div>
-              <span className="font-medium text-green-600">
-                -${Number(proof.amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-green-600">
+                  -${Number(proof.amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </span>
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={(e) => handleDeleteClick(e, proof)}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
           
@@ -167,6 +266,39 @@ export function PaymentProofsHistory({
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar comprobante de pago?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará el comprobante de pago #{proofToDelete?.proof_number} por{" "}
+              <span className="font-semibold">
+                ${Number(proofToDelete?.amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </span>.
+              <br /><br />
+              El monto pagado de la factura se actualizará automáticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => proofToDelete && deleteMutation.mutate(proofToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                "Eliminar"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Collapsible>
   );
 }
