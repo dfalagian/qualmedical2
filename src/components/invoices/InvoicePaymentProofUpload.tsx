@@ -12,6 +12,7 @@ import { Loader2, FileCheck, Plus, CheckCircle2, Eye, Receipt } from "lucide-rea
 import { convertPDFToImages } from "@/lib/pdfToImages";
 import { useAuth } from "@/hooks/useAuth";
 import { getSignedUrl } from "@/lib/storage";
+import { calculateInvoiceTotal } from "@/lib/invoiceTotals";
 
 interface InvoicePaymentProofUploadProps {
   invoiceId: string;
@@ -119,11 +120,14 @@ export function InvoicePaymentProofUpload({
 
         const { data: invoiceData, error: invoiceError } = await supabase
           .from("invoices")
-          .select("amount")
+          .select("amount, subtotal, descuento, total_impuestos, impuestos_detalle")
           .eq("id", invoiceId)
           .single();
 
         if (invoiceError) throw invoiceError;
+
+        const computedInvoiceTotal =
+          invoiceAmount && invoiceAmount > 0 ? invoiceAmount : calculateInvoiceTotal(invoiceData);
 
         const { data: newPago, error: createPagoError } = await supabase
           .from("pagos")
@@ -131,7 +135,8 @@ export function InvoicePaymentProofUpload({
             supplier_id: supplierId,
             datos_bancarios_id: bankDocsData.id,
             invoice_id: invoiceId,
-            amount: invoiceData.amount,
+            amount: computedInvoiceTotal,
+            original_amount: computedInvoiceTotal,
             status: "pendiente",
             nombre_banco: bankDocsData.nombre_banco,
           })
