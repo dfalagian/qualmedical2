@@ -3,13 +3,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Plus, Minus } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Plus, Minus, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface QuickStockButtonsProps {
   productId: string;
   productName: string;
   currentStock: number;
+  rfidRequired?: boolean;
   className?: string;
   onAdjustmentComplete?: () => void;
 }
@@ -18,6 +20,7 @@ export function QuickStockButtons({
   productId,
   productName,
   currentStock,
+  rfidRequired = false,
   className,
   onAdjustmentComplete,
 }: QuickStockButtonsProps) {
@@ -25,6 +28,30 @@ export function QuickStockButtons({
   const queryClient = useQueryClient();
   const [isPending, setIsPending] = useState(false);
   const isProcessingRef = useRef(false);
+
+  // If RFID is required, show disabled state with tooltip
+  if (rfidRequired) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className={cn("flex items-center gap-1 opacity-50", className)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground cursor-not-allowed"
+              disabled
+            >
+              <Radio className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="text-xs">Este producto requiere lectura RFID</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
 
   const adjustStock = useCallback(async (mode: "increment" | "decrement") => {
     // Prevent double-fires using ref
