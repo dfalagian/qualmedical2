@@ -196,7 +196,7 @@ export const CreateSupplierOrderDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
@@ -251,45 +251,47 @@ export const CreateSupplierOrderDialog = ({
                 <p className="font-semibold text-sm">
                   Productos seleccionados ({selectedProducts.length})
                 </p>
-                <ScrollArea className="h-40">
+                <ScrollArea className="h-48">
                   <div className="space-y-2 pr-3">
                     {selectedProducts.map((product) => (
                       <div
                         key={product.id}
-                        className="flex items-center gap-2 text-sm bg-background rounded-md p-2 border"
+                        className="flex items-center gap-3 text-sm bg-background rounded-md p-2.5 border"
                       >
-                        <span className="flex-1 truncate text-xs">{product.name}</span>
-                        <div className="flex items-center gap-1">
+                        <span className="flex-1 min-w-0 text-sm leading-tight" title={product.name}>
+                          {product.name}
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
                           <Button
                             type="button"
                             variant="outline"
                             size="icon"
-                            className="h-6 w-6"
+                            className="h-7 w-7"
                             onClick={() => updateQuantity(product.id, -1)}
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
-                          <span className="w-6 text-center text-xs">{product.quantity}</span>
+                          <span className="w-8 text-center text-sm font-medium">{product.quantity}</span>
                           <Button
                             type="button"
                             variant="outline"
                             size="icon"
-                            className="h-6 w-6"
+                            className="h-7 w-7"
                             onClick={() => updateQuantity(product.id, 1)}
                           >
                             <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                        <span className="text-muted-foreground text-xs">×</span>
+                        <span className="text-muted-foreground shrink-0">×</span>
                         <Input
                           type="number"
                           value={product.unit_price}
                           onChange={(e) =>
                             updatePrice(product.id, parseFloat(e.target.value) || 0)
                           }
-                          className="w-16 h-6 text-xs"
+                          className="w-20 h-7 text-sm shrink-0"
                         />
-                        <span className="w-16 text-right font-medium text-xs">
+                        <span className="w-20 text-right font-semibold text-sm shrink-0">
                           ${(product.quantity * product.unit_price).toFixed(2)}
                         </span>
                       </div>
