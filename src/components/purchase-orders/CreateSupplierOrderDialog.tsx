@@ -136,38 +136,40 @@ export const CreateSupplierOrderDialog = ({
     unitPrice: number,
     hasIva: boolean
   ) => {
-    // Check if product already exists
-    const exists = selectedProducts.find((p) => p.id === product.id);
-    if (exists) {
-      toast.error("Este producto ya está en la lista");
-      return;
-    }
-
     const ivaAmount = hasIva ? unitPrice * quantity * IVA_RATE : 0;
     const total = unitPrice * quantity + ivaAmount;
 
-    setSelectedProducts([
-      ...selectedProducts,
-      {
-        id: product.id,
-        name: product.name,
-        sku: product.sku,
-        quantity,
-        unitPrice,
-        hasIva,
-        ivaAmount,
-        total,
-      },
-    ]);
+    setSelectedProducts((prev) => {
+      // Check if product already exists
+      const exists = prev.find((p) => p.id === product.id);
+      if (exists) {
+        toast.error("Este producto ya está en la lista");
+        return prev;
+      }
+
+      return [
+        ...prev,
+        {
+          id: product.id,
+          name: product.name,
+          sku: product.sku,
+          quantity,
+          unitPrice,
+          hasIva,
+          ivaAmount,
+          total,
+        },
+      ];
+    });
   };
 
   const removeProduct = (productId: string) => {
-    setSelectedProducts(selectedProducts.filter((p) => p.id !== productId));
+    setSelectedProducts((prev) => prev.filter((p) => p.id !== productId));
   };
 
   const updateProductQuantity = (productId: string, quantity: number) => {
-    setSelectedProducts(
-      selectedProducts.map((p) => {
+    setSelectedProducts((prev) =>
+      prev.map((p) => {
         if (p.id === productId) {
           const ivaAmount = p.hasIva ? p.unitPrice * quantity * IVA_RATE : 0;
           const total = p.unitPrice * quantity + ivaAmount;
