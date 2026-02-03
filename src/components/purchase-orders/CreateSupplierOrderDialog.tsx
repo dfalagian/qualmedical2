@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -335,11 +334,11 @@ export const CreateSupplierOrderDialog = ({
             />
 
             {/* Products Table */}
-            <div className="flex-1 border rounded-lg overflow-hidden bg-background min-h-0">
-              <ScrollArea className="h-[280px]">
-                {selectedProducts.length > 0 ? (
+            <div className="border rounded-lg overflow-hidden bg-background">
+              {selectedProducts.length > 0 ? (
+                <div className="max-h-[280px] overflow-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow>
                         <TableHead className="w-[40%]">Producto</TableHead>
                         <TableHead className="w-[10%] text-center">Cant.</TableHead>
@@ -401,14 +400,14 @@ export const CreateSupplierOrderDialog = ({
                       ))}
                     </TableBody>
                   </Table>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                    <Package className="h-12 w-12 mb-3 opacity-30" />
-                    <p className="text-sm">No hay productos agregados</p>
-                    <p className="text-xs">Usa el buscador para agregar productos</p>
-                  </div>
-                )}
-              </ScrollArea>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <Package className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-sm">No hay productos agregados</p>
+                  <p className="text-xs">Usa el buscador para agregar productos</p>
+                </div>
+              )}
             </div>
 
             {/* Totals */}
