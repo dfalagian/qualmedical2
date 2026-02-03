@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { formatSupplierName } from "@/lib/formatters";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,13 +10,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye, ArrowRight } from "lucide-react";
+import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye, ArrowRight, Search, X, CalendarIcon } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PurchaseOrderImportDialog } from "@/components/purchase-orders/PurchaseOrderImportDialog";
 import { CreateSupplierOrderDialog } from "@/components/purchase-orders/CreateSupplierOrderDialog";
 import { ConvertToQualOrderDialog } from "@/components/purchase-orders/ConvertToQualOrderDialog";
 import { PurchaseOrderDetailDialog } from "@/components/purchase-orders/PurchaseOrderDetailDialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +44,11 @@ const PurchaseOrders = () => {
   const [orderToDelete, setOrderToDelete] = useState<any>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [orderToConvert, setOrderToConvert] = useState<any>(null);
+  
+  // Search/filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>("all");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ["purchase_orders"],
@@ -75,6 +85,48 @@ const PurchaseOrders = () => {
 
   // Get existing order numbers to prevent duplicate imports
   const existingOrderNumbers = orders?.map(o => o.order_number) || [];
+
+  // Filter orders based on search criteria
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
+    
+    return orders.filter((order: any) => {
+      // Filter by order number search
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const orderNumberMatch = order.order_number?.toLowerCase().includes(query);
+        if (!orderNumberMatch) return false;
+      }
+      
+      // Filter by supplier
+      if (selectedSupplierFilter && selectedSupplierFilter !== "all") {
+        if (order.supplier_id !== selectedSupplierFilter) return false;
+      }
+      
+      // Filter by date
+      if (selectedDate) {
+        const orderDate = new Date(order.created_at);
+        const filterDate = selectedDate;
+        if (
+          orderDate.getFullYear() !== filterDate.getFullYear() ||
+          orderDate.getMonth() !== filterDate.getMonth() ||
+          orderDate.getDate() !== filterDate.getDate()
+        ) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [orders, searchQuery, selectedSupplierFilter, selectedDate]);
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedSupplierFilter("all");
+    setSelectedDate(undefined);
+  };
+
+  const hasActiveFilters = searchQuery || selectedSupplierFilter !== "all" || selectedDate;
 
   // Import mutation for external orders
   const importOrdersMutation = useMutation({
@@ -387,6 +439,84 @@ const PurchaseOrders = () => {
         </div>
 
 
+        {/* Search and Filters */}
+        <Card className="shadow-sm">
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              {/* Order Number Search */}
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por número de orden..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              
+              {/* Supplier Filter */}
+              <div className="w-full md:w-[250px]">
+                <Select value={selectedSupplierFilter} onValueChange={setSelectedSupplierFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filtrar por proveedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los proveedores</SelectItem>
+                    {suppliers?.map((supplier) => (
+                      <SelectItem key={supplier.id} value={supplier.id}>
+                        {supplier.company_name || supplier.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Date Filter */}
+              <div className="w-full md:w-[200px]">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !selectedDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: es }) : "Filtrar por fecha"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              {/* Clear Filters */}
+              {hasActiveFilters && (
+                <Button variant="ghost" onClick={clearFilters} className="gap-2">
+                  <X className="h-4 w-4" />
+                  Limpiar
+                </Button>
+              )}
+            </div>
+            
+            {hasActiveFilters && (
+              <p className="text-sm text-muted-foreground mt-3">
+                Mostrando {filteredOrders.length} de {orders?.length || 0} órdenes
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         <Card className="shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -397,9 +527,9 @@ const PurchaseOrders = () => {
           <CardContent>
             {isLoading ? (
               <p className="text-center py-8 text-muted-foreground">Cargando órdenes...</p>
-            ) : orders && orders.length > 0 ? (
+            ) : filteredOrders && filteredOrders.length > 0 ? (
               <div className="space-y-4">
-                {orders.map((order: any) => {
+                {filteredOrders.map((order: any) => {
                   const isCitioOrder = order.description?.includes('CITIO');
                   return (
                   <div
@@ -535,9 +665,18 @@ const PurchaseOrders = () => {
                 })}
               </div>
             ) : (
-              <p className="text-center py-8 text-muted-foreground">
-                No hay órdenes de compra
-              </p>
+              <div className="text-center py-8 text-muted-foreground">
+                {hasActiveFilters ? (
+                  <div>
+                    <p>No se encontraron órdenes con los filtros seleccionados</p>
+                    <Button variant="link" onClick={clearFilters} className="mt-2">
+                      Limpiar filtros
+                    </Button>
+                  </div>
+                ) : (
+                  <p>No hay órdenes de compra</p>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
