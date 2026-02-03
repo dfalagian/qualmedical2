@@ -21,7 +21,6 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { QuickTagAssignment } from "./QuickTagAssignment";
-import { QuickStockButtons } from "./QuickStockButtons";
 
 interface Product {
   id: string;
@@ -173,21 +172,11 @@ export function ProductRowWithBatches({
           )}
         </TableCell>
         <TableCell className="text-center">
-          <div className="flex items-center justify-center gap-2">
-            {showQuickStock && canEdit && (
-              <QuickStockButtons
-                productId={product.id}
-                productName={product.name}
-                currentStock={product.current_stock}
-                rfidRequired={product.rfid_required}
-              />
-            )}
-            <Badge 
-              variant={product.current_stock <= product.minimum_stock ? "destructive" : "default"}
-            >
-              {product.current_stock} / {product.minimum_stock}
-            </Badge>
-          </div>
+          <Badge
+            variant={product.current_stock <= product.minimum_stock ? "destructive" : "default"}
+          >
+            {product.current_stock} / {product.minimum_stock}
+          </Badge>
         </TableCell>
         <TableCell className="text-right">
           {product.unit_price ? `$${product.unit_price.toFixed(2)}` : "-"}
