@@ -35,7 +35,7 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
   const [open, setOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [unitPrice, setUnitPrice] = useState(0);
+  const [manualPrice, setManualPrice] = useState<string>("");
   const [hasIva, setHasIva] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -52,17 +52,21 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
 
   const handleSelectProduct = (product: Product) => {
     setSelectedProduct(product);
-    setUnitPrice(product.unit_price || 0);
+    setManualPrice("");
     setOpen(false);
   };
 
   const handleAddProduct = () => {
     if (!selectedProduct) return;
-    onAddProduct(selectedProduct, quantity, unitPrice, hasIva);
+    // Si hay precio manual, usarlo; si no, usar el precio guardado
+    const finalPrice = manualPrice.trim() !== "" 
+      ? parseFloat(manualPrice) || 0 
+      : (selectedProduct.unit_price || 0);
+    onAddProduct(selectedProduct, quantity, finalPrice, hasIva);
     // Reset form
     setSelectedProduct(null);
     setQuantity(1);
-    setUnitPrice(0);
+    setManualPrice("");
     setHasIva(false);
     setSearchTerm("");
   };
@@ -145,14 +149,21 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Precio Unit.</Label>
+              <Label className="text-xs text-muted-foreground">Precio Guardado</Label>
+              <div className="h-9 px-3 flex items-center bg-muted rounded-md text-sm font-medium">
+                ${(selectedProduct.unit_price || 0).toFixed(2)}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Precio Manual</Label>
               <Input
                 type="number"
                 min={0}
                 step="0.01"
-                value={unitPrice}
-                onChange={(e) => setUnitPrice(parseFloat(e.target.value) || 0)}
-                className="w-24 h-9"
+                value={manualPrice}
+                onChange={(e) => setManualPrice(e.target.value)}
+                placeholder="Opcional"
+                className="w-28 h-9"
               />
             </div>
             <div className="flex items-center gap-2 h-9">
