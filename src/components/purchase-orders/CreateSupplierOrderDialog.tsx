@@ -132,6 +132,13 @@ export const CreateSupplierOrderDialog = ({
     const total = unitPrice * quantity + ivaAmount;
 
     setSelectedProducts((prev) => {
+      // Debug: verificar que la lista se acumula correctamente
+      console.debug("[CreateSupplierOrderDialog] addProduct", {
+        adding: { id: product.id, sku: product.sku, name: product.name },
+        prevLen: prev.length,
+        prevIds: prev.map((p) => p.id),
+      });
+
       // Check if product already exists
       const exists = prev.find((p) => p.id === product.id);
       if (exists) {
@@ -139,7 +146,7 @@ export const CreateSupplierOrderDialog = ({
         return prev;
       }
 
-      return [
+      const next = [
         ...prev,
         {
           id: product.id,
@@ -152,6 +159,13 @@ export const CreateSupplierOrderDialog = ({
           total,
         },
       ];
+
+      console.debug("[CreateSupplierOrderDialog] addProduct result", {
+        nextLen: next.length,
+        nextIds: next.map((p) => p.id),
+      });
+
+      return next;
     });
   };
 
@@ -353,8 +367,11 @@ export const CreateSupplierOrderDialog = ({
                       </tr>
                     </thead>
                     <tbody className="[&_tr:last-child]:border-0">
-                      {selectedProducts.map((product) => (
-                        <tr key={product.id} className="border-b transition-colors hover:bg-muted/50">
+                      {selectedProducts.map((product, idx) => (
+                        <tr
+                          key={`${product.id}-${product.sku}-${idx}`}
+                          className="border-b transition-colors hover:bg-muted/50"
+                        >
                           <td className="p-4 align-middle">
                             <div>
                               <p className="font-medium text-sm">{product.name}</p>
