@@ -21,14 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Package, Trash2, FileText } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
 import { PurchaseOrderPDFViewer } from "./PurchaseOrderPDFViewer";
@@ -336,30 +328,43 @@ export const CreateSupplierOrderDialog = ({
             />
 
             {/* Products Table */}
-            <div className="border rounded-lg overflow-hidden bg-background">
+            <div className="flex-1 min-h-0 border rounded-lg overflow-hidden bg-background">
               {selectedProducts.length > 0 ? (
-                <div className="max-h-[280px] overflow-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 bg-background z-10">
-                      <TableRow>
-                        <TableHead className="w-[40%]">Producto</TableHead>
-                        <TableHead className="w-[10%] text-center">Cant.</TableHead>
-                        <TableHead className="w-[15%] text-right">P. Unit.</TableHead>
-                        <TableHead className="w-[10%] text-center">IVA</TableHead>
-                        <TableHead className="w-[15%] text-right">Importe</TableHead>
-                        <TableHead className="w-[10%]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                <div className="h-full overflow-auto">
+                  <table className="w-full caption-bottom text-sm">
+                    <thead className="[&_tr]:border-b sticky top-0 bg-background z-10">
+                      <tr>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[40%]">
+                          Producto
+                        </th>
+                        <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[10%]">
+                          Cant.
+                        </th>
+                        <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[15%]">
+                          P. Unit.
+                        </th>
+                        <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[10%]">
+                          IVA
+                        </th>
+                        <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[15%]">
+                          Importe
+                        </th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[10%]" />
+                      </tr>
+                    </thead>
+                    <tbody className="[&_tr:last-child]:border-0">
                       {selectedProducts.map((product) => (
-                        <TableRow key={product.id}>
-                          <TableCell>
+                        <tr
+                          key={product.id}
+                          className="border-b transition-colors hover:bg-muted/50"
+                        >
+                          <td className="p-4 align-middle">
                             <div>
                               <p className="font-medium text-sm">{product.name}</p>
                               <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
                             </div>
-                          </TableCell>
-                          <TableCell className="text-center">
+                          </td>
+                          <td className="p-4 align-middle text-center">
                             <Input
                               type="number"
                               min={1}
@@ -372,11 +377,11 @@ export const CreateSupplierOrderDialog = ({
                               }
                               className="w-16 h-8 text-center mx-auto"
                             />
-                          </TableCell>
-                          <TableCell className="text-right">
+                          </td>
+                          <td className="p-4 align-middle text-right">
                             ${product.unitPrice.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-center">
+                          </td>
+                          <td className="p-4 align-middle text-center">
                             {product.hasIva ? (
                               <span className="text-xs text-primary font-medium">
                                 ${product.ivaAmount.toFixed(2)}
@@ -384,11 +389,11 @@ export const CreateSupplierOrderDialog = ({
                             ) : (
                               <span className="text-xs text-muted-foreground">0%</span>
                             )}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold">
+                          </td>
+                          <td className="p-4 align-middle text-right font-semibold">
                             ${product.total.toFixed(2)}
-                          </TableCell>
-                          <TableCell>
+                          </td>
+                          <td className="p-4 align-middle">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -397,11 +402,11 @@ export const CreateSupplierOrderDialog = ({
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                          </TableCell>
-                        </TableRow>
+                          </td>
+                        </tr>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </tbody>
+                  </table>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
