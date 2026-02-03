@@ -15,17 +15,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   ArrowRightLeft, 
   ScanBarcode, 
-  Hash, 
   Trash2, 
   Package, 
   Tag as TagIcon,
-  Warehouse
+  Warehouse,
+  Plus
 } from "lucide-react";
 
 interface Warehouse {
@@ -41,6 +40,13 @@ interface ScannedTag {
   batchNumber?: string;
 }
 
+interface ManualTransferItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  maxStock: number;
+}
+
 interface WarehouseTransferDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -54,11 +60,11 @@ export function WarehouseTransferDialog({
   const queryClient = useQueryClient();
   const scanInputRef = useRef<HTMLInputElement>(null);
   
-  const [transferMode, setTransferMode] = useState<"rfid" | "manual">("rfid");
   const [fromWarehouseId, setFromWarehouseId] = useState<string>("");
   const [toWarehouseId, setToWarehouseId] = useState<string>("");
   const [scannedTags, setScannedTags] = useState<ScannedTag[]>([]);
   const [scanInput, setScanInput] = useState("");
+  const [manualItems, setManualItems] = useState<ManualTransferItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [manualQuantity, setManualQuantity] = useState<number>(1);
   const [notes, setNotes] = useState("");
@@ -90,7 +96,7 @@ export function WarehouseTransferDialog({
       if (error) throw error;
       return data;
     },
-    enabled: !!fromWarehouseId && transferMode === "manual",
+    enabled: !!fromWarehouseId,
   });
 
   // Set default warehouses when loaded
@@ -105,10 +111,10 @@ export function WarehouseTransferDialog({
 
   // Focus scan input when dialog opens
   useEffect(() => {
-    if (open && transferMode === "rfid") {
+    if (open) {
       setTimeout(() => scanInputRef.current?.focus(), 100);
     }
-  }, [open, transferMode]);
+  }, [open]);
 
   // Handle RFID scan
   const handleScan = async (epc: string) => {
@@ -187,135 +193,151 @@ export function WarehouseTransferDialog({
     setScannedTags(prev => prev.filter(t => t.epc !== epc));
   };
 
-  // Transfer mutation for RFID mode
-  const transferRfidMutation = useMutation({
+  // Add manual transfer item
+  const addManualItem = () => {
+    if (!selectedProductId || manualQuantity <= 0) return;
+    
+    const product = products.find(p => p.id === selectedProductId);
+    if (!product) return;
+
+    // Check if already added
+    const existing = manualItems.find(i => i.productId === selectedProductId);
+    if (existing) {
+      toast({
+        title: "Producto ya agregado",
+        description: "Elimínalo primero si deseas cambiar la cantidad.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (manualQuantity > product.current_stock) {
+      toast({
+        title: "Stock insuficiente",
+        description: `Solo hay ${product.current_stock} disponibles.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setManualItems(prev => [...prev, {
+      productId: product.id,
+      productName: product.name,
+      quantity: manualQuantity,
+      maxStock: product.current_stock,
+    }]);
+
+    setSelectedProductId("");
+    setManualQuantity(1);
+  };
+
+  // Remove manual item
+  const removeManualItem = (productId: string) => {
+    setManualItems(prev => prev.filter(i => i.productId !== productId));
+  };
+
+  // Transfer mutation
+  const transferMutation = useMutation({
     mutationFn: async () => {
-      const tagIds = scannedTags.map(t => t.id);
-      
-      // Update all tags to new warehouse
-      const { error: tagError } = await supabase
-        .from("rfid_tags")
-        .update({ 
-          warehouse_id: toWarehouseId,
-          last_location: warehouses.find(w => w.id === toWarehouseId)?.name || null,
-          last_read_at: new Date().toISOString()
-        })
-        .in("id", tagIds);
+      const results = { rfidCount: 0, manualCount: 0 };
 
-      if (tagError) throw tagError;
+      // Transfer RFID tags
+      if (scannedTags.length > 0) {
+        const tagIds = scannedTags.map(t => t.id);
+        
+        const { error: tagError } = await supabase
+          .from("rfid_tags")
+          .update({ 
+            warehouse_id: toWarehouseId,
+            last_location: warehouses.find(w => w.id === toWarehouseId)?.name || null,
+            last_read_at: new Date().toISOString()
+          })
+          .in("id", tagIds);
 
-      // Record transfers
-      const transfers = scannedTags.map(tag => ({
-        from_warehouse_id: fromWarehouseId,
-        to_warehouse_id: toWarehouseId,
-        rfid_tag_id: tag.id,
-        transfer_type: "rfid",
-        notes: notes || null,
-      }));
+        if (tagError) throw tagError;
 
-      const { error: transferError } = await supabase
-        .from("warehouse_transfers")
-        .insert(transfers);
+        const transfers = scannedTags.map(tag => ({
+          from_warehouse_id: fromWarehouseId,
+          to_warehouse_id: toWarehouseId,
+          rfid_tag_id: tag.id,
+          transfer_type: "rfid",
+          notes: notes || null,
+        }));
 
-      if (transferError) throw transferError;
+        const { error: transferError } = await supabase
+          .from("warehouse_transfers")
+          .insert(transfers);
 
-      return { count: scannedTags.length };
+        if (transferError) throw transferError;
+        results.rfidCount = scannedTags.length;
+      }
+
+      // Transfer manual items
+      for (const item of manualItems) {
+        const { data: product, error: productError } = await supabase
+          .from("products")
+          .select("id, name, current_stock")
+          .eq("id", item.productId)
+          .single();
+
+        if (productError || !product) continue;
+
+        // Update source product stock
+        await supabase
+          .from("products")
+          .update({ 
+            current_stock: product.current_stock - item.quantity,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", item.productId);
+
+        // Check if product exists in destination or create reference
+        const { data: destProduct } = await supabase
+          .from("products")
+          .select("id, current_stock")
+          .eq("warehouse_id", toWarehouseId)
+          .eq("name", product.name)
+          .maybeSingle();
+
+        if (destProduct) {
+          await supabase
+            .from("products")
+            .update({ 
+              current_stock: destProduct.current_stock + item.quantity,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", destProduct.id);
+        }
+
+        // Record transfer
+        await supabase
+          .from("warehouse_transfers")
+          .insert({
+            from_warehouse_id: fromWarehouseId,
+            to_warehouse_id: toWarehouseId,
+            product_id: item.productId,
+            quantity: item.quantity,
+            transfer_type: "manual",
+            notes: notes || null,
+          });
+
+        results.manualCount += item.quantity;
+      }
+
+      return results;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
-      queryClient.invalidateQueries({ queryKey: ["warehouse_transfers"] });
-      toast({
-        title: "Transferencia completada",
-        description: `${data.count} tag(s) transferido(s) exitosamente.`,
-      });
-      resetForm();
-      onOpenChange(false);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error en transferencia",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Transfer mutation for manual mode
-  const transferManualMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedProductId || manualQuantity <= 0) {
-        throw new Error("Seleccione un producto y cantidad válida");
-      }
-
-      // Get product info
-      const { data: product, error: productError } = await supabase
-        .from("products")
-        .select("id, name, current_stock")
-        .eq("id", selectedProductId)
-        .single();
-
-      if (productError || !product) throw new Error("Producto no encontrado");
-
-      if (product.current_stock < manualQuantity) {
-        throw new Error(`Stock insuficiente. Disponible: ${product.current_stock}`);
-      }
-
-      // Update source product stock
-      const { error: updateError } = await supabase
-        .from("products")
-        .update({ 
-          current_stock: product.current_stock - manualQuantity,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", selectedProductId);
-
-      if (updateError) throw updateError;
-
-      // Check if product exists in destination warehouse or create it
-      const { data: destProduct, error: destError } = await supabase
-        .from("products")
-        .select("id, current_stock")
-        .eq("warehouse_id", toWarehouseId)
-        .eq("name", product.name)
-        .maybeSingle();
-
-      if (destError) throw destError;
-
-      if (destProduct) {
-        // Update destination product stock
-        const { error: destUpdateError } = await supabase
-          .from("products")
-          .update({ 
-            current_stock: destProduct.current_stock + manualQuantity,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", destProduct.id);
-
-        if (destUpdateError) throw destUpdateError;
-      }
-
-      // Record transfer
-      const { error: transferError } = await supabase
-        .from("warehouse_transfers")
-        .insert({
-          from_warehouse_id: fromWarehouseId,
-          to_warehouse_id: toWarehouseId,
-          product_id: selectedProductId,
-          quantity: manualQuantity,
-          transfer_type: "manual",
-          notes: notes || null,
-        });
-
-      if (transferError) throw transferError;
-
-      return { productName: product.name, quantity: manualQuantity };
-    },
-    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse_transfers"] });
+      
+      const parts = [];
+      if (data.rfidCount > 0) parts.push(`${data.rfidCount} tag(s)`);
+      if (data.manualCount > 0) parts.push(`${data.manualCount} unidades`);
+      
       toast({
         title: "Transferencia completada",
-        description: `${data.quantity} unidades de "${data.productName}" transferidas.`,
+        description: `${parts.join(" y ")} transferido(s) exitosamente.`,
       });
       resetForm();
       onOpenChange(false);
@@ -331,6 +353,7 @@ export function WarehouseTransferDialog({
 
   const resetForm = () => {
     setScannedTags([]);
+    setManualItems([]);
     setScanInput("");
     setSelectedProductId("");
     setManualQuantity(1);
@@ -342,14 +365,12 @@ export function WarehouseTransferDialog({
     setFromWarehouseId(toWarehouseId);
     setToWarehouseId(temp);
     setScannedTags([]);
-    setSelectedProductId("");
+    setManualItems([]);
   };
 
-  const canTransfer = transferMode === "rfid" 
-    ? scannedTags.length > 0 && fromWarehouseId && toWarehouseId
-    : selectedProductId && manualQuantity > 0 && fromWarehouseId && toWarehouseId;
-
+  const canTransfer = (scannedTags.length > 0 || manualItems.length > 0) && fromWarehouseId && toWarehouseId;
   const selectedProduct = products.find(p => p.id === selectedProductId);
+  const totalItems = scannedTags.length + manualItems.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -369,7 +390,7 @@ export function WarehouseTransferDialog({
               <Select value={fromWarehouseId} onValueChange={(v) => {
                 setFromWarehouseId(v);
                 setScannedTags([]);
-                setSelectedProductId("");
+                setManualItems([]);
               }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Almacén origen" />
@@ -416,110 +437,127 @@ export function WarehouseTransferDialog({
             </div>
           </div>
 
-          {/* Transfer Mode Tabs */}
-          <Tabs value={transferMode} onValueChange={(v) => setTransferMode(v as "rfid" | "manual")}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="rfid" className="gap-2">
-                <TagIcon className="h-4 w-4" />
-                Por Tag RFID
-              </TabsTrigger>
-              <TabsTrigger value="manual" className="gap-2">
-                <Hash className="h-4 w-4" />
-                Por Cantidad
-              </TabsTrigger>
-            </TabsList>
-
-            {/* RFID Mode */}
-            <TabsContent value="rfid" className="space-y-4">
-              <div className="space-y-2">
-                <Label>Escanear Tags</Label>
-                <div className="relative">
-                  <ScanBarcode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    ref={scanInputRef}
-                    value={scanInput}
-                    onChange={(e) => setScanInput(e.target.value.toUpperCase())}
-                    onKeyDown={handleScanKeyDown}
-                    placeholder="Escanee o ingrese EPC..."
-                    className="pl-9 font-mono"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  El lector RFID USB ingresará automáticamente los EPCs
-                </p>
-              </div>
-
-              {/* Scanned Tags List */}
-              {scannedTags.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Tags para transferir ({scannedTags.length})</Label>
-                  <ScrollArea className="h-40 border rounded-lg p-2">
-                    <div className="space-y-2">
-                      {scannedTags.map((tag) => (
-                        <div 
-                          key={tag.epc}
-                          className="flex items-center justify-between p-2 bg-muted/50 rounded"
-                        >
-                          <div className="flex-1">
-                            <p className="font-mono text-sm">{tag.epc}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {tag.productName}
-                              {tag.batchNumber && ` • Lote: ${tag.batchNumber}`}
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeScannedTag(tag.epc)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      ))}
+          {/* RFID Scanning Section */}
+          <div className="space-y-3 p-4 border rounded-lg">
+            <div className="flex items-center gap-2">
+              <TagIcon className="h-4 w-4 text-primary" />
+              <Label className="font-medium">Escanear Tags RFID</Label>
+            </div>
+            <div className="relative">
+              <ScanBarcode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                ref={scanInputRef}
+                value={scanInput}
+                onChange={(e) => setScanInput(e.target.value.toUpperCase())}
+                onKeyDown={handleScanKeyDown}
+                placeholder="Escanee o ingrese EPC..."
+                className="pl-9 font-mono"
+              />
+            </div>
+            
+            {scannedTags.length > 0 && (
+              <ScrollArea className="h-24 border rounded-lg p-2">
+                <div className="space-y-1">
+                  {scannedTags.map((tag) => (
+                    <div 
+                      key={tag.epc}
+                      className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
+                    >
+                      <div className="flex-1">
+                        <span className="font-mono">{tag.epc}</span>
+                        <span className="text-muted-foreground ml-2">• {tag.productName}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => removeScannedTag(tag.epc)}
+                      >
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
                     </div>
-                  </ScrollArea>
+                  ))}
                 </div>
-              )}
-            </TabsContent>
+              </ScrollArea>
+            )}
+          </div>
 
-            {/* Manual Mode */}
-            <TabsContent value="manual" className="space-y-4">
-              <div className="space-y-2">
-                <Label>Producto</Label>
-                <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar producto..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        <div className="flex items-center justify-between gap-4 w-full">
-                          <span>{p.name}</span>
-                          <Badge variant="secondary">{p.current_stock} disp.</Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* Manual Transfer Section */}
+          <div className="space-y-3 p-4 border rounded-lg">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-primary" />
+              <Label className="font-medium">Transferir por Cantidad</Label>
+            </div>
+            
+            <div className="flex gap-2">
+              <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Seleccionar producto..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.filter(p => !manualItems.some(i => i.productId === p.id)).map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <div className="flex items-center justify-between gap-2 w-full">
+                        <span className="truncate">{p.name}</span>
+                        <Badge variant="secondary" className="ml-2">{p.current_stock}</Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Input
+                type="number"
+                min={1}
+                max={selectedProduct?.current_stock || 1}
+                value={manualQuantity}
+                onChange={(e) => setManualQuantity(parseInt(e.target.value) || 1)}
+                className="w-20"
+                placeholder="Cant."
+              />
+              
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={addManualItem}
+                disabled={!selectedProductId}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {selectedProduct && (
+              <p className="text-xs text-muted-foreground">
+                Stock disponible: {selectedProduct.current_stock}
+              </p>
+            )}
 
-              <div className="space-y-2">
-                <Label>Cantidad a transferir</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={selectedProduct?.current_stock || 1}
-                  value={manualQuantity}
-                  onChange={(e) => setManualQuantity(parseInt(e.target.value) || 1)}
-                />
-                {selectedProduct && (
-                  <p className="text-xs text-muted-foreground">
-                    Stock disponible: {selectedProduct.current_stock}
-                  </p>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
+            {manualItems.length > 0 && (
+              <ScrollArea className="h-24 border rounded-lg p-2">
+                <div className="space-y-1">
+                  {manualItems.map((item) => (
+                    <div 
+                      key={item.productId}
+                      className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
+                    >
+                      <div className="flex-1">
+                        <span>{item.productName}</span>
+                        <Badge variant="secondary" className="ml-2">{item.quantity} uds</Badge>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => removeManualItem(item.productId)}
+                      >
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
 
           {/* Notes */}
           <div className="space-y-2">
@@ -538,18 +576,12 @@ export function WarehouseTransferDialog({
             <Button variant="outline">Cancelar</Button>
           </DialogClose>
           <Button
-            onClick={() => {
-              if (transferMode === "rfid") {
-                transferRfidMutation.mutate();
-              } else {
-                transferManualMutation.mutate();
-              }
-            }}
-            disabled={!canTransfer || transferRfidMutation.isPending || transferManualMutation.isPending}
+            onClick={() => transferMutation.mutate()}
+            disabled={!canTransfer || transferMutation.isPending}
           >
-            {transferRfidMutation.isPending || transferManualMutation.isPending 
+            {transferMutation.isPending 
               ? "Transfiriendo..." 
-              : `Transferir ${transferMode === "rfid" ? `${scannedTags.length} tag(s)` : `${manualQuantity} unidades`}`
+              : `Transferir ${totalItems > 0 ? `(${totalItems})` : ""}`
             }
           </Button>
         </DialogFooter>
