@@ -179,6 +179,19 @@ export const CreateSupplierOrderDialog = ({
     );
   };
 
+  const updateProductPrice = (productId: string, unitPrice: number) => {
+    setSelectedProducts(
+      selectedProducts.map((p) => {
+        if (p.id === productId) {
+          const ivaAmount = p.hasIva ? unitPrice * p.quantity * IVA_RATE : 0;
+          const total = unitPrice * p.quantity + ivaAmount;
+          return { ...p, unitPrice, ivaAmount, total };
+        }
+        return p;
+      })
+    );
+  };
+
   const { subtotal, totalIva, total } = useMemo(() => {
     const subtotal = selectedProducts.reduce(
       (sum, p) => sum + p.unitPrice * p.quantity,
@@ -373,7 +386,22 @@ export const CreateSupplierOrderDialog = ({
                             />
                           </TableCell>
                           <TableCell className="text-right">
-                            ${product.unitPrice.toFixed(2)}
+                            <div className="flex items-center justify-end gap-1">
+                              <span className="text-muted-foreground">$</span>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={product.unitPrice}
+                                onChange={(e) =>
+                                  updateProductPrice(
+                                    product.id,
+                                    Math.max(0, parseFloat(e.target.value) || 0)
+                                  )
+                                }
+                                className="w-24 h-8 text-right"
+                              />
+                            </div>
                           </TableCell>
                           <TableCell className="text-center">
                             {product.hasIva ? (
