@@ -843,6 +843,74 @@ export type Database = {
           },
         ]
       }
+      product_price_history: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          previous_price: number | null
+          price: number
+          price_change_percentage: number | null
+          product_id: string
+          purchase_order_id: string | null
+          supplier_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          previous_price?: number | null
+          price: number
+          price_change_percentage?: number | null
+          product_id: string
+          purchase_order_id?: string | null
+          supplier_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          previous_price?: number | null
+          price?: number
+          price_change_percentage?: number | null
+          product_id?: string
+          purchase_order_id?: string | null
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_price_history_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_price_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_price_history_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_price_history_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           barcode: string | null
@@ -981,6 +1049,9 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          original_price: number | null
+          price_updated_at: string | null
+          price_updated_by: string | null
           product_id: string
           purchase_order_id: string
           quantity_ordered: number
@@ -991,6 +1062,9 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          original_price?: number | null
+          price_updated_at?: string | null
+          price_updated_by?: string | null
           product_id: string
           purchase_order_id: string
           quantity_ordered: number
@@ -1001,6 +1075,9 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          original_price?: number | null
+          price_updated_at?: string | null
+          price_updated_by?: string | null
           product_id?: string
           purchase_order_id?: string
           quantity_ordered?: number
@@ -1009,6 +1086,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "purchase_order_items_price_updated_by_fkey"
+            columns: ["price_updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "purchase_order_items_product_id_fkey"
             columns: ["product_id"]
