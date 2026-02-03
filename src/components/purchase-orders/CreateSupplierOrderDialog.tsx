@@ -140,7 +140,7 @@ export const CreateSupplierOrderDialog = ({
         return prev;
       }
 
-      const next = [
+      return [
         ...prev,
         {
           id: product.id,
@@ -153,8 +153,6 @@ export const CreateSupplierOrderDialog = ({
           total,
         },
       ];
-
-      return next;
     });
   };
 
@@ -286,11 +284,6 @@ export const CreateSupplierOrderDialog = ({
             </DialogDescription>
           </DialogHeader>
 
-          {/*
-            Importante: este contenedor DEBE scrollear.
-            Si usamos overflow-hidden aquí, al seleccionar un producto (y expandir el bloque de captura)
-            la tabla queda fuera del viewport del modal y “parece” que desaparece.
-          */}
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 pr-1">
             {/* Top row - Supplier and Order Info */}
             <div className="grid grid-cols-3 gap-4">
@@ -329,25 +322,19 @@ export const CreateSupplierOrderDialog = ({
               </div>
             </div>
 
-            {/* Rebuild: layout en 2 columnas para que la tabla no “desaparezca” al expandirse el selector */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
-              <div className="lg:col-span-2 space-y-4">
-                <ProductCombobox products={products || []} onAddProduct={handleAddProduct} />
-              </div>
+            {/* Layout vertical: selector arriba, grilla abajo */}
+            <ProductCombobox products={products || []} onAddProduct={handleAddProduct} />
 
-              <div className="lg:col-span-3 space-y-4">
-                <SelectedProductsTable
-                  products={selectedProducts}
-                  onRemove={removeProduct}
-                  onQuantityChange={updateProductQuantity}
-                  maxHeight={340}
-                />
+            <SelectedProductsTable
+              products={selectedProducts}
+              onRemove={removeProduct}
+              onQuantityChange={updateProductQuantity}
+              maxHeight={280}
+            />
 
-                {selectedProducts.length > 0 && (
-                  <PurchaseOrderTotalsCard subtotal={subtotal} totalIva={totalIva} total={total} />
-                )}
-              </div>
-            </div>
+            {selectedProducts.length > 0 && (
+              <PurchaseOrderTotalsCard subtotal={subtotal} totalIva={totalIva} total={total} />
+            )}
           </div>
 
           <div className="flex justify-between gap-2 pt-4 border-t mt-4">
