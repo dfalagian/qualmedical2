@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -64,6 +64,46 @@ export const CreateSupplierOrderDialog = ({
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
   const [createdOrderData, setCreatedOrderData] = useState<any>(null);
+
+  // Generate next order number automatically
+  const { data: nextOrderNumber } = useQuery({
+    queryKey: ["next_qual_order_number"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_orders")
+        .select("order_number")
+        .ilike("order_number", "QUAL%")
+        .order("order_number", { ascending: false })
+        .limit(1);
+      
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        return "QUAL2026-001";
+      }
+      
+      // Extract the number from the last order (e.g., QUAL2026-005 -> 5)
+      const lastOrder = data[0].order_number;
+      const match = lastOrder.match(/QUAL(\d{4})-(\d+)/);
+      
+      if (match) {
+        const year = match[1];
+        const lastNum = parseInt(match[2], 10);
+        const nextNum = String(lastNum + 1).padStart(3, "0");
+        return `QUAL${year}-${nextNum}`;
+      }
+      
+      return "QUAL2026-001";
+    },
+    enabled: open,
+  });
+
+  // Set order number when dialog opens or next number is fetched
+  useEffect(() => {
+    if (open && nextOrderNumber && !orderNumber) {
+      setOrderNumber(nextOrderNumber);
+    }
+  }, [open, nextOrderNumber]);
 
   // Fetch suppliers
   const { data: suppliers } = useQuery({
@@ -196,7 +236,7 @@ export const CreateSupplierOrderDialog = ({
     onSuccess: () => {
       toast.success("Orden de compra creada correctamente");
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
-
+      queryClient.invalidateQueries({ queryKey: ["next_qual_order_number"] });
       // Prepare data for PDF viewer
       const orderData = {
         orderNumber,
