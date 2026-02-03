@@ -184,17 +184,19 @@ export function ProductRowWithBatches({
         {canEdit && (
           <TableCell className="text-right">
             <div className="flex justify-end gap-1">
-              <Button 
-                variant="ghost" 
-                size="icon"
-                title="Asignar Tag RFID"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setTagAssignmentOpen(true);
-                }}
-              >
-                <Link2 className="h-4 w-4 text-primary" />
-              </Button>
+              {product.rfid_required && (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  title="Asignar Tag RFID"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTagAssignmentOpen(true);
+                  }}
+                >
+                  <Link2 className="h-4 w-4 text-primary" />
+                </Button>
+              )}
               <Button 
                 variant="ghost" 
                 size="icon"
