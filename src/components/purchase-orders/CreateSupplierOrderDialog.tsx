@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -23,20 +22,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Package, Plus, Minus } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Package, Trash2, FileText } from "lucide-react";
+import { ProductCombobox } from "./ProductCombobox";
+import { PurchaseOrderPDFViewer } from "./PurchaseOrderPDFViewer";
 
 interface SelectedProduct {
   id: string;
   name: string;
   sku: string;
   quantity: number;
-  unit_price: number;
+  unitPrice: number;
+  hasIva: boolean;
+  ivaAmount: number;
+  total: number;
 }
 
 interface CreateSupplierOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+const IVA_RATE = 0.16;
 
 export const CreateSupplierOrderDialog = ({
   open,
@@ -47,8 +61,9 @@ export const CreateSupplierOrderDialog = ({
   const [selectedSupplier, setSelectedSupplier] = useState("");
   const [orderNumber, setOrderNumber] = useState("");
   const [description, setDescription] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [createdOrderData, setCreatedOrderData] = useState<any>(null);
 
   // Fetch suppliers
   const { data: suppliers } = useQuery({
@@ -56,13 +71,13 @@ export const CreateSupplierOrderDialog = ({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, company_name");
+        .select("id, full_name, company_name, rfc");
       if (error) throw error;
       return data;
     },
   });
 
-  // Fetch products from inventory (these come from CITIO)
+  // Fetch products from inventory
   const { data: products } = useQuery({
     queryKey: ["products_for_order"],
     queryFn: async () => {
@@ -76,64 +91,67 @@ export const CreateSupplierOrderDialog = ({
     },
   });
 
-  const filteredProducts = useMemo(() => {
-    if (!products) return [];
-    if (!searchTerm) return products;
-    const term = searchTerm.toLowerCase();
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(term) ||
-        p.sku.toLowerCase().includes(term)
-    );
-  }, [products, searchTerm]);
-
-  const totalAmount = useMemo(() => {
-    return selectedProducts.reduce(
-      (sum, p) => sum + p.quantity * p.unit_price,
-      0
-    );
-  }, [selectedProducts]);
-
-  const toggleProduct = (product: any) => {
+  const handleAddProduct = (
+    product: { id: string; name: string; sku: string; unit_price: number | null },
+    quantity: number,
+    unitPrice: number,
+    hasIva: boolean
+  ) => {
+    // Check if product already exists
     const exists = selectedProducts.find((p) => p.id === product.id);
     if (exists) {
-      setSelectedProducts(selectedProducts.filter((p) => p.id !== product.id));
-    } else {
-      setSelectedProducts([
-        ...selectedProducts,
-        {
-          id: product.id,
-          name: product.name,
-          sku: product.sku,
-          quantity: 1,
-          unit_price: product.unit_price || 0,
-        },
-      ]);
+      toast.error("Este producto ya está en la lista");
+      return;
     }
+
+    const ivaAmount = hasIva ? unitPrice * quantity * IVA_RATE : 0;
+    const total = unitPrice * quantity + ivaAmount;
+
+    setSelectedProducts([
+      ...selectedProducts,
+      {
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+        quantity,
+        unitPrice,
+        hasIva,
+        ivaAmount,
+        total,
+      },
+    ]);
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
+  const removeProduct = (productId: string) => {
+    setSelectedProducts(selectedProducts.filter((p) => p.id !== productId));
+  };
+
+  const updateProductQuantity = (productId: string, quantity: number) => {
     setSelectedProducts(
       selectedProducts.map((p) => {
         if (p.id === productId) {
-          const newQty = Math.max(1, p.quantity + delta);
-          return { ...p, quantity: newQty };
+          const ivaAmount = p.hasIva ? p.unitPrice * quantity * IVA_RATE : 0;
+          const total = p.unitPrice * quantity + ivaAmount;
+          return { ...p, quantity, ivaAmount, total };
         }
         return p;
       })
     );
   };
 
-  const updatePrice = (productId: string, price: number) => {
-    setSelectedProducts(
-      selectedProducts.map((p) => {
-        if (p.id === productId) {
-          return { ...p, unit_price: price };
-        }
-        return p;
-      })
+  const { subtotal, totalIva, total } = useMemo(() => {
+    const subtotal = selectedProducts.reduce(
+      (sum, p) => sum + p.unitPrice * p.quantity,
+      0
     );
-  };
+    const totalIva = selectedProducts.reduce((sum, p) => sum + p.ivaAmount, 0);
+    const total = subtotal + totalIva;
+    return { subtotal, totalIva, total };
+  }, [selectedProducts]);
+
+  const selectedSupplierData = useMemo(() => {
+    return suppliers?.find((s) => s.id === selectedSupplier);
+  }, [suppliers, selectedSupplier]);
 
   const createOrderMutation = useMutation({
     mutationFn: async () => {
@@ -149,7 +167,7 @@ export const CreateSupplierOrderDialog = ({
         .insert({
           order_number: orderNumber,
           supplier_id: selectedSupplier,
-          amount: totalAmount,
+          amount: total,
           description: description || null,
           created_by: user.id,
           status: "pendiente",
@@ -164,7 +182,7 @@ export const CreateSupplierOrderDialog = ({
         purchase_order_id: order.id,
         product_id: p.id,
         quantity_ordered: p.quantity,
-        unit_price: p.unit_price,
+        unit_price: p.unitPrice,
       }));
 
       const { error: itemsError } = await supabase
@@ -178,8 +196,21 @@ export const CreateSupplierOrderDialog = ({
     onSuccess: () => {
       toast.success("Orden de compra creada correctamente");
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
-      resetForm();
-      onOpenChange(false);
+
+      // Prepare data for PDF viewer
+      const orderData = {
+        orderNumber,
+        supplierName: selectedSupplierData?.company_name || selectedSupplierData?.full_name || "",
+        supplierRfc: selectedSupplierData?.rfc,
+        createdAt: new Date(),
+        items: selectedProducts,
+        subtotal,
+        totalIva,
+        total,
+        description,
+      };
+      setCreatedOrderData(orderData);
+      setShowPdfViewer(true);
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al crear la orden");
@@ -190,192 +221,206 @@ export const CreateSupplierOrderDialog = ({
     setSelectedSupplier("");
     setOrderNumber("");
     setDescription("");
-    setSearchTerm("");
     setSelectedProducts([]);
   };
 
+  const handleClose = () => {
+    resetForm();
+    setShowPdfViewer(false);
+    setCreatedOrderData(null);
+    onOpenChange(false);
+  };
+
+  const handlePdfClose = () => {
+    setShowPdfViewer(false);
+    handleClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Nueva Orden de Compra a Proveedor
-          </DialogTitle>
-          <DialogDescription>
-            Crea una orden de compra seleccionando productos del inventario
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open && !showPdfViewer} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Nueva Orden de Compra a Proveedor
+            </DialogTitle>
+            <DialogDescription>
+              Selecciona productos y genera la orden de compra
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-6 flex-1 overflow-hidden">
-          {/* Left column - Form */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Proveedor *</Label>
-              <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona proveedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {suppliers?.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.company_name || s.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Número de Orden *</Label>
-              <Input
-                value={orderNumber}
-                onChange={(e) => setOrderNumber(e.target.value)}
-                placeholder="OC-2024-001"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Descripción</Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Notas adicionales..."
-                rows={2}
-              />
-            </div>
-
-            {/* Selected Products Summary */}
-            {selectedProducts.length > 0 && (
-              <div className="border rounded-lg p-3 bg-muted/30 space-y-3">
-                <p className="font-semibold text-sm">
-                  Productos seleccionados ({selectedProducts.length})
-                </p>
-                <ScrollArea className="h-48">
-                  <div className="space-y-2 pr-3">
-                    {selectedProducts.map((product) => (
-                      <div
-                        key={product.id}
-                        className="flex items-center gap-3 text-sm bg-background rounded-md p-2.5 border"
-                      >
-                        <span className="flex-1 min-w-0 text-sm leading-tight" title={product.name}>
-                          {product.name}
-                        </span>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => updateQuantity(product.id, -1)}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="w-8 text-center text-sm font-medium">{product.quantity}</span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => updateQuantity(product.id, 1)}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        <span className="text-muted-foreground shrink-0">×</span>
-                        <Input
-                          type="number"
-                          value={product.unit_price}
-                          onChange={(e) =>
-                            updatePrice(product.id, parseFloat(e.target.value) || 0)
-                          }
-                          className="w-20 h-7 text-sm shrink-0"
-                        />
-                        <span className="w-20 text-right font-semibold text-sm shrink-0">
-                          ${(product.quantity * product.unit_price).toFixed(2)}
-                        </span>
-                      </div>
+          <div className="flex-1 overflow-hidden flex flex-col gap-4">
+            {/* Top row - Supplier and Order Info */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Proveedor *</Label>
+                <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona proveedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers?.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.company_name || s.full_name}
+                      </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Número de Orden *</Label>
+                <Input
+                  value={orderNumber}
+                  onChange={(e) => setOrderNumber(e.target.value)}
+                  placeholder="OC-2026-001"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Descripción</Label>
+                <Input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Notas adicionales..."
+                />
+              </div>
+            </div>
+
+            {/* Product Combobox */}
+            <ProductCombobox
+              products={products || []}
+              onAddProduct={handleAddProduct}
+            />
+
+            {/* Products Table */}
+            <div className="flex-1 border rounded-lg overflow-hidden bg-background min-h-0">
+              <ScrollArea className="h-[280px]">
+                {selectedProducts.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[40%]">Producto</TableHead>
+                        <TableHead className="w-[10%] text-center">Cant.</TableHead>
+                        <TableHead className="w-[15%] text-right">P. Unit.</TableHead>
+                        <TableHead className="w-[10%] text-center">IVA</TableHead>
+                        <TableHead className="w-[15%] text-right">Importe</TableHead>
+                        <TableHead className="w-[10%]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedProducts.map((product) => (
+                        <TableRow key={product.id}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-sm">{product.name}</p>
+                              <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Input
+                              type="number"
+                              min={1}
+                              value={product.quantity}
+                              onChange={(e) =>
+                                updateProductQuantity(
+                                  product.id,
+                                  Math.max(1, parseInt(e.target.value) || 1)
+                                )
+                              }
+                              className="w-16 h-8 text-center mx-auto"
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ${product.unitPrice.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {product.hasIva ? (
+                              <span className="text-xs text-primary font-medium">
+                                ${product.ivaAmount.toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">0%</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            ${product.total.toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => removeProduct(product.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                    <Package className="h-12 w-12 mb-3 opacity-30" />
+                    <p className="text-sm">No hay productos agregados</p>
+                    <p className="text-xs">Usa el buscador para agregar productos</p>
                   </div>
-                </ScrollArea>
-                <div className="flex justify-between pt-2 border-t font-semibold">
-                  <span>Total:</span>
-                  <span className="text-primary">${totalAmount.toFixed(2)} MXN</span>
+                )}
+              </ScrollArea>
+            </div>
+
+            {/* Totals */}
+            {selectedProducts.length > 0 && (
+              <div className="flex justify-end">
+                <div className="w-64 bg-muted/50 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal:</span>
+                    <span>${subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>IVA (16%):</span>
+                    <span>${totalIva.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                    <span>Total:</span>
+                    <span className="text-primary">${total.toFixed(2)} MXN</span>
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Right column - Product List */}
-          <div className="flex flex-col space-y-2 overflow-hidden">
-            <div className="space-y-2">
-              <Label>Buscar Productos</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar por nombre o SKU..."
-                  className="pl-10"
-                />
-              </div>
+          <div className="flex justify-between gap-2 pt-4 border-t mt-4">
+            <div className="text-sm text-muted-foreground">
+              {selectedProducts.length} producto(s) agregado(s)
             </div>
-
-            <div className="flex-1 border rounded-lg overflow-hidden bg-background">
-              <ScrollArea className="h-[350px]">
-                <div className="divide-y">
-                  {filteredProducts.map((product) => {
-                    const isSelected = selectedProducts.some(
-                      (p) => p.id === product.id
-                    );
-                    return (
-                      <div
-                        key={product.id}
-                        className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-muted/50 ${
-                          isSelected ? "bg-primary/10 border-l-2 border-l-primary" : ""
-                        }`}
-                        onClick={() => toggleProduct(product)}
-                      >
-                        <Checkbox checked={isSelected} className="h-4 w-4" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{product.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            SKU: {product.sku} · Stock: {product.current_stock || 0}
-                          </p>
-                        </div>
-                        <span className="text-sm font-semibold text-primary whitespace-nowrap">
-                          ${(product.unit_price || 0).toFixed(2)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  {filteredProducts.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                      <Package className="h-8 w-8 mb-2 opacity-50" />
-                      <p className="text-sm">No se encontraron productos</p>
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleClose}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => createOrderMutation.mutate()}
+                disabled={createOrderMutation.isPending || selectedProducts.length === 0}
+                className="gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                {createOrderMutation.isPending ? "Creando..." : "Crear y Ver PDF"}
+              </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {filteredProducts.length} productos disponibles
-            </p>
           </div>
-        </div>
+        </DialogContent>
+      </Dialog>
 
-        <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={() => createOrderMutation.mutate()}
-            disabled={createOrderMutation.isPending || selectedProducts.length === 0}
-          >
-            {createOrderMutation.isPending ? "Creando..." : "Crear Orden"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* PDF Viewer */}
+      {showPdfViewer && createdOrderData && (
+        <PurchaseOrderPDFViewer
+          open={showPdfViewer}
+          onOpenChange={handlePdfClose}
+          orderData={createdOrderData}
+        />
+      )}
+    </>
   );
 };
