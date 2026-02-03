@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -21,9 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Package, Trash2, FileText } from "lucide-react";
+import { Package, FileText } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
 import { PurchaseOrderPDFViewer } from "./PurchaseOrderPDFViewer";
+import { SelectedProductsTable } from "./SelectedProductsTable";
+import { PurchaseOrderTotalsCard } from "./PurchaseOrderTotalsCard";
 
 interface SelectedProduct {
   id: string;
@@ -328,115 +329,25 @@ export const CreateSupplierOrderDialog = ({
               </div>
             </div>
 
-            {/* Product Combobox */}
-            <ProductCombobox
-              products={products || []}
-              onAddProduct={handleAddProduct}
-            />
-
-            {/* Products Table */}
-            <div className="border rounded-lg overflow-hidden bg-background">
-              {selectedProducts.length > 0 ? (
-                <div className="max-h-[280px] overflow-x-auto overflow-y-auto">
-                  <table className="w-full caption-bottom text-sm">
-                    <thead className="[&_tr]:border-b bg-background">
-                      <tr>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[40%]">
-                          Producto
-                        </th>
-                        <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[10%]">
-                          Cant.
-                        </th>
-                        <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[15%]">
-                          P. Unit.
-                        </th>
-                        <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[10%]">
-                          IVA
-                        </th>
-                        <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[15%]">
-                          Importe
-                        </th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[10%]" />
-                      </tr>
-                    </thead>
-                    <tbody className="[&_tr:last-child]:border-0">
-                      {selectedProducts.map((product, idx) => (
-                        <tr
-                          key={`${product.id}-${product.sku}-${idx}`}
-                          className="border-b transition-colors hover:bg-muted/50"
-                        >
-                          <td className="p-4 align-middle">
-                            <div>
-                              <p className="font-medium text-sm">{product.name}</p>
-                              <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
-                            </div>
-                          </td>
-                          <td className="p-4 align-middle text-center">
-                            <Input
-                              type="number"
-                              min={1}
-                              value={product.quantity}
-                              onChange={(e) =>
-                                updateProductQuantity(
-                                  product.id,
-                                  Math.max(1, parseInt(e.target.value) || 1)
-                                )
-                              }
-                              className="w-16 h-8 text-center mx-auto"
-                            />
-                          </td>
-                          <td className="p-4 align-middle text-right">${product.unitPrice.toFixed(2)}</td>
-                          <td className="p-4 align-middle text-center">
-                            {product.hasIva ? (
-                              <span className="text-xs text-primary font-medium">${product.ivaAmount.toFixed(2)}</span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">0%</span>
-                            )}
-                          </td>
-                          <td className="p-4 align-middle text-right font-semibold">${product.total.toFixed(2)}</td>
-                          <td className="p-4 align-middle">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => removeProduct(product.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                  <Package className="h-12 w-12 mb-3 opacity-30" />
-                  <p className="text-sm">No hay productos agregados</p>
-                  <p className="text-xs">Usa el buscador para agregar productos</p>
-                </div>
-              )}
-            </div>
-
-            {/* Totals */}
-            {selectedProducts.length > 0 && (
-              <div className="flex justify-end">
-                <div className="w-64 bg-muted/50 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Subtotal:</span>
-                    <span>${subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>IVA (16%):</span>
-                    <span>${totalIva.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                    <span>Total:</span>
-                    <span className="text-primary">${total.toFixed(2)} MXN</span>
-                  </div>
-                </div>
+            {/* Rebuild: layout en 2 columnas para que la tabla no “desaparezca” al expandirse el selector */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
+              <div className="lg:col-span-2 space-y-4">
+                <ProductCombobox products={products || []} onAddProduct={handleAddProduct} />
               </div>
-            )}
+
+              <div className="lg:col-span-3 space-y-4">
+                <SelectedProductsTable
+                  products={selectedProducts}
+                  onRemove={removeProduct}
+                  onQuantityChange={updateProductQuantity}
+                  maxHeight={340}
+                />
+
+                {selectedProducts.length > 0 && (
+                  <PurchaseOrderTotalsCard subtotal={subtotal} totalIva={totalIva} total={total} />
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-between gap-2 pt-4 border-t mt-4">
