@@ -60,8 +60,8 @@ export const PurchaseOrderPDFViewer = ({
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Header with blue background
-    doc.setFillColor(0, 51, 102);
+    // Header with green background (QualMedical brand color)
+    doc.setFillColor(0, 128, 105); // Teal/dark green from logo
     doc.rect(0, 0, pageWidth, 40, "F");
 
     // Company name
@@ -90,7 +90,7 @@ export const PurchaseOrderPDFViewer = ({
     let currentY = 50;
 
     // FACTURAR A section
-    doc.setFillColor(0, 51, 102);
+    doc.setFillColor(0, 128, 105);
     doc.rect(14, currentY, pageWidth - 28, 7, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
@@ -126,7 +126,7 @@ export const PurchaseOrderPDFViewer = ({
     currentY += 10;
 
     // PROVEEDOR section
-    doc.setFillColor(0, 51, 102);
+    doc.setFillColor(0, 128, 105);
     doc.rect(14, currentY, pageWidth - 28, 7, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
@@ -163,7 +163,7 @@ export const PurchaseOrderPDFViewer = ({
     currentY += 12;
 
     // REQUISICION section
-    doc.setFillColor(0, 51, 102);
+    doc.setFillColor(0, 128, 105);
     doc.rect(14, currentY, pageWidth - 28, 7, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
@@ -193,7 +193,7 @@ export const PurchaseOrderPDFViewer = ({
       body: tableData,
       theme: "grid",
       headStyles: {
-        fillColor: [0, 51, 102],
+        fillColor: [0, 128, 105],
         textColor: [255, 255, 255],
         fontSize: 7,
         fontStyle: "bold",
