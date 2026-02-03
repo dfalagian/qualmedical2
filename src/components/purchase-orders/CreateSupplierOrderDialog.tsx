@@ -132,13 +132,6 @@ export const CreateSupplierOrderDialog = ({
     const total = unitPrice * quantity + ivaAmount;
 
     setSelectedProducts((prev) => {
-      // Debug: verificar que la lista se acumula correctamente
-      console.log("[CreateSupplierOrderDialog] addProduct", {
-        adding: { id: product.id, sku: product.sku, name: product.name },
-        prevLen: prev.length,
-        prevIds: prev.map((p) => p.id),
-      });
-
       // Check if product already exists
       const exists = prev.find((p) => p.id === product.id);
       if (exists) {
@@ -159,11 +152,6 @@ export const CreateSupplierOrderDialog = ({
           total,
         },
       ];
-
-      console.log("[CreateSupplierOrderDialog] addProduct result", {
-        nextLen: next.length,
-        nextIds: next.map((p) => p.id),
-      });
 
       return next;
     });
@@ -297,7 +285,12 @@ export const CreateSupplierOrderDialog = ({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden flex flex-col gap-4">
+          {/*
+            Importante: este contenedor DEBE scrollear.
+            Si usamos overflow-hidden aquí, al seleccionar un producto (y expandir el bloque de captura)
+            la tabla queda fuera del viewport del modal y “parece” que desaparece.
+          */}
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 pr-1">
             {/* Top row - Supplier and Order Info */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
