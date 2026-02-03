@@ -133,7 +133,7 @@ export const CreateSupplierOrderDialog = ({
 
     setSelectedProducts((prev) => {
       // Debug: verificar que la lista se acumula correctamente
-      console.debug("[CreateSupplierOrderDialog] addProduct", {
+      console.log("[CreateSupplierOrderDialog] addProduct", {
         adding: { id: product.id, sku: product.sku, name: product.name },
         prevLen: prev.length,
         prevIds: prev.map((p) => p.id),
@@ -160,7 +160,7 @@ export const CreateSupplierOrderDialog = ({
         },
       ];
 
-      console.debug("[CreateSupplierOrderDialog] addProduct result", {
+      console.log("[CreateSupplierOrderDialog] addProduct result", {
         nextLen: next.length,
         nextIds: next.map((p) => p.id),
       });
@@ -344,7 +344,7 @@ export const CreateSupplierOrderDialog = ({
             {/* Products Table */}
             <div className="border rounded-lg overflow-hidden bg-background">
               {selectedProducts.length > 0 ? (
-                <div className="h-[280px] overflow-auto">
+                <div className="max-h-[280px] overflow-x-auto overflow-y-auto">
                   <table className="w-full caption-bottom text-sm">
                     <thead className="[&_tr]:border-b bg-background">
                       <tr>
