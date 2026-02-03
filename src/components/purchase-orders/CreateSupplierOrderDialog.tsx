@@ -328,11 +328,11 @@ export const CreateSupplierOrderDialog = ({
             />
 
             {/* Products Table */}
-            <div className="flex-1 min-h-0 border rounded-lg overflow-hidden bg-background">
+            <div className="border rounded-lg overflow-hidden bg-background">
               {selectedProducts.length > 0 ? (
-                <div className="h-full overflow-auto">
+                <div className="h-[280px] overflow-auto">
                   <table className="w-full caption-bottom text-sm">
-                    <thead className="[&_tr]:border-b sticky top-0 bg-background z-10">
+                    <thead className="[&_tr]:border-b bg-background">
                       <tr>
                         <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[40%]">
                           Producto
@@ -354,10 +354,7 @@ export const CreateSupplierOrderDialog = ({
                     </thead>
                     <tbody className="[&_tr:last-child]:border-0">
                       {selectedProducts.map((product) => (
-                        <tr
-                          key={product.id}
-                          className="border-b transition-colors hover:bg-muted/50"
-                        >
+                        <tr key={product.id} className="border-b transition-colors hover:bg-muted/50">
                           <td className="p-4 align-middle">
                             <div>
                               <p className="font-medium text-sm">{product.name}</p>
@@ -378,21 +375,15 @@ export const CreateSupplierOrderDialog = ({
                               className="w-16 h-8 text-center mx-auto"
                             />
                           </td>
-                          <td className="p-4 align-middle text-right">
-                            ${product.unitPrice.toFixed(2)}
-                          </td>
+                          <td className="p-4 align-middle text-right">${product.unitPrice.toFixed(2)}</td>
                           <td className="p-4 align-middle text-center">
                             {product.hasIva ? (
-                              <span className="text-xs text-primary font-medium">
-                                ${product.ivaAmount.toFixed(2)}
-                              </span>
+                              <span className="text-xs text-primary font-medium">${product.ivaAmount.toFixed(2)}</span>
                             ) : (
                               <span className="text-xs text-muted-foreground">0%</span>
                             )}
                           </td>
-                          <td className="p-4 align-middle text-right font-semibold">
-                            ${product.total.toFixed(2)}
-                          </td>
+                          <td className="p-4 align-middle text-right font-semibold">${product.total.toFixed(2)}</td>
                           <td className="p-4 align-middle">
                             <Button
                               variant="ghost"
