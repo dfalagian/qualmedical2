@@ -1,0 +1,674 @@
+import { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { 
+  FileText, 
+  Search, 
+  Plus, 
+  Trash2, 
+  ChevronsUpDown,
+  Check,
+  Calendar
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+
+interface Client {
+  id: string;
+  nombre_cliente: string;
+  razon_social: string | null;
+  rfc: string | null;
+  cfdi: string | null;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  unit_price: number | null;
+  current_stock: number | null;
+}
+
+interface QuoteItem {
+  id: string;
+  product_id: string | null;
+  nombre_producto: string;
+  marca: string;
+  lote: string;
+  fecha_caducidad: Date | null;
+  cantidad: number;
+  precio_unitario: number;
+  importe: number;
+}
+
+export const QuotesManagement = () => {
+  // Client selection state
+  const [clientOpen, setClientOpen] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+
+  // Quote data
+  const [folio, setFolio] = useState("");
+  const [concepto, setConcepto] = useState("");
+  const [fechaCotizacion, setFechaCotizacion] = useState<Date>(new Date());
+  const [fechaEntrega, setFechaEntrega] = useState<Date | undefined>(undefined);
+  const [facturaAnterior, setFacturaAnterior] = useState("");
+  const [fechaFacturaAnterior, setFechaFacturaAnterior] = useState<Date | undefined>(undefined);
+  const [montoFacturaAnterior, setMontoFacturaAnterior] = useState("");
+
+  // Product selection state
+  const [productOpen, setProductOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [productMarca, setProductMarca] = useState("");
+  const [productLote, setProductLote] = useState("");
+  const [productFechaCaducidad, setProductFechaCaducidad] = useState<Date | undefined>(undefined);
+  const [productCantidad, setProductCantidad] = useState(1);
+  const [productPrecio, setProductPrecio] = useState("");
+
+  // Quote items
+  const [quoteItems, setQuoteItems] = useState<QuoteItem[]>([]);
+
+  // Fetch clients
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients-active"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, nombre_cliente, razon_social, rfc, cfdi")
+        .eq("is_active", true)
+        .order("nombre_cliente");
+      if (error) throw error;
+      return data as Client[];
+    },
+  });
+
+  // Fetch products
+  const { data: products = [] } = useQuery({
+    queryKey: ["products-active"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, sku, unit_price, current_stock")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data as Product[];
+    },
+  });
+
+  // Generate folio on mount
+  useEffect(() => {
+    const generateFolio = async () => {
+      const { data, error } = await supabase.rpc("generate_quote_folio");
+      if (!error && data) {
+        setFolio(data);
+      }
+    };
+    generateFolio();
+  }, []);
+
+  // Filter clients
+  const filteredClients = useMemo(() => {
+    if (!clientSearch) return clients;
+    const term = clientSearch.toLowerCase();
+    return clients.filter(
+      (c) =>
+        c.nombre_cliente.toLowerCase().includes(term) ||
+        c.razon_social?.toLowerCase().includes(term) ||
+        c.rfc?.toLowerCase().includes(term)
+    );
+  }, [clients, clientSearch]);
+
+  // Filter products
+  const filteredProducts = useMemo(() => {
+    if (!productSearch) return products;
+    const term = productSearch.toLowerCase();
+    return products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(term) ||
+        p.sku.toLowerCase().includes(term)
+    );
+  }, [products, productSearch]);
+
+  // Handle client selection
+  const handleSelectClient = (client: Client) => {
+    setSelectedClient(client);
+    setClientOpen(false);
+    setClientSearch("");
+  };
+
+  // Handle product selection
+  const handleSelectProduct = (product: Product) => {
+    setSelectedProduct(product);
+    setProductPrecio(product.unit_price?.toString() || "0");
+    setProductOpen(false);
+    setProductSearch("");
+  };
+
+  // Add product to quote
+  const handleAddProduct = () => {
+    if (!selectedProduct) {
+      toast.error("Seleccione un producto");
+      return;
+    }
+    if (productCantidad <= 0) {
+      toast.error("La cantidad debe ser mayor a 0");
+      return;
+    }
+
+    const precio = parseFloat(productPrecio) || 0;
+    const importe = precio * productCantidad;
+
+    const newItem: QuoteItem = {
+      id: crypto.randomUUID(),
+      product_id: selectedProduct.id,
+      nombre_producto: selectedProduct.name,
+      marca: productMarca,
+      lote: productLote,
+      fecha_caducidad: productFechaCaducidad || null,
+      cantidad: productCantidad,
+      precio_unitario: precio,
+      importe: importe,
+    };
+
+    setQuoteItems([...quoteItems, newItem]);
+
+    // Reset product form
+    setSelectedProduct(null);
+    setProductMarca("");
+    setProductLote("");
+    setProductFechaCaducidad(undefined);
+    setProductCantidad(1);
+    setProductPrecio("");
+  };
+
+  // Remove item from quote
+  const handleRemoveItem = (id: string) => {
+    setQuoteItems(quoteItems.filter((item) => item.id !== id));
+  };
+
+  // Calculate totals
+  const subtotal = useMemo(() => {
+    return quoteItems.reduce((sum, item) => sum + item.importe, 0);
+  }, [quoteItems]);
+
+  const total = subtotal; // Por ahora igual al subtotal, se puede agregar IVA después
+
+  // Date picker popover states
+  const [fechaCotizacionOpen, setFechaCotizacionOpen] = useState(false);
+  const [fechaEntregaOpen, setFechaEntregaOpen] = useState(false);
+  const [fechaFacturaAntOpen, setFechaFacturaAntOpen] = useState(false);
+  const [fechaCaducidadOpen, setFechaCaducidadOpen] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      {/* Client Search Section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Nueva Cotización
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Client Selector */}
+          <div className="space-y-2">
+            <Label>Buscar Cliente</Label>
+            <Popover open={clientOpen} onOpenChange={setClientOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={clientOpen}
+                  className="w-full justify-between h-10 text-left font-normal"
+                >
+                  {selectedClient ? (
+                    <span className="truncate">{selectedClient.nombre_cliente}</span>
+                  ) : (
+                    <span className="text-muted-foreground">Buscar cliente...</span>
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[400px] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="Buscar por nombre, razón social o RFC..."
+                    value={clientSearch}
+                    onValueChange={setClientSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No se encontraron clientes.</CommandEmpty>
+                    <CommandGroup>
+                      {filteredClients.slice(0, 50).map((client) => (
+                        <CommandItem
+                          key={client.id}
+                          value={client.id}
+                          onSelect={() => handleSelectClient(client)}
+                          className="flex items-center justify-between"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {client.nombre_cliente}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {client.rfc || "Sin RFC"} · {client.razon_social || "Sin razón social"}
+                            </p>
+                          </div>
+                          <Check
+                            className={cn(
+                              "h-4 w-4",
+                              selectedClient?.id === client.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Client Data (auto-filled) */}
+          {selectedClient && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Nombre Cliente</Label>
+                <p className="text-sm font-medium">{selectedClient.nombre_cliente}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">RFC</Label>
+                <p className="text-sm font-medium">{selectedClient.rfc || "-"}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Razón Social</Label>
+                <p className="text-sm font-medium">{selectedClient.razon_social || "-"}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">CFDI</Label>
+                <p className="text-sm font-medium">{selectedClient.cfdi || "-"}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Quote Info Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Concepto</Label>
+              <Input
+                value={concepto}
+                onChange={(e) => setConcepto(e.target.value)}
+                placeholder="Número cotización / Paciente"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Folio Cotización</Label>
+              <Input value={folio} readOnly className="bg-muted" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Fecha Cotización</Label>
+              <Popover open={fechaCotizacionOpen} onOpenChange={setFechaCotizacionOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {format(fechaCotizacion, "PPP", { locale: es })}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={fechaCotizacion}
+                    onSelect={(date) => {
+                      if (date) setFechaCotizacion(date);
+                      setFechaCotizacionOpen(false);
+                    }}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Fecha Entrega</Label>
+              <Popover open={fechaEntregaOpen} onOpenChange={setFechaEntregaOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !fechaEntrega && "text-muted-foreground"
+                    )}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {fechaEntrega ? format(fechaEntrega, "PPP", { locale: es }) : "Seleccionar fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={fechaEntrega}
+                    onSelect={(date) => {
+                      setFechaEntrega(date);
+                      setFechaEntregaOpen(false);
+                    }}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Factura Anterior</Label>
+              <Input
+                value={facturaAnterior}
+                onChange={(e) => setFacturaAnterior(e.target.value)}
+                placeholder="Número de factura"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Fecha Factura Anterior</Label>
+              <Popover open={fechaFacturaAntOpen} onOpenChange={setFechaFacturaAntOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !fechaFacturaAnterior && "text-muted-foreground"
+                    )}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {fechaFacturaAnterior 
+                      ? format(fechaFacturaAnterior, "PPP", { locale: es }) 
+                      : "Seleccionar fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={fechaFacturaAnterior}
+                    onSelect={(date) => {
+                      setFechaFacturaAnterior(date);
+                      setFechaFacturaAntOpen(false);
+                    }}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Monto Factura Anterior</Label>
+              <Input
+                type="number"
+                value={montoFacturaAnterior}
+                onChange={(e) => setMontoFacturaAnterior(e.target.value)}
+                placeholder="$0.00"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Product Selector Section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Agregar Productos</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+            {/* Product Selector */}
+            <div className="lg:col-span-2 space-y-2">
+              <Label>Producto</Label>
+              <Popover open={productOpen} onOpenChange={setProductOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={productOpen}
+                    className="w-full justify-between h-10 text-left font-normal"
+                  >
+                    {selectedProduct ? (
+                      <span className="truncate">{selectedProduct.name}</span>
+                    ) : (
+                      <span className="text-muted-foreground">Buscar producto...</span>
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Buscar por nombre o SKU..."
+                      value={productSearch}
+                      onValueChange={setProductSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                      <CommandGroup>
+                        {filteredProducts.slice(0, 50).map((product) => (
+                          <CommandItem
+                            key={product.id}
+                            value={product.id}
+                            onSelect={() => handleSelectProduct(product)}
+                            className="flex items-center justify-between"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{product.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                SKU: {product.sku} · Stock: {product.current_stock || 0}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-sm font-semibold text-primary">
+                                ${(product.unit_price || 0).toFixed(2)}
+                              </span>
+                              <Check
+                                className={cn(
+                                  "h-4 w-4",
+                                  selectedProduct?.id === product.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Marca</Label>
+              <Input
+                value={productMarca}
+                onChange={(e) => setProductMarca(e.target.value)}
+                placeholder="Marca"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Lote</Label>
+              <Input
+                value={productLote}
+                onChange={(e) => setProductLote(e.target.value)}
+                placeholder="Número lote"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>F. Caducidad</Label>
+              <Popover open={fechaCaducidadOpen} onOpenChange={setFechaCaducidadOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal h-10",
+                      !productFechaCaducidad && "text-muted-foreground"
+                    )}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {productFechaCaducidad 
+                      ? format(productFechaCaducidad, "dd/MM/yy") 
+                      : "Fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={productFechaCaducidad}
+                    onSelect={(date) => {
+                      setProductFechaCaducidad(date);
+                      setFechaCaducidadOpen(false);
+                    }}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Cantidad</Label>
+              <Input
+                type="number"
+                min={1}
+                value={productCantidad}
+                onChange={(e) => setProductCantidad(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Precio Unitario</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={productPrecio}
+                onChange={(e) => setProductPrecio(e.target.value)}
+                placeholder="$0.00"
+              />
+            </div>
+
+            <div className="flex items-end">
+              <Button onClick={handleAddProduct} className="w-full h-10">
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar
+              </Button>
+            </div>
+          </div>
+
+          {/* Products Table */}
+          <div className="border rounded-lg overflow-hidden">
+            <div className="max-h-[300px] overflow-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background">
+                  <TableRow>
+                    <TableHead>Producto</TableHead>
+                    <TableHead>Marca</TableHead>
+                    <TableHead>Lote</TableHead>
+                    <TableHead>F. Caducidad</TableHead>
+                    <TableHead className="text-right">Cantidad</TableHead>
+                    <TableHead className="text-right">P. Unitario</TableHead>
+                    <TableHead className="text-right">Importe</TableHead>
+                    <TableHead className="w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {quoteItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        No hay productos agregados
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    quoteItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.nombre_producto}</TableCell>
+                        <TableCell>{item.marca || "-"}</TableCell>
+                        <TableCell>{item.lote || "-"}</TableCell>
+                        <TableCell>
+                          {item.fecha_caducidad 
+                            ? format(item.fecha_caducidad, "dd/MM/yyyy") 
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">{item.cantidad}</TableCell>
+                        <TableCell className="text-right">
+                          ${item.precio_unitario.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          ${item.importe.toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveItem(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          {/* Totals */}
+          <div className="flex justify-end">
+            <div className="w-full max-w-xs space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Sub-Total:</span>
+                <span className="font-medium">${subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-lg font-bold border-t pt-2">
+                <span>Total:</span>
+                <span className="text-primary">${total.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};

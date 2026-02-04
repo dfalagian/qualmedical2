@@ -1214,6 +1214,128 @@ export type Database = {
           },
         ]
       }
+      quote_items: {
+        Row: {
+          cantidad: number
+          created_at: string | null
+          fecha_caducidad: string | null
+          id: string
+          importe: number
+          lote: string | null
+          marca: string | null
+          nombre_producto: string
+          precio_unitario: number
+          product_id: string | null
+          quote_id: string
+        }
+        Insert: {
+          cantidad?: number
+          created_at?: string | null
+          fecha_caducidad?: string | null
+          id?: string
+          importe?: number
+          lote?: string | null
+          marca?: string | null
+          nombre_producto: string
+          precio_unitario?: number
+          product_id?: string | null
+          quote_id: string
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string | null
+          fecha_caducidad?: string | null
+          id?: string
+          importe?: number
+          lote?: string | null
+          marca?: string | null
+          nombre_producto?: string
+          precio_unitario?: number
+          product_id?: string | null
+          quote_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          client_id: string
+          concepto: string | null
+          created_at: string | null
+          created_by: string | null
+          factura_anterior: string | null
+          fecha_cotizacion: string
+          fecha_entrega: string | null
+          fecha_factura_anterior: string | null
+          folio: string
+          id: string
+          monto_factura_anterior: number | null
+          notes: string | null
+          status: string
+          subtotal: number
+          total: number
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          concepto?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          factura_anterior?: string | null
+          fecha_cotizacion?: string
+          fecha_entrega?: string | null
+          fecha_factura_anterior?: string | null
+          folio: string
+          id?: string
+          monto_factura_anterior?: number | null
+          notes?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          concepto?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          factura_anterior?: string | null
+          fecha_cotizacion?: string
+          fecha_entrega?: string | null
+          fecha_factura_anterior?: string | null
+          folio?: string
+          id?: string
+          monto_factura_anterior?: number | null
+          notes?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rfid_tags: {
         Row: {
           batch_id: string | null
@@ -1494,6 +1616,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_quote_folio: { Args: never; Returns: string }
       get_parent_supplier_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
