@@ -25,6 +25,7 @@ import {
   Pencil,
   Radio,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -170,6 +171,11 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
   // Cancel confirmation
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [quoteToCancel, setQuoteToCancel] = useState<Quote | null>(null);
+  
+  // Delete confirmation
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [quoteToDelete, setQuoteToDelete] = useState<Quote | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch quotes
   const { data: quotes = [], isLoading } = useQuery({
@@ -457,6 +463,45 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
     }
   };
 
+  // Start delete process
+  const handleStartDelete = (quote: Quote) => {
+    setQuoteToDelete(quote);
+    setDeleteDialogOpen(true);
+  };
+
+  // Confirm delete
+  const handleConfirmDelete = async () => {
+    if (!quoteToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      // First delete quote items
+      const { error: itemsError } = await supabase
+        .from("quote_items")
+        .delete()
+        .eq("quote_id", quoteToDelete.id);
+      
+      if (itemsError) throw itemsError;
+      
+      // Then delete the quote
+      const { error: quoteError } = await supabase
+        .from("quotes")
+        .delete()
+        .eq("id", quoteToDelete.id);
+      
+      if (quoteError) throw quoteError;
+      
+      toast.success(`Cotización ${quoteToDelete.folio} eliminada`);
+      setDeleteDialogOpen(false);
+      setQuoteToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    } catch (error: any) {
+      toast.error("Error al eliminar: " + error.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -616,6 +661,17 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
                               >
                                 <XCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {quote.status === "borrador" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleStartDelete(quote)}
+                                title="Eliminar cotización"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
                           </div>
@@ -807,6 +863,34 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
               className="bg-destructive hover:bg-destructive/90"
             >
               {isCancelling ? "Cancelando..." : "Sí, cancelar venta"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Eliminar Cotización
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Está seguro de eliminar la cotización <strong>{quoteToDelete?.folio}</strong>?
+              <br />
+              <br />
+              Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? "Eliminando..." : "Sí, eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
