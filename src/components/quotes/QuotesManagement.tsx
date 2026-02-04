@@ -52,6 +52,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQuoteActions } from "@/hooks/useQuoteActions";
 import { printQuoteHtml } from "./quoteHtmlPrint";
+import { QuoteBatchSelector } from "./QuoteBatchSelector";
 
 interface Client {
   id: string;
@@ -181,6 +182,10 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
   // Batch selection state
   const [batchOpen, setBatchOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+  
+  // Batch selector dialog state (for showing multiple batches)
+  const [batchSelectorOpen, setBatchSelectorOpen] = useState(false);
+  const [pendingProductForBatch, setPendingProductForBatch] = useState<Product | null>(null);
   
   // Price type selection
   const [selectedPriceType, setSelectedPriceType] = useState<PriceType>("1");
@@ -338,7 +343,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     return priceMap[priceType] ?? product.unit_price ?? 0;
   };
 
-  // Handle product selection
+  // Handle product selection - now opens batch selector
   const handleSelectProduct = (product: Product) => {
     setSelectedProduct(product);
     setSelectedBatch(null); // Reset batch when product changes
@@ -348,6 +353,83 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     setIsManualPrice(selectedPriceType === "manual");
     setProductOpen(false);
     setProductSearch("");
+    
+    // Open batch selector dialog
+    setPendingProductForBatch(product);
+    setBatchSelectorOpen(true);
+  };
+
+  // Handle batch selection from dialog
+  const handleBatchSelected = (batchInfo: { batchId: string; batchNumber: string; expirationDate: string; availableQuantity: number } | null) => {
+    if (batchInfo && pendingProductForBatch) {
+      setSelectedBatch({
+        id: batchInfo.batchId,
+        batch_number: batchInfo.batchNumber,
+        expiration_date: batchInfo.expirationDate,
+        current_quantity: batchInfo.availableQuantity,
+      });
+      
+      // Immediately add product with batch
+      addProductToQuote(pendingProductForBatch, batchInfo);
+    } else if (pendingProductForBatch) {
+      // Add product without batch (user chose to skip)
+      addProductToQuote(pendingProductForBatch, null);
+    }
+    
+    setPendingProductForBatch(null);
+    setBatchSelectorOpen(false);
+  };
+  
+  // Helper function to add product to quote
+  const addProductToQuote = (
+    product: Product, 
+    batchInfo: { batchId: string; batchNumber: string; expirationDate: string; availableQuantity: number } | null
+  ) => {
+    const precio = parseFloat(productPrecio) || getProductPrice(product, selectedPriceType);
+    const cantidad = 1; // Default quantity, editable in grid
+    const importe = precio * cantidad;
+
+    // Check if this product already exists in the quote
+    const existingProduct = quoteItems.find(
+      item => item.product_id === product.id
+    );
+    
+    if (existingProduct) {
+      toast.warning(
+        `"${product.name}" ya está en la cotización. Puede modificar la cantidad directamente en la grilla.`,
+        { duration: 4000 }
+      );
+      return;
+    }
+
+    const newItem: QuoteItem = {
+      id: crypto.randomUUID(),
+      product_id: product.id,
+      batch_id: batchInfo?.batchId || null,
+      nombre_producto: product.name,
+      marca: product.brand || "",
+      lote: batchInfo?.batchNumber || "",
+      fecha_caducidad: batchInfo?.expirationDate ? new Date(batchInfo.expirationDate) : null,
+      cantidad: cantidad,
+      precio_unitario: precio,
+      importe: importe,
+      tipo_precio: selectedPriceType,
+      categoria: product.category,
+      precios_disponibles: {
+        price_type_1: product.price_type_1 || 0,
+        price_type_2: product.price_type_2 || 0,
+        price_type_3: product.price_type_3 || 0,
+        price_type_4: product.price_type_4 || 0,
+        price_type_5: product.price_type_5 || 0,
+      },
+    };
+
+    setQuoteItems([...quoteItems, newItem]);
+
+    // Reset product form
+    setSelectedProduct(null);
+    setSelectedBatch(null);
+    setProductPrecio("");
   };
 
   // Handle price type change
@@ -369,59 +451,6 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
   const handleSelectBatch = (batch: Batch) => {
     setSelectedBatch(batch);
     setBatchOpen(false);
-  };
-
-  // Add product to quote (without batch - batch will be selected at approval time)
-  const handleAddProduct = () => {
-    if (!selectedProduct) {
-      toast.error("Seleccione un producto");
-      return;
-    }
-
-    const precio = parseFloat(productPrecio) || 0;
-    const cantidad = 1; // Default quantity, editable in grid
-    const importe = precio * cantidad;
-
-    // Check if this product already exists in the quote
-    const existingProduct = quoteItems.find(
-      item => item.product_id === selectedProduct.id
-    );
-    
-    if (existingProduct) {
-      toast.warning(
-        `"${selectedProduct.name}" ya está en la cotización. Puede modificar la cantidad directamente en la grilla.`,
-        { duration: 4000 }
-      );
-      return;
-    }
-
-    const newItem: QuoteItem = {
-      id: crypto.randomUUID(),
-      product_id: selectedProduct.id,
-      batch_id: null, // Batch will be selected at approval time
-      nombre_producto: selectedProduct.name,
-      marca: selectedProduct.brand || "",
-      lote: "", // Will be filled at approval time
-      fecha_caducidad: null, // Will be filled at approval time
-      cantidad: cantidad,
-      precio_unitario: precio,
-      importe: importe,
-      tipo_precio: selectedPriceType,
-      categoria: selectedProduct.category,
-      precios_disponibles: {
-        price_type_1: selectedProduct.price_type_1 || 0,
-        price_type_2: selectedProduct.price_type_2 || 0,
-        price_type_3: selectedProduct.price_type_3 || 0,
-        price_type_4: selectedProduct.price_type_4 || 0,
-        price_type_5: selectedProduct.price_type_5 || 0,
-      },
-    };
-
-    setQuoteItems([...quoteItems, newItem]);
-
-    // Reset product form
-    setSelectedProduct(null);
-    setProductPrecio("");
   };
 
   // Remove item from quote
@@ -952,13 +981,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
               </Popover>
             </div>
 
-            {/* Add button - batch will be selected at approval */}
-            <div className="flex items-end">
-              <Button onClick={handleAddProduct} className="w-full h-10" disabled={!selectedProduct}>
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar
-              </Button>
-            </div>
+            {/* Info: product will be added after selecting batch */}
           </div>
 
           {/* Price types info when product is selected */}
@@ -990,13 +1013,6 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
             </div>
           )}
 
-          {/* Note about batch selection */}
-          {selectedProduct && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span>El lote y fecha de caducidad se seleccionarán al aprobar la cotización para verificar stock actualizado.</span>
-            </div>
-          )}
 
           {/* Products Table */}
           <div className="border rounded-lg overflow-hidden">
@@ -1173,6 +1189,22 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
           </div>
         </CardContent>
       </Card>
+      
+      {/* Batch Selector Dialog */}
+      {pendingProductForBatch && (
+        <QuoteBatchSelector
+          open={batchSelectorOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPendingProductForBatch(null);
+            }
+            setBatchSelectorOpen(open);
+          }}
+          productId={pendingProductForBatch.id}
+          productName={pendingProductForBatch.name}
+          onSelect={handleBatchSelected}
+        />
+      )}
     </div>
   );
 };
