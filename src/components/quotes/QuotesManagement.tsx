@@ -69,6 +69,7 @@ interface Product {
   current_stock: number | null;
   brand: string | null;
   category: string | null;
+  grupo_sat: string | null;
   price_type_1: number | null;
   price_type_2: number | null;
   price_type_3: number | null;
@@ -206,7 +207,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, sku, unit_price, current_stock, brand, category, price_type_1, price_type_2, price_type_3, price_type_4")
+        .select("id, name, sku, unit_price, current_stock, brand, category, grupo_sat, price_type_1, price_type_2, price_type_3, price_type_4")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -307,7 +308,9 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     return products.filter(
       (p) =>
         p.name.toLowerCase().includes(term) ||
-        p.sku.toLowerCase().includes(term)
+        p.sku.toLowerCase().includes(term) ||
+        p.brand?.toLowerCase().includes(term) ||
+        p.grupo_sat?.toLowerCase().includes(term)
     );
   }, [products, productSearch]);
 
@@ -879,10 +882,10 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
+                <PopoverContent className="w-[550px] p-0" align="start">
                   <Command shouldFilter={false}>
                     <CommandInput
-                      placeholder="Buscar por nombre o SKU..."
+                      placeholder="Buscar por nombre, SKU, marca o grupo SAT..."
                       value={productSearch}
                       onValueChange={setProductSearch}
                     />
@@ -899,25 +902,30 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                               key={product.id}
                               value={product.id}
                               onSelect={() => handleSelectProduct(product)}
-                              className="flex items-center justify-between"
+                              className="flex items-center justify-between py-2"
                             >
-                              <div className="flex-1 min-w-0">
+                              <div className="flex-1 min-w-0 space-y-0.5">
                                 <p className="text-sm font-medium truncate">{product.name}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  SKU: {product.sku} · {product.brand || "Sin marca"}
+                                  SKU: {product.sku} · <span className="font-medium">{product.brand || "Sin marca"}</span>
                                 </p>
+                                {product.grupo_sat && (
+                                  <p className="text-xs text-muted-foreground/80 truncate max-w-[350px]" title={product.grupo_sat}>
+                                    {product.grupo_sat}
+                                  </p>
+                                )}
                               </div>
-                              <div className="flex items-center gap-3 shrink-0">
+                              <div className="flex items-center gap-2 shrink-0">
                                 {/* Stock badge - prominently displayed */}
                                 <span className={cn(
-                                  "text-xs font-bold px-2 py-1 rounded-md min-w-[60px] text-center",
+                                  "text-xs font-bold px-2 py-1 rounded-md min-w-[50px] text-center",
                                   isLowStock && "bg-destructive/15 text-destructive",
                                   isWarningStock && "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300",
                                   !isLowStock && !isWarningStock && "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
                                 )}>
-                                  {stockLevel} uds
+                                  {stockLevel}
                                 </span>
-                                <span className="text-sm font-semibold text-primary">
+                                <span className="text-sm font-semibold text-primary min-w-[70px] text-right">
                                   ${(product.unit_price || 0).toFixed(2)}
                                 </span>
                                 <Check
