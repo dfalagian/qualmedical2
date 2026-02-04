@@ -117,7 +117,7 @@ export const QuotesList = () => {
 
   // Fetch quotes
   const { data: quotes = [], isLoading } = useQuery({
-    queryKey: ["quotes-list"],
+    queryKey: ["quotes"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
