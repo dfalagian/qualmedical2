@@ -23,6 +23,7 @@ import {
   Calendar,
   Save,
   CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -38,6 +39,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -86,6 +97,11 @@ export const QuotesManagement = () => {
   
   // Saved quote state
   const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null);
+  
+  // Stock warning dialog state
+  const [stockWarningOpen, setStockWarningOpen] = useState(false);
+  const [stockWarnings, setStockWarnings] = useState<string[]>([]);
+  
   // Client selection state
   const [clientOpen, setClientOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
@@ -316,7 +332,7 @@ export const QuotesManagement = () => {
   };
 
   // Handle approve quote (convert to sale)
-  const handleApproveQuote = async () => {
+  const handleApproveQuote = async (forceApprove = false) => {
     if (!savedQuoteId) {
       toast.error("Primero guarde la cotización");
       return;
@@ -329,22 +345,36 @@ export const QuotesManagement = () => {
       return;
     }
 
+    const approvalItems = quoteItems.map(item => ({
+      product_id: item.product_id!,
+      batch_id: item.batch_id!,
+      cantidad: item.cantidad,
+      nombre_producto: item.nombre_producto,
+    }));
+
     try {
       await approveQuote({
         quoteId: savedQuoteId,
-        items: quoteItems.map(item => ({
-          product_id: item.product_id!,
-          batch_id: item.batch_id!,
-          cantidad: item.cantidad,
-          nombre_producto: item.nombre_producto,
-        })),
+        items: approvalItems,
+        forceApprove,
       });
       
       // Reset form after successful approval
       resetForm();
-    } catch (error) {
-      // Error already handled by hook
+    } catch (error: any) {
+      // Check if it's a stock warning that allows force approval
+      if (error?.type === "STOCK_WARNING") {
+        setStockWarnings(error.warnings);
+        setStockWarningOpen(true);
+      }
+      // Other errors are handled by the hook
     }
+  };
+
+  // Handle forced approval after warning confirmation
+  const handleForceApprove = async () => {
+    setStockWarningOpen(false);
+    await handleApproveQuote(true);
   };
 
   // Reset form after save or approve
@@ -840,7 +870,7 @@ export const QuotesManagement = () => {
                 {isSaving ? "Guardando..." : "Guardar Borrador"}
               </Button>
               <Button
-                onClick={handleApproveQuote}
+                onClick={() => handleApproveQuote()}
                 disabled={!savedQuoteId || quoteItems.length === 0 || isApproving}
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
@@ -850,6 +880,48 @@ export const QuotesManagement = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Stock Warning Dialog */}
+      <AlertDialog open={stockWarningOpen} onOpenChange={setStockWarningOpen}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Advertencia: Stock Insuficiente
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p className="text-foreground font-medium">
+                  Los siguientes productos no tienen stock suficiente:
+                </p>
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md p-3 max-h-48 overflow-y-auto">
+                  <ul className="space-y-1 text-sm text-amber-800 dark:text-amber-200">
+                    {stockWarnings.map((warning, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-amber-500 mt-0.5">•</span>
+                        <span>{warning}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  ¿Está seguro de que desea proceder con la venta? 
+                  Esto resultará en <span className="font-semibold text-destructive">stock negativo</span> para estos productos.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleForceApprove}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              Aprobar de todos modos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
