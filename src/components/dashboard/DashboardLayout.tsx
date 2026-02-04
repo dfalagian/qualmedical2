@@ -16,7 +16,8 @@ import {
   CreditCard,
   Package,
   Pill,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ArrowLeftRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "react-router-dom";
@@ -104,6 +105,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       { name: "Pagos", href: "/dashboard/payments", icon: CreditCard },
       { name: "Inventario", href: "/dashboard/inventory", icon: Package },
       { name: "Cotizaciones", href: "/dashboard/quotes", icon: FileSpreadsheet },
+      { name: "Compras-Ventas", href: "/dashboard/purchases-sales", icon: ArrowLeftRight },
       { name: "Catálogo", href: "/dashboard/medications-citio", icon: Pill },
       { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
       { name: "Administración", href: "/dashboard/admin", icon: Settings },
