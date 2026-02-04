@@ -341,7 +341,11 @@ export const CreateSupplierOrderDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+        <DialogContent 
+          className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col"
+          onInteractOutside={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
