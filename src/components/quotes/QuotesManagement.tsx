@@ -55,7 +55,7 @@ interface Product {
   sku: string;
   unit_price: number | null;
   current_stock: number | null;
-  category: string | null;
+  brand: string | null;
 }
 
 interface Batch {
@@ -127,7 +127,7 @@ export const QuotesManagement = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, sku, unit_price, current_stock, category")
+        .select("id, name, sku, unit_price, current_stock, brand")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -229,7 +229,7 @@ export const QuotesManagement = () => {
       product_id: selectedProduct.id,
       batch_id: selectedBatch.id,
       nombre_producto: selectedProduct.name,
-      marca: selectedProduct.category || "", // Using category as brand
+      marca: selectedProduct.brand || "",
       lote: selectedBatch.batch_number,
       fecha_caducidad: new Date(selectedBatch.expiration_date),
       cantidad: cantidad,
@@ -543,7 +543,7 @@ export const QuotesManagement = () => {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{product.name}</p>
                               <p className="text-xs text-muted-foreground">
-                                SKU: {product.sku} · {product.category || "Sin marca"}
+                                SKU: {product.sku} · {product.brand || "Sin marca"}
                               </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
@@ -646,7 +646,7 @@ export const QuotesManagement = () => {
             <div className="grid grid-cols-3 gap-4 p-3 bg-muted/50 rounded-lg text-sm">
               <div>
                 <span className="text-muted-foreground">Marca: </span>
-                <span className="font-medium">{selectedProduct.category || "-"}</span>
+                <span className="font-medium">{selectedProduct.brand || "-"}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Lote: </span>
