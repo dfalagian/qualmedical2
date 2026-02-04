@@ -247,6 +247,26 @@ export const QuotesManagement = () => {
     const cantidad = 1; // Default quantity, editable in grid
     const importe = precio * cantidad;
 
+    // Check if this product already exists in the quote with a different batch
+    const existingWithDifferentBatch = quoteItems.find(
+      item => item.product_id === selectedProduct.id && item.batch_id !== selectedBatch.id
+    );
+    
+    if (existingWithDifferentBatch) {
+      toast.warning(
+        `"${selectedProduct.name}" ya tiene otro lote (${existingWithDifferentBatch.lote}) en la cotización. Se está agregando con el lote ${selectedBatch.batch_number}.`,
+        { duration: 5000 }
+      );
+    }
+
+    // Warn if batch stock is low
+    if (selectedBatch.current_quantity < cantidad) {
+      toast.warning(
+        `El lote ${selectedBatch.batch_number} tiene solo ${selectedBatch.current_quantity} unidades disponibles.`,
+        { duration: 4000 }
+      );
+    }
+
     const newItem: QuoteItem = {
       id: crypto.randomUUID(),
       product_id: selectedProduct.id,
@@ -294,6 +314,46 @@ export const QuotesManagement = () => {
   }, [quoteItems]);
 
   const total = subtotal; // Por ahora igual al subtotal, se puede agregar IVA después
+
+  // Detect products with multiple batches in the quote
+  const productsWithMultipleBatches = useMemo(() => {
+    const productBatchMap = new Map<string, Set<string>>();
+    
+    quoteItems.forEach(item => {
+      if (item.product_id && item.batch_id) {
+        if (!productBatchMap.has(item.product_id)) {
+          productBatchMap.set(item.product_id, new Set());
+        }
+        productBatchMap.get(item.product_id)!.add(item.batch_id);
+      }
+    });
+
+    // Return product IDs that have more than one batch
+    const multiLoteProducts: string[] = [];
+    productBatchMap.forEach((batches, productId) => {
+      if (batches.size > 1) {
+        multiLoteProducts.push(productId);
+      }
+    });
+    return multiLoteProducts;
+  }, [quoteItems]);
+
+  // Get summary of multi-batch products for display
+  const multiBatchSummary = useMemo(() => {
+    if (productsWithMultipleBatches.length === 0) return [];
+    
+    return productsWithMultipleBatches.map(productId => {
+      const items = quoteItems.filter(item => item.product_id === productId);
+      const totalQuantity = items.reduce((sum, item) => sum + item.cantidad, 0);
+      const batches = items.map(item => item.lote).join(", ");
+      return {
+        productName: items[0].nombre_producto,
+        totalQuantity,
+        batchCount: items.length,
+        batches
+      };
+    });
+  }, [quoteItems, productsWithMultipleBatches]);
 
   // Date picker popover states
   const [fechaCotizacionOpen, setFechaCotizacionOpen] = useState(false);
@@ -804,47 +864,81 @@ export const QuotesManagement = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    quoteItems.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.nombre_producto}</TableCell>
-                        <TableCell>{item.marca || "-"}</TableCell>
-                        <TableCell>{item.lote || "-"}</TableCell>
-                        <TableCell>
-                          {item.fecha_caducidad 
-                            ? format(item.fecha_caducidad, "dd/MM/yyyy") 
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Input
-                            type="number"
-                            min={1}
-                            value={item.cantidad}
-                            onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
-                            className="w-20 h-8 text-right"
-                          />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          ${item.precio_unitario.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          ${item.importe.toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveItem(item.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    quoteItems.map((item) => {
+                      const isMultiBatch = item.product_id && productsWithMultipleBatches.includes(item.product_id);
+                      return (
+                        <TableRow key={item.id} className={isMultiBatch ? "bg-amber-50/50 dark:bg-amber-950/20" : ""}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {item.nombre_producto}
+                              {isMultiBatch && (
+                                <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  Multi-lote
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>{item.marca || "-"}</TableCell>
+                          <TableCell>{item.lote || "-"}</TableCell>
+                          <TableCell>
+                            {item.fecha_caducidad 
+                              ? format(item.fecha_caducidad, "dd/MM/yyyy") 
+                              : "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              min={1}
+                              value={item.cantidad}
+                              onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
+                              className="w-20 h-8 text-right"
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ${item.precio_unitario.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            ${item.importe.toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveItem(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
             </div>
           </div>
+
+          {/* Multi-batch warning banner */}
+          {multiBatchSummary.length > 0 && (
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Atención: Productos con múltiples lotes
+                  </p>
+                  <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-0.5">
+                    {multiBatchSummary.map((item, idx) => (
+                      <li key={idx}>
+                        <span className="font-medium">{item.productName}</span>: {item.totalQuantity} unidades en {item.batchCount} lotes ({item.batches})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Totals */}
           <div className="flex justify-between items-end pt-4">
