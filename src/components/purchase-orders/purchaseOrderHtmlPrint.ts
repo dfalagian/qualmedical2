@@ -116,9 +116,11 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
           margin-bottom: 12px;
         }
         .section-header {
-          background-color: #008069;
-          color: white;
-          padding: 5px 10px;
+          background-color: #008069 !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color: white !important;
+          padding: 6px 10px;
           font-weight: bold;
           font-size: 11px;
           margin-bottom: 8px;
@@ -149,8 +151,10 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
           font-size: 9px;
         }
         th {
-          background-color: #008069;
-          color: white;
+          background-color: #008069 !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color: white !important;
           padding: 8px 5px;
           text-align: center;
           font-weight: bold;
