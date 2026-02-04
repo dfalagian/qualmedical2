@@ -13,6 +13,7 @@ interface QuoteItem {
   cantidad: number;
   precio_unitario: number;
   importe: number;
+  tipo_precio: string; // "1", "2", "3", "4", or "manual"
 }
 
 interface SaveQuoteParams {
@@ -90,6 +91,7 @@ export const useQuoteActions = () => {
         cantidad: item.cantidad,
         precio_unitario: item.precio_unitario,
         importe: item.importe,
+        tipo_precio: item.tipo_precio || "1",
       }));
 
       const { error: itemsError } = await supabase

@@ -1243,6 +1243,7 @@ export type Database = {
           precio_unitario: number
           product_id: string | null
           quote_id: string
+          tipo_precio: string | null
         }
         Insert: {
           batch_id?: string | null
@@ -1257,6 +1258,7 @@ export type Database = {
           precio_unitario?: number
           product_id?: string | null
           quote_id: string
+          tipo_precio?: string | null
         }
         Update: {
           batch_id?: string | null
@@ -1271,6 +1273,7 @@ export type Database = {
           precio_unitario?: number
           product_id?: string | null
           quote_id?: string
+          tipo_precio?: string | null
         }
         Relationships: [
           {
