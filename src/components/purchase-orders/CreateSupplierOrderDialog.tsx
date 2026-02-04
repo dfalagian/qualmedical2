@@ -13,6 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -20,11 +22,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Package, FileText } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Package, Trash2, FileText } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
 import { PurchaseOrderPDFViewer } from "./PurchaseOrderPDFViewer";
-import { SelectedProductsTable } from "./SelectedProductsTable";
-import { PurchaseOrderTotalsCard } from "./PurchaseOrderTotalsCard";
 
 interface SelectedProduct {
   id: string;
@@ -129,40 +137,38 @@ export const CreateSupplierOrderDialog = ({
     unitPrice: number,
     hasIva: boolean
   ) => {
+    // Check if product already exists
+    const exists = selectedProducts.find((p) => p.id === product.id);
+    if (exists) {
+      toast.error("Este producto ya está en la lista");
+      return;
+    }
+
     const ivaAmount = hasIva ? unitPrice * quantity * IVA_RATE : 0;
     const total = unitPrice * quantity + ivaAmount;
 
-    setSelectedProducts((prev) => {
-      // Check if product already exists
-      const exists = prev.find((p) => p.id === product.id);
-      if (exists) {
-        toast.error("Este producto ya está en la lista");
-        return prev;
-      }
-
-      return [
-        ...prev,
-        {
-          id: product.id,
-          name: product.name,
-          sku: product.sku,
-          quantity,
-          unitPrice,
-          hasIva,
-          ivaAmount,
-          total,
-        },
-      ];
-    });
+    setSelectedProducts([
+      ...selectedProducts,
+      {
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+        quantity,
+        unitPrice,
+        hasIva,
+        ivaAmount,
+        total,
+      },
+    ]);
   };
 
   const removeProduct = (productId: string) => {
-    setSelectedProducts((prev) => prev.filter((p) => p.id !== productId));
+    setSelectedProducts(selectedProducts.filter((p) => p.id !== productId));
   };
 
   const updateProductQuantity = (productId: string, quantity: number) => {
-    setSelectedProducts((prev) =>
-      prev.map((p) => {
+    setSelectedProducts(
+      selectedProducts.map((p) => {
         if (p.id === productId) {
           const ivaAmount = p.hasIva ? p.unitPrice * quantity * IVA_RATE : 0;
           const total = p.unitPrice * quantity + ivaAmount;
@@ -273,13 +279,7 @@ export const CreateSupplierOrderDialog = ({
   return (
     <>
       <Dialog open={open && !showPdfViewer} onOpenChange={onOpenChange}>
-        <DialogContent
-          className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col"
-          // Evita que el diálogo se cierre al interactuar con overlays anidados (como el Popover del combobox)
-          // lo cual provocaba un remount y, por ende, el reseteo visual de la grilla.
-          onInteractOutside={(e) => e.preventDefault()}
-          onPointerDownOutside={(e) => e.preventDefault()}
-        >
+        <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
@@ -290,7 +290,7 @@ export const CreateSupplierOrderDialog = ({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 pr-1">
+          <div className="flex-1 overflow-hidden flex flex-col gap-4">
             {/* Top row - Supplier and Order Info */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
@@ -328,18 +328,107 @@ export const CreateSupplierOrderDialog = ({
               </div>
             </div>
 
-            {/* Layout vertical: selector arriba, grilla abajo */}
-            <ProductCombobox products={products || []} onAddProduct={handleAddProduct} />
-
-            <SelectedProductsTable
-              products={selectedProducts}
-              onRemove={removeProduct}
-              onQuantityChange={updateProductQuantity}
-              maxHeight={280}
+            {/* Product Combobox */}
+            <ProductCombobox
+              products={products || []}
+              onAddProduct={handleAddProduct}
             />
 
+            {/* Products Table */}
+            <div className="flex-1 border rounded-lg overflow-hidden bg-background min-h-0">
+              <ScrollArea className="h-[280px]">
+                {selectedProducts.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[40%]">Producto</TableHead>
+                        <TableHead className="w-[10%] text-center">Cant.</TableHead>
+                        <TableHead className="w-[15%] text-right">P. Unit.</TableHead>
+                        <TableHead className="w-[10%] text-center">IVA</TableHead>
+                        <TableHead className="w-[15%] text-right">Importe</TableHead>
+                        <TableHead className="w-[10%]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedProducts.map((product) => (
+                        <TableRow key={product.id}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-sm">{product.name}</p>
+                              <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Input
+                              type="number"
+                              min={1}
+                              value={product.quantity}
+                              onChange={(e) =>
+                                updateProductQuantity(
+                                  product.id,
+                                  Math.max(1, parseInt(e.target.value) || 1)
+                                )
+                              }
+                              className="w-16 h-8 text-center mx-auto"
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ${product.unitPrice.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {product.hasIva ? (
+                              <span className="text-xs text-primary font-medium">
+                                ${product.ivaAmount.toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">0%</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            ${product.total.toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => removeProduct(product.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                    <Package className="h-12 w-12 mb-3 opacity-30" />
+                    <p className="text-sm">No hay productos agregados</p>
+                    <p className="text-xs">Usa el buscador para agregar productos</p>
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
+
+            {/* Totals */}
             {selectedProducts.length > 0 && (
-              <PurchaseOrderTotalsCard subtotal={subtotal} totalIva={totalIva} total={total} />
+              <div className="flex justify-end">
+                <div className="w-64 bg-muted/50 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal:</span>
+                    <span>${subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>IVA (16%):</span>
+                    <span>${totalIva.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                    <span>Total:</span>
+                    <span className="text-primary">${total.toFixed(2)} MXN</span>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 

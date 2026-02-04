@@ -93,7 +93,7 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent portalled={false} className="w-[400px] p-0" align="start">
+          <PopoverContent className="w-[400px] p-0" align="start">
             <Command shouldFilter={false}>
               <CommandInput 
                 placeholder="Buscar por nombre o SKU..." 
@@ -172,7 +172,7 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
                 id="has-iva"
                 checked={hasIva}
                 onChange={(e) => setHasIva(e.target.checked)}
-                className="h-4 w-4 rounded border border-input bg-background accent-primary"
+                className="h-4 w-4 rounded border-gray-300"
               />
               <Label htmlFor="has-iva" className="text-xs cursor-pointer">
                 +IVA (16%)
