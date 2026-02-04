@@ -160,19 +160,39 @@ export const BatchSelectionDialog = ({
   // Check if all items have valid selections
   const allSelected = selections.every(sel => sel.batchId !== null);
   
-  // Check for stock warnings
-  const stockWarnings = selections.filter(sel => 
+  // Check for items with insufficient stock (including zero stock)
+  const itemsWithInsufficientStock = selections.filter(sel => 
     sel.batchId && sel.availableQuantity < sel.requestedQuantity
   );
 
-  // Check for items without available batches
+  // Check for items without available batches (no stock at all)
   const itemsWithoutBatches = quoteItems.filter(item => {
     const productBatches = batchesByProduct[item.product_id!] || [];
     return productBatches.length === 0;
   });
 
+  // Combine all products without sufficient stock for the error message
+  const allProductsWithoutStock = [
+    ...itemsWithoutBatches.map(item => ({
+      name: item.nombre_producto,
+      requested: item.cantidad,
+      available: 0,
+    })),
+    ...itemsWithInsufficientStock.map(sel => {
+      const item = quoteItems.find(i => i.id === sel.itemId);
+      return {
+        name: item?.nombre_producto || "Producto desconocido",
+        requested: sel.requestedQuantity,
+        available: sel.availableQuantity,
+      };
+    }),
+  ];
+
+  // Cannot approve if there's any stock issue
+  const canApprove = allSelected && allProductsWithoutStock.length === 0;
+
   const handleConfirm = () => {
-    if (!allSelected) {
+    if (!canApprove) {
       return;
     }
     onConfirm(selections);
@@ -197,37 +217,29 @@ export const BatchSelectionDialog = ({
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Warning if items have no available batches */}
-            {itemsWithoutBatches.length > 0 && (
-              <div className="p-3 bg-destructive/10 rounded-lg flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            {/* Error: Products without sufficient stock - BLOCKS approval */}
+            {allProductsWithoutStock.length > 0 && (
+              <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-3">
+                <AlertCircle className="h-6 w-6 text-destructive shrink-0 mt-0.5" />
                 <div className="text-sm text-destructive">
-                  <p className="font-medium">Los siguientes productos no tienen lotes disponibles:</p>
-                  <ul className="list-disc pl-5 mt-1">
-                    {itemsWithoutBatches.map(item => (
-                      <li key={item.id}>{item.nombre_producto}</li>
+                  <p className="font-semibold text-base mb-2">
+                    No se puede aprobar la venta - Stock insuficiente
+                  </p>
+                  <p className="mb-2">Los siguientes medicamentos no tienen stock disponible suficiente:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {allProductsWithoutStock.map((product, index) => (
+                      <li key={index} className="font-medium">
+                        {product.name}: 
+                        <span className="ml-1">
+                          Disponible <strong>{product.available}</strong>, 
+                          Solicitado <strong>{product.requested}</strong>
+                        </span>
+                      </li>
                     ))}
                   </ul>
-                </div>
-              </div>
-            )}
-
-            {/* Stock warnings */}
-            {stockWarnings.length > 0 && (
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg flex items-start gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                <div className="text-sm text-amber-700 dark:text-amber-300">
-                  <p className="font-medium">Advertencia de stock insuficiente:</p>
-                  <ul className="list-disc pl-5 mt-1">
-                    {stockWarnings.map(sel => {
-                      const item = quoteItems.find(i => i.id === sel.itemId);
-                      return (
-                        <li key={sel.itemId}>
-                          {item?.nombre_producto}: Disponible {sel.availableQuantity}, Solicitado {sel.requestedQuantity}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <p className="mt-3 text-destructive/80 italic">
+                    Por favor, ajuste las cantidades en la cotización o ingrese stock antes de aprobar.
+                  </p>
                 </div>
               </div>
             )}
@@ -329,14 +341,10 @@ export const BatchSelectionDialog = ({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={!allSelected || itemsWithoutBatches.length > 0 || isApproving}
-            className={cn(
-              stockWarnings.length > 0 
-                ? "bg-amber-600 hover:bg-amber-700" 
-                : "bg-emerald-600 hover:bg-emerald-700"
-            )}
+            disabled={!canApprove || isApproving}
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-muted"
           >
-            {isApproving ? "Aprobando..." : stockWarnings.length > 0 ? "Aprobar con Advertencia" : "Confirmar y Aprobar"}
+            {isApproving ? "Aprobando..." : "Confirmar y Aprobar"}
           </Button>
         </DialogFooter>
       </DialogContent>
