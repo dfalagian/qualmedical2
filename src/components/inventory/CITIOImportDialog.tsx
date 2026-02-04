@@ -33,6 +33,10 @@ interface CITIOMedication {
   price_type_2?: number;
   price_type_3?: number;
   price_type_4?: number;
+  price_type_5?: number;
+  price_with_tax?: number;
+  price_without_tax?: number;
+  tax_rate?: number;
   current_stock?: number;
   codigo_sat?: string;
   clave_unidad?: string;
@@ -192,6 +196,12 @@ export function CITIOImportDialog({
               price_type_2: med.price_type_2 || null,
               price_type_3: med.price_type_3 || null,
               price_type_4: med.price_type_4 || null,
+              price_type_5: med.price_type_5 || null,
+              price_with_tax: med.price_with_tax || null,
+              price_without_tax: med.price_without_tax || null,
+              tax_rate: med.tax_rate || null,
+              codigo_sat: med.codigo_sat || null,
+              clave_unidad: med.clave_unidad || null,
               current_stock: 0,
               minimum_stock: 0,
               is_active: true,
