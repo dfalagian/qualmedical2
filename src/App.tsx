@@ -26,6 +26,7 @@ import Payments from "./pages/Payments";
 import Inventory from "./pages/Inventory";
 import MedicationsCatalogCITIO from "./pages/MedicationsCatalogCITIO";
 import Quotes from "./pages/Quotes";
+import PurchasesSales from "./pages/PurchasesSales";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -189,6 +190,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Quotes />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/purchases-sales"
+              element={
+                <ProtectedRoute>
+                  <PurchasesSales />
                 </ProtectedRoute>
               }
             />
