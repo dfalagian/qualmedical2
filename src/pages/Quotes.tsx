@@ -5,11 +5,12 @@ import { Navigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClientsManagement } from "@/components/quotes/ClientsManagement";
 import { QuotesManagement } from "@/components/quotes/QuotesManagement";
-import { Users, FileText } from "lucide-react";
+import { QuotesList } from "@/components/quotes/QuotesList";
+import { Users, FileText, List, PlusCircle } from "lucide-react";
 
 const Quotes = () => {
   const { isAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState("quotes");
+  const [activeTab, setActiveTab] = useState("list");
 
   if (!isAdmin) {
     return <Navigate to="/dashboard" replace />;
@@ -28,10 +29,14 @@ const Quotes = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="quotes" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Cotizaciones</span>
+          <TabsList className="grid w-full grid-cols-3 max-w-lg">
+            <TabsTrigger value="list" className="flex items-center gap-2">
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">Listado</span>
+            </TabsTrigger>
+            <TabsTrigger value="new" className="flex items-center gap-2">
+              <PlusCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Nueva</span>
             </TabsTrigger>
             <TabsTrigger value="clients" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
@@ -39,7 +44,11 @@ const Quotes = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="quotes" className="mt-4">
+          <TabsContent value="list" className="mt-4">
+            <QuotesList />
+          </TabsContent>
+
+          <TabsContent value="new" className="mt-4">
             <QuotesManagement />
           </TabsContent>
 
