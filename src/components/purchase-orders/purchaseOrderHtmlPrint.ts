@@ -33,20 +33,22 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
   }
 
   const fecha = orderData.createdAt.toLocaleDateString("es-MX");
+  // Logo desde public folder
+  const logoUrl = `${window.location.origin}/images/qualmedical-logo-oc.jpg`;
 
   const itemsHtml = orderData.items
     .map(
       (item, index) => `
       <tr>
-        <td style="text-align: center;">${index + 1}</td>
-        <td>${item.sku}</td>
-        <td>${item.name}</td>
-        <td style="text-align: center;">-</td>
-        <td style="text-align: center;">${item.quantity}</td>
-        <td style="text-align: center;">PZA</td>
-        <td style="text-align: right;">$${item.unitPrice.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</td>
-        <td style="text-align: right;">${item.hasIva ? `$${item.ivaAmount.toLocaleString("es-MX", { minimumFractionDigits: 2 })}` : "$0.00"}</td>
-        <td style="text-align: right;">$${item.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</td>
+        <td style="text-align: center; border: 1px solid #ccc; padding: 6px;">${index + 1}</td>
+        <td style="border: 1px solid #ccc; padding: 6px;">${item.sku}</td>
+        <td style="border: 1px solid #ccc; padding: 6px;">${item.name}</td>
+        <td style="text-align: center; border: 1px solid #ccc; padding: 6px;">-</td>
+        <td style="text-align: center; border: 1px solid #ccc; padding: 6px;">${item.quantity}</td>
+        <td style="text-align: center; border: 1px solid #ccc; padding: 6px;">PZAS</td>
+        <td style="text-align: right; border: 1px solid #ccc; padding: 6px;">$${item.unitPrice.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</td>
+        <td style="text-align: right; border: 1px solid #ccc; padding: 6px;">${item.hasIva ? `$${item.ivaAmount.toLocaleString("es-MX", { minimumFractionDigits: 2 })}` : "$0.00"}</td>
+        <td style="text-align: right; border: 1px solid #ccc; padding: 6px;">$${item.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</td>
       </tr>
     `
     )
@@ -65,128 +67,151 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
           box-sizing: border-box;
         }
         body {
-          font-family: Helvetica, Arial, sans-serif;
-          font-size: 9px;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 10px;
           color: #000;
-          padding: 10px 14px;
-          line-height: 1.3;
+          padding: 20px;
+          line-height: 1.4;
         }
         .header {
-          background-color: #008069;
-          color: white;
-          padding: 12px 14px;
-          margin: -10px -14px 15px -14px;
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
+          margin-bottom: 15px;
+          border-bottom: 3px solid #008069;
+          padding-bottom: 10px;
         }
-        .header-left h1 {
-          font-size: 11px;
-          font-weight: bold;
-          margin-bottom: 4px;
+        .header-left {
+          display: flex;
+          align-items: center;
+          gap: 15px;
         }
-        .header-left h2 {
-          font-size: 16px;
+        .logo {
+          width: 80px;
+          height: auto;
+        }
+        .header-title {
+          color: #008069;
+        }
+        .header-title h1 {
+          font-size: 12px;
           font-weight: bold;
           margin-bottom: 2px;
+          color: #333;
         }
-        .header-left p {
-          font-size: 9px;
+        .header-title h2 {
+          font-size: 20px;
+          font-weight: bold;
+          color: #008069;
         }
         .header-right {
           text-align: right;
-          font-size: 10px;
+          font-size: 11px;
         }
         .header-right .order-num {
           font-weight: bold;
+          font-size: 12px;
+        }
+        .section {
+          margin-bottom: 12px;
         }
         .section-header {
           background-color: #008069;
           color: white;
-          padding: 4px 8px;
+          padding: 5px 10px;
           font-weight: bold;
+          font-size: 11px;
+          margin-bottom: 8px;
+        }
+        .info-grid {
+          display: grid;
+          grid-template-columns: 140px 1fr;
+          gap: 3px 10px;
           font-size: 10px;
-          margin: 10px 0 6px 0;
+          padding-left: 5px;
         }
-        .info-row {
-          display: flex;
-          gap: 4px;
-          margin-bottom: 3px;
-          font-size: 9px;
-        }
-        .info-row strong {
-          min-width: 100px;
+        .info-label {
+          font-weight: bold;
         }
         .dates-row {
           display: flex;
-          gap: 30px;
+          gap: 40px;
+          margin-top: 5px;
+        }
+        .dates-row .info-grid {
+          display: flex;
+          gap: 5px;
         }
         table {
           width: 100%;
           border-collapse: collapse;
-          margin-top: 6px;
-          font-size: 7px;
+          margin-top: 8px;
+          font-size: 9px;
         }
         th {
           background-color: #008069;
           color: white;
-          padding: 4px 3px;
+          padding: 8px 5px;
           text-align: center;
           font-weight: bold;
           border: 1px solid #006050;
         }
-        td {
-          border: 1px solid #ddd;
-          padding: 3px;
-          vertical-align: top;
-        }
         .totals-section {
           display: flex;
           justify-content: flex-end;
-          margin-top: 10px;
+          margin-top: 15px;
         }
         .totals-box {
-          width: 200px;
-          font-size: 9px;
+          width: 220px;
+          font-size: 10px;
+          border: 1px solid #ccc;
         }
         .totals-row {
           display: flex;
           justify-content: space-between;
-          padding: 2px 0;
+          padding: 5px 10px;
+          border-bottom: 1px solid #ccc;
+        }
+        .totals-row:last-child {
+          border-bottom: none;
         }
         .totals-row.total {
           font-weight: bold;
-          font-size: 10px;
-          border-top: 1px solid #333;
-          padding-top: 4px;
-          margin-top: 4px;
+          font-size: 11px;
+          background-color: #f5f5f5;
         }
         .signatures {
           display: flex;
-          justify-content: space-between;
-          margin-top: 40px;
-          padding: 0 20px;
+          justify-content: space-around;
+          margin-top: 50px;
+          padding: 0 40px;
         }
         .signature-block {
           text-align: center;
-          width: 200px;
+          width: 220px;
+        }
+        .signature-name {
+          font-weight: bold;
+          font-size: 10px;
+          margin-bottom: 25px;
         }
         .signature-line {
           border-top: 1px solid #333;
-          margin-bottom: 4px;
+          margin-bottom: 5px;
         }
         .signature-label {
           font-weight: bold;
-          font-size: 9px;
+          font-size: 10px;
+          margin-bottom: 3px;
         }
         .signature-sub {
-          font-size: 8px;
+          font-size: 9px;
           color: #666;
         }
         @media print {
           body {
             margin: 0;
-            padding: 10px 14px;
+            padding: 15px;
           }
           .no-print {
             display: none;
@@ -197,9 +222,11 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
     <body>
       <div class="header">
         <div class="header-left">
-          <h1>ORDEN DE COMPRA</h1>
-          <h2>Qual Medical</h2>
-          <p>FARMA</p>
+          <img src="${logoUrl}" alt="Qual Medical" class="logo" />
+          <div class="header-title">
+            <h1>ORDEN DE COMPRA</h1>
+            <h2>Qual Medical</h2>
+          </div>
         </div>
         <div class="header-right">
           <div class="order-num">No. de Orden: ${orderData.orderNumber}</div>
@@ -207,39 +234,65 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
         </div>
       </div>
 
-      <div class="section-header">FACTURAR A:</div>
-      <div class="info-row"><strong>RAZON SOCIAL:</strong> QUAL MEDICAL FARMA S.A. DE C.V.</div>
-      <div class="info-row"><strong>RFC:</strong> QME240321HF3</div>
-      <div class="info-row"><strong>REGIMEN FISCAL:</strong> LEY DE PERSONAS MORALES</div>
-      <div class="info-row"><strong>USO CFDI:</strong> ADQUISICION DE MERCANCIAS</div>
-
-      <div class="section-header">PROVEEDOR</div>
-      <div class="info-row"><strong>EMPRESA:</strong> ${orderData.supplierName.toUpperCase()}</div>
-      ${orderData.supplierRfc ? `<div class="info-row"><strong>RFC:</strong> ${orderData.supplierRfc}</div>` : ""}
-      <div class="dates-row">
-        <div class="info-row"><strong>FECHA REQUERIDA:</strong> ${fecha}</div>
-        <div class="info-row"><strong>FECHA ENTREGA:</strong> ${fecha}</div>
+      <div class="section">
+        <div class="section-header">FACTURAR A:</div>
+        <div class="info-grid">
+          <span class="info-label">RAZON SOCIAL:</span>
+          <span>QUAL MEDICAL</span>
+          <span class="info-label">RFC:</span>
+          <span>QME240321HF3</span>
+          <span class="info-label">REGIMEN FISCAL:</span>
+          <span>LEY DE PERSONAS MORALES</span>
+          <span class="info-label">USO CFDI:</span>
+          <span>ADQUISICION DE MERCANCIAS</span>
+          <span class="info-label">DIRECCION:</span>
+          <span>AV. PERIFERICO SUR 4225 INT. 4, JARDINES EN LA MONTAÑA, TLALPAN, CIUDAD DE MEXICO, C.P. 14210</span>
+        </div>
       </div>
 
-      <div class="section-header">REQUISICIÓN</div>
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 5%;">No.</th>
-            <th style="width: 12%;">CAT</th>
-            <th style="width: 30%;">DESCRIPCIÓN DEL PRODUCTO</th>
-            <th style="width: 8%;">MARCA</th>
-            <th style="width: 8%;">CANT</th>
-            <th style="width: 8%;">UNIDAD</th>
-            <th style="width: 12%;">PRECIO UNITARIO</th>
-            <th style="width: 8%;">IVA</th>
-            <th style="width: 12%;">IMPORTE</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemsHtml}
-        </tbody>
-      </table>
+      <div class="section">
+        <div class="section-header">PROVEEDOR</div>
+        <div class="info-grid">
+          <span class="info-label">EMPRESA:</span>
+          <span>${orderData.supplierName.toUpperCase()}</span>
+          ${orderData.supplierRfc ? `
+          <span class="info-label">RFC:</span>
+          <span>${orderData.supplierRfc}</span>
+          ` : ""}
+        </div>
+        <div class="dates-row" style="margin-top: 8px; padding-left: 5px;">
+          <div class="info-grid">
+            <span class="info-label">FECHA REQUERIDA:</span>
+            <span>${fecha}</span>
+          </div>
+          <div class="info-grid">
+            <span class="info-label">FECHA ENTREGA:</span>
+            <span>${fecha}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">REQUISICIÓN</div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 4%;">No.</th>
+              <th style="width: 8%;">CAT</th>
+              <th style="width: 32%;">DESCRIPCIÓN DEL PRODUCTO</th>
+              <th style="width: 10%;">MARCA</th>
+              <th style="width: 6%;">CANT</th>
+              <th style="width: 8%;">UNIDAD</th>
+              <th style="width: 12%;">PRECIO UNITARIO</th>
+              <th style="width: 10%;">IVA</th>
+              <th style="width: 10%;">IMPORTE</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+      </div>
 
       <div class="totals-section">
         <div class="totals-box">
@@ -260,11 +313,13 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
 
       <div class="signatures">
         <div class="signature-block">
+          <div class="signature-name">ENF. ISMAEL REYES PEREZ</div>
           <div class="signature-line"></div>
           <div class="signature-label">SOLICITÓ</div>
           <div class="signature-sub">NOMBRE Y FIRMA</div>
         </div>
         <div class="signature-block">
+          <div class="signature-name">LIC. L. FERNANDO SORROZA LOPEZ</div>
           <div class="signature-line"></div>
           <div class="signature-label">AUTORIZÓ</div>
           <div class="signature-sub">NOMBRE Y FIRMA</div>
