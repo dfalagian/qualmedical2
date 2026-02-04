@@ -68,6 +68,7 @@ interface Product {
   unit_price: number | null;
   current_stock: number | null;
   brand: string | null;
+  category: string | null;
   price_type_1: number | null;
   price_type_2: number | null;
   price_type_3: number | null;
@@ -103,6 +104,7 @@ interface QuoteItem {
   precio_unitario: number;
   importe: number;
   tipo_precio: PriceType;
+  categoria: string | null;
   // Store all prices for easy switching in grid
   precios_disponibles: {
     price_type_1: number;
@@ -204,7 +206,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, sku, unit_price, current_stock, brand, price_type_1, price_type_2, price_type_3, price_type_4")
+        .select("id, name, sku, unit_price, current_stock, brand, category, price_type_1, price_type_2, price_type_3, price_type_4")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -260,6 +262,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
           precio_unitario: item.precio_unitario,
           importe: item.importe,
           tipo_precio: (item.tipo_precio as PriceType) || "1",
+          categoria: product?.category || null,
           precios_disponibles: {
             price_type_1: product?.price_type_1 || 0,
             price_type_2: product?.price_type_2 || 0,
@@ -396,6 +399,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
       precio_unitario: precio,
       importe: importe,
       tipo_precio: selectedPriceType,
+      categoria: selectedProduct.category,
       precios_disponibles: {
         price_type_1: selectedProduct.price_type_1 || 0,
         price_type_2: selectedProduct.price_type_2 || 0,

@@ -9,6 +9,7 @@ interface QuoteItem {
   cantidad: number;
   precio_unitario: number;
   importe: number;
+  categoria: string | null;
 }
 
 interface Client {
@@ -47,12 +48,29 @@ export const printQuoteHtml = (data: QuotePrintData) => {
     return `$${amount.toFixed(2)}`;
   };
 
-  // Calculate IVA (16% for items that apply)
-  const iva = data.subtotal * 0.16; // Simplified - you may need to adjust per item
+  // Categories exempt from IVA (medications in Mexico)
+  const EXEMPT_CATEGORIES = ["medicamentos", "inmunoterapia", "oncologicos"];
+  
+  // Check if an item is exempt from IVA
+  const isExemptFromIva = (categoria: string | null): boolean => {
+    if (!categoria) return false;
+    return EXEMPT_CATEGORIES.includes(categoria.toLowerCase());
+  };
+
+  // Calculate IVA only for non-exempt items (16% for items that apply)
+  const itemsWithIva = data.items.map(item => ({
+    ...item,
+    exempt: isExemptFromIva(item.categoria),
+    ivaAmount: isExemptFromIva(item.categoria) ? 0 : item.importe * 0.16,
+  }));
+
+  const subtotalExento = itemsWithIva.filter(i => i.exempt).reduce((sum, i) => sum + i.importe, 0);
+  const subtotalGravado = itemsWithIva.filter(i => !i.exempt).reduce((sum, i) => sum + i.importe, 0);
+  const iva = subtotalGravado * 0.16;
   const totalConIva = data.subtotal + iva;
 
   // Group items by category (simplified - using just one category for now)
-  const itemsHtml = data.items.map(item => `
+  const itemsHtml = itemsWithIva.map(item => `
     <tr>
       <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: left;">${item.nombre_producto}</td>
       <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.marca || "-"}</td>
@@ -60,8 +78,8 @@ export const printQuoteHtml = (data: QuotePrintData) => {
       <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.fecha_caducidad ? format(item.fecha_caducidad, "MMM-yy", { locale: es }) : "-"}</td>
       <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.cantidad}</td>
       <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.precio_unitario)}</td>
-      <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.precio_unitario * 0.16)}</td>
-      <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;">${formatCurrency(item.importe)}</td>
+      <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.exempt ? "Exento" : formatCurrency(item.ivaAmount)}</td>
+      <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;">${formatCurrency(item.importe + item.ivaAmount)}</td>
     </tr>
   `).join("");
 
