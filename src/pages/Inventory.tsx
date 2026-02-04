@@ -201,6 +201,11 @@ export default function Inventory() {
     minimum_stock: 0,
     current_stock: 0,
     unit_price: 0,
+    price_type_1: 0,
+    price_type_2: 0,
+    price_type_3: 0,
+    price_type_4: 0,
+    price_type_5: 0,
     rfid_required: false
   });
 
@@ -334,6 +339,11 @@ export default function Inventory() {
             minimum_stock: product.minimum_stock,
             current_stock: product.current_stock,
             unit_price: product.unit_price || null,
+            price_type_1: product.price_type_1 || null,
+            price_type_2: product.price_type_2 || null,
+            price_type_3: product.price_type_3 || null,
+            price_type_4: product.price_type_4 || null,
+            price_type_5: product.price_type_5 || null,
             rfid_required: product.rfid_required
           })
           .eq("id", product.id);
@@ -350,6 +360,11 @@ export default function Inventory() {
             minimum_stock: product.minimum_stock,
             current_stock: product.current_stock,
             unit_price: product.unit_price || null,
+            price_type_1: product.price_type_1 || null,
+            price_type_2: product.price_type_2 || null,
+            price_type_3: product.price_type_3 || null,
+            price_type_4: product.price_type_4 || null,
+            price_type_5: product.price_type_5 || null,
             rfid_required: product.rfid_required
           });
         if (error) throw error;
@@ -928,6 +943,11 @@ export default function Inventory() {
       minimum_stock: 0,
       current_stock: 0,
       unit_price: 0,
+      price_type_1: 0,
+      price_type_2: 0,
+      price_type_3: 0,
+      price_type_4: 0,
+      price_type_5: 0,
       rfid_required: false
     });
   };
@@ -945,18 +965,33 @@ export default function Inventory() {
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
-    setProductForm({
-      sku: product.sku,
-      name: product.name,
-      description: product.description || "",
-      category: product.category || "",
-      unit: product.unit,
-      minimum_stock: product.minimum_stock,
-      current_stock: product.current_stock,
-      unit_price: product.unit_price || 0,
-      rfid_required: product.rfid_required || false
-    });
-    setProductDialogOpen(true);
+    // Need to fetch full product data with price types
+    supabase
+      .from("products")
+      .select("*")
+      .eq("id", product.id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setProductForm({
+            sku: data.sku,
+            name: data.name,
+            description: data.description || "",
+            category: data.category || "",
+            unit: data.unit || "pieza",
+            minimum_stock: data.minimum_stock || 0,
+            current_stock: data.current_stock || 0,
+            unit_price: data.unit_price || 0,
+            price_type_1: data.price_type_1 || 0,
+            price_type_2: data.price_type_2 || 0,
+            price_type_3: data.price_type_3 || 0,
+            price_type_4: data.price_type_4 || 0,
+            price_type_5: data.price_type_5 || 0,
+            rfid_required: data.rfid_required || false
+          });
+          setProductDialogOpen(true);
+        }
+      });
   };
 
   const handleEditTag = (tag: RfidTag) => {
@@ -2151,7 +2186,7 @@ export default function Inventory() {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="unit_price" className="text-right">Precio Unitario</Label>
+                <Label htmlFor="unit_price" className="text-right">Precio Base</Label>
                 <Input
                   id="unit_price"
                   type="number"
@@ -2160,6 +2195,73 @@ export default function Inventory() {
                   onChange={(e) => setProductForm({ ...productForm, unit_price: parseFloat(e.target.value) || 0 })}
                   className="col-span-3"
                 />
+              </div>
+              
+              {/* 5 Tipos de Precio */}
+              <div className="border rounded-lg p-4 space-y-3">
+                <Label className="text-sm font-medium">Tipos de Precio</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="price_type_1" className="text-xs text-muted-foreground w-24 shrink-0">T1 - Público</Label>
+                    <Input
+                      id="price_type_1"
+                      type="number"
+                      step="0.01"
+                      value={productForm.price_type_1}
+                      onChange={(e) => setProductForm({ ...productForm, price_type_1: parseFloat(e.target.value) || 0 })}
+                      className="h-8"
+                      placeholder="$0.00"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="price_type_2" className="text-xs text-muted-foreground w-24 shrink-0">T2 - Mayoreo</Label>
+                    <Input
+                      id="price_type_2"
+                      type="number"
+                      step="0.01"
+                      value={productForm.price_type_2}
+                      onChange={(e) => setProductForm({ ...productForm, price_type_2: parseFloat(e.target.value) || 0 })}
+                      className="h-8"
+                      placeholder="$0.00"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="price_type_3" className="text-xs text-muted-foreground w-24 shrink-0">T3 - Distribuidor</Label>
+                    <Input
+                      id="price_type_3"
+                      type="number"
+                      step="0.01"
+                      value={productForm.price_type_3}
+                      onChange={(e) => setProductForm({ ...productForm, price_type_3: parseFloat(e.target.value) || 0 })}
+                      className="h-8"
+                      placeholder="$0.00"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="price_type_4" className="text-xs text-muted-foreground w-24 shrink-0">T4 - Especial</Label>
+                    <Input
+                      id="price_type_4"
+                      type="number"
+                      step="0.01"
+                      value={productForm.price_type_4}
+                      onChange={(e) => setProductForm({ ...productForm, price_type_4: parseFloat(e.target.value) || 0 })}
+                      className="h-8"
+                      placeholder="$0.00"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="price_type_5" className="text-xs text-muted-foreground w-24 shrink-0">T5 - VIP</Label>
+                    <Input
+                      id="price_type_5"
+                      type="number"
+                      step="0.01"
+                      value={productForm.price_type_5}
+                      onChange={(e) => setProductForm({ ...productForm, price_type_5: parseFloat(e.target.value) || 0 })}
+                      className="h-8"
+                      placeholder="$0.00"
+                    />
+                  </div>
+                </div>
               </div>
               
               {/* Checkbox RFID - con explicación clara para usuarios no técnicos */}
