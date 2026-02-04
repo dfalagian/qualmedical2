@@ -47,7 +47,6 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
         <td style="text-align: right;">$${item.unitPrice.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</td>
         <td style="text-align: right;">${item.hasIva ? `$${item.ivaAmount.toLocaleString("es-MX", { minimumFractionDigits: 2 })}` : "$0.00"}</td>
         <td style="text-align: right;">$${item.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</td>
-        <td>${orderData.description || ""}</td>
       </tr>
     `
     )
@@ -227,15 +226,14 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
         <thead>
           <tr>
             <th style="width: 5%;">No.</th>
-            <th style="width: 10%;">CAT</th>
-            <th style="width: 25%;">DESCRIPCIÓN DEL PRODUCTO</th>
+            <th style="width: 12%;">CAT</th>
+            <th style="width: 30%;">DESCRIPCIÓN DEL PRODUCTO</th>
             <th style="width: 8%;">MARCA</th>
-            <th style="width: 6%;">CANT</th>
+            <th style="width: 8%;">CANT</th>
             <th style="width: 8%;">UNIDAD</th>
             <th style="width: 12%;">PRECIO UNITARIO</th>
             <th style="width: 8%;">IVA</th>
-            <th style="width: 10%;">IMPORTE</th>
-            <th style="width: 8%;">OBSERVACIONES</th>
+            <th style="width: 12%;">IMPORTE</th>
           </tr>
         </thead>
         <tbody>
