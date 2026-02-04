@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +22,6 @@ import {
   Search,
   ListFilter,
   FileText,
-  AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -54,6 +53,7 @@ import {
 } from "@/components/ui/select";
 import { printQuoteHtml } from "./quoteHtmlPrint";
 import { useQuoteActions } from "@/hooks/useQuoteActions";
+import { BatchSelectionDialog } from "./BatchSelectionDialog";
 
 interface Quote {
   id: string;
@@ -105,11 +105,9 @@ export const QuotesList = () => {
   const [quoteItems, setQuoteItems] = useState<QuoteItem[]>([]);
   const [detailOpen, setDetailOpen] = useState(false);
   
-  // Approve confirmation
-  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  // Batch selection dialog for approval
+  const [batchSelectionOpen, setBatchSelectionOpen] = useState(false);
   const [quoteToApprove, setQuoteToApprove] = useState<Quote | null>(null);
-  const [stockWarnings, setStockWarnings] = useState<string[]>([]);
-  const [forceApprove, setForceApprove] = useState(false);
   
   // Cancel confirmation
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -208,69 +206,62 @@ export const QuotesList = () => {
     }
   };
 
-  // Start approve process
+  // Start approve process - open batch selection dialog
   const handleStartApprove = async (quote: Quote) => {
     setQuoteToApprove(quote);
-    setForceApprove(false);
-    setStockWarnings([]);
     
     try {
       const items = await fetchQuoteItems(quote.id);
       setQuoteItems(items);
-      
-      // Check stock availability
-      const warnings: string[] = [];
-      for (const item of items) {
-        if (item.batch_id) {
-          const { data: batch } = await supabase
-            .from("product_batches")
-            .select("current_quantity, batch_number")
-            .eq("id", item.batch_id)
-            .single();
-          
-          if (!batch || batch.current_quantity < item.cantidad) {
-            warnings.push(
-              `${item.nombre_producto} (Lote: ${batch?.batch_number || item.lote}): Disponible ${batch?.current_quantity || 0}, Solicitado ${item.cantidad}`
-            );
-          }
-        }
-      }
-      
-      setStockWarnings(warnings);
-      setApproveDialogOpen(true);
+      setBatchSelectionOpen(true);
     } catch (error) {
-      toast.error("Error al verificar stock");
+      toast.error("Error al cargar los productos de la cotización");
     }
   };
 
-  // Confirm approve
-  const handleConfirmApprove = async () => {
+  // Handle batch selection confirmation and approve
+  const handleBatchSelectionConfirm = async (selections: Array<{
+    itemId: string;
+    productId: string;
+    batchId: string | null;
+    batchNumber: string | null;
+    expirationDate: string | null;
+    availableQuantity: number;
+    requestedQuantity: number;
+  }>) => {
     if (!quoteToApprove) return;
     
     try {
+      // Map selections to the format expected by approveQuote
+      const itemsWithBatches = selections
+        .filter(sel => sel.batchId)
+        .map(sel => {
+          const originalItem = quoteItems.find(i => i.id === sel.itemId);
+          return {
+            product_id: sel.productId,
+            batch_id: sel.batchId!,
+            cantidad: sel.requestedQuantity,
+            nombre_producto: originalItem?.nombre_producto || "",
+          };
+        });
+
+      // Check if any have insufficient stock
+      const hasStockWarnings = selections.some(sel => 
+        sel.batchId && sel.availableQuantity < sel.requestedQuantity
+      );
+
       await approveQuote({
         quoteId: quoteToApprove.id,
-        items: quoteItems
-          .filter(item => item.product_id && item.batch_id)
-          .map(item => ({
-            product_id: item.product_id!,
-            batch_id: item.batch_id!,
-            cantidad: item.cantidad,
-            nombre_producto: item.nombre_producto,
-          })),
-        forceApprove: forceApprove || stockWarnings.length === 0,
+        items: itemsWithBatches,
+        forceApprove: hasStockWarnings,
       });
       
-      setApproveDialogOpen(false);
+      setBatchSelectionOpen(false);
       setQuoteToApprove(null);
-      queryClient.invalidateQueries({ queryKey: ["quotes-list"] });
+      setQuoteItems([]);
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
     } catch (error: any) {
-      if (error.type === "STOCK_WARNING") {
-        setStockWarnings(error.warnings);
-        setForceApprove(true);
-      } else {
-        toast.error("Error al aprobar: " + error.message);
-      }
+      toast.error("Error al aprobar: " + error.message);
     }
   };
 
@@ -288,7 +279,7 @@ export const QuotesList = () => {
       await cancelQuote(quoteToCancel.id);
       setCancelDialogOpen(false);
       setQuoteToCancel(null);
-      queryClient.invalidateQueries({ queryKey: ["quotes-list"] });
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
     } catch (error: any) {
       toast.error("Error al cancelar: " + error.message);
     }
@@ -548,60 +539,23 @@ export const QuotesList = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Approve Confirmation Dialog */}
-      <AlertDialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              {stockWarnings.length > 0 ? (
-                <>
-                  <AlertTriangle className="h-5 w-5 text-amber-500" />
-                  Advertencia de Stock
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  Confirmar Aprobación
-                </>
-              )}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              {stockWarnings.length > 0 ? (
-                <>
-                  <p>Los siguientes productos tienen stock insuficiente:</p>
-                  <ul className="list-disc pl-5 space-y-1 text-sm text-amber-600">
-                    {stockWarnings.map((warning, idx) => (
-                      <li key={idx}>{warning}</li>
-                    ))}
-                  </ul>
-                  <p className="font-medium">¿Desea aprobar la venta de todas formas? El stock podría quedar en negativo.</p>
-                </>
-              ) : (
-                <p>
-                  ¿Está seguro de aprobar la cotización <strong>{quoteToApprove?.folio}</strong>?
-                  <br />
-                  <br />
-                  Esta acción descontará el stock de los productos incluidos y convertirá la cotización en una venta.
-                </p>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isApproving}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmApprove}
-              disabled={isApproving}
-              className={cn(
-                stockWarnings.length > 0 
-                  ? "bg-amber-600 hover:bg-amber-700" 
-                  : "bg-emerald-600 hover:bg-emerald-700"
-              )}
-            >
-              {isApproving ? "Aprobando..." : stockWarnings.length > 0 ? "Aprobar de todas formas" : "Aprobar Venta"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Batch Selection Dialog for Approval */}
+      {quoteToApprove && (
+        <BatchSelectionDialog
+          open={batchSelectionOpen}
+          onOpenChange={(open) => {
+            setBatchSelectionOpen(open);
+            if (!open) {
+              setQuoteToApprove(null);
+              setQuoteItems([]);
+            }
+          }}
+          quoteId={quoteToApprove.id}
+          quoteItems={quoteItems}
+          onConfirm={handleBatchSelectionConfirm}
+          isApproving={isApproving}
+        />
+      )}
 
       {/* Cancel Confirmation Dialog */}
       <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
