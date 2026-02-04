@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 import {
   Select,
@@ -32,10 +31,7 @@ import {
 } from "@/components/ui/table";
 import { Package, Trash2, FileText } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
-import {
-  createPurchaseOrderPdfBlob,
-  downloadPurchaseOrderPdf,
-} from "./purchaseOrderPdf";
+import { openPurchaseOrderPrint } from "./purchaseOrderHtmlPrint";
 
 interface SelectedProduct {
   id: string;
@@ -194,10 +190,8 @@ export const CreateSupplierOrderDialog = ({
     return suppliers?.find((s) => s.id === selectedSupplier);
   }, [suppliers, selectedSupplier]);
 
-  type CreateOrderVars = { popup: Window | null };
-
-  const createOrderMutation = useMutation<any, any, CreateOrderVars>({
-    mutationFn: async (_variables) => {
+  const createOrderMutation = useMutation({
+    mutationFn: async () => {
       if (!user) throw new Error("Usuario no autenticado");
       if (!selectedSupplier) throw new Error("Selecciona un proveedor");
       if (!orderNumber) throw new Error("Ingresa el número de orden");
@@ -236,94 +230,33 @@ export const CreateSupplierOrderDialog = ({
 
       return order;
     },
-    onSuccess: (order, variables) => {
+    onSuccess: () => {
       toast.success("Orden de compra creada correctamente");
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
       queryClient.invalidateQueries({ queryKey: ["next_qual_order_number"] });
 
-      const orderData = {
+      // Abrir PDF con el patrón HTML nativo + window.print()
+      openPurchaseOrderPrint({
         orderNumber,
         supplierName: selectedSupplierData?.company_name || selectedSupplierData?.full_name || "",
-        supplierRfc: selectedSupplierData?.rfc,
+        supplierRfc: selectedSupplierData?.rfc ?? undefined,
         createdAt: new Date(),
         items: selectedProducts,
         subtotal,
         totalIva,
         total,
         description,
-      };
-
-      // Abrir como URL https (evita bloqueos por blob:/data:)
-      void (async () => {
-        const popup = variables?.popup;
-        try {
-          if (popup && !popup.closed) {
-            try {
-              popup.document.title = `OC ${orderNumber}`;
-              popup.document.body.innerHTML =
-                '<div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px;">Subiendo PDF...</div>';
-            } catch {
-              // ignore
-            }
-          }
-
-          const pdfBlob = createPurchaseOrderPdfBlob(orderData);
-          const filePath = `${selectedSupplier}/ordenes_compra/${order.id}/OC-${orderNumber}.pdf`;
-
-          const { error: uploadError } = await supabase.storage
-            .from("documents")
-            .upload(filePath, pdfBlob, { contentType: "application/pdf", upsert: true });
-
-          if (uploadError) throw uploadError;
-
-          const {
-            data: { publicUrl },
-          } = supabase.storage.from("documents").getPublicUrl(filePath);
-
-          if (popup && !popup.closed) {
-            popup.location.href = publicUrl;
-            popup.focus();
-          } else {
-            // Si el navegador bloqueó el popup, navega en la misma pestaña.
-            window.location.href = publicUrl;
-          }
-        } catch (e) {
-          console.error("Error abriendo PDF por URL https:", e);
-          if (variables?.popup && !variables.popup.closed) {
-            variables.popup.close();
-          }
-          toast.error("No se pudo abrir el PDF", {
-            description: "Se descargará el PDF en su lugar.",
-          });
-          downloadPurchaseOrderPdf(orderData);
-        }
-      })();
+      });
 
       handleClose();
     },
-    onError: (error: any, variables) => {
-      if (variables?.popup && !variables.popup.closed) {
-        // Si falló la creación, cerramos la pestaña pre-abierta para no dejarla colgada.
-        variables.popup.close();
-      }
+    onError: (error: any) => {
       toast.error(error.message || "Error al crear la orden");
     },
   });
 
   const handleCreateAndViewPdf = () => {
-    // Abrir la pestaña *en el gesto del usuario* para que Chrome no la bloquee.
-    const popup = window.open("about:blank", "_blank");
-    if (popup) {
-      try {
-        popup.document.title = `OC ${orderNumber || ""}`;
-        popup.document.body.innerHTML =
-          '<div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px;">Creando orden y preparando PDF...</div>';
-      } catch {
-        // ignore
-      }
-    }
-
-    createOrderMutation.mutate({ popup });
+    createOrderMutation.mutate();
   };
 
   const resetForm = () => {
