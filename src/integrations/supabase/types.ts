@@ -1219,6 +1219,7 @@ export type Database = {
       }
       quote_items: {
         Row: {
+          batch_id: string | null
           cantidad: number
           created_at: string | null
           fecha_caducidad: string | null
@@ -1232,6 +1233,7 @@ export type Database = {
           quote_id: string
         }
         Insert: {
+          batch_id?: string | null
           cantidad?: number
           created_at?: string | null
           fecha_caducidad?: string | null
@@ -1245,6 +1247,7 @@ export type Database = {
           quote_id: string
         }
         Update: {
+          batch_id?: string | null
           cantidad?: number
           created_at?: string | null
           fecha_caducidad?: string | null
@@ -1258,6 +1261,13 @@ export type Database = {
           quote_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "quote_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quote_items_product_id_fkey"
             columns: ["product_id"]
@@ -1276,6 +1286,10 @@ export type Database = {
       }
       quotes: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           client_id: string
           concepto: string | null
           created_at: string | null
@@ -1294,6 +1308,10 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           client_id: string
           concepto?: string | null
           created_at?: string | null
@@ -1312,6 +1330,10 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           client_id?: string
           concepto?: string | null
           created_at?: string | null
@@ -1330,6 +1352,20 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "quotes_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quotes_client_id_fkey"
             columns: ["client_id"]

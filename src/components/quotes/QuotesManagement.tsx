@@ -16,12 +16,13 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { 
   FileText, 
-  Search, 
   Plus, 
   Trash2, 
   ChevronsUpDown,
   Check,
-  Calendar
+  Calendar,
+  Save,
+  CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -40,6 +41,7 @@ import {
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useQuoteActions } from "@/hooks/useQuoteActions";
 
 interface Client {
   id: string;
@@ -79,6 +81,11 @@ interface QuoteItem {
 }
 
 export const QuotesManagement = () => {
+  // Quote actions hook
+  const { saveQuote, approveQuote, isSaving, isApproving, validateStock } = useQuoteActions();
+  
+  // Saved quote state
+  const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null);
   // Client selection state
   const [clientOpen, setClientOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
@@ -276,7 +283,91 @@ export const QuotesManagement = () => {
   const [fechaCotizacionOpen, setFechaCotizacionOpen] = useState(false);
   const [fechaEntregaOpen, setFechaEntregaOpen] = useState(false);
   const [fechaFacturaAntOpen, setFechaFacturaAntOpen] = useState(false);
-  const [fechaCaducidadOpen, setFechaCaducidadOpen] = useState(false);
+
+  // Handle save quote as draft
+  const handleSaveQuote = async () => {
+    if (!selectedClient) {
+      toast.error("Seleccione un cliente");
+      return;
+    }
+    if (quoteItems.length === 0) {
+      toast.error("Agregue al menos un producto");
+      return;
+    }
+
+    try {
+      const quote = await saveQuote({
+        clientId: selectedClient.id,
+        folio,
+        concepto,
+        fechaCotizacion,
+        fechaEntrega,
+        facturaAnterior,
+        fechaFacturaAnterior,
+        montoFacturaAnterior: montoFacturaAnterior ? parseFloat(montoFacturaAnterior) : undefined,
+        subtotal,
+        total,
+        items: quoteItems,
+      });
+      setSavedQuoteId(quote.id);
+    } catch (error) {
+      // Error already handled by hook
+    }
+  };
+
+  // Handle approve quote (convert to sale)
+  const handleApproveQuote = async () => {
+    if (!savedQuoteId) {
+      toast.error("Primero guarde la cotización");
+      return;
+    }
+
+    // Validate all items have batch_id
+    const invalidItems = quoteItems.filter(item => !item.batch_id || !item.product_id);
+    if (invalidItems.length > 0) {
+      toast.error("Todos los productos deben tener un lote seleccionado");
+      return;
+    }
+
+    try {
+      await approveQuote({
+        quoteId: savedQuoteId,
+        items: quoteItems.map(item => ({
+          product_id: item.product_id!,
+          batch_id: item.batch_id!,
+          cantidad: item.cantidad,
+          nombre_producto: item.nombre_producto,
+        })),
+      });
+      
+      // Reset form after successful approval
+      resetForm();
+    } catch (error) {
+      // Error already handled by hook
+    }
+  };
+
+  // Reset form after save or approve
+  const resetForm = () => {
+    setSelectedClient(null);
+    setFolio("");
+    setConcepto("");
+    setFechaCotizacion(new Date());
+    setFechaEntrega(undefined);
+    setFacturaAnterior("");
+    setFechaFacturaAnterior(undefined);
+    setMontoFacturaAnterior("");
+    setQuoteItems([]);
+    setSavedQuoteId(null);
+    // Generate new folio
+    const generateNewFolio = async () => {
+      const { data, error } = await supabase.rpc("generate_quote_folio");
+      if (!error && data) {
+        setFolio(data);
+      }
+    };
+    generateNewFolio();
+  };
 
   return (
     <div className="space-y-4">
@@ -726,7 +817,7 @@ export const QuotesManagement = () => {
           </div>
 
           {/* Totals */}
-          <div className="flex justify-end">
+          <div className="flex justify-between items-end pt-4">
             <div className="w-full max-w-xs space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Sub-Total:</span>
@@ -736,6 +827,25 @@ export const QuotesManagement = () => {
                 <span>Total:</span>
                 <span className="text-primary">${total.toFixed(2)}</span>
               </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={handleSaveQuote}
+                disabled={!selectedClient || quoteItems.length === 0 || isSaving}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {isSaving ? "Guardando..." : "Guardar Borrador"}
+              </Button>
+              <Button
+                onClick={handleApproveQuote}
+                disabled={!savedQuoteId || quoteItems.length === 0 || isApproving}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                {isApproving ? "Aprobando..." : "Aprobar (Venta)"}
+              </Button>
             </div>
           </div>
         </CardContent>
