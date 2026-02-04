@@ -619,9 +619,12 @@ const Documents = () => {
                       // Solo validar tamaño básico aquí, validación completa en submit
                       const validFiles: File[] = [];
                       for (const file of selectedFiles) {
-                        // Validar solo tamaño máximo genérico
+                        const fileSizeMB = file.size / (1024 * 1024);
+                        console.log(`[Validación] Archivo: ${file.name}, Tamaño: ${fileSizeMB.toFixed(2)} MB, Tipo: ${file.type}`);
+                        
+                        // Validar tamaño máximo (20MB para todos en selección inicial)
                         if (file.size > MAX_FILE_SIZE_ACTA) {
-                          toast.error(`${file.name}: archivo demasiado grande (máximo 20MB)`);
+                          toast.error(`${file.name}: archivo demasiado grande (${fileSizeMB.toFixed(2)}MB, máximo 20MB)`);
                           e.target.value = '';
                           setFiles([]);
                           return;
@@ -629,7 +632,7 @@ const Documents = () => {
                         validFiles.push(file);
                       }
                       setFiles(validFiles);
-                      console.log('Archivos seleccionados:', validFiles.length);
+                      console.log('Archivos seleccionados:', validFiles.length, validFiles.map(f => `${f.name} (${(f.size/1024/1024).toFixed(2)}MB)`));
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
