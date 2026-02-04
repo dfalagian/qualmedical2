@@ -290,7 +290,7 @@ export const CreateSupplierOrderDialog = ({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden flex flex-col gap-4">
+          <div className="flex-1 overflow-y-auto flex flex-col gap-4">
             {/* Top row - Supplier and Order Info */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
