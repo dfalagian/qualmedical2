@@ -968,6 +968,8 @@ export type Database = {
           brand: string | null
           category: string | null
           citio_id: string | null
+          clave_unidad: string | null
+          codigo_sat: string | null
           created_at: string | null
           current_stock: number | null
           description: string | null
@@ -980,9 +982,13 @@ export type Database = {
           price_type_2: number | null
           price_type_3: number | null
           price_type_4: number | null
+          price_type_5: number | null
+          price_with_tax: number | null
+          price_without_tax: number | null
           rfid_required: boolean
           sku: string
           supplier_id: string | null
+          tax_rate: number | null
           unit: string | null
           unit_price: number | null
           updated_at: string | null
@@ -993,6 +999,8 @@ export type Database = {
           brand?: string | null
           category?: string | null
           citio_id?: string | null
+          clave_unidad?: string | null
+          codigo_sat?: string | null
           created_at?: string | null
           current_stock?: number | null
           description?: string | null
@@ -1005,9 +1013,13 @@ export type Database = {
           price_type_2?: number | null
           price_type_3?: number | null
           price_type_4?: number | null
+          price_type_5?: number | null
+          price_with_tax?: number | null
+          price_without_tax?: number | null
           rfid_required?: boolean
           sku: string
           supplier_id?: string | null
+          tax_rate?: number | null
           unit?: string | null
           unit_price?: number | null
           updated_at?: string | null
@@ -1018,6 +1030,8 @@ export type Database = {
           brand?: string | null
           category?: string | null
           citio_id?: string | null
+          clave_unidad?: string | null
+          codigo_sat?: string | null
           created_at?: string | null
           current_stock?: number | null
           description?: string | null
@@ -1030,9 +1044,13 @@ export type Database = {
           price_type_2?: number | null
           price_type_3?: number | null
           price_type_4?: number | null
+          price_type_5?: number | null
+          price_with_tax?: number | null
+          price_without_tax?: number | null
           rfid_required?: boolean
           sku?: string
           supplier_id?: string | null
+          tax_rate?: number | null
           unit?: string | null
           unit_price?: number | null
           updated_at?: string | null
