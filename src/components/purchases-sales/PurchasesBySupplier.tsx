@@ -60,6 +60,8 @@ export const PurchasesBySupplier = () => {
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices-by-supplier"],
+    refetchOnMount: "always",
+    staleTime: 0,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invoices")
