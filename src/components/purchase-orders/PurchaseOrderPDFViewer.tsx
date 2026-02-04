@@ -217,30 +217,48 @@ export const generateAndOpenPDF = (orderData: OrderData, targetWindow?: Window |
   doc.text("NOMBRE Y FIRMA", 40, sigY + 8, { align: "center" });
   doc.text("NOMBRE Y FIRMA", pageWidth - 40, sigY + 8, { align: "center" });
 
-  // Abrir directamente en el navegador
-  const pdfBlob = doc.output("blob");
-  const url = URL.createObjectURL(pdfBlob);
+  // Nota: `blob:` puede dar ERR_BLOCKED_BY_CLIENT (extensiones/filtros). Usamos Data URI.
+  const dataUri = doc.output("datauristring") as unknown as string;
 
-  // Si ya existe una pestaña abierta desde el gesto del usuario, úsala para evitar bloqueos.
-  if (targetWindow && !targetWindow.closed) {
+  const html = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OC-${orderData.orderNumber}</title>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      iframe { width: 100%; height: 100%; border: 0; }
+    </style>
+  </head>
+  <body>
+    <iframe src="${dataUri}" title="OC-${orderData.orderNumber}"></iframe>
+  </body>
+</html>`;
+
+  const writeToWindow = (w: Window) => {
     try {
-      targetWindow.location.href = url;
-      targetWindow.focus();
-      return;
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      return true;
     } catch {
-      // fallback
+      return false;
     }
+  };
+
+  if (targetWindow && !targetWindow.closed) {
+    if (writeToWindow(targetWindow)) return;
   }
 
-  const w = window.open(url, "_blank");
-  if (!w) {
-    // Último recurso: intentar abrir mediante un <a> (algunos navegadores lo permiten)
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.click();
+  const w = window.open("about:blank", "_blank");
+  if (w) {
+    if (writeToWindow(w)) return;
   }
+
+  // Último recurso: descargar
+  doc.save(`OC-${orderData.orderNumber}.pdf`);
 };
 
 // Función para descargar el PDF
