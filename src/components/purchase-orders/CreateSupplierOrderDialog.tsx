@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/table";
 import { Package, Trash2, FileText } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
-import { PurchaseOrderPDFViewer } from "./PurchaseOrderPDFViewer";
+import { generateAndOpenPDF } from "./PurchaseOrderPDFViewer";
 
 interface SelectedProduct {
   id: string;
@@ -62,8 +62,6 @@ export const CreateSupplierOrderDialog = ({
   const [orderNumber, setOrderNumber] = useState("");
   const [description, setDescription] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
-  const [showPdfViewer, setShowPdfViewer] = useState(false);
-  const [createdOrderData, setCreatedOrderData] = useState<any>(null);
 
   // Generate next order number automatically
   const { data: nextOrderNumber } = useQuery({
@@ -237,7 +235,7 @@ export const CreateSupplierOrderDialog = ({
       toast.success("Orden de compra creada correctamente");
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
       queryClient.invalidateQueries({ queryKey: ["next_qual_order_number"] });
-      // Prepare data for PDF viewer
+      // Generar y abrir PDF directamente en el navegador
       const orderData = {
         orderNumber,
         supplierName: selectedSupplierData?.company_name || selectedSupplierData?.full_name || "",
@@ -249,8 +247,8 @@ export const CreateSupplierOrderDialog = ({
         total,
         description,
       };
-      setCreatedOrderData(orderData);
-      setShowPdfViewer(true);
+      generateAndOpenPDF(orderData);
+      handleClose();
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al crear la orden");
@@ -266,19 +264,12 @@ export const CreateSupplierOrderDialog = ({
 
   const handleClose = () => {
     resetForm();
-    setShowPdfViewer(false);
-    setCreatedOrderData(null);
     onOpenChange(false);
-  };
-
-  const handlePdfClose = () => {
-    setShowPdfViewer(false);
-    handleClose();
   };
 
   return (
     <>
-      <Dialog open={open && !showPdfViewer} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -453,14 +444,6 @@ export const CreateSupplierOrderDialog = ({
         </DialogContent>
       </Dialog>
 
-      {/* PDF Viewer */}
-      {showPdfViewer && createdOrderData && (
-        <PurchaseOrderPDFViewer
-          open={showPdfViewer}
-          onOpenChange={handlePdfClose}
-          orderData={createdOrderData}
-        />
-      )}
     </>
   );
 };
