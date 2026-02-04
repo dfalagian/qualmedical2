@@ -714,32 +714,47 @@ export const QuotesManagement = () => {
                     <CommandList>
                       <CommandEmpty>No se encontraron productos.</CommandEmpty>
                       <CommandGroup>
-                        {filteredProducts.slice(0, 50).map((product) => (
-                          <CommandItem
-                            key={product.id}
-                            value={product.id}
-                            onSelect={() => handleSelectProduct(product)}
-                            className="flex items-center justify-between"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{product.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                SKU: {product.sku} · {product.brand || "Sin marca"}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-sm font-semibold text-primary">
-                                ${(product.unit_price || 0).toFixed(2)}
-                              </span>
-                              <Check
-                                className={cn(
-                                  "h-4 w-4",
-                                  selectedProduct?.id === product.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                            </div>
-                          </CommandItem>
-                        ))}
+                        {filteredProducts.slice(0, 50).map((product) => {
+                          const stockLevel = product.current_stock || 0;
+                          const isLowStock = stockLevel <= 0;
+                          const isWarningStock = stockLevel > 0 && stockLevel <= 10;
+                          
+                          return (
+                            <CommandItem
+                              key={product.id}
+                              value={product.id}
+                              onSelect={() => handleSelectProduct(product)}
+                              className="flex items-center justify-between"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{product.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  SKU: {product.sku} · {product.brand || "Sin marca"}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                {/* Stock badge - prominently displayed */}
+                                <span className={cn(
+                                  "text-xs font-bold px-2 py-1 rounded-md min-w-[60px] text-center",
+                                  isLowStock && "bg-destructive/15 text-destructive",
+                                  isWarningStock && "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300",
+                                  !isLowStock && !isWarningStock && "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                                )}>
+                                  {stockLevel} uds
+                                </span>
+                                <span className="text-sm font-semibold text-primary">
+                                  ${(product.unit_price || 0).toFixed(2)}
+                                </span>
+                                <Check
+                                  className={cn(
+                                    "h-4 w-4",
+                                    selectedProduct?.id === product.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                              </div>
+                            </CommandItem>
+                          );
+                        })}
                       </CommandGroup>
                     </CommandList>
                   </Command>
