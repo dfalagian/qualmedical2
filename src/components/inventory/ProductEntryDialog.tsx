@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -99,6 +99,19 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       return data;
     }
   });
+
+  // Set default warehouse to "Almacén Principal" when data loads
+  useEffect(() => {
+    if (almacenes.length > 0 && !formData.almacenId) {
+      const principal = almacenes.find(a => a.name.toLowerCase().includes("principal") || a.code === "PRINCIPAL");
+      if (principal) {
+        setFormData(prev => ({ ...prev, almacenId: principal.id }));
+      } else {
+        // If no "principal" found, use first warehouse
+        setFormData(prev => ({ ...prev, almacenId: almacenes[0].id }));
+      }
+    }
+  }, [almacenes]);
 
   // Fetch productos existentes
   const { data: productos = [] } = useQuery({
