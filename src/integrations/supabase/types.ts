@@ -1315,6 +1315,7 @@ export type Database = {
           fecha_factura_anterior: string | null
           folio: string
           id: string
+          inventory_exit_status: string | null
           monto_factura_anterior: number | null
           notes: string | null
           status: string
@@ -1337,6 +1338,7 @@ export type Database = {
           fecha_factura_anterior?: string | null
           folio: string
           id?: string
+          inventory_exit_status?: string | null
           monto_factura_anterior?: number | null
           notes?: string | null
           status?: string
@@ -1359,6 +1361,7 @@ export type Database = {
           fecha_factura_anterior?: string | null
           folio?: string
           id?: string
+          inventory_exit_status?: string | null
           monto_factura_anterior?: number | null
           notes?: string | null
           status?: string
