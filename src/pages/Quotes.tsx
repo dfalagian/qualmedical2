@@ -6,15 +6,58 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClientsManagement } from "@/components/quotes/ClientsManagement";
 import { QuotesManagement } from "@/components/quotes/QuotesManagement";
 import { QuotesList } from "@/components/quotes/QuotesList";
-import { Users, FileText, List, PlusCircle } from "lucide-react";
+import { Users, List, PlusCircle } from "lucide-react";
+
+interface QuoteToEdit {
+  id: string;
+  folio: string;
+  concepto: string | null;
+  fecha_cotizacion: string;
+  fecha_entrega: string | null;
+  factura_anterior: string | null;
+  fecha_factura_anterior: string | null;
+  monto_factura_anterior: number | null;
+  client_id: string;
+  client: {
+    id: string;
+    nombre_cliente: string;
+    razon_social: string | null;
+    rfc: string | null;
+    cfdi: string | null;
+  };
+  items: Array<{
+    id: string;
+    product_id: string | null;
+    batch_id: string | null;
+    nombre_producto: string;
+    marca: string | null;
+    lote: string | null;
+    fecha_caducidad: string | null;
+    cantidad: number;
+    precio_unitario: number;
+    importe: number;
+    tipo_precio: string | null;
+  }>;
+}
 
 const Quotes = () => {
   const { isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState("list");
+  const [quoteToEdit, setQuoteToEdit] = useState<QuoteToEdit | null>(null);
 
   if (!isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  const handleEditQuote = (quote: QuoteToEdit) => {
+    setQuoteToEdit(quote);
+    setActiveTab("new");
+  };
+
+  const handleEditComplete = () => {
+    setQuoteToEdit(null);
+    setActiveTab("list");
+  };
 
   return (
     <DashboardLayout>
@@ -28,7 +71,12 @@ const Quotes = () => {
           </p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => {
+          setActiveTab(value);
+          if (value !== "new") {
+            setQuoteToEdit(null);
+          }
+        }} className="w-full">
           <TabsList className="grid w-full grid-cols-3 max-w-lg">
             <TabsTrigger value="list" className="flex items-center gap-2">
               <List className="h-4 w-4" />
@@ -36,7 +84,7 @@ const Quotes = () => {
             </TabsTrigger>
             <TabsTrigger value="new" className="flex items-center gap-2">
               <PlusCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Nueva</span>
+              <span className="hidden sm:inline">{quoteToEdit ? "Editar" : "Nueva"}</span>
             </TabsTrigger>
             <TabsTrigger value="clients" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
@@ -45,11 +93,14 @@ const Quotes = () => {
           </TabsList>
 
           <TabsContent value="list" className="mt-4">
-            <QuotesList />
+            <QuotesList onEditQuote={handleEditQuote} />
           </TabsContent>
 
           <TabsContent value="new" className="mt-4">
-            <QuotesManagement />
+            <QuotesManagement 
+              quoteToEdit={quoteToEdit} 
+              onEditComplete={handleEditComplete}
+            />
           </TabsContent>
 
           <TabsContent value="clients" className="mt-4">

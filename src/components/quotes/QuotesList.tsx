@@ -22,6 +22,7 @@ import {
   Search,
   ListFilter,
   FileText,
+  Pencil,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -61,6 +62,9 @@ interface Quote {
   concepto: string | null;
   fecha_cotizacion: string;
   fecha_entrega: string | null;
+  factura_anterior?: string | null;
+  fecha_factura_anterior?: string | null;
+  monto_factura_anterior?: number | null;
   status: string;
   subtotal: number;
   total: number;
@@ -85,6 +89,43 @@ interface QuoteItem {
   cantidad: number;
   precio_unitario: number;
   importe: number;
+  tipo_precio?: string | null;
+}
+
+interface QuoteToEdit {
+  id: string;
+  folio: string;
+  concepto: string | null;
+  fecha_cotizacion: string;
+  fecha_entrega: string | null;
+  factura_anterior: string | null;
+  fecha_factura_anterior: string | null;
+  monto_factura_anterior: number | null;
+  client_id: string;
+  client: {
+    id: string;
+    nombre_cliente: string;
+    razon_social: string | null;
+    rfc: string | null;
+    cfdi: string | null;
+  };
+  items: Array<{
+    id: string;
+    product_id: string | null;
+    batch_id: string | null;
+    nombre_producto: string;
+    marca: string | null;
+    lote: string | null;
+    fecha_caducidad: string | null;
+    cantidad: number;
+    precio_unitario: number;
+    importe: number;
+    tipo_precio: string | null;
+  }>;
+}
+
+interface QuotesListProps {
+  onEditQuote?: (quote: QuoteToEdit) => void;
 }
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; className?: string }> = {
@@ -93,7 +134,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   cancelada: { label: "Cancelada", variant: "destructive" },
 };
 
-export const QuotesList = () => {
+export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
   const queryClient = useQueryClient();
   const { approveQuote, cancelQuote, isApproving, isCancelling } = useQuoteActions();
   
@@ -125,6 +166,9 @@ export const QuotesList = () => {
           concepto,
           fecha_cotizacion,
           fecha_entrega,
+          factura_anterior,
+          fecha_factura_anterior,
+          monto_factura_anterior,
           status,
           subtotal,
           total,
@@ -177,6 +221,34 @@ export const QuotesList = () => {
       setDetailOpen(true);
     } catch (error) {
       toast.error("Error al cargar los detalles de la cotización");
+    }
+  };
+
+  // Edit quote
+  const handleEditQuote = async (quote: Quote) => {
+    if (!onEditQuote) return;
+    
+    try {
+      const items = await fetchQuoteItems(quote.id);
+      
+      onEditQuote({
+        id: quote.id,
+        folio: quote.folio,
+        concepto: quote.concepto,
+        fecha_cotizacion: quote.fecha_cotizacion,
+        fecha_entrega: quote.fecha_entrega,
+        factura_anterior: quote.factura_anterior || null,
+        fecha_factura_anterior: quote.fecha_factura_anterior || null,
+        monto_factura_anterior: quote.monto_factura_anterior || null,
+        client_id: quote.client.id,
+        client: quote.client,
+        items: items.map(item => ({
+          ...item,
+          tipo_precio: item.tipo_precio || "1",
+        })),
+      });
+    } catch (error) {
+      toast.error("Error al cargar la cotización para editar");
     }
   };
 
@@ -381,6 +453,17 @@ export const QuotesList = () => {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
+                            {quote.status === "borrador" && onEditQuote && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditQuote(quote)}
+                                title="Editar cotización"
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
