@@ -1136,14 +1136,16 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                 <Save className="h-4 w-4 mr-2" />
                 {isSaving || isUpdating ? "Guardando..." : isEditMode ? "Actualizar Cotización" : "Guardar Cotización"}
               </Button>
-              <Button
-                variant="secondary"
-                onClick={handlePrintQuote}
-                disabled={!selectedClient || quoteItems.length === 0}
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Imprimir PDF
-              </Button>
+              {isEditMode && (
+                <Button
+                  variant="secondary"
+                  onClick={handlePrintQuote}
+                  disabled={!selectedClient || quoteItems.length === 0}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir PDF
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
