@@ -112,9 +112,43 @@ interface QuoteItem {
   };
 }
 
-export const QuotesManagement = () => {
+interface QuoteToEdit {
+  id: string;
+  folio: string;
+  concepto: string | null;
+  fecha_cotizacion: string;
+  fecha_entrega: string | null;
+  factura_anterior: string | null;
+  fecha_factura_anterior: string | null;
+  monto_factura_anterior: number | null;
+  client_id: string;
+  client: Client;
+  items: Array<{
+    id: string;
+    product_id: string | null;
+    batch_id: string | null;
+    nombre_producto: string;
+    marca: string | null;
+    lote: string | null;
+    fecha_caducidad: string | null;
+    cantidad: number;
+    precio_unitario: number;
+    importe: number;
+    tipo_precio: string | null;
+  }>;
+}
+
+interface QuotesManagementProps {
+  quoteToEdit?: QuoteToEdit | null;
+  onEditComplete?: () => void;
+}
+
+export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManagementProps) => {
   // Quote actions hook
-  const { saveQuote, isSaving } = useQuoteActions();
+  const { saveQuote, updateQuote, isSaving, isUpdating } = useQuoteActions();
+  
+  // Edit mode
+  const isEditMode = !!quoteToEdit;
   
   // Saved quote state
   const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null);
@@ -196,16 +230,60 @@ export const QuotesManagement = () => {
     enabled: !!selectedProduct,
   });
 
-  // Generate folio on mount
+  // Load quote data when editing
   useEffect(() => {
-    const generateFolio = async () => {
-      const { data, error } = await supabase.rpc("generate_quote_folio");
-      if (!error && data) {
-        setFolio(data);
-      }
-    };
-    generateFolio();
-  }, []);
+    if (quoteToEdit && products.length > 0) {
+      setFolio(quoteToEdit.folio);
+      setConcepto(quoteToEdit.concepto || "");
+      setFechaCotizacion(new Date(quoteToEdit.fecha_cotizacion));
+      setFechaEntrega(quoteToEdit.fecha_entrega ? new Date(quoteToEdit.fecha_entrega) : undefined);
+      setFacturaAnterior(quoteToEdit.factura_anterior || "");
+      setFechaFacturaAnterior(quoteToEdit.fecha_factura_anterior ? new Date(quoteToEdit.fecha_factura_anterior) : undefined);
+      setMontoFacturaAnterior(quoteToEdit.monto_factura_anterior?.toString() || "");
+      setSelectedClient(quoteToEdit.client);
+      setSavedQuoteId(quoteToEdit.id);
+      
+      // Convert items to QuoteItem format
+      const editItems: QuoteItem[] = quoteToEdit.items.map(item => {
+        // Find product to get available prices
+        const product = products.find(p => p.id === item.product_id);
+        
+        return {
+          id: item.id,
+          product_id: item.product_id,
+          batch_id: item.batch_id,
+          nombre_producto: item.nombre_producto,
+          marca: item.marca || "",
+          lote: item.lote || "",
+          fecha_caducidad: item.fecha_caducidad ? new Date(item.fecha_caducidad) : null,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio_unitario,
+          importe: item.importe,
+          tipo_precio: (item.tipo_precio as PriceType) || "1",
+          precios_disponibles: {
+            price_type_1: product?.price_type_1 || 0,
+            price_type_2: product?.price_type_2 || 0,
+            price_type_3: product?.price_type_3 || 0,
+            price_type_4: product?.price_type_4 || 0,
+          },
+        };
+      });
+      setQuoteItems(editItems);
+    }
+  }, [quoteToEdit, products]);
+
+  // Generate folio on mount (only for new quotes)
+  useEffect(() => {
+    if (!isEditMode) {
+      const generateFolio = async () => {
+        const { data, error } = await supabase.rpc("generate_quote_folio");
+        if (!error && data) {
+          setFolio(data);
+        }
+      };
+      generateFolio();
+    }
+  }, [isEditMode]);
 
   // Filter clients
   const filteredClients = useMemo(() => {
@@ -447,7 +525,7 @@ export const QuotesManagement = () => {
   const [fechaEntregaOpen, setFechaEntregaOpen] = useState(false);
   const [fechaFacturaAntOpen, setFechaFacturaAntOpen] = useState(false);
 
-  // Handle save quote as draft
+  // Handle save quote as draft (or update existing)
   const handleSaveQuote = async () => {
     if (!selectedClient) {
       toast.error("Seleccione un cliente");
@@ -459,20 +537,40 @@ export const QuotesManagement = () => {
     }
 
     try {
-      const quote = await saveQuote({
-        clientId: selectedClient.id,
-        folio,
-        concepto,
-        fechaCotizacion,
-        fechaEntrega,
-        facturaAnterior,
-        fechaFacturaAnterior,
-        montoFacturaAnterior: montoFacturaAnterior ? parseFloat(montoFacturaAnterior) : undefined,
-        subtotal,
-        total,
-        items: quoteItems,
-      });
-      setSavedQuoteId(quote.id);
+      if (isEditMode && quoteToEdit) {
+        // Update existing quote
+        await updateQuote({
+          quoteId: quoteToEdit.id,
+          clientId: selectedClient.id,
+          folio,
+          concepto,
+          fechaCotizacion,
+          fechaEntrega,
+          facturaAnterior,
+          fechaFacturaAnterior,
+          montoFacturaAnterior: montoFacturaAnterior ? parseFloat(montoFacturaAnterior) : undefined,
+          subtotal,
+          total,
+          items: quoteItems,
+        });
+        onEditComplete?.();
+      } else {
+        // Create new quote
+        const quote = await saveQuote({
+          clientId: selectedClient.id,
+          folio,
+          concepto,
+          fechaCotizacion,
+          fechaEntrega,
+          facturaAnterior,
+          fechaFacturaAnterior,
+          montoFacturaAnterior: montoFacturaAnterior ? parseFloat(montoFacturaAnterior) : undefined,
+          subtotal,
+          total,
+          items: quoteItems,
+        });
+        setSavedQuoteId(quote.id);
+      }
     } catch (error) {
       // Error already handled by hook
     }
@@ -539,7 +637,7 @@ export const QuotesManagement = () => {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Nueva Cotización
+            {isEditMode ? `Editar Cotización - ${folio}` : "Nueva Cotización"}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1022,13 +1120,21 @@ export const QuotesManagement = () => {
             
             {/* Action Buttons */}
             <div className="flex gap-3">
+              {isEditMode && (
+                <Button
+                  variant="ghost"
+                  onClick={onEditComplete}
+                >
+                  Cancelar
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={handleSaveQuote}
-                disabled={!selectedClient || quoteItems.length === 0 || isSaving}
+                disabled={!selectedClient || quoteItems.length === 0 || isSaving || isUpdating}
               >
                 <Save className="h-4 w-4 mr-2" />
-                {isSaving ? "Guardando..." : "Guardar Cotización"}
+                {isSaving || isUpdating ? "Guardando..." : isEditMode ? "Actualizar Cotización" : "Guardar Cotización"}
               </Button>
               <Button
                 variant="secondary"

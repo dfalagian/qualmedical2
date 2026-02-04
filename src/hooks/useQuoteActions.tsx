@@ -31,6 +31,10 @@ interface SaveQuoteParams {
   notes?: string;
 }
 
+interface UpdateQuoteParams extends SaveQuoteParams {
+  quoteId: string;
+}
+
 interface ApproveQuoteParams {
   quoteId: string;
   items: Array<{
@@ -108,6 +112,74 @@ export const useQuoteActions = () => {
     },
     onError: (error: any) => {
       toast.error("Error al guardar: " + error.message);
+    },
+  });
+
+  // Actualizar cotización existente
+  const updateQuoteMutation = useMutation({
+    mutationFn: async (params: UpdateQuoteParams) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No autenticado");
+
+      // Actualizar cotización
+      const { data: quote, error: quoteError } = await supabase
+        .from("quotes")
+        .update({
+          client_id: params.clientId,
+          concepto: params.concepto,
+          fecha_cotizacion: params.fechaCotizacion.toISOString().split('T')[0],
+          fecha_entrega: params.fechaEntrega?.toISOString().split('T')[0] || null,
+          factura_anterior: params.facturaAnterior || null,
+          fecha_factura_anterior: params.fechaFacturaAnterior?.toISOString().split('T')[0] || null,
+          monto_factura_anterior: params.montoFacturaAnterior || null,
+          subtotal: params.subtotal,
+          total: params.total,
+          notes: params.notes || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", params.quoteId)
+        .select()
+        .single();
+
+      if (quoteError) throw quoteError;
+
+      // Eliminar items existentes
+      const { error: deleteError } = await supabase
+        .from("quote_items")
+        .delete()
+        .eq("quote_id", params.quoteId);
+
+      if (deleteError) throw deleteError;
+
+      // Insertar nuevos items
+      const itemsToInsert = params.items.map(item => ({
+        quote_id: params.quoteId,
+        product_id: item.product_id,
+        batch_id: item.batch_id,
+        nombre_producto: item.nombre_producto,
+        marca: item.marca,
+        lote: item.lote,
+        fecha_caducidad: item.fecha_caducidad?.toISOString().split('T')[0] || null,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario,
+        importe: item.importe,
+        tipo_precio: item.tipo_precio || "1",
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("quote_items")
+        .insert(itemsToInsert);
+
+      if (itemsError) throw itemsError;
+
+      return quote;
+    },
+    onSuccess: () => {
+      toast.success("Cotización actualizada correctamente");
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    },
+    onError: (error: any) => {
+      toast.error("Error al actualizar: " + error.message);
     },
   });
 
@@ -328,9 +400,11 @@ export const useQuoteActions = () => {
 
   return {
     saveQuote: saveQuoteMutation.mutateAsync,
+    updateQuote: updateQuoteMutation.mutateAsync,
     approveQuote: approveQuoteMutation.mutateAsync,
     cancelQuote: cancelQuoteMutation.mutateAsync,
     isSaving: saveQuoteMutation.isPending,
+    isUpdating: updateQuoteMutation.isPending,
     isApproving: approveQuoteMutation.isPending,
     isCancelling: cancelQuoteMutation.isPending,
     validateStock,
