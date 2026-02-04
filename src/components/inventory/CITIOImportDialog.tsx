@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -14,8 +14,10 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Plus, Check, Pill, Package } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Plus, Check, Pill, Package, CheckSquare, Square, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface CITIOMedication {
   id: string;
@@ -28,10 +30,14 @@ interface CITIOMedication {
     name: string;
   };
   price_type_1?: number;
+  price_type_2?: number;
+  price_type_3?: number;
+  price_type_4?: number;
   current_stock?: number;
   codigo_sat?: string;
   clave_unidad?: string;
   medication_code?: string;
+  grupo_sat?: string;
 }
 
 interface CITIOImportDialogProps {
@@ -48,7 +54,9 @@ export function CITIOImportDialog({
   existingCitioIds,
 }: CITIOImportDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedMedication, setSelectedMedication] = useState<CITIOMedication | null>(null);
+  const [selectedMedications, setSelectedMedications] = useState<Set<string>>(new Set());
+  const [isImporting, setIsImporting] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: medications = [], isLoading, error } = useQuery({
     queryKey: ['citio-medications-for-import'],
@@ -80,9 +88,15 @@ export function CITIOImportDialog({
         med.brand?.toLowerCase().includes(term) ||
         med.description?.toLowerCase().includes(term) ||
         med.medication_families?.name?.toLowerCase().includes(term) ||
-        med.medication_code?.toLowerCase().includes(term)
+        med.medication_code?.toLowerCase().includes(term) ||
+        med.grupo_sat?.toLowerCase().includes(term)
     );
   }, [medications, searchTerm]);
+
+  // Medicamentos disponibles para importar (no importados aún)
+  const availableMedications = useMemo(() => {
+    return filteredMedications.filter(med => !existingCitioIds.includes(med.id));
+  }, [filteredMedications, existingCitioIds]);
 
   const groupedByFamily = useMemo(() => {
     const groups: Record<string, CITIOMedication[]> = {};
@@ -98,15 +112,139 @@ export function CITIOImportDialog({
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredMedications]);
 
-  const handleImport = () => {
-    if (selectedMedication) {
-      onImport(selectedMedication);
-      setSelectedMedication(null);
+  const isAlreadyImported = (id: string) => existingCitioIds.includes(id);
+
+  const toggleSelection = (id: string) => {
+    const newSelection = new Set(selectedMedications);
+    if (newSelection.has(id)) {
+      newSelection.delete(id);
+    } else {
+      newSelection.add(id);
+    }
+    setSelectedMedications(newSelection);
+  };
+
+  const selectAll = () => {
+    const allAvailableIds = availableMedications.map(med => med.id);
+    setSelectedMedications(new Set(allAvailableIds));
+  };
+
+  const deselectAll = () => {
+    setSelectedMedications(new Set());
+  };
+
+  const allSelected = availableMedications.length > 0 && 
+    availableMedications.every(med => selectedMedications.has(med.id));
+
+  // Generar SKU único
+  const generateUniqueSKU = async (barcode: string): Promise<string> => {
+    const basePrefix = barcode ? `${barcode}-QUAL` : 'MED-QUAL';
+    
+    // Buscar SKUs existentes con este prefijo
+    const { data: existingSkus } = await supabase
+      .from('products')
+      .select('sku')
+      .like('sku', `${basePrefix}-%`);
+    
+    // Encontrar el siguiente número secuencial
+    let maxNum = 0;
+    if (existingSkus && existingSkus.length > 0) {
+      existingSkus.forEach(p => {
+        const match = p.sku.match(/-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      });
+    }
+    
+    return `${basePrefix}-${String(maxNum + 1).padStart(4, '0')}`;
+  };
+
+  // Importación masiva
+  const handleBulkImport = async () => {
+    if (selectedMedications.size === 0) return;
+    
+    setIsImporting(true);
+    
+    try {
+      const selectedMeds = medications.filter(med => selectedMedications.has(med.id));
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const med of selectedMeds) {
+        try {
+          const sku = await generateUniqueSKU(med.medication_code || '');
+          
+          const { error } = await supabase
+            .from('products')
+            .insert({
+              citio_id: med.id,
+              sku: sku,
+              name: med.name,
+              description: med.description,
+              barcode: med.medication_code || null,
+              brand: med.brand || null,
+              category: med.medication_families?.name || null,
+              grupo_sat: med.grupo_sat || null,
+              unit: med.presentacion || 'pieza',
+              price_type_1: med.price_type_1 || null,
+              price_type_2: med.price_type_2 || null,
+              price_type_3: med.price_type_3 || null,
+              price_type_4: med.price_type_4 || null,
+              current_stock: 0,
+              minimum_stock: 0,
+              is_active: true,
+              rfid_required: false,
+            });
+          
+          if (error) {
+            console.error(`Error importing ${med.name}:`, error);
+            errorCount++;
+          } else {
+            successCount++;
+          }
+        } catch (err) {
+          console.error(`Error importing ${med.name}:`, err);
+          errorCount++;
+        }
+      }
+      
+      // Invalidar queries
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products-list'] });
+      
+      if (successCount > 0) {
+        toast.success(`${successCount} producto(s) importado(s) correctamente`);
+      }
+      if (errorCount > 0) {
+        toast.error(`${errorCount} producto(s) no pudieron ser importados`);
+      }
+      
+      // Limpiar selección y cerrar
+      setSelectedMedications(new Set());
       setSearchTerm("");
+      onOpenChange(false);
+      
+    } catch (error: any) {
+      toast.error("Error en la importación: " + error.message);
+    } finally {
+      setIsImporting(false);
     }
   };
 
-  const isAlreadyImported = (id: string) => existingCitioIds.includes(id);
+  // Importación individual (mantener compatibilidad)
+  const handleSingleImport = () => {
+    if (selectedMedications.size === 1) {
+      const medId = Array.from(selectedMedications)[0];
+      const med = medications.find(m => m.id === medId);
+      if (med) {
+        onImport(med);
+        setSelectedMedications(new Set());
+        setSearchTerm("");
+      }
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -118,17 +256,47 @@ export function CITIOImportDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar medicamento por nombre, marca o familia..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar medicamento por nombre, marca, familia o grupo SAT..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={allSelected ? deselectAll : selectAll}
+            disabled={availableMedications.length === 0}
+            className="whitespace-nowrap"
+          >
+            {allSelected ? (
+              <>
+                <Square className="h-4 w-4 mr-1" />
+                Deseleccionar
+              </>
+            ) : (
+              <>
+                <CheckSquare className="h-4 w-4 mr-1" />
+                Seleccionar Todos ({availableMedications.length})
+              </>
+            )}
+          </Button>
         </div>
 
-        <ScrollArea className="h-[350px] border rounded-md">
+        {selectedMedications.size > 0 && (
+          <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg">
+            <Package className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">
+              {selectedMedications.size} producto(s) seleccionado(s)
+            </span>
+          </div>
+        )}
+
+        <ScrollArea className="h-[300px] border rounded-md">
           {isLoading ? (
             <div className="p-4 space-y-3">
               {[...Array(5)].map((_, i) => (
@@ -153,12 +321,12 @@ export function CITIOImportDialog({
                   <div className="space-y-0.5">
                     {meds.map((med) => {
                       const imported = isAlreadyImported(med.id);
-                      const isSelected = selectedMedication?.id === med.id;
+                      const isSelected = selectedMedications.has(med.id);
                       
                       return (
                         <button
                           key={med.id}
-                          onClick={() => !imported && setSelectedMedication(med)}
+                          onClick={() => !imported && toggleSelection(med.id)}
                           disabled={imported}
                           className={cn(
                             "w-full text-left px-2 py-1.5 rounded border transition-all text-sm",
@@ -169,7 +337,16 @@ export function CITIOImportDialog({
                               : "hover:bg-accent hover:border-accent-foreground/20"
                           )}
                         >
-                            <div className="flex flex-col gap-0.5">
+                          <div className="flex items-start gap-2">
+                            {!imported && (
+                              <Checkbox 
+                                checked={isSelected} 
+                                className="mt-0.5"
+                                onClick={(e) => e.stopPropagation()}
+                                onCheckedChange={() => toggleSelection(med.id)}
+                              />
+                            )}
+                            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex-1 min-w-0 flex items-center gap-2">
                                   <span className="font-medium truncate">{med.name}</span>
@@ -179,27 +356,31 @@ export function CITIOImportDialog({
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1.5 shrink-0">
-                                  {med.price_type_1 && (
+                                  {med.price_type_1 != null && med.price_type_1 > 0 && (
                                     <Badge variant="secondary" className="text-xs px-1.5 py-0">
                                       ${med.price_type_1.toFixed(2)}
                                     </Badge>
                                   )}
-                                  {imported ? (
-                                    <Badge variant="outline" className="text-green-600 text-xs px-1.5 py-0">
+                                  {imported && (
+                                    <Badge variant="secondary" className="text-xs px-1.5 py-0 border-green-200 bg-green-50 text-green-700">
                                       <Check className="h-3 w-3 mr-0.5" />
                                       Imp.
                                     </Badge>
-                                  ) : isSelected ? (
-                                    <Check className="h-4 w-4 text-primary" />
-                                  ) : null}
+                                  )}
                                 </div>
                               </div>
-                              {med.medication_code && (
-                                <div className="text-xs text-muted-foreground">
+                              <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
+                                {med.medication_code && (
                                   <span className="font-mono bg-muted px-1 rounded">CB: {med.medication_code}</span>
-                                </div>
-                              )}
+                                )}
+                                {med.grupo_sat && (
+                                  <span className="bg-accent text-accent-foreground px-1 rounded truncate max-w-[300px]" title={med.grupo_sat}>
+                                    {med.grupo_sat}
+                                  </span>
+                                )}
+                              </div>
                             </div>
+                          </div>
                         </button>
                       );
                     })}
@@ -210,32 +391,25 @@ export function CITIOImportDialog({
           )}
         </ScrollArea>
 
-        {selectedMedication && (
-          <div className="p-3 bg-primary/5 border rounded-lg">
-            <div className="text-sm font-medium mb-1">Seleccionado:</div>
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-primary" />
-              <span className="font-semibold">{selectedMedication.name}</span>
-              <span className="text-muted-foreground">- {selectedMedication.brand}</span>
-            </div>
-            {selectedMedication.medication_code && (
-              <div className="mt-1 text-xs text-muted-foreground">
-                Código de barras: <span className="font-mono bg-muted px-1 rounded">{selectedMedication.medication_code}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        <DialogFooter>
+        <DialogFooter className="gap-2">
           <DialogClose asChild>
-            <Button variant="outline">Cancelar</Button>
+            <Button variant="outline" disabled={isImporting}>Cancelar</Button>
           </DialogClose>
           <Button 
-            onClick={handleImport} 
-            disabled={!selectedMedication}
+            onClick={handleBulkImport} 
+            disabled={selectedMedications.size === 0 || isImporting}
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Importar al Inventario
+            {isImporting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Importando...
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                Importar {selectedMedications.size > 0 ? `(${selectedMedications.size})` : ''}
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

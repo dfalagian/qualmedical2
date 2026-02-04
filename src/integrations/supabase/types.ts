@@ -971,6 +971,7 @@ export type Database = {
           created_at: string | null
           current_stock: number | null
           description: string | null
+          grupo_sat: string | null
           id: string
           is_active: boolean | null
           minimum_stock: number | null
@@ -995,6 +996,7 @@ export type Database = {
           created_at?: string | null
           current_stock?: number | null
           description?: string | null
+          grupo_sat?: string | null
           id?: string
           is_active?: boolean | null
           minimum_stock?: number | null
@@ -1019,6 +1021,7 @@ export type Database = {
           created_at?: string | null
           current_stock?: number | null
           description?: string | null
+          grupo_sat?: string | null
           id?: string
           is_active?: boolean | null
           minimum_stock?: number | null
