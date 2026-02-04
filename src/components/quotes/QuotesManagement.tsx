@@ -24,6 +24,7 @@ import {
   Save,
   Printer,
   AlertTriangle,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -39,6 +40,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -60,7 +68,21 @@ interface Product {
   unit_price: number | null;
   current_stock: number | null;
   brand: string | null;
+  price_type_1: number | null;
+  price_type_2: number | null;
+  price_type_3: number | null;
+  price_type_4: number | null;
 }
+
+type PriceType = "1" | "2" | "3" | "4" | "manual";
+
+const PRICE_TYPE_LABELS: Record<PriceType, string> = {
+  "1": "Tipo 1 - Público",
+  "2": "Tipo 2 - Mayoreo",
+  "3": "Tipo 3 - Distribuidor",
+  "4": "Tipo 4 - Especial",
+  "manual": "Precio Manual",
+};
 
 interface Batch {
   id: string;
@@ -112,7 +134,10 @@ export const QuotesManagement = () => {
   const [batchOpen, setBatchOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   
+  // Price type selection
+  const [selectedPriceType, setSelectedPriceType] = useState<PriceType>("1");
   const [productPrecio, setProductPrecio] = useState("");
+  const [isManualPrice, setIsManualPrice] = useState(false);
 
   // Quote items
   const [quoteItems, setQuoteItems] = useState<QuoteItem[]>([]);
@@ -131,13 +156,13 @@ export const QuotesManagement = () => {
     },
   });
 
-  // Fetch products
+  // Fetch products with all price types
   const { data: products = [] } = useQuery({
-    queryKey: ["products-active"],
+    queryKey: ["products-active-with-prices"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, sku, unit_price, current_stock, brand")
+        .select("id, name, sku, unit_price, current_stock, brand, price_type_1, price_type_2, price_type_3, price_type_4")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -204,13 +229,43 @@ export const QuotesManagement = () => {
     setClientSearch("");
   };
 
+  // Get price by type for a product
+  const getProductPrice = (product: Product, priceType: PriceType): number => {
+    if (priceType === "manual") return 0;
+    const priceMap: Record<string, number | null> = {
+      "1": product.price_type_1,
+      "2": product.price_type_2,
+      "3": product.price_type_3,
+      "4": product.price_type_4,
+    };
+    return priceMap[priceType] ?? product.unit_price ?? 0;
+  };
+
   // Handle product selection
   const handleSelectProduct = (product: Product) => {
     setSelectedProduct(product);
     setSelectedBatch(null); // Reset batch when product changes
-    setProductPrecio(product.unit_price?.toString() || "0");
+    // Set price based on selected price type
+    const price = getProductPrice(product, selectedPriceType);
+    setProductPrecio(price.toString());
+    setIsManualPrice(selectedPriceType === "manual");
     setProductOpen(false);
     setProductSearch("");
+  };
+
+  // Handle price type change
+  const handlePriceTypeChange = (priceType: PriceType) => {
+    setSelectedPriceType(priceType);
+    setIsManualPrice(priceType === "manual");
+    
+    if (selectedProduct) {
+      if (priceType === "manual") {
+        setProductPrecio(""); // Clear for manual entry
+      } else {
+        const price = getProductPrice(selectedProduct, priceType);
+        setProductPrecio(price.toString());
+      }
+    }
   };
 
   // Handle batch selection
@@ -416,6 +471,12 @@ export const QuotesManagement = () => {
     setMontoFacturaAnterior("");
     setQuoteItems([]);
     setSavedQuoteId(null);
+    // Reset product selection state
+    setSelectedProduct(null);
+    setSelectedBatch(null);
+    setSelectedPriceType("1");
+    setProductPrecio("");
+    setIsManualPrice(false);
     // Generate new folio
     const generateNewFolio = async () => {
       const { data, error } = await supabase.rpc("generate_quote_folio");
@@ -785,14 +846,37 @@ export const QuotesManagement = () => {
               </Popover>
             </div>
 
+            {/* Price Type Selector */}
             <div className="space-y-2">
-              <Label>Precio Unitario</Label>
+              <Label className="flex items-center gap-1">
+                <DollarSign className="h-3 w-3" />
+                Tipo de Precio
+              </Label>
+              <Select value={selectedPriceType} onValueChange={(v) => handlePriceTypeChange(v as PriceType)}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">{PRICE_TYPE_LABELS["1"]}</SelectItem>
+                  <SelectItem value="2">{PRICE_TYPE_LABELS["2"]}</SelectItem>
+                  <SelectItem value="3">{PRICE_TYPE_LABELS["3"]}</SelectItem>
+                  <SelectItem value="4">{PRICE_TYPE_LABELS["4"]}</SelectItem>
+                  <SelectItem value="manual">{PRICE_TYPE_LABELS["manual"]}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Price Input */}
+            <div className="space-y-2">
+              <Label>{isManualPrice ? "Precio Manual" : "Precio"}</Label>
               <Input
                 type="number"
                 step="0.01"
                 value={productPrecio}
                 onChange={(e) => setProductPrecio(e.target.value)}
                 placeholder="$0.00"
+                readOnly={!isManualPrice}
+                className={cn(!isManualPrice && "bg-muted")}
               />
             </div>
 
@@ -803,6 +887,32 @@ export const QuotesManagement = () => {
               </Button>
             </div>
           </div>
+
+          {/* Price types info when product is selected */}
+          {selectedProduct && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 p-3 bg-muted/30 rounded-lg text-xs">
+              <div className={cn("p-2 rounded border", selectedPriceType === "1" && "border-primary bg-primary/5")}>
+                <span className="text-muted-foreground block">Tipo 1 (Público)</span>
+                <span className="font-semibold">${(selectedProduct.price_type_1 || 0).toFixed(2)}</span>
+              </div>
+              <div className={cn("p-2 rounded border", selectedPriceType === "2" && "border-primary bg-primary/5")}>
+                <span className="text-muted-foreground block">Tipo 2 (Mayoreo)</span>
+                <span className="font-semibold">${(selectedProduct.price_type_2 || 0).toFixed(2)}</span>
+              </div>
+              <div className={cn("p-2 rounded border", selectedPriceType === "3" && "border-primary bg-primary/5")}>
+                <span className="text-muted-foreground block">Tipo 3 (Distrib.)</span>
+                <span className="font-semibold">${(selectedProduct.price_type_3 || 0).toFixed(2)}</span>
+              </div>
+              <div className={cn("p-2 rounded border", selectedPriceType === "4" && "border-primary bg-primary/5")}>
+                <span className="text-muted-foreground block">Tipo 4 (Especial)</span>
+                <span className="font-semibold">${(selectedProduct.price_type_4 || 0).toFixed(2)}</span>
+              </div>
+              <div className={cn("p-2 rounded border", selectedPriceType === "manual" && "border-primary bg-primary/5")}>
+                <span className="text-muted-foreground block">Manual</span>
+                <span className="font-semibold italic">Personalizado</span>
+              </div>
+            </div>
+          )}
 
           {/* Auto-filled batch info */}
           {selectedBatch && selectedProduct && (

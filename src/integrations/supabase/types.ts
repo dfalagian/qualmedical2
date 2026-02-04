@@ -975,6 +975,10 @@ export type Database = {
           is_active: boolean | null
           minimum_stock: number | null
           name: string
+          price_type_1: number | null
+          price_type_2: number | null
+          price_type_3: number | null
+          price_type_4: number | null
           rfid_required: boolean
           sku: string
           supplier_id: string | null
@@ -995,6 +999,10 @@ export type Database = {
           is_active?: boolean | null
           minimum_stock?: number | null
           name: string
+          price_type_1?: number | null
+          price_type_2?: number | null
+          price_type_3?: number | null
+          price_type_4?: number | null
           rfid_required?: boolean
           sku: string
           supplier_id?: string | null
@@ -1015,6 +1023,10 @@ export type Database = {
           is_active?: boolean | null
           minimum_stock?: number | null
           name?: string
+          price_type_1?: number | null
+          price_type_2?: number | null
+          price_type_3?: number | null
+          price_type_4?: number | null
           rfid_required?: boolean
           sku?: string
           supplier_id?: string | null
