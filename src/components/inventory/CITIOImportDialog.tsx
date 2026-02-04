@@ -140,29 +140,15 @@ export function CITIOImportDialog({
   const allSelected = availableMedications.length > 0 && 
     availableMedications.every(med => selectedMedications.has(med.id));
 
-  // Generar SKU único
-  const generateUniqueSKU = async (barcode: string): Promise<string> => {
-    const basePrefix = barcode ? `${barcode}-QUAL` : 'MED-QUAL';
-    
-    // Buscar SKUs existentes con este prefijo
-    const { data: existingSkus } = await supabase
-      .from('products')
-      .select('sku')
-      .like('sku', `${basePrefix}-%`);
-    
-    // Encontrar el siguiente número secuencial
-    let maxNum = 0;
-    if (existingSkus && existingSkus.length > 0) {
-      existingSkus.forEach(p => {
-        const match = p.sku.match(/-(\d+)$/);
-        if (match) {
-          const num = parseInt(match[1], 10);
-          if (num > maxNum) maxNum = num;
-        }
-      });
+  // Generar SKU: usar el código original del catálogo externo
+  // La unicidad se controla mediante citio_id, no mediante modificaciones al SKU
+  const getSKU = (med: CITIOMedication): string => {
+    // Prioridad: medication_code (código de barras) > id de CITIO > generar uno
+    if (med.medication_code && med.medication_code.trim()) {
+      return med.medication_code.trim();
     }
-    
-    return `${basePrefix}-${String(maxNum + 1).padStart(4, '0')}`;
+    // Fallback: usar el ID de CITIO como SKU
+    return `CITIO-${med.id.substring(0, 8)}`;
   };
 
   // Importación masiva
@@ -178,16 +164,19 @@ export function CITIOImportDialog({
       
       for (const med of selectedMeds) {
         try {
-          const sku = await generateUniqueSKU(med.medication_code || '');
+          // SKU = código original del catálogo (sin modificar)
+          // La unicidad se garantiza por citio_id
+          const sku = getSKU(med);
+          const barcode = med.medication_code?.trim() || null;
           
           const { error } = await supabase
             .from('products')
             .insert({
-              citio_id: med.id,
-              sku: sku,
+              citio_id: med.id, // Control interno de unicidad
+              sku: sku,         // Código original (escaneable)
               name: med.name,
               description: med.description,
-              barcode: med.medication_code || null,
+              barcode: barcode, // Código de barras original
               brand: med.brand || null,
               category: med.medication_families?.name || null,
               grupo_sat: med.grupo_sat || null,
