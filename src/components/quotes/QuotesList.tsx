@@ -23,6 +23,8 @@ import {
   ListFilter,
   FileText,
   Pencil,
+  Radio,
+  AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -67,6 +69,7 @@ interface Quote {
   fecha_factura_anterior?: string | null;
   monto_factura_anterior?: number | null;
   status: string;
+  inventory_exit_status: string | null;
   subtotal: number;
   total: number;
   created_at: string;
@@ -184,6 +187,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
           fecha_factura_anterior,
           monto_factura_anterior,
           status,
+          inventory_exit_status,
           subtotal,
           total,
           created_at,
@@ -395,6 +399,44 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
     }
   };
 
+  // Start exit scan for already approved quote
+  const handleStartExitScan = async (quote: Quote) => {
+    try {
+      const items = await fetchQuoteItems(quote.id);
+      
+      // Fetch rfid_required for all products
+      const productIds = [...new Set(items.filter(i => i.product_id).map(i => i.product_id as string))];
+      const { data: productsData } = await supabase
+        .from("products")
+        .select("id, rfid_required")
+        .in("id", productIds);
+      
+      const rfidMap = new Map(productsData?.map(p => [p.id, p.rfid_required]) || []);
+      
+      // Get batch_id from quote_items (they should have been set during approval)
+      const itemsForScan = items
+        .filter(item => item.product_id && item.batch_id)
+        .map(item => ({
+          id: item.id,
+          product_id: item.product_id!,
+          batch_id: item.batch_id!,
+          nombre_producto: item.nombre_producto,
+          cantidad: item.cantidad,
+          rfid_required: rfidMap.get(item.product_id!) || false,
+        }));
+      
+      if (itemsForScan.length > 0) {
+        setApprovedQuoteId(quote.id);
+        setApprovedItems(itemsForScan);
+        setExitScanOpen(true);
+      } else {
+        toast.error("No hay productos con lotes asignados para escanear");
+      }
+    } catch (error) {
+      toast.error("Error al cargar los productos");
+    }
+  };
+
   // Start cancel process
   const handleStartCancel = (quote: Quote) => {
     setQuoteToCancel(quote);
@@ -494,12 +536,25 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                           ${quote.total.toFixed(2)}
                         </TableCell>
                         <TableCell>
-                          <Badge 
-                            variant={config.variant}
-                            className={config.className}
-                          >
-                            {config.label}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge 
+                              variant={config.variant}
+                              className={config.className}
+                            >
+                              {config.label}
+                            </Badge>
+                            {/* Alert for pending inventory exit */}
+                            {quote.status === "aprobada" && quote.inventory_exit_status !== "completed" && (
+                              <Badge 
+                                variant="outline" 
+                                className="text-amber-600 border-amber-400 bg-amber-50 animate-pulse"
+                                title="Salida de inventario pendiente"
+                              >
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Salida pendiente
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex justify-end gap-1">
@@ -539,6 +594,17 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                                 className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
                               >
                                 <CheckCircle2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {quote.status === "aprobada" && quote.inventory_exit_status !== "completed" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleStartExitScan(quote)}
+                                title="Registrar salida de inventario"
+                                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                              >
+                                <Radio className="h-4 w-4" />
                               </Button>
                             )}
                             {quote.status === "aprobada" && (

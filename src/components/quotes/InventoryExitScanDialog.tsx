@@ -299,6 +299,12 @@ export const InventoryExitScanDialog = ({
           });
       }
 
+      // Update quote inventory_exit_status to 'completed'
+      await supabase
+        .from("quotes")
+        .update({ inventory_exit_status: "completed" })
+        .eq("id", quoteId);
+
       toast.success("¡Salida de inventario completada!");
       onComplete();
       onOpenChange(false);
@@ -309,12 +315,18 @@ export const InventoryExitScanDialog = ({
     }
   };
 
-  // Handle close without completing
-  const handleClose = () => {
+  // Handle close without completing - update to partial if some items scanned
+  const handleClose = async () => {
     if (scannedItems.length > 0 && !allComplete) {
-      if (!confirm("Hay productos pendientes de escanear. ¿Desea cerrar de todos modos?")) {
+      if (!confirm("Hay productos pendientes de escanear. ¿Desea cerrar de todos modos? El progreso parcial se guardará.")) {
         return;
       }
+      
+      // Update status to partial
+      await supabase
+        .from("quotes")
+        .update({ inventory_exit_status: "partial" })
+        .eq("id", quoteId);
     }
     onOpenChange(false);
   };

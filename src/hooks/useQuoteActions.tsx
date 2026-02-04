@@ -224,12 +224,12 @@ export const useQuoteActions = () => {
         };
       }
 
-      // Procesar cada item: descontar stock y crear movimiento (puede resultar en stock negativo)
+      // Procesar cada item: descontar stock, crear movimiento y guardar batch_id
       for (const item of params.items) {
         // Obtener stock actual del lote
         const { data: batch } = await supabase
           .from("product_batches")
-          .select("current_quantity, product_id")
+          .select("current_quantity, product_id, batch_number, expiration_date")
           .eq("id", item.batch_id)
           .single();
 
@@ -277,6 +277,17 @@ export const useQuoteActions = () => {
           });
 
         if (movementError) throw movementError;
+
+        // Actualizar quote_item con batch_id, lote y fecha_caducidad seleccionados
+        await supabase
+          .from("quote_items")
+          .update({
+            batch_id: item.batch_id,
+            lote: batch.batch_number,
+            fecha_caducidad: batch.expiration_date,
+          })
+          .eq("quote_id", params.quoteId)
+          .eq("product_id", item.product_id);
       }
 
       // Actualizar estado de la cotización
@@ -286,6 +297,7 @@ export const useQuoteActions = () => {
           status: "aprobada",
           approved_at: new Date().toISOString(),
           approved_by: user.id,
+          inventory_exit_status: "pending", // Track inventory exit status
         })
         .eq("id", params.quoteId);
 
