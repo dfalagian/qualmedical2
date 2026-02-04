@@ -23,7 +23,7 @@ interface OrderData {
   description?: string;
 }
 
-export const generateAndOpenPDF = (orderData: OrderData) => {
+export const generateAndOpenPDF = (orderData: OrderData, targetWindow?: Window | null) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -220,7 +220,27 @@ export const generateAndOpenPDF = (orderData: OrderData) => {
   // Abrir directamente en el navegador
   const pdfBlob = doc.output("blob");
   const url = URL.createObjectURL(pdfBlob);
-  window.open(url, "_blank");
+
+  // Si ya existe una pestaña abierta desde el gesto del usuario, úsala para evitar bloqueos.
+  if (targetWindow && !targetWindow.closed) {
+    try {
+      targetWindow.location.href = url;
+      targetWindow.focus();
+      return;
+    } catch {
+      // fallback
+    }
+  }
+
+  const w = window.open(url, "_blank");
+  if (!w) {
+    // Último recurso: intentar abrir mediante un <a> (algunos navegadores lo permiten)
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.click();
+  }
 };
 
 // Función para descargar el PDF

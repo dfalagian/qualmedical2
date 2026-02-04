@@ -191,8 +191,10 @@ export const CreateSupplierOrderDialog = ({
     return suppliers?.find((s) => s.id === selectedSupplier);
   }, [suppliers, selectedSupplier]);
 
-  const createOrderMutation = useMutation({
-    mutationFn: async () => {
+  type CreateOrderVars = { popup: Window | null };
+
+  const createOrderMutation = useMutation<any, any, CreateOrderVars>({
+    mutationFn: async (_variables) => {
       if (!user) throw new Error("Usuario no autenticado");
       if (!selectedSupplier) throw new Error("Selecciona un proveedor");
       if (!orderNumber) throw new Error("Ingresa el número de orden");
@@ -231,7 +233,7 @@ export const CreateSupplierOrderDialog = ({
 
       return order;
     },
-    onSuccess: () => {
+    onSuccess: (_order, variables) => {
       toast.success("Orden de compra creada correctamente");
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
       queryClient.invalidateQueries({ queryKey: ["next_qual_order_number"] });
@@ -247,13 +249,33 @@ export const CreateSupplierOrderDialog = ({
         total,
         description,
       };
-      generateAndOpenPDF(orderData);
+      generateAndOpenPDF(orderData, variables?.popup);
       handleClose();
     },
-    onError: (error: any) => {
+    onError: (error: any, variables) => {
+      if (variables?.popup && !variables.popup.closed) {
+        // Si falló la creación, cerramos la pestaña pre-abierta para no dejarla colgada.
+        variables.popup.close();
+      }
       toast.error(error.message || "Error al crear la orden");
     },
   });
+
+  const handleCreateAndViewPdf = () => {
+    // Abrir la pestaña *en el gesto del usuario* para que Chrome no la bloquee.
+    const popup = window.open("about:blank", "_blank");
+    if (popup) {
+      try {
+        popup.document.title = `OC ${orderNumber || ""}`;
+        popup.document.body.innerHTML =
+          '<div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px;">Generando PDF...</div>';
+      } catch {
+        // ignore
+      }
+    }
+
+    createOrderMutation.mutate({ popup });
+  };
 
   const resetForm = () => {
     setSelectedSupplier("");
@@ -432,7 +454,7 @@ export const CreateSupplierOrderDialog = ({
                 Cancelar
               </Button>
               <Button
-                onClick={() => createOrderMutation.mutate()}
+                onClick={handleCreateAndViewPdf}
                 disabled={createOrderMutation.isPending || selectedProducts.length === 0}
                 className="gap-2"
               >
