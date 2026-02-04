@@ -90,6 +90,7 @@ interface QuoteItem {
   precio_unitario: number;
   importe: number;
   tipo_precio?: string | null;
+  categoria?: string | null;
 }
 
 interface QuoteToEdit {
@@ -200,16 +201,25 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
     return matchesSearch && matchesStatus;
   });
 
-  // Fetch quote items for detail view
+  // Fetch quote items for detail view (with product category)
   const fetchQuoteItems = async (quoteId: string) => {
     const { data, error } = await supabase
       .from("quote_items")
-      .select("*")
+      .select(`
+        *,
+        products:product_id (category)
+      `)
       .eq("quote_id", quoteId)
       .order("created_at");
     
     if (error) throw error;
-    return data as QuoteItem[];
+    
+    // Map to include category from joined product
+    return (data || []).map(item => ({
+      ...item,
+      categoria: item.products?.category || null,
+      products: undefined, // Remove the nested object
+    })) as QuoteItem[];
   };
 
   // View quote details
@@ -269,6 +279,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
           marca: item.marca || "",
           lote: item.lote || "",
           fecha_caducidad: item.fecha_caducidad ? new Date(item.fecha_caducidad) : null,
+          categoria: item.categoria || null,
         })),
         subtotal: quote.subtotal,
         total: quote.total,
