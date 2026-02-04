@@ -74,15 +74,17 @@ interface Product {
   price_type_2: number | null;
   price_type_3: number | null;
   price_type_4: number | null;
+  price_type_5: number | null;
 }
 
-type PriceType = "1" | "2" | "3" | "4" | "manual";
+type PriceType = "1" | "2" | "3" | "4" | "5" | "manual";
 
 const PRICE_TYPE_LABELS: Record<PriceType, string> = {
   "1": "Tipo 1 - Público",
   "2": "Tipo 2 - Mayoreo",
   "3": "Tipo 3 - Distribuidor",
   "4": "Tipo 4 - Especial",
+  "5": "Tipo 5 - VIP",
   "manual": "Precio Manual",
 };
 
@@ -112,6 +114,7 @@ interface QuoteItem {
     price_type_2: number;
     price_type_3: number;
     price_type_4: number;
+    price_type_5: number;
   };
 }
 
@@ -207,7 +210,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, sku, unit_price, current_stock, brand, category, grupo_sat, price_type_1, price_type_2, price_type_3, price_type_4")
+        .select("id, name, sku, unit_price, current_stock, brand, category, grupo_sat, price_type_1, price_type_2, price_type_3, price_type_4, price_type_5")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -269,6 +272,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
             price_type_2: product?.price_type_2 || 0,
             price_type_3: product?.price_type_3 || 0,
             price_type_4: product?.price_type_4 || 0,
+            price_type_5: product?.price_type_5 || 0,
           },
         };
       });
@@ -329,6 +333,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
       "2": product.price_type_2,
       "3": product.price_type_3,
       "4": product.price_type_4,
+      "5": product.price_type_5,
     };
     return priceMap[priceType] ?? product.unit_price ?? 0;
   };
@@ -408,6 +413,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
         price_type_2: selectedProduct.price_type_2 || 0,
         price_type_3: selectedProduct.price_type_3 || 0,
         price_type_4: selectedProduct.price_type_4 || 0,
+        price_type_5: selectedProduct.price_type_5 || 0,
       },
     };
 
@@ -450,6 +456,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
             "2": item.precios_disponibles.price_type_2,
             "3": item.precios_disponibles.price_type_3,
             "4": item.precios_disponibles.price_type_4,
+            "5": item.precios_disponibles.price_type_5,
           };
           newPrice = priceMap[newPriceType] || 0;
         }
@@ -958,7 +965,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
           {selectedProduct && (
             <div className="p-3 bg-muted/30 rounded-lg">
               <p className="text-xs text-muted-foreground mb-2">Precios disponibles para <span className="font-medium text-foreground">{selectedProduct.name}</span>:</p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
                 <div className="p-2 rounded border bg-background">
                   <span className="text-muted-foreground block">T1 - Público</span>
                   <span className="font-semibold">${(selectedProduct.price_type_1 || 0).toFixed(2)}</span>
@@ -974,6 +981,10 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                 <div className="p-2 rounded border bg-background">
                   <span className="text-muted-foreground block">T4 - Especial</span>
                   <span className="font-semibold">${(selectedProduct.price_type_4 || 0).toFixed(2)}</span>
+                </div>
+                <div className="p-2 rounded border bg-background">
+                  <span className="text-muted-foreground block">T5 - VIP</span>
+                  <span className="font-semibold">${(selectedProduct.price_type_5 || 0).toFixed(2)}</span>
                 </div>
               </div>
             </div>
