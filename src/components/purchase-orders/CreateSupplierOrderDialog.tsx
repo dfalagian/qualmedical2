@@ -32,7 +32,10 @@ import {
 } from "@/components/ui/table";
 import { Package, Trash2, FileText } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
-import { generateAndOpenPDF } from "./PurchaseOrderPDFViewer";
+import {
+  createPurchaseOrderPdfBlob,
+  downloadPurchaseOrderPdf,
+} from "./purchaseOrderPdf";
 
 interface SelectedProduct {
   id: string;
@@ -233,11 +236,11 @@ export const CreateSupplierOrderDialog = ({
 
       return order;
     },
-    onSuccess: (_order, variables) => {
+    onSuccess: (order, variables) => {
       toast.success("Orden de compra creada correctamente");
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
       queryClient.invalidateQueries({ queryKey: ["next_qual_order_number"] });
-      // Generar y abrir PDF directamente en el navegador
+
       const orderData = {
         orderNumber,
         supplierName: selectedSupplierData?.company_name || selectedSupplierData?.full_name || "",
@@ -249,7 +252,53 @@ export const CreateSupplierOrderDialog = ({
         total,
         description,
       };
-      generateAndOpenPDF(orderData, variables?.popup);
+
+      // Abrir como URL https (evita bloqueos por blob:/data:)
+      void (async () => {
+        const popup = variables?.popup;
+        try {
+          if (popup && !popup.closed) {
+            try {
+              popup.document.title = `OC ${orderNumber}`;
+              popup.document.body.innerHTML =
+                '<div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px;">Subiendo PDF...</div>';
+            } catch {
+              // ignore
+            }
+          }
+
+          const pdfBlob = createPurchaseOrderPdfBlob(orderData);
+          const filePath = `${selectedSupplier}/ordenes_compra/${order.id}/OC-${orderNumber}.pdf`;
+
+          const { error: uploadError } = await supabase.storage
+            .from("documents")
+            .upload(filePath, pdfBlob, { contentType: "application/pdf", upsert: true });
+
+          if (uploadError) throw uploadError;
+
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from("documents").getPublicUrl(filePath);
+
+          if (popup && !popup.closed) {
+            popup.location.href = publicUrl;
+            popup.focus();
+          } else {
+            // Si el navegador bloqueó el popup, navega en la misma pestaña.
+            window.location.href = publicUrl;
+          }
+        } catch (e) {
+          console.error("Error abriendo PDF por URL https:", e);
+          if (variables?.popup && !variables.popup.closed) {
+            variables.popup.close();
+          }
+          toast.error("No se pudo abrir el PDF", {
+            description: "Se descargará el PDF en su lugar.",
+          });
+          downloadPurchaseOrderPdf(orderData);
+        }
+      })();
+
       handleClose();
     },
     onError: (error: any, variables) => {
@@ -268,7 +317,7 @@ export const CreateSupplierOrderDialog = ({
       try {
         popup.document.title = `OC ${orderNumber || ""}`;
         popup.document.body.innerHTML =
-          '<div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px;">Generando PDF...</div>';
+          '<div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px;">Creando orden y preparando PDF...</div>';
       } catch {
         // ignore
       }
