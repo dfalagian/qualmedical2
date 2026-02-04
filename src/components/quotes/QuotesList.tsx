@@ -55,6 +55,7 @@ import {
 import { printQuoteHtml } from "./quoteHtmlPrint";
 import { useQuoteActions } from "@/hooks/useQuoteActions";
 import { BatchSelectionDialog } from "./BatchSelectionDialog";
+import { InventoryExitScanDialog } from "./InventoryExitScanDialog";
 
 interface Quote {
   id: string;
@@ -150,6 +151,18 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
   // Batch selection dialog for approval
   const [batchSelectionOpen, setBatchSelectionOpen] = useState(false);
   const [quoteToApprove, setQuoteToApprove] = useState<Quote | null>(null);
+  
+  // Inventory exit scan dialog (post-approval)
+  const [exitScanOpen, setExitScanOpen] = useState(false);
+  const [approvedQuoteId, setApprovedQuoteId] = useState<string | null>(null);
+  const [approvedItems, setApprovedItems] = useState<Array<{
+    id: string;
+    product_id: string;
+    batch_id: string;
+    nombre_producto: string;
+    cantidad: number;
+    rfid_required: boolean;
+  }>>([]);
   
   // Cancel confirmation
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -315,6 +328,15 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
     if (!quoteToApprove) return;
     
     try {
+      // Fetch rfid_required for all products
+      const productIds = [...new Set(selections.map(s => s.productId))];
+      const { data: productsData } = await supabase
+        .from("products")
+        .select("id, rfid_required")
+        .in("id", productIds);
+      
+      const rfidMap = new Map(productsData?.map(p => [p.id, p.rfid_required]) || []);
+
       // Map selections to the format expected by approveQuote
       const itemsWithBatches = selections
         .filter(sel => sel.batchId)
@@ -339,10 +361,35 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
         forceApprove: hasStockWarnings,
       });
       
+      // Prepare items for exit scan dialog
+      const itemsForScan = selections
+        .filter(sel => sel.batchId)
+        .map(sel => {
+          const originalItem = quoteItems.find(i => i.id === sel.itemId);
+          return {
+            id: sel.itemId,
+            product_id: sel.productId,
+            batch_id: sel.batchId!,
+            nombre_producto: originalItem?.nombre_producto || "",
+            cantidad: sel.requestedQuantity,
+            rfid_required: rfidMap.get(sel.productId) || false,
+          };
+        });
+      
+      // Check if any product requires RFID scan
+      const hasRfidProducts = itemsForScan.some(item => item.rfid_required);
+      
       setBatchSelectionOpen(false);
       setQuoteToApprove(null);
       setQuoteItems([]);
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      
+      // Open exit scan dialog if there are products to process
+      if (itemsForScan.length > 0 && hasRfidProducts) {
+        setApprovedQuoteId(quoteToApprove.id);
+        setApprovedItems(itemsForScan);
+        setExitScanOpen(true);
+      }
     } catch (error: any) {
       toast.error("Error al aprobar: " + error.message);
     }
@@ -648,6 +695,26 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
           quoteItems={quoteItems}
           onConfirm={handleBatchSelectionConfirm}
           isApproving={isApproving}
+        />
+      )}
+
+      {/* Inventory Exit Scan Dialog */}
+      {approvedQuoteId && (
+        <InventoryExitScanDialog
+          open={exitScanOpen}
+          onOpenChange={(open) => {
+            setExitScanOpen(open);
+            if (!open) {
+              setApprovedQuoteId(null);
+              setApprovedItems([]);
+            }
+          }}
+          quoteId={approvedQuoteId}
+          quoteItems={approvedItems}
+          onComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ["products"] });
+            queryClient.invalidateQueries({ queryKey: ["rfid-tags"] });
+          }}
         />
       )}
 
