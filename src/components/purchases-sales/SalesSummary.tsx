@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -13,9 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, FileSpreadsheet, Calendar, Package, CheckCircle } from "lucide-react";
+import { Search, FileSpreadsheet, Calendar, Package, CheckCircle, Receipt, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { SalesInvoiceUpload } from "./SalesInvoiceUpload";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface QuoteWithClient {
   id: string;
@@ -40,10 +44,25 @@ interface QuoteWithClient {
   }>;
 }
 
+interface SalesInvoice {
+  id: string;
+  folio: string;
+  uuid: string | null;
+  fecha_emision: string | null;
+  subtotal: number | null;
+  total: number;
+  currency: string | null;
+  emisor_nombre: string | null;
+  receptor_nombre: string | null;
+  receptor_rfc: string | null;
+  created_at: string;
+}
+
 export const SalesSummary = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeSubTab, setActiveSubTab] = useState("quotes");
 
-  const { data: quotes, isLoading } = useQuery({
+  const { data: quotes, isLoading: isLoadingQuotes } = useQuery({
     queryKey: ["approved-quotes-sales"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -78,6 +97,35 @@ export const SalesSummary = () => {
     },
   });
 
+  const { data: salesInvoices, isLoading: isLoadingInvoices, refetch: refetchInvoices } = useQuery({
+    queryKey: ["sales-invoices"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sales_invoices")
+        .select("*")
+        .order("fecha_emision", { ascending: false });
+
+      if (error) throw error;
+      return data as SalesInvoice[];
+    },
+  });
+
+  const handleDeleteInvoice = async (id: string) => {
+    if (!confirm("¿Estás seguro de eliminar esta factura?")) return;
+    
+    const { error } = await supabase
+      .from("sales_invoices")
+      .delete()
+      .eq("id", id);
+      
+    if (error) {
+      toast.error("Error al eliminar la factura");
+    } else {
+      toast.success("Factura eliminada");
+      refetchInvoices();
+    }
+  };
+
   const filteredQuotes = quotes?.filter((quote) => {
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -87,6 +135,15 @@ export const SalesSummary = () => {
       quote.items?.some((item) =>
         item.nombre_producto?.toLowerCase().includes(searchLower)
       )
+    );
+  });
+
+  const filteredInvoices = salesInvoices?.filter((invoice) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      invoice.folio?.toLowerCase().includes(searchLower) ||
+      invoice.receptor_nombre?.toLowerCase().includes(searchLower) ||
+      invoice.receptor_rfc?.toLowerCase().includes(searchLower)
     );
   });
 
@@ -101,14 +158,14 @@ export const SalesSummary = () => {
     switch (status) {
       case "completed":
         return (
-          <Badge className="bg-green-100 text-green-800">
+          <Badge variant="default" className="bg-green-600">
             <CheckCircle className="h-3 w-3 mr-1" />
             Salida completada
           </Badge>
         );
       case "partial":
         return (
-          <Badge className="bg-amber-100 text-amber-800">
+          <Badge variant="secondary" className="bg-amber-500 text-white">
             <Package className="h-3 w-3 mr-1" />
             Salida parcial
           </Badge>
@@ -123,8 +180,8 @@ export const SalesSummary = () => {
     }
   };
 
-  // Calcular totales
-  const totals = filteredQuotes?.reduce(
+  // Calculate totals for quotes
+  const quoteTotals = filteredQuotes?.reduce(
     (acc, quote) => ({
       sales: acc.sales + 1,
       items: acc.items + (quote.items?.length || 0),
@@ -134,6 +191,17 @@ export const SalesSummary = () => {
     }),
     { sales: 0, items: 0, amount: 0, completedExits: 0 }
   ) || { sales: 0, items: 0, amount: 0, completedExits: 0 };
+
+  // Calculate totals for invoices
+  const invoiceTotals = filteredInvoices?.reduce(
+    (acc, invoice) => ({
+      count: acc.count + 1,
+      amount: acc.amount + invoice.total,
+    }),
+    { count: 0, amount: 0 }
+  ) || { count: 0, amount: 0 };
+
+  const isLoading = isLoadingQuotes || isLoadingInvoices;
 
   if (isLoading) {
     return (
@@ -146,135 +214,259 @@ export const SalesSummary = () => {
 
   return (
     <div className="space-y-4">
-      {/* Resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Ventas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totals.sales}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Productos Vendidos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totals.items}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Monto Total
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              {formatCurrency(totals.amount)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Salidas Completadas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {totals.completedExits} / {totals.sales}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Sub-tabs for Quotes vs Invoices */}
+      <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <TabsList>
+            <TabsTrigger value="quotes" className="gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              Cotizaciones Aprobadas
+            </TabsTrigger>
+            <TabsTrigger value="invoices" className="gap-2">
+              <Receipt className="h-4 w-4" />
+              Facturas de Venta
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Búsqueda */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar venta, cliente o producto..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+          {activeSubTab === "invoices" && <SalesInvoiceUpload />}
+        </div>
 
-      {/* Tabla de ventas */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Folio</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Fecha Venta</TableHead>
-                <TableHead>Productos</TableHead>
-                <TableHead>Estado Salida</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredQuotes?.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No se encontraron ventas aprobadas
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredQuotes?.map((quote) => (
-                  <TableRow key={quote.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{quote.folio}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">
-                          {quote.client?.nombre_cliente}
-                        </div>
-                        {quote.client?.razon_social && (
-                          <div className="text-xs text-muted-foreground">
-                            {quote.client.razon_social}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Calendar className="h-3 w-3" />
-                        {format(
-                          new Date(quote.fecha_cotizacion),
-                          "dd MMM yyyy",
-                          { locale: es }
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {quote.items?.length || 0} productos
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {getExitStatusBadge(quote.inventory_exit_status)}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {formatCurrency(quote.total)}
-                    </TableCell>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+          {activeSubTab === "quotes" ? (
+            <>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Ventas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{quoteTotals.sales}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Productos Vendidos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{quoteTotals.items}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Monto Total
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-primary">
+                    {formatCurrency(quoteTotals.amount)}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Salidas Completadas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">
+                    {quoteTotals.completedExits} / {quoteTotals.sales}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Facturas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{invoiceTotals.count}</div>
+                </CardContent>
+              </Card>
+              <Card className="md:col-span-3">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Monto Total Facturado
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-primary">
+                    {formatCurrency(invoiceTotals.amount)}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
+
+        {/* Search */}
+        <div className="relative max-w-sm mt-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={activeSubTab === "quotes" 
+              ? "Buscar venta, cliente o producto..." 
+              : "Buscar factura, cliente o RFC..."}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        {/* Quotes Tab Content */}
+        <TabsContent value="quotes" className="mt-4">
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Folio</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Fecha Venta</TableHead>
+                    <TableHead>Productos</TableHead>
+                    <TableHead>Estado Salida</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {filteredQuotes?.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No se encontraron ventas aprobadas
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredQuotes?.map((quote) => (
+                      <TableRow key={quote.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{quote.folio}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">
+                              {quote.client?.nombre_cliente}
+                            </div>
+                            {quote.client?.razon_social && (
+                              <div className="text-xs text-muted-foreground">
+                                {quote.client.razon_social}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-sm">
+                            <Calendar className="h-3 w-3" />
+                            {format(
+                              new Date(quote.fecha_cotizacion),
+                              "dd MMM yyyy",
+                              { locale: es }
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {quote.items?.length || 0} productos
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {getExitStatusBadge(quote.inventory_exit_status)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {formatCurrency(quote.total)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Invoices Tab Content */}
+        <TabsContent value="invoices" className="mt-4">
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Folio</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>RFC Cliente</TableHead>
+                    <TableHead>Fecha Emisión</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredInvoices?.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No hay facturas de venta registradas
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredInvoices?.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Receipt className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{invoice.folio}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">
+                            {invoice.receptor_nombre || "-"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {invoice.receptor_rfc || "-"}
+                        </TableCell>
+                        <TableCell>
+                          {invoice.fecha_emision ? (
+                            <div className="flex items-center gap-1 text-sm">
+                              <Calendar className="h-3 w-3" />
+                              {format(
+                                new Date(invoice.fecha_emision),
+                                "dd MMM yyyy",
+                                { locale: es }
+                              )}
+                            </div>
+                          ) : "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {formatCurrency(invoice.total)}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteInvoice(invoice.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

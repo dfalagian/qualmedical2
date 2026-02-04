@@ -1457,6 +1457,74 @@ export type Database = {
           },
         ]
       }
+      sales_invoices: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          emisor_nombre: string | null
+          emisor_rfc: string | null
+          fecha_emision: string | null
+          folio: string
+          id: string
+          notes: string | null
+          pdf_url: string | null
+          quote_id: string | null
+          receptor_nombre: string | null
+          receptor_rfc: string | null
+          subtotal: number | null
+          total: number
+          uuid: string | null
+          xml_url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          emisor_nombre?: string | null
+          emisor_rfc?: string | null
+          fecha_emision?: string | null
+          folio: string
+          id?: string
+          notes?: string | null
+          pdf_url?: string | null
+          quote_id?: string | null
+          receptor_nombre?: string | null
+          receptor_rfc?: string | null
+          subtotal?: number | null
+          total: number
+          uuid?: string | null
+          xml_url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          emisor_nombre?: string | null
+          emisor_rfc?: string | null
+          fecha_emision?: string | null
+          folio?: string
+          id?: string
+          notes?: string | null
+          pdf_url?: string | null
+          quote_id?: string | null
+          receptor_nombre?: string | null
+          receptor_rfc?: string | null
+          subtotal?: number | null
+          total?: number
+          uuid?: string | null
+          xml_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_invoices_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_alerts: {
         Row: {
           alert_type: string
