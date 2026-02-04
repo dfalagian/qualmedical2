@@ -22,7 +22,7 @@ import {
   Check,
   Calendar,
   Save,
-  CheckCircle2,
+  Printer,
   AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,20 +39,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQuoteActions } from "@/hooks/useQuoteActions";
+import { printQuoteHtml } from "./quoteHtmlPrint";
 
 interface Client {
   id: string;
@@ -93,14 +84,10 @@ interface QuoteItem {
 
 export const QuotesManagement = () => {
   // Quote actions hook
-  const { saveQuote, approveQuote, isSaving, isApproving, validateStock } = useQuoteActions();
+  const { saveQuote, isSaving } = useQuoteActions();
   
   // Saved quote state
   const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null);
-  
-  // Stock warning dialog state
-  const [stockWarningOpen, setStockWarningOpen] = useState(false);
-  const [stockWarnings, setStockWarnings] = useState<string[]>([]);
   
   // Client selection state
   const [clientOpen, setClientOpen] = useState(false);
@@ -391,50 +378,30 @@ export const QuotesManagement = () => {
     }
   };
 
-  // Handle approve quote (convert to sale)
-  const handleApproveQuote = async (forceApprove = false) => {
-    if (!savedQuoteId) {
-      toast.error("Primero guarde la cotización");
+  // Handle print quote
+  const handlePrintQuote = () => {
+    if (!selectedClient) {
+      toast.error("Seleccione un cliente");
+      return;
+    }
+    if (quoteItems.length === 0) {
+      toast.error("Agregue al menos un producto");
       return;
     }
 
-    // Validate all items have batch_id
-    const invalidItems = quoteItems.filter(item => !item.batch_id || !item.product_id);
-    if (invalidItems.length > 0) {
-      toast.error("Todos los productos deben tener un lote seleccionado");
-      return;
-    }
-
-    const approvalItems = quoteItems.map(item => ({
-      product_id: item.product_id!,
-      batch_id: item.batch_id!,
-      cantidad: item.cantidad,
-      nombre_producto: item.nombre_producto,
-    }));
-
-    try {
-      await approveQuote({
-        quoteId: savedQuoteId,
-        items: approvalItems,
-        forceApprove,
-      });
-      
-      // Reset form after successful approval
-      resetForm();
-    } catch (error: any) {
-      // Check if it's a stock warning that allows force approval
-      if (error?.type === "STOCK_WARNING") {
-        setStockWarnings(error.warnings);
-        setStockWarningOpen(true);
-      }
-      // Other errors are handled by the hook
-    }
-  };
-
-  // Handle forced approval after warning confirmation
-  const handleForceApprove = async () => {
-    setStockWarningOpen(false);
-    await handleApproveQuote(true);
+    printQuoteHtml({
+      folio,
+      concepto,
+      fechaCotizacion,
+      fechaEntrega,
+      facturaAnterior,
+      fechaFacturaAnterior,
+      montoFacturaAnterior: montoFacturaAnterior ? parseFloat(montoFacturaAnterior) : undefined,
+      client: selectedClient,
+      items: quoteItems,
+      subtotal,
+      total,
+    });
   };
 
   // Reset form after save or approve
@@ -976,61 +943,20 @@ export const QuotesManagement = () => {
                 disabled={!selectedClient || quoteItems.length === 0 || isSaving}
               >
                 <Save className="h-4 w-4 mr-2" />
-                {isSaving ? "Guardando..." : "Guardar Borrador"}
+                {isSaving ? "Guardando..." : "Guardar Cotización"}
               </Button>
               <Button
-                onClick={() => handleApproveQuote()}
-                disabled={!savedQuoteId || quoteItems.length === 0 || isApproving}
+                variant="secondary"
+                onClick={handlePrintQuote}
+                disabled={!selectedClient || quoteItems.length === 0}
               >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                {isApproving ? "Aprobando..." : "Aprobar (Venta)"}
+                <Printer className="h-4 w-4 mr-2" />
+                Imprimir PDF
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
-
-      {/* Stock Warning Dialog */}
-      <AlertDialog open={stockWarningOpen} onOpenChange={setStockWarningOpen}>
-        <AlertDialogContent className="max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
-              <AlertTriangle className="h-5 w-5" />
-              Advertencia: Stock Insuficiente
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p className="text-foreground font-medium">
-                  Los siguientes productos no tienen stock suficiente:
-                </p>
-                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md p-3 max-h-48 overflow-y-auto">
-                  <ul className="space-y-1 text-sm text-amber-800 dark:text-amber-200">
-                    {stockWarnings.map((warning, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-amber-500 mt-0.5">•</span>
-                        <span>{warning}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  ¿Está seguro de que desea proceder con la venta? 
-                  Esto resultará en <span className="font-semibold text-destructive">stock negativo</span> para estos productos.
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleForceApprove}
-              className="bg-amber-600 hover:bg-amber-700"
-            >
-              Aprobar de todos modos
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };
