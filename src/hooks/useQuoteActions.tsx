@@ -38,6 +38,12 @@ interface ApproveQuoteParams {
     cantidad: number;
     nombre_producto: string;
   }>;
+  forceApprove?: boolean; // Permitir aprobar sin stock suficiente (con advertencia)
+}
+
+interface StockValidationResult {
+  isValid: boolean;
+  warnings: string[];
 }
 
 export const useQuoteActions = () => {
@@ -103,9 +109,9 @@ export const useQuoteActions = () => {
     },
   });
 
-  // Validar stock disponible
-  const validateStock = async (items: ApproveQuoteParams["items"]) => {
-    const insufficientStock: string[] = [];
+  // Validar stock disponible - retorna resultado con advertencias en lugar de bloquear
+  const validateStock = async (items: ApproveQuoteParams["items"]): Promise<StockValidationResult> => {
+    const warnings: string[] = [];
 
     for (const item of items) {
       const { data: batch } = await supabase
@@ -115,13 +121,16 @@ export const useQuoteActions = () => {
         .single();
 
       if (!batch || batch.current_quantity < item.cantidad) {
-        insufficientStock.push(
+        warnings.push(
           `${item.nombre_producto} (Lote: ${batch?.batch_number || item.batch_id}): Disponible ${batch?.current_quantity || 0}, Solicitado ${item.cantidad}`
         );
       }
     }
 
-    return insufficientStock;
+    return {
+      isValid: warnings.length === 0,
+      warnings
+    };
   };
 
   // Aprobar cotización (convertir en venta)
@@ -130,13 +139,18 @@ export const useQuoteActions = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autenticado");
 
-      // Validar stock
-      const insufficientStock = await validateStock(params.items);
-      if (insufficientStock.length > 0) {
-        throw new Error(`Stock insuficiente:\n${insufficientStock.join("\n")}`);
+      // Validar stock - solo bloquear si no se fuerza la aprobación
+      const stockValidation = await validateStock(params.items);
+      if (!stockValidation.isValid && !params.forceApprove) {
+        // Retornar las advertencias para que el UI muestre el diálogo de confirmación
+        throw { 
+          type: "STOCK_WARNING", 
+          warnings: stockValidation.warnings,
+          message: `Stock insuficiente:\n${stockValidation.warnings.join("\n")}`
+        };
       }
 
-      // Procesar cada item: descontar stock y crear movimiento
+      // Procesar cada item: descontar stock y crear movimiento (puede resultar en stock negativo)
       for (const item of params.items) {
         // Obtener stock actual del lote
         const { data: batch } = await supabase
