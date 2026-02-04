@@ -282,14 +282,10 @@ export const QuotesManagement = () => {
     setBatchOpen(false);
   };
 
-  // Add product to quote
+  // Add product to quote (without batch - batch will be selected at approval time)
   const handleAddProduct = () => {
     if (!selectedProduct) {
       toast.error("Seleccione un producto");
-      return;
-    }
-    if (!selectedBatch) {
-      toast.error("Seleccione un lote");
       return;
     }
 
@@ -297,34 +293,27 @@ export const QuotesManagement = () => {
     const cantidad = 1; // Default quantity, editable in grid
     const importe = precio * cantidad;
 
-    // Check if this product already exists in the quote with a different batch
-    const existingWithDifferentBatch = quoteItems.find(
-      item => item.product_id === selectedProduct.id && item.batch_id !== selectedBatch.id
+    // Check if this product already exists in the quote
+    const existingProduct = quoteItems.find(
+      item => item.product_id === selectedProduct.id
     );
     
-    if (existingWithDifferentBatch) {
+    if (existingProduct) {
       toast.warning(
-        `"${selectedProduct.name}" ya tiene otro lote (${existingWithDifferentBatch.lote}) en la cotización. Se está agregando con el lote ${selectedBatch.batch_number}.`,
-        { duration: 5000 }
-      );
-    }
-
-    // Warn if batch stock is low
-    if (selectedBatch.current_quantity < cantidad) {
-      toast.warning(
-        `El lote ${selectedBatch.batch_number} tiene solo ${selectedBatch.current_quantity} unidades disponibles.`,
+        `"${selectedProduct.name}" ya está en la cotización. Puede modificar la cantidad directamente en la grilla.`,
         { duration: 4000 }
       );
+      return;
     }
 
     const newItem: QuoteItem = {
       id: crypto.randomUUID(),
       product_id: selectedProduct.id,
-      batch_id: selectedBatch.id,
+      batch_id: null, // Batch will be selected at approval time
       nombre_producto: selectedProduct.name,
       marca: selectedProduct.brand || "",
-      lote: selectedBatch.batch_number,
-      fecha_caducidad: new Date(selectedBatch.expiration_date),
+      lote: "", // Will be filled at approval time
+      fecha_caducidad: null, // Will be filled at approval time
       cantidad: cantidad,
       precio_unitario: precio,
       importe: importe,
@@ -341,7 +330,6 @@ export const QuotesManagement = () => {
 
     // Reset product form
     setSelectedProduct(null);
-    setSelectedBatch(null);
     setProductPrecio("");
   };
 
@@ -847,64 +835,9 @@ export const QuotesManagement = () => {
               </Popover>
             </div>
 
-            {/* Batch Selector */}
-            <div className="space-y-2">
-              <Label>Lote</Label>
-              <Popover open={batchOpen} onOpenChange={setBatchOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={batchOpen}
-                    className="w-full justify-between h-10 text-left font-normal"
-                    disabled={!selectedProduct}
-                  >
-                    {selectedBatch ? (
-                      <span className="truncate">{selectedBatch.batch_number}</span>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        {selectedProduct ? "Seleccionar lote..." : "Primero seleccione producto"}
-                      </span>
-                    )}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Buscar lote..." />
-                    <CommandList>
-                      <CommandEmpty>No hay lotes disponibles.</CommandEmpty>
-                      <CommandGroup>
-                        {productBatches.map((batch) => (
-                          <CommandItem
-                            key={batch.id}
-                            value={batch.id}
-                            onSelect={() => handleSelectBatch(batch)}
-                            className="flex items-center justify-between"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium">{batch.batch_number}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Cad: {format(new Date(batch.expiration_date), "dd/MM/yyyy")} · Stock: {batch.current_quantity}
-                              </p>
-                            </div>
-                            <Check
-                              className={cn(
-                                "h-4 w-4",
-                                selectedBatch?.id === batch.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-
+            {/* Add button - batch will be selected at approval */}
             <div className="flex items-end">
-              <Button onClick={handleAddProduct} className="w-full h-10" disabled={!selectedProduct || !selectedBatch}>
+              <Button onClick={handleAddProduct} className="w-full h-10" disabled={!selectedProduct}>
                 <Plus className="h-4 w-4 mr-2" />
                 Agregar
               </Button>
@@ -936,21 +869,11 @@ export const QuotesManagement = () => {
             </div>
           )}
 
-          {/* Auto-filled batch info */}
-          {selectedBatch && selectedProduct && (
-            <div className="grid grid-cols-3 gap-4 p-3 bg-muted/50 rounded-lg text-sm">
-              <div>
-                <span className="text-muted-foreground">Marca: </span>
-                <span className="font-medium">{selectedProduct.brand || "-"}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Lote: </span>
-                <span className="font-medium">{selectedBatch.batch_number}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Caducidad: </span>
-                <span className="font-medium">{format(new Date(selectedBatch.expiration_date), "dd/MM/yyyy")}</span>
-              </div>
+          {/* Note about batch selection */}
+          {selectedProduct && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>El lote y fecha de caducidad se seleccionarán al aprobar la cotización para verificar stock actualizado.</span>
             </div>
           )}
 
