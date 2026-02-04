@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import {
   Select,
   SelectContent,
@@ -335,8 +335,8 @@ export const CreateSupplierOrderDialog = ({
             />
 
             {/* Products Table */}
-            <div className="flex-1 border rounded-lg overflow-hidden bg-background min-h-0">
-              <ScrollArea className="h-[280px]">
+            <div className="border rounded-lg bg-background">
+              <div className="h-[280px] overflow-auto">
                 {selectedProducts.length > 0 ? (
                   <Table>
                     <TableHeader>
@@ -408,7 +408,7 @@ export const CreateSupplierOrderDialog = ({
                     <p className="text-xs">Usa el buscador para agregar productos</p>
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </div>
 
             {/* Totals */}
