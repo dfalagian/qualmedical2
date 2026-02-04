@@ -102,6 +102,14 @@ interface QuoteItem {
   cantidad: number;
   precio_unitario: number;
   importe: number;
+  tipo_precio: PriceType;
+  // Store all prices for easy switching in grid
+  precios_disponibles: {
+    price_type_1: number;
+    price_type_2: number;
+    price_type_3: number;
+    price_type_4: number;
+  };
 }
 
 export const QuotesManagement = () => {
@@ -320,6 +328,13 @@ export const QuotesManagement = () => {
       cantidad: cantidad,
       precio_unitario: precio,
       importe: importe,
+      tipo_precio: selectedPriceType,
+      precios_disponibles: {
+        price_type_1: selectedProduct.price_type_1 || 0,
+        price_type_2: selectedProduct.price_type_2 || 0,
+        price_type_3: selectedProduct.price_type_3 || 0,
+        price_type_4: selectedProduct.price_type_4 || 0,
+      },
     };
 
     setQuoteItems([...quoteItems, newItem]);
@@ -344,6 +359,48 @@ export const QuotesManagement = () => {
           ...item,
           cantidad,
           importe: item.precio_unitario * cantidad
+        };
+      }
+      return item;
+    }));
+  };
+
+  // Update item price type
+  const handleUpdatePriceType = (id: string, newPriceType: PriceType) => {
+    setQuoteItems(quoteItems.map(item => {
+      if (item.id === id) {
+        let newPrice = item.precio_unitario;
+        
+        if (newPriceType !== "manual") {
+          const priceMap: Record<string, number> = {
+            "1": item.precios_disponibles.price_type_1,
+            "2": item.precios_disponibles.price_type_2,
+            "3": item.precios_disponibles.price_type_3,
+            "4": item.precios_disponibles.price_type_4,
+          };
+          newPrice = priceMap[newPriceType] || 0;
+        }
+        
+        return {
+          ...item,
+          tipo_precio: newPriceType,
+          precio_unitario: newPrice,
+          importe: newPrice * item.cantidad
+        };
+      }
+      return item;
+    }));
+  };
+
+  // Update item manual price
+  const handleUpdateManualPrice = (id: string, newPrice: number) => {
+    setQuoteItems(quoteItems.map(item => {
+      if (item.id === id) {
+        const precio = Math.max(0, newPrice);
+        return {
+          ...item,
+          precio_unitario: precio,
+          importe: precio * item.cantidad
         };
       }
       return item;
@@ -846,40 +903,6 @@ export const QuotesManagement = () => {
               </Popover>
             </div>
 
-            {/* Price Type Selector */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1">
-                <DollarSign className="h-3 w-3" />
-                Tipo de Precio
-              </Label>
-              <Select value={selectedPriceType} onValueChange={(v) => handlePriceTypeChange(v as PriceType)}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Seleccionar tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">{PRICE_TYPE_LABELS["1"]}</SelectItem>
-                  <SelectItem value="2">{PRICE_TYPE_LABELS["2"]}</SelectItem>
-                  <SelectItem value="3">{PRICE_TYPE_LABELS["3"]}</SelectItem>
-                  <SelectItem value="4">{PRICE_TYPE_LABELS["4"]}</SelectItem>
-                  <SelectItem value="manual">{PRICE_TYPE_LABELS["manual"]}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Price Input */}
-            <div className="space-y-2">
-              <Label>{isManualPrice ? "Precio Manual" : "Precio"}</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={productPrecio}
-                onChange={(e) => setProductPrecio(e.target.value)}
-                placeholder="$0.00"
-                readOnly={!isManualPrice}
-                className={cn(!isManualPrice && "bg-muted")}
-              />
-            </div>
-
             <div className="flex items-end">
               <Button onClick={handleAddProduct} className="w-full h-10" disabled={!selectedProduct || !selectedBatch}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -890,26 +913,25 @@ export const QuotesManagement = () => {
 
           {/* Price types info when product is selected */}
           {selectedProduct && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 p-3 bg-muted/30 rounded-lg text-xs">
-              <div className={cn("p-2 rounded border", selectedPriceType === "1" && "border-primary bg-primary/5")}>
-                <span className="text-muted-foreground block">Tipo 1 (Público)</span>
-                <span className="font-semibold">${(selectedProduct.price_type_1 || 0).toFixed(2)}</span>
-              </div>
-              <div className={cn("p-2 rounded border", selectedPriceType === "2" && "border-primary bg-primary/5")}>
-                <span className="text-muted-foreground block">Tipo 2 (Mayoreo)</span>
-                <span className="font-semibold">${(selectedProduct.price_type_2 || 0).toFixed(2)}</span>
-              </div>
-              <div className={cn("p-2 rounded border", selectedPriceType === "3" && "border-primary bg-primary/5")}>
-                <span className="text-muted-foreground block">Tipo 3 (Distrib.)</span>
-                <span className="font-semibold">${(selectedProduct.price_type_3 || 0).toFixed(2)}</span>
-              </div>
-              <div className={cn("p-2 rounded border", selectedPriceType === "4" && "border-primary bg-primary/5")}>
-                <span className="text-muted-foreground block">Tipo 4 (Especial)</span>
-                <span className="font-semibold">${(selectedProduct.price_type_4 || 0).toFixed(2)}</span>
-              </div>
-              <div className={cn("p-2 rounded border", selectedPriceType === "manual" && "border-primary bg-primary/5")}>
-                <span className="text-muted-foreground block">Manual</span>
-                <span className="font-semibold italic">Personalizado</span>
+            <div className="p-3 bg-muted/30 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-2">Precios disponibles para <span className="font-medium text-foreground">{selectedProduct.name}</span>:</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                <div className="p-2 rounded border bg-background">
+                  <span className="text-muted-foreground block">T1 - Público</span>
+                  <span className="font-semibold">${(selectedProduct.price_type_1 || 0).toFixed(2)}</span>
+                </div>
+                <div className="p-2 rounded border bg-background">
+                  <span className="text-muted-foreground block">T2 - Mayoreo</span>
+                  <span className="font-semibold">${(selectedProduct.price_type_2 || 0).toFixed(2)}</span>
+                </div>
+                <div className="p-2 rounded border bg-background">
+                  <span className="text-muted-foreground block">T3 - Distribuidor</span>
+                  <span className="font-semibold">${(selectedProduct.price_type_3 || 0).toFixed(2)}</span>
+                </div>
+                <div className="p-2 rounded border bg-background">
+                  <span className="text-muted-foreground block">T4 - Especial</span>
+                  <span className="font-semibold">${(selectedProduct.price_type_4 || 0).toFixed(2)}</span>
+                </div>
               </div>
             </div>
           )}
@@ -939,64 +961,94 @@ export const QuotesManagement = () => {
                 <TableHeader className="sticky top-0 bg-background">
                   <TableRow>
                     <TableHead>Producto</TableHead>
-                    <TableHead>Marca</TableHead>
                     <TableHead>Lote</TableHead>
-                    <TableHead>F. Caducidad</TableHead>
-                    <TableHead className="text-right">Cantidad</TableHead>
+                    <TableHead className="text-center">Cantidad</TableHead>
+                    <TableHead>Tipo Precio</TableHead>
                     <TableHead className="text-right">P. Unitario</TableHead>
                     <TableHead className="text-right">Importe</TableHead>
-                    <TableHead className="w-12"></TableHead>
+                    <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {quoteItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         No hay productos agregados
                       </TableCell>
                     </TableRow>
                   ) : (
                     quoteItems.map((item) => {
                       const isMultiBatch = item.product_id && productsWithMultipleBatches.includes(item.product_id);
+                      const isManual = item.tipo_precio === "manual";
                       return (
                         <TableRow key={item.id} className={isMultiBatch ? "bg-amber-50/50 dark:bg-amber-950/20" : ""}>
                           <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              {item.nombre_producto}
-                              {isMultiBatch && (
-                                <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
-                                  <AlertTriangle className="h-3 w-3" />
-                                  Multi-lote
-                                </span>
-                              )}
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="truncate max-w-[180px]">{item.nombre_producto}</span>
+                                {isMultiBatch && (
+                                  <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                                    <AlertTriangle className="h-3 w-3" />
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-xs text-muted-foreground">{item.marca || ""}</span>
                             </div>
                           </TableCell>
-                          <TableCell>{item.marca || "-"}</TableCell>
-                          <TableCell>{item.lote || "-"}</TableCell>
                           <TableCell>
-                            {item.fecha_caducidad 
-                              ? format(item.fecha_caducidad, "dd/MM/yyyy") 
-                              : "-"}
+                            <div className="text-sm">{item.lote || "-"}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {item.fecha_caducidad ? format(item.fecha_caducidad, "dd/MM/yy") : ""}
+                            </div>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell>
                             <Input
                               type="number"
                               min={1}
                               value={item.cantidad}
                               onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
-                              className="w-20 h-8 text-right"
+                              className="w-16 h-8 text-center"
                             />
                           </TableCell>
-                          <TableCell className="text-right">
-                            ${item.precio_unitario.toFixed(2)}
+                          <TableCell>
+                            <Select 
+                              value={item.tipo_precio} 
+                              onValueChange={(v) => handleUpdatePriceType(item.id, v as PriceType)}
+                            >
+                              <SelectTrigger className="w-[130px] h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">T1 - Público</SelectItem>
+                                <SelectItem value="2">T2 - Mayoreo</SelectItem>
+                                <SelectItem value="3">T3 - Distrib.</SelectItem>
+                                <SelectItem value="4">T4 - Especial</SelectItem>
+                                <SelectItem value="manual">Manual</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </TableCell>
-                          <TableCell className="text-right font-medium">
+                          <TableCell className="text-right">
+                            {isManual ? (
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                value={item.precio_unitario}
+                                onChange={(e) => handleUpdateManualPrice(item.id, parseFloat(e.target.value) || 0)}
+                                className="w-24 h-8 text-right"
+                              />
+                            ) : (
+                              <span className="font-medium">${item.precio_unitario.toFixed(2)}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
                             ${item.importe.toFixed(2)}
                           </TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="h-8 w-8"
                               onClick={() => handleRemoveItem(item.id)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
