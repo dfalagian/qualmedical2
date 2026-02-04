@@ -274,11 +274,10 @@ export const PurchaseOrderPDFViewer = ({
 
   const handlePrint = () => {
     if (pdfUrl) {
-      const printWindow = window.open(pdfUrl);
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.print();
-        };
+      // Usar el iframe existente para imprimir sin abrir nueva ventana
+      const iframe = document.querySelector('iframe[title="Vista previa del PDF"]') as HTMLIFrameElement;
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.print();
       }
     }
   };
