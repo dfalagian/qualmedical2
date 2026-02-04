@@ -50,6 +50,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
     cantidad: 1,
     numeroFactura: "",
     proveedor: "",
+    almacenId: "",
     isExistingBatch: false
   });
 
@@ -78,6 +79,21 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
         .from("profiles")
         .select("id, full_name, company_name")
         .order("company_name");
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch almacenes
+  const { data: almacenes = [] } = useQuery({
+    queryKey: ["warehouses-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouses")
+        .select("id, code, name")
+        .eq("is_active", true)
+        .order("name");
       
       if (error) throw error;
       return data;
@@ -311,6 +327,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       cantidad: 1,
       numeroFactura: "",
       proveedor: "",
+      almacenId: "",
       isExistingBatch: false
     });
     setItems([]);
@@ -475,8 +492,8 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
             </div>
           </div>
 
-          {/* Tercera fila: Nº Factura, Proveedor, botón Ingresar */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
+          {/* Tercera fila: Nº Factura, Proveedor, Almacén, botón Ingresar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
             <div className="space-y-1">
               <Label className="text-xs">Nº Factura</Label>
               <Input
@@ -499,6 +516,24 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
                   {proveedores.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.company_name || p.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Almacén</Label>
+              <Select
+                value={formData.almacenId}
+                onValueChange={(value) => setFormData({ ...formData, almacenId: value })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Seleccionar almacén..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {almacenes.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
