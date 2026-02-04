@@ -663,7 +663,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                                 <XCircle className="h-4 w-4" />
                               </Button>
                             )}
-                            {quote.status === "borrador" && (
+                            {(quote.status === "borrador" || quote.status === "cancelada") && (
                               <Button
                                 variant="ghost"
                                 size="icon"
