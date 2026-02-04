@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye, ArrowRight, Search, X, CalendarIcon } from "lucide-react";
+import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye, ArrowRight, Search, X, CalendarIcon, FileText } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PurchaseOrderImportDialog } from "@/components/purchase-orders/PurchaseOrderImportDialog";
@@ -22,6 +22,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { openPurchaseOrderPrint } from "@/components/purchase-orders/purchaseOrderHtmlPrint";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -573,8 +574,55 @@ const PurchaseOrders = () => {
                               e.stopPropagation();
                               handleViewDetail(order);
                             }}
+                            title="Ver detalle"
                           >
                             <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:text-primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Calcular totales de los items
+                              const items = order.purchase_order_items?.map((item: any) => {
+                                const unitPrice = item.unit_price || 0;
+                                const quantity = item.quantity_ordered || 0;
+                                // Asumimos IVA 16% si el monto total lo sugiere
+                                const subtotalItem = unitPrice * quantity;
+                                const hasIva = false; // Por defecto sin IVA individual
+                                const ivaAmount = 0;
+                                const total = subtotalItem + ivaAmount;
+                                return {
+                                  name: item.products?.name || 'Producto',
+                                  sku: item.products?.sku || '-',
+                                  quantity,
+                                  unitPrice,
+                                  hasIva,
+                                  ivaAmount,
+                                  total,
+                                };
+                              }) || [];
+                              
+                              const subtotal = items.reduce((sum: number, i: any) => sum + i.unitPrice * i.quantity, 0);
+                              const totalIva = items.reduce((sum: number, i: any) => sum + i.ivaAmount, 0);
+                              const total = order.amount || subtotal + totalIva;
+
+                              openPurchaseOrderPrint({
+                                orderNumber: order.order_number,
+                                supplierName: formatSupplierName(order.profiles),
+                                supplierRfc: order.profiles?.rfc,
+                                createdAt: new Date(order.created_at),
+                                items,
+                                subtotal,
+                                totalIva,
+                                total,
+                                description: order.description,
+                              });
+                            }}
+                            title="Ver PDF"
+                          >
+                            <FileText className="h-4 w-4" />
                           </Button>
                           {isAdmin && isCitioOrder && (
                             <Button
