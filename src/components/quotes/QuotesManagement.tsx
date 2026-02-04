@@ -55,11 +55,20 @@ interface Product {
   sku: string;
   unit_price: number | null;
   current_stock: number | null;
+  category: string | null;
+}
+
+interface Batch {
+  id: string;
+  batch_number: string;
+  expiration_date: string;
+  current_quantity: number;
 }
 
 interface QuoteItem {
   id: string;
   product_id: string | null;
+  batch_id: string | null;
   nombre_producto: string;
   marca: string;
   lote: string;
@@ -88,10 +97,11 @@ export const QuotesManagement = () => {
   const [productOpen, setProductOpen] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [productMarca, setProductMarca] = useState("");
-  const [productLote, setProductLote] = useState("");
-  const [productFechaCaducidad, setProductFechaCaducidad] = useState<Date | undefined>(undefined);
-  const [productCantidad, setProductCantidad] = useState(1);
+  
+  // Batch selection state
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+  
   const [productPrecio, setProductPrecio] = useState("");
 
   // Quote items
@@ -117,12 +127,30 @@ export const QuotesManagement = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, sku, unit_price, current_stock")
+        .select("id, name, sku, unit_price, current_stock, category")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
       return data as Product[];
     },
+  });
+
+  // Fetch batches for selected product
+  const { data: productBatches = [] } = useQuery({
+    queryKey: ["product-batches-quote", selectedProduct?.id],
+    queryFn: async () => {
+      if (!selectedProduct) return [];
+      const { data, error } = await supabase
+        .from("product_batches")
+        .select("id, batch_number, expiration_date, current_quantity")
+        .eq("product_id", selectedProduct.id)
+        .eq("is_active", true)
+        .gt("current_quantity", 0)
+        .order("expiration_date", { ascending: true });
+      if (error) throw error;
+      return data as Batch[];
+    },
+    enabled: !!selectedProduct,
   });
 
   // Generate folio on mount
@@ -169,9 +197,16 @@ export const QuotesManagement = () => {
   // Handle product selection
   const handleSelectProduct = (product: Product) => {
     setSelectedProduct(product);
+    setSelectedBatch(null); // Reset batch when product changes
     setProductPrecio(product.unit_price?.toString() || "0");
     setProductOpen(false);
     setProductSearch("");
+  };
+
+  // Handle batch selection
+  const handleSelectBatch = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setBatchOpen(false);
   };
 
   // Add product to quote
@@ -180,22 +215,24 @@ export const QuotesManagement = () => {
       toast.error("Seleccione un producto");
       return;
     }
-    if (productCantidad <= 0) {
-      toast.error("La cantidad debe ser mayor a 0");
+    if (!selectedBatch) {
+      toast.error("Seleccione un lote");
       return;
     }
 
     const precio = parseFloat(productPrecio) || 0;
-    const importe = precio * productCantidad;
+    const cantidad = 1; // Default quantity, editable in grid
+    const importe = precio * cantidad;
 
     const newItem: QuoteItem = {
       id: crypto.randomUUID(),
       product_id: selectedProduct.id,
+      batch_id: selectedBatch.id,
       nombre_producto: selectedProduct.name,
-      marca: productMarca,
-      lote: productLote,
-      fecha_caducidad: productFechaCaducidad || null,
-      cantidad: productCantidad,
+      marca: selectedProduct.category || "", // Using category as brand
+      lote: selectedBatch.batch_number,
+      fecha_caducidad: new Date(selectedBatch.expiration_date),
+      cantidad: cantidad,
       precio_unitario: precio,
       importe: importe,
     };
@@ -204,16 +241,28 @@ export const QuotesManagement = () => {
 
     // Reset product form
     setSelectedProduct(null);
-    setProductMarca("");
-    setProductLote("");
-    setProductFechaCaducidad(undefined);
-    setProductCantidad(1);
+    setSelectedBatch(null);
     setProductPrecio("");
   };
 
   // Remove item from quote
   const handleRemoveItem = (id: string) => {
     setQuoteItems(quoteItems.filter((item) => item.id !== id));
+  };
+
+  // Update item quantity
+  const handleUpdateQuantity = (id: string, newQuantity: number) => {
+    setQuoteItems(quoteItems.map(item => {
+      if (item.id === id) {
+        const cantidad = Math.max(1, newQuantity);
+        return {
+          ...item,
+          cantidad,
+          importe: item.precio_unitario * cantidad
+        };
+      }
+      return item;
+    }));
   };
 
   // Calculate totals
@@ -454,9 +503,9 @@ export const QuotesManagement = () => {
           <CardTitle className="text-lg">Agregar Productos</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Product Selector */}
-            <div className="lg:col-span-2 space-y-2">
+            <div className="space-y-2">
               <Label>Producto</Label>
               <Popover open={productOpen} onOpenChange={setProductOpen}>
                 <PopoverTrigger asChild>
@@ -494,7 +543,7 @@ export const QuotesManagement = () => {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{product.name}</p>
                               <p className="text-xs text-muted-foreground">
-                                SKU: {product.sku} · Stock: {product.current_stock || 0}
+                                SKU: {product.sku} · {product.category || "Sin marca"}
                               </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
@@ -517,64 +566,60 @@ export const QuotesManagement = () => {
               </Popover>
             </div>
 
-            <div className="space-y-2">
-              <Label>Marca</Label>
-              <Input
-                value={productMarca}
-                onChange={(e) => setProductMarca(e.target.value)}
-                placeholder="Marca"
-              />
-            </div>
-
+            {/* Batch Selector */}
             <div className="space-y-2">
               <Label>Lote</Label>
-              <Input
-                value={productLote}
-                onChange={(e) => setProductLote(e.target.value)}
-                placeholder="Número lote"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>F. Caducidad</Label>
-              <Popover open={fechaCaducidadOpen} onOpenChange={setFechaCaducidadOpen}>
+              <Popover open={batchOpen} onOpenChange={setBatchOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal h-10",
-                      !productFechaCaducidad && "text-muted-foreground"
-                    )}
+                    role="combobox"
+                    aria-expanded={batchOpen}
+                    className="w-full justify-between h-10 text-left font-normal"
+                    disabled={!selectedProduct}
                   >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    {productFechaCaducidad 
-                      ? format(productFechaCaducidad, "dd/MM/yy") 
-                      : "Fecha"}
+                    {selectedBatch ? (
+                      <span className="truncate">{selectedBatch.batch_number}</span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {selectedProduct ? "Seleccionar lote..." : "Primero seleccione producto"}
+                      </span>
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={productFechaCaducidad}
-                    onSelect={(date) => {
-                      setProductFechaCaducidad(date);
-                      setFechaCaducidadOpen(false);
-                    }}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
+                <PopoverContent className="w-[300px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar lote..." />
+                    <CommandList>
+                      <CommandEmpty>No hay lotes disponibles.</CommandEmpty>
+                      <CommandGroup>
+                        {productBatches.map((batch) => (
+                          <CommandItem
+                            key={batch.id}
+                            value={batch.id}
+                            onSelect={() => handleSelectBatch(batch)}
+                            className="flex items-center justify-between"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium">{batch.batch_number}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Cad: {format(new Date(batch.expiration_date), "dd/MM/yyyy")} · Stock: {batch.current_quantity}
+                              </p>
+                            </div>
+                            <Check
+                              className={cn(
+                                "h-4 w-4",
+                                selectedBatch?.id === batch.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
                 </PopoverContent>
               </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Cantidad</Label>
-              <Input
-                type="number"
-                min={1}
-                value={productCantidad}
-                onChange={(e) => setProductCantidad(Math.max(1, parseInt(e.target.value) || 1))}
-              />
             </div>
 
             <div className="space-y-2">
@@ -589,12 +634,30 @@ export const QuotesManagement = () => {
             </div>
 
             <div className="flex items-end">
-              <Button onClick={handleAddProduct} className="w-full h-10">
+              <Button onClick={handleAddProduct} className="w-full h-10" disabled={!selectedProduct || !selectedBatch}>
                 <Plus className="h-4 w-4 mr-2" />
                 Agregar
               </Button>
             </div>
           </div>
+
+          {/* Auto-filled batch info */}
+          {selectedBatch && selectedProduct && (
+            <div className="grid grid-cols-3 gap-4 p-3 bg-muted/50 rounded-lg text-sm">
+              <div>
+                <span className="text-muted-foreground">Marca: </span>
+                <span className="font-medium">{selectedProduct.category || "-"}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Lote: </span>
+                <span className="font-medium">{selectedBatch.batch_number}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Caducidad: </span>
+                <span className="font-medium">{format(new Date(selectedBatch.expiration_date), "dd/MM/yyyy")}</span>
+              </div>
+            </div>
+          )}
 
           {/* Products Table */}
           <div className="border rounded-lg overflow-hidden">
@@ -630,7 +693,15 @@ export const QuotesManagement = () => {
                             ? format(item.fecha_caducidad, "dd/MM/yyyy") 
                             : "-"}
                         </TableCell>
-                        <TableCell className="text-right">{item.cantidad}</TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            min={1}
+                            value={item.cantidad}
+                            onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
+                            className="w-20 h-8 text-right"
+                          />
+                        </TableCell>
                         <TableCell className="text-right">
                           ${item.precio_unitario.toFixed(2)}
                         </TableCell>
