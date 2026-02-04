@@ -25,6 +25,7 @@ import DatabaseBackup from "./pages/DatabaseBackup";
 import Payments from "./pages/Payments";
 import Inventory from "./pages/Inventory";
 import MedicationsCatalogCITIO from "./pages/MedicationsCatalogCITIO";
+import Quotes from "./pages/Quotes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -180,6 +181,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <MedicationsCatalogCITIO />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/quotes"
+              element={
+                <ProtectedRoute>
+                  <Quotes />
                 </ProtectedRoute>
               }
             />

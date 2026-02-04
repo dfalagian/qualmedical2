@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      clients: {
+        Row: {
+          cfdi: string | null
+          codigo_postal: string | null
+          created_at: string | null
+          created_by: string | null
+          direccion: string | null
+          email: string | null
+          id: string
+          is_active: boolean | null
+          nombre_cliente: string
+          persona_contacto: string | null
+          razon_social: string | null
+          rfc: string | null
+          telefono: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cfdi?: string | null
+          codigo_postal?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          direccion?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          nombre_cliente: string
+          persona_contacto?: string | null
+          razon_social?: string | null
+          rfc?: string | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cfdi?: string | null
+          codigo_postal?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          direccion?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          nombre_cliente?: string
+          persona_contacto?: string | null
+          razon_social?: string | null
+          rfc?: string | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       document_versions: {
         Row: {
           created_at: string | null
