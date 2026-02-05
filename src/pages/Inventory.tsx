@@ -64,6 +64,7 @@ import { StockAdjustmentDialog } from "@/components/inventory/StockAdjustmentDia
 import { WarehouseTransferDialog } from "@/components/inventory/WarehouseTransferDialog";
 import { WarehouseFilter } from "@/components/inventory/WarehouseFilter";
 import { StockByWarehouseModal } from "@/components/dashboard/StockByWarehouseModal";
+import { PriceTypesEditor } from "@/components/inventory/PriceTypesEditor";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -2260,72 +2261,18 @@ export default function Inventory() {
                 />
               </div>
               
-              {/* 5 Tipos de Precio */}
-              <div className="border rounded-lg p-4 space-y-3">
-                <Label className="text-sm font-medium">Tipos de Precio</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="price_type_1" className="text-xs text-muted-foreground w-24 shrink-0">T1 - Público</Label>
-                    <Input
-                      id="price_type_1"
-                      type="number"
-                      step="0.01"
-                      value={productForm.price_type_1}
-                      onChange={(e) => setProductForm({ ...productForm, price_type_1: parseFloat(e.target.value) || 0 })}
-                      className="h-8"
-                      placeholder="$0.00"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="price_type_2" className="text-xs text-muted-foreground w-24 shrink-0">T2 - Mayoreo</Label>
-                    <Input
-                      id="price_type_2"
-                      type="number"
-                      step="0.01"
-                      value={productForm.price_type_2}
-                      onChange={(e) => setProductForm({ ...productForm, price_type_2: parseFloat(e.target.value) || 0 })}
-                      className="h-8"
-                      placeholder="$0.00"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="price_type_3" className="text-xs text-muted-foreground w-24 shrink-0">T3 - Distribuidor</Label>
-                    <Input
-                      id="price_type_3"
-                      type="number"
-                      step="0.01"
-                      value={productForm.price_type_3}
-                      onChange={(e) => setProductForm({ ...productForm, price_type_3: parseFloat(e.target.value) || 0 })}
-                      className="h-8"
-                      placeholder="$0.00"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="price_type_4" className="text-xs text-muted-foreground w-24 shrink-0">T4 - Especial</Label>
-                    <Input
-                      id="price_type_4"
-                      type="number"
-                      step="0.01"
-                      value={productForm.price_type_4}
-                      onChange={(e) => setProductForm({ ...productForm, price_type_4: parseFloat(e.target.value) || 0 })}
-                      className="h-8"
-                      placeholder="$0.00"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="price_type_5" className="text-xs text-muted-foreground w-24 shrink-0">T5 - VIP</Label>
-                    <Input
-                      id="price_type_5"
-                      type="number"
-                      step="0.01"
-                      value={productForm.price_type_5}
-                      onChange={(e) => setProductForm({ ...productForm, price_type_5: parseFloat(e.target.value) || 0 })}
-                      className="h-8"
-                      placeholder="$0.00"
-                    />
-                  </div>
-                </div>
-              </div>
+              {/* 5 Tipos de Precio con ajuste por % */}
+              <PriceTypesEditor
+                priceType1={productForm.price_type_1}
+                priceType2={productForm.price_type_2}
+                priceType3={productForm.price_type_3}
+                priceType4={productForm.price_type_4}
+                priceType5={productForm.price_type_5}
+                onChange={(prices) => setProductForm({ 
+                  ...productForm, 
+                  ...prices 
+                })}
+              />
               
               {/* Checkbox RFID - con explicación clara para usuarios no técnicos */}
               <div className="flex items-start space-x-3 p-4 bg-muted/50 rounded-lg border">
