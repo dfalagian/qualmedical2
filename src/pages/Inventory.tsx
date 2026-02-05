@@ -206,7 +206,8 @@ export default function Inventory() {
     price_type_3: 0,
     price_type_4: 0,
     price_type_5: 0,
-    rfid_required: false
+    rfid_required: false,
+    warehouse_id: ""
   });
 
   const [tagForm, setTagForm] = useState({
@@ -274,7 +275,19 @@ export default function Inventory() {
     }
   });
 
-  // Fetch stock alerts
+  // Fetch warehouses for product assignment
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ["warehouses"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouses")
+        .select("id, code, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    }
+  });
   const { data: alerts = [], isLoading: loadingAlerts, refetch: refetchAlerts } = useQuery({
     queryKey: ["stock_alerts"],
     queryFn: async () => {
@@ -327,6 +340,17 @@ export default function Inventory() {
   // Create/Update product
   const productMutation = useMutation({
     mutationFn: async (product: typeof productForm & { id?: string }) => {
+      // Get default warehouse if none selected
+      let warehouseId = product.warehouse_id;
+      if (!warehouseId) {
+        const { data: warehouses } = await supabase
+          .from("warehouses")
+          .select("id")
+          .or("name.ilike.%principal%,code.eq.PRINCIPAL")
+          .limit(1);
+        warehouseId = warehouses?.[0]?.id || null;
+      }
+      
       if (product.id) {
         const { error } = await supabase
           .from("products")
@@ -344,7 +368,8 @@ export default function Inventory() {
             price_type_3: product.price_type_3 || null,
             price_type_4: product.price_type_4 || null,
             price_type_5: product.price_type_5 || null,
-            rfid_required: product.rfid_required
+            rfid_required: product.rfid_required,
+            warehouse_id: warehouseId || null
           })
           .eq("id", product.id);
         if (error) throw error;
@@ -365,7 +390,8 @@ export default function Inventory() {
             price_type_3: product.price_type_3 || null,
             price_type_4: product.price_type_4 || null,
             price_type_5: product.price_type_5 || null,
-            rfid_required: product.rfid_required
+            rfid_required: product.rfid_required,
+            warehouse_id: warehouseId || null
           });
         if (error) throw error;
       }
@@ -456,6 +482,13 @@ export default function Inventory() {
         citioMedication.presentacion || ''
       ].filter(Boolean).join(' - ');
       
+      // Get default warehouse (Almacén Principal)
+      const { data: defaultWarehouse } = await supabase
+        .from("warehouses")
+        .select("id")
+        .or("name.ilike.%principal%,code.eq.PRINCIPAL")
+        .limit(1);
+      
       const { error } = await supabase
         .from("products")
         .insert({
@@ -469,6 +502,7 @@ export default function Inventory() {
           current_stock: 0,
           unit_price: citioMedication.price_type_1 || 0,
           citio_id: citioMedication.id,
+          warehouse_id: defaultWarehouse?.[0]?.id || null
         });
       
       if (error) throw error;
@@ -948,7 +982,8 @@ export default function Inventory() {
       price_type_3: 0,
       price_type_4: 0,
       price_type_5: 0,
-      rfid_required: false
+      rfid_required: false,
+      warehouse_id: ""
     });
   };
 
@@ -987,7 +1022,8 @@ export default function Inventory() {
             price_type_3: data.price_type_3 || 0,
             price_type_4: data.price_type_4 || 0,
             price_type_5: data.price_type_5 || 0,
-            rfid_required: data.rfid_required || false
+            rfid_required: data.rfid_required || false,
+            warehouse_id: data.warehouse_id || ""
           });
           setProductDialogOpen(true);
         }
@@ -2162,6 +2198,25 @@ export default function Inventory() {
                     <SelectItem value="frasco">Frasco</SelectItem>
                     <SelectItem value="ampolleta">Ampolleta</SelectItem>
                     <SelectItem value="sobre">Sobre</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="warehouse" className="text-right">Almacén</Label>
+                <Select
+                  value={productForm.warehouse_id || "none"}
+                  onValueChange={(value) => setProductForm({ ...productForm, warehouse_id: value === "none" ? "" : value })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Seleccionar almacén..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin asignar</SelectItem>
+                    {warehouses.map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
