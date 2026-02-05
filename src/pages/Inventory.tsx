@@ -2143,161 +2143,209 @@ export default function Inventory() {
             resetProductForm();
           }
         }}>
-          <DialogContent className="sm:max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogContent className="w-[96vw] sm:max-w-5xl h-[92vh] overflow-hidden flex flex-col">
             <DialogHeader className="flex-shrink-0 pb-2">
               <DialogTitle>
                 {editingProduct ? "Editar Producto" : "Nuevo Producto"}
               </DialogTitle>
               <DialogDescription>
-                {editingProduct 
+                {editingProduct
                   ? "Modifica los datos del producto seleccionado."
                   : "Completa los datos para crear un nuevo producto."}
               </DialogDescription>
             </DialogHeader>
-            <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] pr-3">
-              <div className="grid gap-3 py-2">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="sku" className="text-right">SKU</Label>
-                <Input
-                  id="sku"
-                  value={productForm.sku}
-                  onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
-                  className="col-span-3"
-                  disabled={!!editingProduct}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">Nombre</Label>
-                <Input
-                  id="name"
-                  value={productForm.name}
-                  onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">Descripción</Label>
-                <Textarea
-                  id="description"
-                  value={productForm.description}
-                  onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="category" className="text-right">Categoría</Label>
-                <Input
-                  id="category"
-                  value={productForm.category}
-                  onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="unit" className="text-right">Unidad</Label>
-                <Select
-                  value={productForm.unit}
-                  onValueChange={(value) => setProductForm({ ...productForm, unit: value })}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pieza">Pieza</SelectItem>
-                    <SelectItem value="caja">Caja</SelectItem>
-                    <SelectItem value="frasco">Frasco</SelectItem>
-                    <SelectItem value="ampolleta">Ampolleta</SelectItem>
-                    <SelectItem value="sobre">Sobre</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="warehouse" className="text-right">Almacén</Label>
-                <Select
-                  value={productForm.warehouse_id || "none"}
-                  onValueChange={(value) => setProductForm({ ...productForm, warehouse_id: value === "none" ? "" : value })}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Seleccionar almacén..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin asignar</SelectItem>
-                    {warehouses.map((w) => (
-                      <SelectItem key={w.id} value={w.id}>
-                        {w.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="minimum_stock" className="text-right">Stock Mínimo</Label>
-                <Input
-                  id="minimum_stock"
-                  type="number"
-                  value={productForm.minimum_stock}
-                  onChange={(e) => setProductForm({ ...productForm, minimum_stock: parseInt(e.target.value) || 0 })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="current_stock" className="text-right">Stock Actual</Label>
-                <Input
-                  id="current_stock"
-                  type="number"
-                  value={productForm.current_stock}
-                  onChange={(e) => setProductForm({ ...productForm, current_stock: parseInt(e.target.value) || 0 })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="unit_price" className="text-right">Precio Base</Label>
-                <Input
-                  id="unit_price"
-                  type="number"
-                  step="0.01"
-                  value={productForm.unit_price}
-                  onChange={(e) => setProductForm({ ...productForm, unit_price: parseFloat(e.target.value) || 0 })}
-                  className="col-span-3"
-                />
-              </div>
-              
-              {/* 5 Tipos de Precio con ajuste por % */}
-              <PriceTypesEditor
-                priceType1={productForm.price_type_1}
-                priceType2={productForm.price_type_2}
-                priceType3={productForm.price_type_3}
-                priceType4={productForm.price_type_4}
-                priceType5={productForm.price_type_5}
-                onChange={(prices) => setProductForm({ 
-                  ...productForm, 
-                  ...prices 
-                })}
-              />
-              
-              {/* Checkbox RFID - con explicación clara para usuarios no técnicos */}
-              <div className="flex items-start space-x-3 p-4 bg-muted/50 rounded-lg border">
-                <Checkbox
-                  id="rfid_required"
-                  checked={productForm.rfid_required}
-                  onCheckedChange={(checked) => setProductForm({ ...productForm, rfid_required: checked === true })}
-                  className="mt-0.5"
-                />
-                <div className="grid gap-1.5 leading-none">
-                  <Label 
-                    htmlFor="rfid_required" 
-                    className="text-sm font-medium cursor-pointer"
-                  >
-                    Solo movimientos con lector RFID
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Cuando está activado, no se podrán usar los botones +/- para ajustar el stock manualmente. 
-                    Solo se permitirá mover este producto escaneando sus etiquetas RFID con el lector.
-                  </p>
+
+            <div className="flex-1 min-h-0">
+              <div className="grid gap-4 py-2 h-full">
+                <div className="grid grid-cols-1 lg:grid-cols-[1.25fr,1fr] gap-4">
+                  {/* Datos generales */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="sku" className="text-xs">SKU</Label>
+                        <Input
+                          id="sku"
+                          value={productForm.sku}
+                          onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
+                          className="h-9"
+                          disabled={!!editingProduct}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="name" className="text-xs">Nombre</Label>
+                        <Input
+                          id="name"
+                          value={productForm.name}
+                          onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                          className="h-9"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="description" className="text-xs">Descripción</Label>
+                      <Textarea
+                        id="description"
+                        value={productForm.description}
+                        onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                        className="min-h-[64px] resize-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="category" className="text-xs">Categoría</Label>
+                        <Input
+                          id="category"
+                          value={productForm.category}
+                          onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                          className="h-9"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs">Unidad</Label>
+                        <Select
+                          value={productForm.unit}
+                          onValueChange={(value) => setProductForm({ ...productForm, unit: value })}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pieza">Pieza</SelectItem>
+                            <SelectItem value="caja">Caja</SelectItem>
+                            <SelectItem value="frasco">Frasco</SelectItem>
+                            <SelectItem value="ampolleta">Ampolleta</SelectItem>
+                            <SelectItem value="sobre">Sobre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Almacén</Label>
+                        <Select
+                          value={productForm.warehouse_id || "none"}
+                          onValueChange={(value) =>
+                            setProductForm({
+                              ...productForm,
+                              warehouse_id: value === "none" ? "" : value,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Seleccionar almacén..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Sin asignar</SelectItem>
+                            {warehouses.map((w) => (
+                              <SelectItem key={w.id} value={w.id}>
+                                {w.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* RFID */}
+                      <div className="flex items-start gap-3 p-3 bg-muted/40 rounded-lg border">
+                        <Checkbox
+                          id="rfid_required"
+                          checked={productForm.rfid_required}
+                          onCheckedChange={(checked) =>
+                            setProductForm({ ...productForm, rfid_required: checked === true })
+                          }
+                          className="mt-0.5"
+                        />
+                        <div className="grid gap-1 leading-none">
+                          <Label
+                            htmlFor="rfid_required"
+                            className="text-xs font-medium cursor-pointer"
+                          >
+                            Solo movimientos con lector RFID
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Desactiva ajustes manuales (+/-) y obliga escaneo de etiquetas RFID.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stock y precios */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="minimum_stock" className="text-xs">Stock Mínimo</Label>
+                        <Input
+                          id="minimum_stock"
+                          type="number"
+                          value={productForm.minimum_stock}
+                          onChange={(e) =>
+                            setProductForm({
+                              ...productForm,
+                              minimum_stock: parseInt(e.target.value) || 0,
+                            })
+                          }
+                          className="h-9"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="current_stock" className="text-xs">Stock Actual</Label>
+                        <Input
+                          id="current_stock"
+                          type="number"
+                          value={productForm.current_stock}
+                          onChange={(e) =>
+                            setProductForm({
+                              ...productForm,
+                              current_stock: parseInt(e.target.value) || 0,
+                            })
+                          }
+                          className="h-9"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="unit_price" className="text-xs">Precio Base</Label>
+                        <Input
+                          id="unit_price"
+                          type="number"
+                          step="0.01"
+                          value={productForm.unit_price}
+                          onChange={(e) =>
+                            setProductForm({
+                              ...productForm,
+                              unit_price: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="h-9"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 5 Tipos de Precio con ajuste por % (visible sin scroll) */}
+                    <PriceTypesEditor
+                      priceType1={productForm.price_type_1}
+                      priceType2={productForm.price_type_2}
+                      priceType3={productForm.price_type_3}
+                      priceType4={productForm.price_type_4}
+                      priceType5={productForm.price_type_5}
+                      onChange={(prices) =>
+                        setProductForm({
+                          ...productForm,
+                          ...prices,
+                        })
+                      }
+                    />
+                  </div>
                 </div>
               </div>
-              </div>
-            </ScrollArea>
+            </div>
             <DialogFooter className="flex-shrink-0 pt-3 border-t mt-2">
               <DialogClose asChild>
                 <Button variant="outline">Cancelar</Button>
