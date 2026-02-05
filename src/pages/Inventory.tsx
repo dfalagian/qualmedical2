@@ -63,6 +63,7 @@ import { ProductRowWithBatches } from "@/components/inventory/ProductRowWithBatc
 import { StockAdjustmentDialog } from "@/components/inventory/StockAdjustmentDialog";
 import { WarehouseTransferDialog } from "@/components/inventory/WarehouseTransferDialog";
 import { WarehouseFilter } from "@/components/inventory/WarehouseFilter";
+import { StockByWarehouseModal } from "@/components/dashboard/StockByWarehouseModal";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -1201,6 +1202,13 @@ export default function Inventory() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Botón Stock por Almacén - Solo para admin */}
+        {isAdmin && (
+          <div className="flex justify-start">
+            <StockByWarehouseModal />
+          </div>
+        )}
 
         {/* Tabs */}
         <Tabs defaultValue="batches" className="w-full">
