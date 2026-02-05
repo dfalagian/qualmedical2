@@ -14,10 +14,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, FileSpreadsheet, Calendar, Package, CheckCircle, Receipt, Trash2 } from "lucide-react";
+import { Search, FileSpreadsheet, Calendar, Package, CheckCircle, Receipt, Trash2, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { SalesInvoiceUpload } from "./SalesInvoiceUpload";
+import { SalesInvoiceViewer } from "./SalesInvoiceViewer";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -53,14 +54,19 @@ interface SalesInvoice {
   total: number;
   currency: string | null;
   emisor_nombre: string | null;
+  emisor_rfc: string | null;
   receptor_nombre: string | null;
   receptor_rfc: string | null;
+  xml_url: string;
+  pdf_url: string | null;
   created_at: string;
 }
 
 export const SalesSummary = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSubTab, setActiveSubTab] = useState("quotes");
+  const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoice | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const { data: quotes, isLoading: isLoadingQuotes } = useQuery({
     queryKey: ["approved-quotes-sales"],
@@ -406,7 +412,7 @@ export const SalesSummary = () => {
                     <TableHead>RFC Cliente</TableHead>
                     <TableHead>Fecha Emisión</TableHead>
                     <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                    <TableHead className="w-[100px]">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -418,7 +424,10 @@ export const SalesSummary = () => {
                     </TableRow>
                   ) : (
                     filteredInvoices?.map((invoice) => (
-                      <TableRow key={invoice.id}>
+                      <TableRow key={invoice.id} className="cursor-pointer hover:bg-muted/50" onClick={() => {
+                        setSelectedInvoice(invoice);
+                        setViewerOpen(true);
+                      }}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Receipt className="h-4 w-4 text-muted-foreground" />
@@ -449,14 +458,31 @@ export const SalesSummary = () => {
                           {formatCurrency(invoice.total)}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteInvoice(invoice.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedInvoice(invoice);
+                                setViewerOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteInvoice(invoice.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -467,6 +493,13 @@ export const SalesSummary = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Invoice Viewer Dialog */}
+      <SalesInvoiceViewer
+        invoice={selectedInvoice}
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+      />
     </div>
   );
 };
