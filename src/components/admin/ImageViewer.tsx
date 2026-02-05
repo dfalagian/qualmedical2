@@ -1,9 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Eye, ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
+import { Eye, ChevronLeft, ChevronRight, Download, Loader2, FileText } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { getSignedUrls } from "@/lib/storage";
 import { toast } from "sonner";
+import { PdfInlineViewer } from "@/components/pdf/PdfInlineViewer";
 
 interface ImageViewerProps {
   fileUrl?: string;
@@ -30,15 +31,47 @@ export const ImageViewer = ({
   const [signedUrls, setSignedUrls] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
   
+  // Detectar si es un PDF sin imágenes convertidas
+  const isPdfWithoutImages = useMemo(() => {
+    const hasNoImages = !imageUrls || imageUrls.length === 0;
+    const isPdf = fileUrl?.toLowerCase().includes('.pdf') || fileName?.toLowerCase().endsWith('.pdf');
+    return hasNoImages && isPdf && fileUrl;
+  }, [imageUrls, fileUrl, fileName]);
+
   const rawPaths = useMemo(() => {
-    return imageUrls && imageUrls.length > 0 ? imageUrls : fileUrl ? [fileUrl] : [];
+    // Si es PDF sin imágenes, no intentamos cargar el PDF como imagen
+    if (isPdfWithoutImages) {
+      return [];
+    }
+    return imageUrls && imageUrls.length > 0 ? imageUrls : [];
   }, [fileUrl, imageUrls]);
 
   useEffect(() => {
     const loadSignedUrls = async () => {
       setIsLoading(true);
       
+      // Si es PDF sin imágenes, cargar URL firmada del PDF
+      if (isPdfWithoutImages && fileUrl) {
+        try {
+          const path = fileUrl.startsWith('http') 
+            ? fileUrl.split(`/${bucket}/`)[1] 
+            : fileUrl;
+          
+          if (path) {
+            const urls = await getSignedUrls(bucket, [path], 3600);
+            if (urls[0]) {
+              setPdfSignedUrl(urls[0]);
+            }
+          }
+        } catch (error) {
+          console.error('Error loading PDF signed URL:', error);
+        }
+        setIsLoading(false);
+        return;
+      }
+
       console.log('ImageViewer - rawPaths:', rawPaths);
       console.log('ImageViewer - bucket:', bucket);
       
@@ -86,8 +119,12 @@ export const ImageViewer = ({
 
     if (rawPaths.length > 0) {
       loadSignedUrls();
+    } else if (isPdfWithoutImages) {
+      loadSignedUrls();
+    } else {
+      setIsLoading(false);
     }
-  }, [rawPaths, bucket]);
+  }, [rawPaths, bucket, isPdfWithoutImages, fileUrl]);
 
   const totalPages = signedUrls.length;
   const hasMultiplePages = totalPages > 1;
@@ -220,8 +257,10 @@ export const ImageViewer = ({
         <div className="relative overflow-auto max-h-[calc(90vh-100px)]">
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
-              <p className="text-muted-foreground">Cargando imagen...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
+          ) : isPdfWithoutImages && pdfSignedUrl ? (
+            <PdfInlineViewer url={pdfSignedUrl} />
           ) : signedUrls.length > 0 ? (
             <img 
               src={signedUrls[currentPage]} 
@@ -229,8 +268,17 @@ export const ImageViewer = ({
               className="w-full h-auto rounded-lg"
             />
           ) : (
-            <div className="flex items-center justify-center h-64">
-              <p className="text-destructive">Error al cargar imagen</p>
+            <div className="flex flex-col items-center justify-center h-64 gap-4">
+              <FileText className="h-16 w-16 text-muted-foreground" />
+              <p className="text-muted-foreground">No hay vista previa disponible</p>
+              {pdfSignedUrl && (
+                <Button asChild variant="outline">
+                  <a href={pdfSignedUrl} target="_blank" rel="noopener noreferrer">
+                    <Download className="h-4 w-4 mr-2" />
+                    Descargar PDF
+                  </a>
+                </Button>
+              )}
             </div>
           )}
           
