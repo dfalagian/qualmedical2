@@ -2143,8 +2143,8 @@ export default function Inventory() {
             resetProductForm();
           }
         }}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>
                 {editingProduct ? "Editar Producto" : "Nuevo Producto"}
               </DialogTitle>
@@ -2154,6 +2154,7 @@ export default function Inventory() {
                   : "Completa los datos para crear un nuevo producto."}
               </DialogDescription>
             </DialogHeader>
+            <ScrollArea className="flex-1 pr-4">
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="sku" className="text-right">SKU</Label>
@@ -2296,7 +2297,8 @@ export default function Inventory() {
                 </div>
               </div>
             </div>
-            <DialogFooter>
+            </ScrollArea>
+            <DialogFooter className="flex-shrink-0 pt-4 border-t">
               <DialogClose asChild>
                 <Button variant="outline">Cancelar</Button>
               </DialogClose>
