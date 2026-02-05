@@ -348,7 +348,13 @@ const Invoices = () => {
         .select()
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        // Detectar error de duplicado por restricción única
+        if (insertError.code === '23505' && insertError.message?.includes('idx_invoices_supplier_uuid_unique')) {
+          throw new Error(`Esta factura ya existe en tu perfil. No se permiten facturas duplicadas.`);
+        }
+        throw insertError;
+      }
 
       // Insertar conceptos/artículos si existen
       if (validationData.conceptos && validationData.conceptos.length > 0) {
