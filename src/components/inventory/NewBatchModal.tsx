@@ -44,14 +44,32 @@ export function NewBatchModal({ open, onOpenChange, productName, onConfirm }: Ne
   };
 
   const handleDateInputChange = (value: string) => {
-    setDateInputValue(value);
+    // Remove any non-digit characters to get raw input
+    const digits = value.replace(/\D/g, '');
     
-    // Try to parse the date in dd/MM/yyyy format
-    if (value.length === 10) {
-      const parsedDate = parse(value, "dd/MM/yyyy", new Date());
+    // Format with slashes automatically
+    let formatted = '';
+    if (digits.length > 0) {
+      formatted = digits.substring(0, 2);
+    }
+    if (digits.length > 2) {
+      formatted += '/' + digits.substring(2, 4);
+    }
+    if (digits.length > 4) {
+      formatted += '/' + digits.substring(4, 8);
+    }
+    
+    setDateInputValue(formatted);
+    
+    // Try to parse the date when we have all 8 digits (dd/MM/yyyy = 10 chars with slashes)
+    if (formatted.length === 10) {
+      const parsedDate = parse(formatted, "dd/MM/yyyy", new Date());
       if (isValid(parsedDate) && parsedDate >= new Date(new Date().setHours(0, 0, 0, 0))) {
         setExpirationDate(parsedDate);
       }
+    } else {
+      // Clear the date if input is incomplete
+      setExpirationDate(undefined);
     }
   };
 
