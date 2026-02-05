@@ -399,7 +399,7 @@ export const CreateSupplierOrderDialog = ({
                             <div className="flex items-center justify-end gap-1">
                               <History className="h-3 w-3 text-muted-foreground" />
                               <span className="text-sm text-muted-foreground">
-                                ${product.savedPrice.toFixed(2)}
+                                ${(product.savedPrice ?? product.unitPrice ?? 0).toFixed(2)}
                               </span>
                             </div>
                           </TableCell>
