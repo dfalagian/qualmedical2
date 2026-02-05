@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, parse, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -20,6 +20,7 @@ interface NewBatchModalProps {
 export function NewBatchModal({ open, onOpenChange, productName, onConfirm }: NewBatchModalProps) {
   const [batchNumber, setBatchNumber] = useState("");
   const [expirationDate, setExpirationDate] = useState<Date | undefined>(undefined);
+  const [dateInputValue, setDateInputValue] = useState("");
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   const handleConfirm = () => {
@@ -31,13 +32,35 @@ export function NewBatchModal({ open, onOpenChange, productName, onConfirm }: Ne
     // Reset form
     setBatchNumber("");
     setExpirationDate(undefined);
+    setDateInputValue("");
     onOpenChange(false);
   };
 
   const handleCancel = () => {
     setBatchNumber("");
     setExpirationDate(undefined);
+    setDateInputValue("");
     onOpenChange(false);
+  };
+
+  const handleDateInputChange = (value: string) => {
+    setDateInputValue(value);
+    
+    // Try to parse the date in dd/MM/yyyy format
+    if (value.length === 10) {
+      const parsedDate = parse(value, "dd/MM/yyyy", new Date());
+      if (isValid(parsedDate) && parsedDate >= new Date(new Date().setHours(0, 0, 0, 0))) {
+        setExpirationDate(parsedDate);
+      }
+    }
+  };
+
+  const handleCalendarSelect = (date: Date | undefined) => {
+    setExpirationDate(date);
+    if (date) {
+      setDateInputValue(format(date, "dd/MM/yyyy"));
+    }
+    setCalendarOpen(false);
   };
 
   return (
@@ -66,36 +89,39 @@ export function NewBatchModal({ open, onOpenChange, productName, onConfirm }: Ne
 
           <div className="space-y-2">
             <Label>Fecha de Caducidad</Label>
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !expirationDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {expirationDate 
-                    ? format(expirationDate, "dd 'de' MMMM, yyyy", { locale: es }) 
-                    : "Seleccionar fecha"
-                  }
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={expirationDate}
-                  onSelect={(date) => {
-                    setExpirationDate(date);
-                    setCalendarOpen(false);
-                  }}
-                  disabled={(date) => date < new Date()}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="flex gap-2">
+              <Input
+                value={dateInputValue}
+                onChange={(e) => handleDateInputChange(e.target.value)}
+                placeholder="dd/mm/aaaa"
+                className="flex-1"
+                maxLength={10}
+              />
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                  >
+                    <CalendarIcon className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={expirationDate}
+                    onSelect={handleCalendarSelect}
+                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Formato: dd/mm/aaaa (ej: 15/12/2025)
+            </p>
           </div>
         </div>
 
