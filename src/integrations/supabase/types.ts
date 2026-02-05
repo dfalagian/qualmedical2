@@ -1488,6 +1488,7 @@ export type Database = {
           fecha_emision: string | null
           folio: string
           id: string
+          items: Json | null
           notes: string | null
           pdf_url: string | null
           quote_id: string | null
@@ -1507,6 +1508,7 @@ export type Database = {
           fecha_emision?: string | null
           folio: string
           id?: string
+          items?: Json | null
           notes?: string | null
           pdf_url?: string | null
           quote_id?: string | null
@@ -1526,6 +1528,7 @@ export type Database = {
           fecha_emision?: string | null
           folio?: string
           id?: string
+          items?: Json | null
           notes?: string | null
           pdf_url?: string | null
           quote_id?: string | null

@@ -53,6 +53,27 @@ export const SalesInvoiceUpload = ({ onSuccess }: SalesInvoiceUploadProps) => {
       return null;
     };
 
+    // Helper function to find all elements by local name
+    const findAllElements = (doc: Document, localName: string): Element[] => {
+      const results: Element[] = [];
+      const prefixes = ["cfdi:", "tfd:", ""];
+      for (const prefix of prefixes) {
+        const elements = doc.getElementsByTagName(prefix + localName);
+        for (let i = 0; i < elements.length; i++) {
+          results.push(elements[i]);
+        }
+        if (results.length > 0) return results;
+      }
+      // Fallback: search all elements by local name
+      const allElements = doc.getElementsByTagName("*");
+      for (let i = 0; i < allElements.length; i++) {
+        if (allElements[i].localName === localName) {
+          results.push(allElements[i]);
+        }
+      }
+      return results;
+    };
+
     // Get Comprobante element
     const comprobante = findElement(xmlDoc, "Comprobante");
 
@@ -87,6 +108,19 @@ export const SalesInvoiceUpload = ({ onSuccess }: SalesInvoiceUploadProps) => {
     const receptorNombre = receptor?.getAttribute("Nombre") || "";
     const receptorRfc = receptor?.getAttribute("Rfc") || "";
 
+    // Extract concepts (items)
+    const conceptosElements = findAllElements(xmlDoc, "Concepto");
+    const items = conceptosElements.map((concepto) => ({
+      clave_prod_serv: concepto.getAttribute("ClaveProdServ") || "",
+      clave_unidad: concepto.getAttribute("ClaveUnidad") || "",
+      descripcion: concepto.getAttribute("Descripcion") || "",
+      cantidad: parseFloat(concepto.getAttribute("Cantidad") || "0"),
+      unidad: concepto.getAttribute("Unidad") || "",
+      valor_unitario: parseFloat(concepto.getAttribute("ValorUnitario") || "0"),
+      importe: parseFloat(concepto.getAttribute("Importe") || "0"),
+      descuento: parseFloat(concepto.getAttribute("Descuento") || "0"),
+    }));
+
     // Generate a folio if none exists
     const generatedFolio = serie && folio 
       ? `${serie}-${folio}` 
@@ -103,6 +137,7 @@ export const SalesInvoiceUpload = ({ onSuccess }: SalesInvoiceUploadProps) => {
       emisor_rfc: emisorRfc,
       receptor_nombre: receptorNombre,
       receptor_rfc: receptorRfc,
+      items,
     };
   };
 

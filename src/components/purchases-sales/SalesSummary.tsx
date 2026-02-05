@@ -45,6 +45,17 @@ interface QuoteWithClient {
   }>;
 }
 
+interface InvoiceItem {
+  clave_prod_serv?: string;
+  clave_unidad?: string;
+  descripcion: string;
+  cantidad: number;
+  unidad?: string;
+  valor_unitario: number;
+  importe: number;
+  descuento?: number;
+}
+
 interface SalesInvoice {
   id: string;
   folio: string;
@@ -60,6 +71,7 @@ interface SalesInvoice {
   xml_url: string;
   pdf_url: string | null;
   created_at: string;
+  items: InvoiceItem[] | null;
 }
 
 export const SalesSummary = () => {
@@ -112,7 +124,11 @@ export const SalesSummary = () => {
         .order("fecha_emision", { ascending: false });
 
       if (error) throw error;
-      return data as SalesInvoice[];
+      // Parse items from JSON to proper array type
+      return (data || []).map(invoice => ({
+        ...invoice,
+        items: Array.isArray(invoice.items) ? invoice.items as unknown as InvoiceItem[] : null
+      })) as SalesInvoice[];
     },
   });
 

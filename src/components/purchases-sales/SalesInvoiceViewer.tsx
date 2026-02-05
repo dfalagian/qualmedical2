@@ -8,10 +8,29 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Download, ExternalLink, Calendar, Building2, Receipt } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { FileText, Download, ExternalLink, Calendar, Building2, Receipt, Package } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { PdfInlineViewer } from "@/components/pdf/PdfInlineViewer";
+
+interface InvoiceItem {
+  clave_prod_serv?: string;
+  clave_unidad?: string;
+  descripcion: string;
+  cantidad: number;
+  unidad?: string;
+  valor_unitario: number;
+  importe: number;
+  descuento?: number;
+}
 
 interface SalesInvoice {
   id: string;
@@ -28,6 +47,7 @@ interface SalesInvoice {
   xml_url: string;
   pdf_url: string | null;
   created_at: string;
+  items?: InvoiceItem[] | null;
 }
 
 interface SalesInvoiceViewerProps {
@@ -128,6 +148,53 @@ export const SalesInvoiceViewer = ({
                   </div>
                 </div>
               </div>
+
+              {/* Conceptos */}
+              {invoice.items && Array.isArray(invoice.items) && invoice.items.length > 0 && (
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Package className="h-4 w-4 text-primary" />
+                    <h4 className="font-semibold">Conceptos ({invoice.items.length})</h4>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50%]">Descripción</TableHead>
+                          <TableHead className="text-right">Cantidad</TableHead>
+                          <TableHead className="text-right">P. Unitario</TableHead>
+                          <TableHead className="text-right">Importe</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {invoice.items.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium text-sm">{item.descripcion}</p>
+                                {item.clave_prod_serv && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Clave SAT: {item.clave_prod_serv}
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {item.cantidad} {item.unidad || ""}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(item.valor_unitario)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(item.importe)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
 
               {/* Montos */}
               <div className="border rounded-lg p-4">
