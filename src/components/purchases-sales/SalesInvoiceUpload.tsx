@@ -29,12 +29,35 @@ export const SalesInvoiceUpload = ({ onSuccess }: SalesInvoiceUploadProps) => {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
 
-    // Get namespace
-    const comprobante = xmlDoc.getElementsByTagName("cfdi:Comprobante")[0] ||
-      xmlDoc.getElementsByTagName("Comprobante")[0];
+    // Check for XML parsing errors
+    const parseError = xmlDoc.getElementsByTagName("parsererror");
+    if (parseError.length > 0) {
+      throw new Error("El archivo XML tiene un formato inválido");
+    }
+
+    // Helper function to find elements by local name (ignoring namespace prefix)
+    const findElement = (doc: Document, localName: string): Element | null => {
+      // Try with common prefixes first
+      const prefixes = ["cfdi:", "tfd:", ""];
+      for (const prefix of prefixes) {
+        const elements = doc.getElementsByTagName(prefix + localName);
+        if (elements.length > 0) return elements[0];
+      }
+      // Fallback: search all elements by local name
+      const allElements = doc.getElementsByTagName("*");
+      for (let i = 0; i < allElements.length; i++) {
+        if (allElements[i].localName === localName) {
+          return allElements[i];
+        }
+      }
+      return null;
+    };
+
+    // Get Comprobante element
+    const comprobante = findElement(xmlDoc, "Comprobante");
 
     if (!comprobante) {
-      throw new Error("No se encontró el elemento Comprobante en el XML");
+      throw new Error("No se encontró el elemento Comprobante en el XML. Verifica que sea un CFDI válido.");
     }
 
     // Extract basic data
@@ -45,29 +68,36 @@ export const SalesInvoiceUpload = ({ onSuccess }: SalesInvoiceUploadProps) => {
     const total = parseFloat(comprobante.getAttribute("Total") || "0");
     const moneda = comprobante.getAttribute("Moneda") || "MXN";
 
+    // Validate we have minimum required data
+    if (total === 0 && subtotal === 0) {
+      throw new Error("El XML no contiene información de montos válidos");
+    }
+
     // Extract UUID from TimbreFiscalDigital
-    const timbre = xmlDoc.getElementsByTagName("tfd:TimbreFiscalDigital")[0] ||
-      xmlDoc.getElementsByTagName("TimbreFiscalDigital")[0];
+    const timbre = findElement(xmlDoc, "TimbreFiscalDigital");
     const uuid = timbre?.getAttribute("UUID") || null;
 
     // Extract emisor data
-    const emisor = xmlDoc.getElementsByTagName("cfdi:Emisor")[0] ||
-      xmlDoc.getElementsByTagName("Emisor")[0];
+    const emisor = findElement(xmlDoc, "Emisor");
     const emisorNombre = emisor?.getAttribute("Nombre") || "";
     const emisorRfc = emisor?.getAttribute("Rfc") || "";
 
     // Extract receptor data
-    const receptor = xmlDoc.getElementsByTagName("cfdi:Receptor")[0] ||
-      xmlDoc.getElementsByTagName("Receptor")[0];
+    const receptor = findElement(xmlDoc, "Receptor");
     const receptorNombre = receptor?.getAttribute("Nombre") || "";
     const receptorRfc = receptor?.getAttribute("Rfc") || "";
 
+    // Generate a folio if none exists
+    const generatedFolio = serie && folio 
+      ? `${serie}-${folio}` 
+      : folio || uuid?.substring(0, 8) || `SIN-FOLIO-${Date.now()}`;
+
     return {
-      folio: serie ? `${serie}-${folio}` : folio,
+      folio: generatedFolio,
       uuid,
       fecha_emision: fecha ? new Date(fecha).toISOString() : null,
       subtotal,
-      total,
+      total: total || subtotal, // Use subtotal as fallback if total is 0
       currency: moneda,
       emisor_nombre: emisorNombre,
       emisor_rfc: emisorRfc,
