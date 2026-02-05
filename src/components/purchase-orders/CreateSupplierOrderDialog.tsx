@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Package, Trash2, FileText } from "lucide-react";
+import { Package, Trash2, FileText, History } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
 import { openPurchaseOrderPrint } from "./purchaseOrderHtmlPrint";
 
@@ -41,6 +41,8 @@ interface SelectedProduct {
   sku: string;
   quantity: number;
   unitPrice: number;
+  savedPrice: number;
+  manualPrice: number | null;
   hasIva: boolean;
   ivaAmount: number;
   total: number;
@@ -152,6 +154,8 @@ export const CreateSupplierOrderDialog = ({
         sku: product.sku,
         quantity,
         unitPrice,
+        savedPrice: unitPrice,
+        manualPrice: null,
         hasIva,
         ivaAmount,
         total,
@@ -167,8 +171,9 @@ export const CreateSupplierOrderDialog = ({
     setSelectedProducts(
       selectedProducts.map((p) => {
         if (p.id === productId) {
-          const ivaAmount = p.hasIva ? p.unitPrice * quantity * IVA_RATE : 0;
-          const total = p.unitPrice * quantity + ivaAmount;
+          const effectivePrice = p.manualPrice ?? p.savedPrice;
+          const ivaAmount = p.hasIva ? effectivePrice * quantity * IVA_RATE : 0;
+          const total = effectivePrice * quantity + ivaAmount;
           return { ...p, quantity, ivaAmount, total };
         }
         return p;
@@ -176,13 +181,15 @@ export const CreateSupplierOrderDialog = ({
     );
   };
 
-  const updateProductPrice = (productId: string, newPrice: number) => {
+  const updateProductManualPrice = (productId: string, manualPriceStr: string) => {
+    const manualPrice = manualPriceStr.trim() === "" ? null : parseFloat(manualPriceStr) || 0;
     setSelectedProducts(
       selectedProducts.map((p) => {
         if (p.id === productId) {
-          const ivaAmount = p.hasIva ? newPrice * p.quantity * IVA_RATE : 0;
-          const total = newPrice * p.quantity + ivaAmount;
-          return { ...p, unitPrice: newPrice, ivaAmount, total };
+          const effectivePrice = manualPrice ?? p.savedPrice;
+          const ivaAmount = p.hasIva ? effectivePrice * p.quantity * IVA_RATE : 0;
+          const total = effectivePrice * p.quantity + ivaAmount;
+          return { ...p, manualPrice, unitPrice: effectivePrice, ivaAmount, total };
         }
         return p;
       })
@@ -191,7 +198,10 @@ export const CreateSupplierOrderDialog = ({
 
   const { subtotal, totalIva, total } = useMemo(() => {
     const subtotal = selectedProducts.reduce(
-      (sum, p) => sum + p.unitPrice * p.quantity,
+      (sum, p) => {
+        const effectivePrice = p.manualPrice ?? p.savedPrice;
+        return sum + effectivePrice * p.quantity;
+      },
       0
     );
     const totalIva = selectedProducts.reduce((sum, p) => sum + p.ivaAmount, 0);
@@ -355,10 +365,11 @@ export const CreateSupplierOrderDialog = ({
                       <TableRow>
                         <TableHead className="w-[40%]">Producto</TableHead>
                         <TableHead className="w-[10%] text-center">Cant.</TableHead>
-                        <TableHead className="w-[15%] text-center">P. Unit.</TableHead>
+                        <TableHead className="w-[12%] text-right">P. Guardado</TableHead>
+                        <TableHead className="w-[12%] text-center">P. Manual</TableHead>
                         <TableHead className="w-[10%] text-center">IVA</TableHead>
                         <TableHead className="w-[15%] text-right">Importe</TableHead>
-                        <TableHead className="w-[10%]"></TableHead>
+                        <TableHead className="w-[5%]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -384,18 +395,24 @@ export const CreateSupplierOrderDialog = ({
                               className="w-16 h-8 text-center mx-auto"
                             />
                           </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <History className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">
+                                ${product.savedPrice.toFixed(2)}
+                              </span>
+                            </div>
+                          </TableCell>
                           <TableCell className="text-center">
                             <Input
                               type="number"
                               min={0}
                               step="0.01"
-                              value={product.unitPrice}
+                              value={product.manualPrice ?? ""}
                               onChange={(e) =>
-                                updateProductPrice(
-                                  product.id,
-                                  Math.max(0, parseFloat(e.target.value) || 0)
-                                )
+                                updateProductManualPrice(product.id, e.target.value)
                               }
+                              placeholder="—"
                               className="w-24 h-8 text-center mx-auto"
                             />
                           </TableCell>
