@@ -133,7 +133,8 @@ export const CreateSupplierOrderDialog = ({
   const handleAddProduct = (
     product: { id: string; name: string; sku: string; unit_price: number | null },
     quantity: number,
-    unitPrice: number,
+    savedPrice: number,
+    manualPrice: number | null,
     hasIva: boolean
   ) => {
     // Check if product already exists
@@ -143,8 +144,9 @@ export const CreateSupplierOrderDialog = ({
       return;
     }
 
-    const ivaAmount = hasIva ? unitPrice * quantity * IVA_RATE : 0;
-    const total = unitPrice * quantity + ivaAmount;
+    const effectivePrice = manualPrice ?? savedPrice;
+    const ivaAmount = hasIva ? effectivePrice * quantity * IVA_RATE : 0;
+    const total = effectivePrice * quantity + ivaAmount;
 
     setSelectedProducts([
       ...selectedProducts,
@@ -153,9 +155,9 @@ export const CreateSupplierOrderDialog = ({
         name: product.name,
         sku: product.sku,
         quantity,
-        unitPrice,
-        savedPrice: unitPrice,
-        manualPrice: null,
+        unitPrice: effectivePrice,
+        savedPrice,
+        manualPrice,
         hasIva,
         ivaAmount,
         total,
@@ -243,6 +245,13 @@ export const CreateSupplierOrderDialog = ({
         product_id: p.id,
         quantity_ordered: p.quantity,
         unit_price: p.unitPrice,
+        original_price: p.savedPrice,
+        price_updated_at:
+          p.manualPrice !== null && p.manualPrice !== p.savedPrice
+            ? new Date().toISOString()
+            : null,
+        price_updated_by:
+          p.manualPrice !== null && p.manualPrice !== p.savedPrice ? user.id : null,
       }));
 
       const { error: itemsError } = await supabase
@@ -250,6 +259,45 @@ export const CreateSupplierOrderDialog = ({
         .insert(items);
 
       if (itemsError) throw itemsError;
+
+      // Registrar histórico SOLO cuando el usuario capturó un precio manual
+      const manualPriceItems = selectedProducts.filter((p) => p.manualPrice !== null);
+      if (manualPriceItems.length > 0) {
+        await Promise.all(
+          manualPriceItems.map(async (p) => {
+            const { data: lastRows, error: lastError } = await supabase
+              .from("product_price_history")
+              .select("price")
+              .eq("product_id", p.id)
+              .eq("supplier_id", selectedSupplier)
+              .order("created_at", { ascending: false })
+              .limit(1);
+
+            if (lastError) throw lastError;
+
+            const previousPrice = lastRows?.[0]?.price ?? null;
+            const priceChangePercentage =
+              previousPrice && previousPrice > 0
+                ? ((p.unitPrice - previousPrice) / previousPrice) * 100
+                : null;
+
+            const { error: historyError } = await supabase
+              .from("product_price_history")
+              .insert({
+                product_id: p.id,
+                supplier_id: selectedSupplier,
+                purchase_order_id: order.id,
+                price: p.unitPrice,
+                previous_price: previousPrice,
+                price_change_percentage: priceChangePercentage,
+                created_by: user.id,
+                notes: `Precio manual en OC ${orderNumber}`,
+              });
+
+            if (historyError) throw historyError;
+          })
+        );
+      }
 
       return order;
     },

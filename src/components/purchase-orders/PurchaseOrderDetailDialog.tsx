@@ -98,6 +98,11 @@ export function PurchaseOrderDetailDialog({
       price: number;
       previousPrice: number | null;
     }) => {
+      const priceChangePercentage =
+        previousPrice && previousPrice > 0
+          ? ((price - previousPrice) / previousPrice) * 100
+          : null;
+
       // 1. Actualizar el precio en purchase_order_items
       const { error: updateError } = await supabase
         .from("purchase_order_items")
@@ -120,7 +125,9 @@ export function PurchaseOrderDetailDialog({
           purchase_order_id: purchaseOrderId,
           price: price,
           previous_price: previousPrice,
+          price_change_percentage: priceChangePercentage,
           created_by: user?.id,
+          notes: "Actualización manual en detalle de OC",
         });
 
       if (historyError) throw historyError;

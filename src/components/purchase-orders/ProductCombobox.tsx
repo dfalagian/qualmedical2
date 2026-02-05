@@ -29,7 +29,13 @@ interface Product {
 
 interface ProductComboboxProps {
   products: Product[];
-  onAddProduct: (product: Product, quantity: number, unitPrice: number, hasIva: boolean) => void;
+  onAddProduct: (
+    product: Product,
+    quantity: number,
+    savedPrice: number,
+    manualPrice: number | null,
+    hasIva: boolean
+  ) => void;
 }
 
 // Helper to get the best available price
@@ -72,11 +78,10 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
   const handleAddProduct = () => {
     if (!selectedProduct) return;
     const savedPrice = getProductPrice(selectedProduct);
+    const parsedManual = manualPrice.trim() !== "" ? parseFloat(manualPrice) || 0 : null;
     // Si hay precio manual, usarlo; si no, usar el precio guardado
-    const finalPrice = manualPrice.trim() !== "" 
-      ? parseFloat(manualPrice) || 0 
-      : savedPrice;
-    onAddProduct(selectedProduct, quantity, finalPrice, hasIva);
+    const effectivePrice = parsedManual ?? savedPrice;
+    onAddProduct(selectedProduct, quantity, savedPrice, parsedManual, hasIva);
     // Reset form
     setSelectedProduct(null);
     setQuantity(1);
