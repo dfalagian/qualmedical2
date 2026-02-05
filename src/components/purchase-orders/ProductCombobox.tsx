@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Check, ChevronsUpDown, Search, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,12 +24,25 @@ interface Product {
   sku: string;
   unit_price: number | null;
   current_stock: number | null;
+  price_type_1?: number | null;
 }
 
 interface ProductComboboxProps {
   products: Product[];
   onAddProduct: (product: Product, quantity: number, unitPrice: number, hasIva: boolean) => void;
 }
+
+// Helper to get the best available price
+const getProductPrice = (product: Product): number => {
+  // Priority: unit_price > price_type_1 > 0
+  if (product.unit_price != null && product.unit_price > 0) {
+    return product.unit_price;
+  }
+  if (product.price_type_1 != null && product.price_type_1 > 0) {
+    return product.price_type_1;
+  }
+  return 0;
+};
 
 export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps) => {
   const [open, setOpen] = useState(false);
@@ -58,10 +71,11 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
 
   const handleAddProduct = () => {
     if (!selectedProduct) return;
+    const savedPrice = getProductPrice(selectedProduct);
     // Si hay precio manual, usarlo; si no, usar el precio guardado
     const finalPrice = manualPrice.trim() !== "" 
       ? parseFloat(manualPrice) || 0 
-      : (selectedProduct.unit_price || 0);
+      : savedPrice;
     onAddProduct(selectedProduct, quantity, finalPrice, hasIva);
     // Reset form
     setSelectedProduct(null);
@@ -118,7 +132,7 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-sm font-semibold text-primary">
-                          ${(product.unit_price || 0).toFixed(2)}
+                          ${getProductPrice(product).toFixed(2)}
                         </span>
                         <Check
                           className={cn(
@@ -151,7 +165,7 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Precio Guardado</Label>
               <div className="h-9 px-3 flex items-center bg-muted rounded-md text-sm font-medium">
-                ${(selectedProduct.unit_price || 0).toFixed(2)}
+                ${getProductPrice(selectedProduct).toFixed(2)}
               </div>
             </div>
             <div className="space-y-1">
@@ -172,7 +186,7 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
                 id="has-iva"
                 checked={hasIva}
                 onChange={(e) => setHasIva(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
+                className="h-4 w-4 rounded border-border"
               />
               <Label htmlFor="has-iva" className="text-xs cursor-pointer">
                 +IVA (16%)

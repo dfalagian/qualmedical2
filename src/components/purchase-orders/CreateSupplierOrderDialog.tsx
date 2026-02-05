@@ -120,7 +120,7 @@ export const CreateSupplierOrderDialog = ({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, sku, unit_price, current_stock")
+        .select("id, name, sku, unit_price, current_stock, price_type_1")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
