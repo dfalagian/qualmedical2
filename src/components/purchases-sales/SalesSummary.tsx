@@ -14,6 +14,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Search, FileSpreadsheet, Calendar, Package, CheckCircle, Receipt, Trash2, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -79,6 +89,8 @@ export const SalesSummary = () => {
   const [activeSubTab, setActiveSubTab] = useState("quotes");
   const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoice | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
 
   const { data: quotes, isLoading: isLoadingQuotes } = useQuery({
     queryKey: ["approved-quotes-sales"],
@@ -132,13 +144,13 @@ export const SalesSummary = () => {
     },
   });
 
-  const handleDeleteInvoice = async (id: string) => {
-    if (!confirm("¿Estás seguro de eliminar esta factura?")) return;
+  const handleDeleteInvoice = async () => {
+    if (!invoiceToDelete) return;
     
     const { error } = await supabase
       .from("sales_invoices")
       .delete()
-      .eq("id", id);
+      .eq("id", invoiceToDelete);
       
     if (error) {
       toast.error("Error al eliminar la factura");
@@ -146,6 +158,13 @@ export const SalesSummary = () => {
       toast.success("Factura eliminada");
       refetchInvoices();
     }
+    setDeleteDialogOpen(false);
+    setInvoiceToDelete(null);
+  };
+
+  const openDeleteDialog = (id: string) => {
+    setInvoiceToDelete(id);
+    setDeleteDialogOpen(true);
   };
 
   const filteredQuotes = quotes?.filter((quote) => {
@@ -493,7 +512,7 @@ export const SalesSummary = () => {
                               className="h-8 w-8 text-destructive hover:text-destructive"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDeleteInvoice(invoice.id);
+                                openDeleteDialog(invoice.id);
                               }}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -516,6 +535,24 @@ export const SalesSummary = () => {
         open={viewerOpen}
         onOpenChange={setViewerOpen}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar factura?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. La factura será eliminada permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteInvoice} className="bg-destructive hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
