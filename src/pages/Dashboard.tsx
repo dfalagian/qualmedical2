@@ -6,7 +6,6 @@ import { EmailServerStatus } from "@/components/dashboard/EmailServerStatus";
 import { Navigate } from "react-router-dom";
 import { ManageContador } from "@/components/supplier/ManageContador";
 import { LowStockCard } from "@/components/dashboard/LowStockCard";
-import { StockByWarehouseModal } from "@/components/dashboard/StockByWarehouseModal";
 
 const Dashboard = () => {
   const { user, isAdmin, isContador, isContadorProveedor, isSupplier } = useAuth();
@@ -88,13 +87,6 @@ const Dashboard = () => {
           {/* Tarjeta de Stock Bajo - Solo para admin */}
           {isAdmin && <LowStockCard />}
         </div>
-
-        {/* Botón para ver stock por almacén - Solo para admin */}
-        {isAdmin && (
-          <div className="flex justify-start">
-            <StockByWarehouseModal />
-          </div>
-        )}
 
         {isAdmin && <EmailServerStatus />}
 
