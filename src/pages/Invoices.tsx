@@ -67,6 +67,9 @@ const Invoices = () => {
   const [paymentHistoryInvoice, setPaymentHistoryInvoice] = useState<any>(null);
   const [complementoToDelete, setComplementoToDelete] = useState<string | null>(null);
 
+  // Ref para prevenir doble-clic/subidas simultáneas
+  const uploadInProgressRef = useRef(false);
+
   // Mutation para eliminar complemento de pago
   const deleteComplementoMutation = useMutation({
     mutationFn: async (invoiceId: string) => {
@@ -172,29 +175,36 @@ const Invoices = () => {
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      if (!pdfFile || !xmlFile || !user) {
-        throw new Error("Los archivos PDF y XML son obligatorios");
+      // Guard para prevenir doble-clic / subidas simultáneas
+      if (uploadInProgressRef.current) {
+        throw new Error("Ya hay una subida en proceso. Por favor espera.");
       }
+      uploadInProgressRef.current = true;
 
-      // Validar que los archivos tengan contenido
-      console.log('Validando archivos antes de subir:', {
-        xmlName: xmlFile.name,
-        xmlSize: xmlFile.size,
-        xmlType: xmlFile.type,
-        pdfName: pdfFile.name,
-        pdfSize: pdfFile.size,
-        pdfType: pdfFile.type
-      });
+      try {
+        if (!pdfFile || !xmlFile || !user) {
+          throw new Error("Los archivos PDF y XML son obligatorios");
+        }
 
-      if (xmlFile.size === 0) {
-        throw new Error("El archivo XML está vacío. Por favor, selecciona un archivo XML válido.");
-      }
+        // Validar que los archivos tengan contenido
+        console.log('Validando archivos antes de subir:', {
+          xmlName: xmlFile.name,
+          xmlSize: xmlFile.size,
+          xmlType: xmlFile.type,
+          pdfName: pdfFile.name,
+          pdfSize: pdfFile.size,
+          pdfType: pdfFile.type
+        });
 
-      if (pdfFile.size === 0) {
-        throw new Error("El archivo PDF está vacío. Por favor, selecciona un archivo PDF válido.");
-      }
+        if (xmlFile.size === 0) {
+          throw new Error("El archivo XML está vacío. Por favor, selecciona un archivo XML válido.");
+        }
 
-      setIsUploading(true);
+        if (pdfFile.size === 0) {
+          throw new Error("El archivo PDF está vacío. Por favor, selecciona un archivo PDF válido.");
+        }
+
+        setIsUploading(true);
 
       // Upload PDF primero
       const pdfExt = pdfFile.name.split(".").pop();
@@ -370,6 +380,9 @@ const Invoices = () => {
       }
 
       return { requiereComplemento: false };
+      } finally {
+        uploadInProgressRef.current = false;
+      }
     },
     onSuccess: (data) => {
       toast.success("Factura subida exitosamente");
