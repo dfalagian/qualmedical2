@@ -33,6 +33,8 @@ import { Package, Trash2, FileText } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
 import { openPurchaseOrderPrint } from "./purchaseOrderHtmlPrint";
 
+const IVA_RATE = 0.16;
+
 interface SelectedProduct {
   id: string;
   name: string;
@@ -48,8 +50,6 @@ interface CreateSupplierOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-const IVA_RATE = 0.16;
 
 export const CreateSupplierOrderDialog = ({
   open,
@@ -170,6 +170,19 @@ export const CreateSupplierOrderDialog = ({
           const ivaAmount = p.hasIva ? p.unitPrice * quantity * IVA_RATE : 0;
           const total = p.unitPrice * quantity + ivaAmount;
           return { ...p, quantity, ivaAmount, total };
+        }
+        return p;
+      })
+    );
+  };
+
+  const updateProductPrice = (productId: string, newPrice: number) => {
+    setSelectedProducts(
+      selectedProducts.map((p) => {
+        if (p.id === productId) {
+          const ivaAmount = p.hasIva ? newPrice * p.quantity * IVA_RATE : 0;
+          const total = newPrice * p.quantity + ivaAmount;
+          return { ...p, unitPrice: newPrice, ivaAmount, total };
         }
         return p;
       })
@@ -342,7 +355,7 @@ export const CreateSupplierOrderDialog = ({
                       <TableRow>
                         <TableHead className="w-[40%]">Producto</TableHead>
                         <TableHead className="w-[10%] text-center">Cant.</TableHead>
-                        <TableHead className="w-[15%] text-right">P. Unit.</TableHead>
+                        <TableHead className="w-[15%] text-center">P. Unit.</TableHead>
                         <TableHead className="w-[10%] text-center">IVA</TableHead>
                         <TableHead className="w-[15%] text-right">Importe</TableHead>
                         <TableHead className="w-[10%]"></TableHead>
@@ -371,8 +384,20 @@ export const CreateSupplierOrderDialog = ({
                               className="w-16 h-8 text-center mx-auto"
                             />
                           </TableCell>
-                          <TableCell className="text-right">
-                            ${product.unitPrice.toFixed(2)}
+                          <TableCell className="text-center">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={product.unitPrice}
+                              onChange={(e) =>
+                                updateProductPrice(
+                                  product.id,
+                                  Math.max(0, parseFloat(e.target.value) || 0)
+                                )
+                              }
+                              className="w-24 h-8 text-center mx-auto"
+                            />
                           </TableCell>
                           <TableCell className="text-center">
                             {product.hasIva ? (
