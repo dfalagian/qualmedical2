@@ -1885,63 +1885,98 @@ export default function Inventory() {
                     </div>
                   ) : (
                     <div className="divide-y">
-                      {alerts.map((alert) => (
-                        <div 
-                          key={alert.id} 
-                          className={`p-4 hover:bg-muted/50 transition-colors ${!alert.is_read ? 'bg-primary/5' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className={`p-2 rounded-full ${
-                              alert.severity === 'critical' ? 'bg-destructive/10 text-destructive' :
-                              alert.severity === 'warning' ? 'bg-orange-500/10 text-orange-500' :
-                              'bg-blue-500/10 text-blue-500'
-                            }`}>
-                              {alert.alert_type === 'movement' ? (
-                                <ArrowRight className="h-4 w-4" />
-                              ) : (
-                                <AlertTriangle className="h-4 w-4" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-medium">{alert.message}</span>
-                                {!alert.is_read && (
-                                  <Badge variant="secondary" className="text-xs">Nuevo</Badge>
+                      {alerts.map((alert) => {
+                        const isUnauthorizedExit = alert.alert_type === 'unauthorized_exit';
+                        
+                        return (
+                          <div 
+                            key={alert.id} 
+                            className={`p-4 hover:bg-muted/50 transition-colors ${
+                              isUnauthorizedExit 
+                                ? 'bg-red-100 dark:bg-red-950/50 border-l-4 border-l-red-500 animate-pulse' 
+                                : !alert.is_read 
+                                  ? 'bg-primary/5' 
+                                  : ''
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`p-2 rounded-full ${
+                                isUnauthorizedExit ? 'bg-red-500 text-white' :
+                                alert.severity === 'critical' ? 'bg-destructive/10 text-destructive' :
+                                alert.severity === 'warning' ? 'bg-orange-500/10 text-orange-500' :
+                                'bg-blue-500/10 text-blue-500'
+                              }`}>
+                                {isUnauthorizedExit ? (
+                                  <AlertTriangle className="h-5 w-5" />
+                                ) : alert.alert_type === 'movement' ? (
+                                  <ArrowRight className="h-4 w-4" />
+                                ) : (
+                                  <AlertTriangle className="h-4 w-4" />
                                 )}
                               </div>
-                              {alert.alert_type === 'movement' && (
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                                  <MapPin className="h-3 w-3" />
-                                  <span>{alert.previous_location}</span>
-                                  <ArrowRight className="h-3 w-3" />
-                                  <span>{alert.new_location}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <span className={`font-medium ${isUnauthorizedExit ? 'text-red-600 dark:text-red-400 text-lg' : ''}`}>
+                                    {alert.message}
+                                  </span>
+                                  {!alert.is_read && (
+                                    <Badge variant="secondary" className="text-xs">Nuevo</Badge>
+                                  )}
+                                  {isUnauthorizedExit && (
+                                    <Badge variant="destructive" className="text-xs animate-bounce">
+                                      🚨 CRÍTICO
+                                    </Badge>
+                                  )}
                                 </div>
-                              )}
-                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                <span>{new Date(alert.created_at).toLocaleString()}</span>
-                                <Badge variant="outline" className="text-xs">
-                                  {alert.alert_type}
-                                </Badge>
+                                {alert.alert_type === 'movement' && (
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                                    <MapPin className="h-3 w-3" />
+                                    <span>{alert.previous_location}</span>
+                                    <ArrowRight className="h-3 w-3" />
+                                    <span>{alert.new_location}</span>
+                                  </div>
+                                )}
+                                {isUnauthorizedExit && alert.rfid_tags && (
+                                  <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded text-sm">
+                                    <p className="font-mono text-xs text-red-700 dark:text-red-300">
+                                      EPC: {alert.rfid_tags.epc}
+                                    </p>
+                                    {alert.products && (
+                                      <p className="text-red-600 dark:text-red-400">
+                                        Producto: {alert.products.name} ({alert.products.sku})
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+                                  <span>{new Date(alert.created_at).toLocaleString()}</span>
+                                  <Badge 
+                                    variant={isUnauthorizedExit ? "destructive" : "outline"} 
+                                    className="text-xs"
+                                  >
+                                    {isUnauthorizedExit ? "SALIDA NO AUTORIZADA" : alert.alert_type}
+                                  </Badge>
+                                </div>
                               </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => markAlertReadMutation.mutate({ 
+                                  id: alert.id, 
+                                  isRead: !alert.is_read 
+                                })}
+                                title={alert.is_read ? "Marcar como no leído" : "Marcar como leído"}
+                              >
+                                {alert.is_read ? (
+                                  <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
+                              </Button>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => markAlertReadMutation.mutate({ 
-                                id: alert.id, 
-                                isRead: !alert.is_read 
-                              })}
-                              title={alert.is_read ? "Marcar como no leído" : "Marcar como leído"}
-                            >
-                              {alert.is_read ? (
-                                <EyeOff className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <Eye className="h-4 w-4" />
-                              )}
-                            </Button>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </ScrollArea>
