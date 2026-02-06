@@ -2306,34 +2306,26 @@ export default function Inventory() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-1">
-                        <Label htmlFor="minimum_stock" className="text-xs">Stock Mínimo</Label>
+                        <Label htmlFor="minimum_stock" className="text-xs text-muted-foreground">Stock Mínimo</Label>
                         <Input
                           id="minimum_stock"
                           type="number"
                           value={productForm.minimum_stock}
-                          onChange={(e) =>
-                            setProductForm({
-                              ...productForm,
-                              minimum_stock: parseInt(e.target.value) || 0,
-                            })
-                          }
-                          className="h-9"
+                          disabled
+                          className="h-9 bg-muted/50 cursor-not-allowed"
+                          title="El stock mínimo se gestiona desde órdenes de compra"
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <Label htmlFor="current_stock" className="text-xs">Stock Actual</Label>
+                        <Label htmlFor="current_stock" className="text-xs text-muted-foreground">Stock Actual</Label>
                         <Input
                           id="current_stock"
                           type="number"
                           value={productForm.current_stock}
-                          onChange={(e) =>
-                            setProductForm({
-                              ...productForm,
-                              current_stock: parseInt(e.target.value) || 0,
-                            })
-                          }
-                          className="h-9"
+                          disabled
+                          className="h-9 bg-muted/50 cursor-not-allowed"
+                          title="El stock se modifica mediante ingresos y salidas"
                         />
                       </div>
 
