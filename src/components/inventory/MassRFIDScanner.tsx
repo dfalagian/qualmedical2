@@ -352,6 +352,25 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
         description: `El producto "${tagInfo.productName}" no está asignado a ninguna venta aprobada.`,
         variant: "destructive",
       });
+      
+      // Registrar alerta en la base de datos
+      try {
+        await supabase
+          .from("stock_alerts")
+          .insert({
+            rfid_tag_id: tagInfo.tagId,
+            product_id: tagInfo.productId,
+            alert_type: "unauthorized_exit",
+            message: `⚠️ INTENTO DE SALIDA NO AUTORIZADA: ${tagInfo.productName || "Producto desconocido"} (EPC: ${cleanEpc})`,
+            severity: "critical",
+            previous_location: "almacen",
+            new_location: "intento_salida_bloqueado",
+          });
+        console.log(`🚨 Alerta de salida no autorizada registrada para EPC: ${cleanEpc}`);
+      } catch (alertError) {
+        console.error("Error registrando alerta:", alertError);
+      }
+      
       // Reproducir sonido de alerta (beep)
       try {
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
