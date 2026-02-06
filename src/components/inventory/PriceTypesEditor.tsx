@@ -55,16 +55,18 @@ type PercentagesState = {
   price_type_5: number;
 };
 
+// Calcula el % de incremento dado el precio base y el precio actual
 const calculatePercentage = (basePrice: number, currentPrice: number): number => {
   if (basePrice <= 0 || currentPrice <= 0) return 0;
-  return Math.round(((basePrice - currentPrice) / basePrice) * 100);
+  return Math.round(((currentPrice - basePrice) / basePrice) * 100);
 };
 
+// Calcula el precio aplicando un % de incremento sobre el precio base
 const calculatePriceFromPercentage = (
   basePrice: number,
-  discountPercent: number
+  incrementPercent: number
 ): number => {
-  return Math.round(basePrice * (1 - discountPercent / 100) * 100) / 100;
+  return Math.round(basePrice * (1 + incrementPercent / 100) * 100) / 100;
 };
 
 export function PriceTypesEditor({
@@ -178,7 +180,7 @@ export function PriceTypesEditor({
         <div>
           <Label className="text-sm font-medium">Tipos de Precio</Label>
           <p className="text-xs text-muted-foreground">
-            Ajusta T2T5 por % de descuento vs T1.
+            Ajusta T2-T5 por % de incremento vs T1.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -270,7 +272,7 @@ export function PriceTypesEditor({
                     }
                     className="h-8 w-[64px] text-center text-xs"
                     placeholder="0"
-                    aria-label={`% descuento ${priceType.shortLabel}`}
+                    aria-label={`% incremento ${priceType.shortLabel}`}
                   />
                   <span className="text-xs text-muted-foreground">%</span>
                 </div>
