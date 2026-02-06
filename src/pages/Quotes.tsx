@@ -6,7 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClientsManagement } from "@/components/quotes/ClientsManagement";
 import { QuotesManagement } from "@/components/quotes/QuotesManagement";
 import { QuotesList } from "@/components/quotes/QuotesList";
-import { Users, List, PlusCircle } from "lucide-react";
+import { QuoteInvoiceLinking } from "@/components/quotes/QuoteInvoiceLinking";
+import { Users, List, PlusCircle, Link2 } from "lucide-react";
 
 interface QuoteToEdit {
   id: string;
@@ -77,7 +78,7 @@ const Quotes = () => {
             setQuoteToEdit(null);
           }
         }} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 max-w-lg">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
             <TabsTrigger value="list" className="flex items-center gap-2">
               <List className="h-4 w-4" />
               <span className="hidden sm:inline">Listado</span>
@@ -85,6 +86,10 @@ const Quotes = () => {
             <TabsTrigger value="new" className="flex items-center gap-2">
               <PlusCircle className="h-4 w-4" />
               <span className="hidden sm:inline">{quoteToEdit ? "Editar" : "Nueva"}</span>
+            </TabsTrigger>
+            <TabsTrigger value="linking" className="flex items-center gap-2">
+              <Link2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Vincular</span>
             </TabsTrigger>
             <TabsTrigger value="clients" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
@@ -101,6 +106,10 @@ const Quotes = () => {
               quoteToEdit={quoteToEdit} 
               onEditComplete={handleEditComplete}
             />
+          </TabsContent>
+
+          <TabsContent value="linking" className="mt-4">
+            <QuoteInvoiceLinking />
           </TabsContent>
 
           <TabsContent value="clients" className="mt-4">
