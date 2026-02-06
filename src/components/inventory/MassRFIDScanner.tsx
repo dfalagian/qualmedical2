@@ -33,10 +33,12 @@ interface ScannedTag {
   productSku: string | null;
   batchNumber: string | null;
   expirationDate: string | null;
-  status: "found" | "not_found" | "no_product" | "registered";
+  status: "found" | "not_found" | "no_product" | "registered" | "unauthorized_exit";
   tagId: string | null;
   productId: string | null;
   batchId: string | null;
+  // Info de autorización de salida
+  authorizedQuoteFolio?: string | null;
 }
 
 interface MassRFIDScannerProps {
@@ -109,7 +111,46 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
     return () => clearInterval(focusInterval);
   }, [isScanning]);
 
-  const lookupTag = useCallback(async (epc: string): Promise<ScannedTag> => {
+  // Check if tag is authorized for exit (assigned to an approved quote with pending exit)
+  const checkExitAuthorization = useCallback(async (tag: {
+    product_id: string | null;
+    batch_id: string | null;
+  }): Promise<{ authorized: boolean; quoteFolio: string | null }> => {
+    if (!tag.product_id || !tag.batch_id) {
+      return { authorized: false, quoteFolio: null };
+    }
+
+    // Look for approved quotes with pending inventory exit that include this product/batch
+    const { data: authorizedItems, error } = await supabase
+      .from("quote_items")
+      .select(`
+        quote_id,
+        quotes!inner (
+          id,
+          folio,
+          status,
+          inventory_exit_status
+        )
+      `)
+      .eq("product_id", tag.product_id)
+      .eq("batch_id", tag.batch_id)
+      .eq("quotes.status", "aprobada")
+      .in("quotes.inventory_exit_status", ["pending", "partial"]);
+
+    if (error) {
+      console.error("Error checking exit authorization:", error);
+      return { authorized: false, quoteFolio: null };
+    }
+
+    if (authorizedItems && authorizedItems.length > 0) {
+      const quote = authorizedItems[0].quotes as unknown as { folio: string };
+      return { authorized: true, quoteFolio: quote?.folio || null };
+    }
+
+    return { authorized: false, quoteFolio: null };
+  }, []);
+
+  const lookupTag = useCallback(async (epc: string, checkAuthorization: boolean = false): Promise<ScannedTag> => {
     const cleanEpc = epc.trim().toUpperCase();
     
     try {
@@ -145,7 +186,8 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
           status: "not_found",
           tagId: null,
           productId: null,
-          batchId: null
+          batchId: null,
+          authorizedQuoteFolio: null
         };
       }
 
@@ -161,12 +203,51 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
           status: "no_product",
           tagId: tag.id,
           productId: null,
-          batchId: tag.batch_id
+          batchId: tag.batch_id,
+          authorizedQuoteFolio: null
         };
       }
 
       // Tag con producto (puede venir de lote o directo)
       const productInfo = tag.product_batches?.products || tag.products;
+      
+      // Si estamos en modo salida, verificar autorización
+      if (checkAuthorization) {
+        const authResult = await checkExitAuthorization({
+          product_id: tag.product_id,
+          batch_id: tag.batch_id
+        });
+
+        if (!authResult.authorized) {
+          return {
+            epc: cleanEpc,
+            timestamp: new Date(),
+            productName: productInfo?.name || null,
+            productSku: productInfo?.sku || null,
+            batchNumber: tag.product_batches?.batch_number || null,
+            expirationDate: tag.product_batches?.expiration_date || null,
+            status: "unauthorized_exit",
+            tagId: tag.id,
+            productId: tag.product_id,
+            batchId: tag.batch_id,
+            authorizedQuoteFolio: null
+          };
+        }
+
+        return {
+          epc: cleanEpc,
+          timestamp: new Date(),
+          productName: productInfo?.name || null,
+          productSku: productInfo?.sku || null,
+          batchNumber: tag.product_batches?.batch_number || null,
+          expirationDate: tag.product_batches?.expiration_date || null,
+          status: "found",
+          tagId: tag.id,
+          productId: tag.product_id,
+          batchId: tag.batch_id,
+          authorizedQuoteFolio: authResult.quoteFolio
+        };
+      }
       
       return {
         epc: cleanEpc,
@@ -178,7 +259,8 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
         status: "found",
         tagId: tag.id,
         productId: tag.product_id,
-        batchId: tag.batch_id
+        batchId: tag.batch_id,
+        authorizedQuoteFolio: null
       };
     } catch (error) {
       console.error("Error looking up tag:", error);
@@ -192,10 +274,11 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
         status: "not_found",
         tagId: null,
         productId: null,
-        batchId: null
+        batchId: null,
+        authorizedQuoteFolio: null
       };
     }
-  }, []);
+  }, [checkExitAuthorization]);
 
   // Ref adicional para bloquear procesamiento mientras se está procesando un EPC
   const isProcessingRef = useRef<boolean>(false);
@@ -233,7 +316,8 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
           status: "registered",
           tagId: result.id,
           productId: null,
-          batchId: null
+          batchId: null,
+          authorizedQuoteFolio: null
         };
         console.log(`✅ Tag ${result.isNew ? 'registrado' : 'ya existía'}: ${cleanEpc}`);
       } catch (error) {
@@ -248,16 +332,45 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
           status: "not_found",
           tagId: null,
           productId: null,
-          batchId: null
+          batchId: null,
+          authorizedQuoteFolio: null
         };
       }
     } else {
-      // Buscar información del tag (modo normal)
-      tagInfo = await lookupTag(cleanEpc);
+      // Buscar información del tag - en modo salida, verificar autorización
+      const checkAuth = scanMode === "salida";
+      tagInfo = await lookupTag(cleanEpc, checkAuth);
     }
 
     // Agregar a la lista
     setScannedTags(prev => [tagInfo, ...prev]);
+
+    // Mostrar alerta sonora/visual si es salida no autorizada
+    if (tagInfo.status === "unauthorized_exit") {
+      toast({
+        title: "⚠️ SALIDA NO AUTORIZADA",
+        description: `El producto "${tagInfo.productName}" no está asignado a ninguna venta aprobada.`,
+        variant: "destructive",
+      });
+      // Reproducir sonido de alerta (beep)
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 400; // Frecuencia baja para error
+        oscillator.type = 'square';
+        gainNode.gain.value = 0.3;
+        oscillator.start();
+        setTimeout(() => {
+          oscillator.stop();
+          audioContext.close();
+        }, 500);
+      } catch (e) {
+        // Audio no disponible
+      }
+    }
 
     console.log(`📦 Tag único escaneado: ${cleanEpc} - Status: ${tagInfo.status}`);
   }, [isScanning, lookupTag, scanMode]);
@@ -336,6 +449,8 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
         return <Badge variant="secondary"><Package className="h-3 w-3 mr-1" />Sin producto</Badge>;
       case "registered":
         return <Badge className="bg-purple-500"><CheckCircle className="h-3 w-3 mr-1" />Registrado</Badge>;
+      case "unauthorized_exit":
+        return <Badge variant="destructive" className="bg-red-600 animate-pulse"><AlertTriangle className="h-3 w-3 mr-1" />NO AUTORIZADO</Badge>;
     }
   };
 
@@ -360,6 +475,7 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
   const notFoundTags = scannedTags.filter(t => t.status === "not_found").length;
   const noProductTags = scannedTags.filter(t => t.status === "no_product").length;
   const registeredTags = scannedTags.filter(t => t.status === "registered").length;
+  const unauthorizedTags = scannedTags.filter(t => t.status === "unauthorized_exit").length;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -463,8 +579,8 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
               </div>
             )}
 
-            {/* Stats rápidas */}
-            <div className="grid grid-cols-4 gap-2">
+            {/* Stats rápidas - mostrar contador de no autorizados en modo salida */}
+            <div className={`grid gap-2 ${scanMode === "salida" ? "grid-cols-5" : "grid-cols-4"}`}>
               <Card className="bg-muted/50">
                 <CardContent className="p-3 text-center">
                   <p className="text-2xl font-bold">{scannedTags.length}</p>
@@ -474,9 +590,21 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
               <Card className="bg-green-50 dark:bg-green-950/30">
                 <CardContent className="p-3 text-center">
                   <p className="text-2xl font-bold text-green-600">{foundTags}</p>
-                  <p className="text-xs text-muted-foreground">Encontrados</p>
+                  <p className="text-xs text-muted-foreground">
+                    {scanMode === "salida" ? "Autorizados" : "Encontrados"}
+                  </p>
                 </CardContent>
               </Card>
+              {scanMode === "salida" && (
+                <Card className={`${unauthorizedTags > 0 ? "bg-red-100 dark:bg-red-950/50 border-red-400 animate-pulse" : "bg-red-50 dark:bg-red-950/30"}`}>
+                  <CardContent className="p-3 text-center">
+                    <p className={`text-2xl font-bold text-red-600 ${unauthorizedTags > 0 ? "animate-bounce" : ""}`}>
+                      {unauthorizedTags}
+                    </p>
+                    <p className="text-xs text-red-600 font-medium">⚠️ NO AUTORIZADOS</p>
+                  </CardContent>
+                </Card>
+              )}
               <Card className="bg-red-50 dark:bg-red-950/30">
                 <CardContent className="p-3 text-center">
                   <p className="text-2xl font-bold text-red-600">{notFoundTags}</p>
@@ -508,6 +636,7 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
                         className={`p-3 rounded-lg border ${
                           tag.status === "found" ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800" :
                           tag.status === "not_found" ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800" :
+                          tag.status === "unauthorized_exit" ? "bg-red-100 dark:bg-red-950/40 border-red-400 dark:border-red-600 ring-2 ring-red-500" :
                           "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800"
                         }`}
                       >
@@ -519,6 +648,11 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
                                 <Clock className="h-3 w-3 inline mr-1" />
                                 {tag.timestamp.toLocaleTimeString()}
                               </span>
+                              {tag.authorizedQuoteFolio && (
+                                <Badge variant="outline" className="text-xs bg-green-100 border-green-400 text-green-700">
+                                  📋 {tag.authorizedQuoteFolio}
+                                </Badge>
+                              )}
                             </div>
                             <p className="font-mono text-sm truncate" title={tag.epc}>
                               EPC: {tag.epc}
@@ -538,6 +672,11 @@ export function MassRFIDScanner({ open, onOpenChange, onComplete }: MassRFIDScan
                                 {tag.expirationDate && (
                                   <span className="ml-2">| Cad: {formatExpirationDate(tag.expirationDate)}</span>
                                 )}
+                              </p>
+                            )}
+                            {tag.status === "unauthorized_exit" && (
+                              <p className="text-sm text-red-600 font-medium mt-1">
+                                ⚠️ Este medicamento NO está asignado a ninguna venta aprobada
                               </p>
                             )}
                           </div>
