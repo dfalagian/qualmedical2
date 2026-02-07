@@ -29,9 +29,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Package, Trash2, FileText, History } from "lucide-react";
+import { Package, Trash2, FileText, History, Building2, User } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
 import { openPurchaseOrderPrint } from "./purchaseOrderHtmlPrint";
+import { Badge } from "@/components/ui/badge";
 
 const IVA_RATE = 0.16;
 
@@ -60,6 +61,7 @@ export const CreateSupplierOrderDialog = ({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedSupplier, setSelectedSupplier] = useState("");
+  const [supplierType, setSupplierType] = useState<"registered" | "general" | "">("");
   const [orderNumber, setOrderNumber] = useState("");
   const [description, setDescription] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
@@ -104,13 +106,27 @@ export const CreateSupplierOrderDialog = ({
     }
   }, [open, nextOrderNumber]);
 
-  // Fetch suppliers
-  const { data: suppliers } = useQuery({
+  // Fetch registered suppliers (profiles)
+  const { data: registeredSuppliers } = useQuery({
     queryKey: ["suppliers_for_order_dialog"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, company_name, rfc");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch general suppliers
+  const { data: generalSuppliers } = useQuery({
+    queryKey: ["general_suppliers_for_order"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("general_suppliers")
+        .select("id, rfc, razon_social, nombre_comercial")
+        .eq("is_active", true)
+        .order("razon_social");
       if (error) throw error;
       return data;
     },
@@ -212,8 +228,34 @@ export const CreateSupplierOrderDialog = ({
   }, [selectedProducts]);
 
   const selectedSupplierData = useMemo(() => {
-    return suppliers?.find((s) => s.id === selectedSupplier);
-  }, [suppliers, selectedSupplier]);
+    if (supplierType === "registered") {
+      const supplier = registeredSuppliers?.find((s) => s.id === selectedSupplier);
+      return supplier ? {
+        name: supplier.company_name || supplier.full_name,
+        rfc: supplier.rfc
+      } : null;
+    } else if (supplierType === "general") {
+      const supplier = generalSuppliers?.find((s) => s.id === selectedSupplier);
+      return supplier ? {
+        name: supplier.nombre_comercial || supplier.razon_social,
+        rfc: supplier.rfc
+      } : null;
+    }
+    return null;
+  }, [registeredSuppliers, generalSuppliers, selectedSupplier, supplierType]);
+
+  const handleSupplierChange = (value: string) => {
+    // Check if it's a registered or general supplier
+    const isRegistered = registeredSuppliers?.some((s) => s.id === value);
+    const isGeneral = generalSuppliers?.some((s) => s.id === value);
+    
+    setSelectedSupplier(value);
+    if (isRegistered) {
+      setSupplierType("registered");
+    } else if (isGeneral) {
+      setSupplierType("general");
+    }
+  };
 
   const createOrderMutation = useMutation({
     mutationFn: async () => {
@@ -229,11 +271,12 @@ export const CreateSupplierOrderDialog = ({
         .insert({
           order_number: orderNumber,
           supplier_id: selectedSupplier,
+          supplier_type: supplierType || "registered",
           amount: total,
           description: description || null,
           created_by: user.id,
           status: "pendiente",
-        })
+        } as any)
         .select("id")
         .single();
 
@@ -260,9 +303,10 @@ export const CreateSupplierOrderDialog = ({
 
       if (itemsError) throw itemsError;
 
-      // Registrar histórico SOLO cuando el usuario capturó un precio manual
+      // Registrar histórico SOLO cuando el usuario capturó un precio manual y es proveedor registrado
+      // (Los proveedores generales no tienen perfil en profiles, así que no pueden registrar histórico)
       const manualPriceItems = selectedProducts.filter((p) => p.manualPrice !== null);
-      if (manualPriceItems.length > 0) {
+      if (manualPriceItems.length > 0 && supplierType === "registered") {
         await Promise.all(
           manualPriceItems.map(async (p) => {
             const { data: lastRows, error: lastError } = await supabase
@@ -309,7 +353,7 @@ export const CreateSupplierOrderDialog = ({
       // Abrir PDF con el patrón HTML nativo + window.print()
       openPurchaseOrderPrint({
         orderNumber,
-        supplierName: selectedSupplierData?.company_name || selectedSupplierData?.full_name || "",
+        supplierName: selectedSupplierData?.name || "",
         supplierRfc: selectedSupplierData?.rfc ?? undefined,
         createdAt: new Date(),
         items: selectedProducts,
@@ -332,6 +376,7 @@ export const CreateSupplierOrderDialog = ({
 
   const resetForm = () => {
     setSelectedSupplier("");
+    setSupplierType("");
     setOrderNumber("");
     setDescription("");
     setSelectedProducts([]);
@@ -365,16 +410,45 @@ export const CreateSupplierOrderDialog = ({
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Proveedor *</Label>
-                <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
+                <Select value={selectedSupplier} onValueChange={handleSupplierChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona proveedor" />
                   </SelectTrigger>
                   <SelectContent>
-                    {suppliers?.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.company_name || s.full_name}
-                      </SelectItem>
-                    ))}
+                    {/* Registered Suppliers */}
+                    {registeredSuppliers && registeredSuppliers.length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          Proveedores Registrados
+                        </div>
+                        {registeredSuppliers.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            <span className="flex items-center gap-2">
+                              {s.company_name || s.full_name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    
+                    {/* General Suppliers */}
+                    {generalSuppliers && generalSuppliers.length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1 mt-2 border-t pt-2">
+                          <Building2 className="h-3 w-3" />
+                          Proveedores Generales
+                        </div>
+                        {generalSuppliers.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            <span className="flex items-center gap-2">
+                              {s.nombre_comercial || s.razon_social}
+                              <Badge variant="outline" className="text-xs ml-1">General</Badge>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

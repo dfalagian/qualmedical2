@@ -1264,6 +1264,7 @@ export type Database = {
           order_number: string
           status: string | null
           supplier_id: string
+          supplier_type: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1276,6 +1277,7 @@ export type Database = {
           order_number: string
           status?: string | null
           supplier_id: string
+          supplier_type?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1288,6 +1290,7 @@ export type Database = {
           order_number?: string
           status?: string | null
           supplier_id?: string
+          supplier_type?: string | null
           updated_at?: string | null
         }
         Relationships: [
