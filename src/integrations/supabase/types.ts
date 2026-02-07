@@ -232,6 +232,63 @@ export type Database = {
           },
         ]
       }
+      general_suppliers: {
+        Row: {
+          codigo_postal: string | null
+          created_at: string | null
+          created_by: string | null
+          direccion: string | null
+          email: string | null
+          id: string
+          invoice_image_url: string | null
+          is_active: boolean | null
+          lugar_expedicion: string | null
+          nombre_comercial: string | null
+          notes: string | null
+          razon_social: string
+          regimen_fiscal: string | null
+          rfc: string
+          telefono: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          codigo_postal?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          direccion?: string | null
+          email?: string | null
+          id?: string
+          invoice_image_url?: string | null
+          is_active?: boolean | null
+          lugar_expedicion?: string | null
+          nombre_comercial?: string | null
+          notes?: string | null
+          razon_social: string
+          regimen_fiscal?: string | null
+          rfc: string
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          codigo_postal?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          direccion?: string | null
+          email?: string | null
+          id?: string
+          invoice_image_url?: string | null
+          is_active?: boolean | null
+          lugar_expedicion?: string | null
+          nombre_comercial?: string | null
+          notes?: string | null
+          razon_social?: string
+          regimen_fiscal?: string | null
+          rfc?: string
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       inventory_movements: {
         Row: {
           created_at: string | null

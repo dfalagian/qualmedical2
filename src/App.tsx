@@ -27,6 +27,7 @@ import Inventory from "./pages/Inventory";
 import MedicationsCatalogCITIO from "./pages/MedicationsCatalogCITIO";
 import Quotes from "./pages/Quotes";
 import PurchasesSales from "./pages/PurchasesSales";
+import GeneralSuppliers from "./pages/GeneralSuppliers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -198,6 +199,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <PurchasesSales />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/general-suppliers"
+              element={
+                <ProtectedRoute>
+                  <GeneralSuppliers />
                 </ProtectedRoute>
               }
             />
