@@ -349,12 +349,20 @@ export default function GeneralSuppliers() {
               </DialogHeader>
               <ScrollArea className="max-h-[75vh] pr-4">
                 <div className="space-y-6">
-                  {/* Image Upload Section */}
-                  <Card>
+                  {/* Option tabs */}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Puedes completar el formulario manualmente o extraer datos desde una imagen de factura</span>
+                  </div>
+
+                  {/* Image Upload Section - Optional */}
+                  <Card className="border-dashed">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
                         <Upload className="h-4 w-4" />
-                        Subir Factura del Proveedor
+                        Extracción desde Factura
+                        <Badge variant="outline" className="ml-2 text-xs font-normal">
+                          Opcional
+                        </Badge>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -405,8 +413,8 @@ export default function GeneralSuppliers() {
                       )}
 
                       {extractedData && (
-                        <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                          <p className="text-sm text-green-700 dark:text-green-300 flex items-center gap-2">
+                        <div className="p-3 bg-accent/50 rounded-lg border border-accent">
+                          <p className="text-sm text-accent-foreground flex items-center gap-2">
                             <Check className="h-4 w-4" />
                             Datos extraídos correctamente. Revisa y ajusta si es necesario.
                           </p>
@@ -415,110 +423,120 @@ export default function GeneralSuppliers() {
                     </CardContent>
                   </Card>
 
-                  {/* Form Fields */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="rfc">RFC *</Label>
-                      <Input
-                        id="rfc"
-                        value={formData.rfc}
-                        onChange={(e) => setFormData({ ...formData, rfc: e.target.value.toUpperCase() })}
-                        placeholder="RFC del proveedor"
-                      />
-                    </div>
+                  {/* Manual Form Section */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Edit className="h-4 w-4" />
+                        Datos del Proveedor
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="rfc">RFC *</Label>
+                          <Input
+                            id="rfc"
+                            value={formData.rfc}
+                            onChange={(e) => setFormData({ ...formData, rfc: e.target.value.toUpperCase() })}
+                            placeholder="RFC del proveedor"
+                          />
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="razon_social">Razón Social *</Label>
-                      <Input
-                        id="razon_social"
-                        value={formData.razon_social}
-                        onChange={(e) => setFormData({ ...formData, razon_social: e.target.value })}
-                        placeholder="Nombre legal del proveedor"
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="razon_social">Razón Social *</Label>
+                          <Input
+                            id="razon_social"
+                            value={formData.razon_social}
+                            onChange={(e) => setFormData({ ...formData, razon_social: e.target.value })}
+                            placeholder="Nombre legal del proveedor"
+                          />
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="nombre_comercial">Nombre Comercial</Label>
-                      <Input
-                        id="nombre_comercial"
-                        value={formData.nombre_comercial}
-                        onChange={(e) => setFormData({ ...formData, nombre_comercial: e.target.value })}
-                        placeholder="Ej: Costco, Sam's Club"
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="nombre_comercial">Nombre Comercial</Label>
+                          <Input
+                            id="nombre_comercial"
+                            value={formData.nombre_comercial}
+                            onChange={(e) => setFormData({ ...formData, nombre_comercial: e.target.value })}
+                            placeholder="Ej: Costco, Sam's Club"
+                          />
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="regimen_fiscal">Régimen Fiscal</Label>
-                      <Input
-                        id="regimen_fiscal"
-                        value={formData.regimen_fiscal}
-                        onChange={(e) => setFormData({ ...formData, regimen_fiscal: e.target.value })}
-                        placeholder="Régimen fiscal"
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="regimen_fiscal">Régimen Fiscal</Label>
+                          <Input
+                            id="regimen_fiscal"
+                            value={formData.regimen_fiscal}
+                            onChange={(e) => setFormData({ ...formData, regimen_fiscal: e.target.value })}
+                            placeholder="Régimen fiscal"
+                          />
+                        </div>
 
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="direccion">Dirección</Label>
-                      <Input
-                        id="direccion"
-                        value={formData.direccion}
-                        onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                        placeholder="Dirección completa"
-                      />
-                    </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label htmlFor="direccion">Dirección</Label>
+                          <Input
+                            id="direccion"
+                            value={formData.direccion}
+                            onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                            placeholder="Dirección completa"
+                          />
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="codigo_postal">Código Postal</Label>
-                      <Input
-                        id="codigo_postal"
-                        value={formData.codigo_postal}
-                        onChange={(e) => setFormData({ ...formData, codigo_postal: e.target.value })}
-                        placeholder="C.P."
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="codigo_postal">Código Postal</Label>
+                          <Input
+                            id="codigo_postal"
+                            value={formData.codigo_postal}
+                            onChange={(e) => setFormData({ ...formData, codigo_postal: e.target.value })}
+                            placeholder="C.P."
+                          />
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="lugar_expedicion">Lugar de Expedición</Label>
-                      <Input
-                        id="lugar_expedicion"
-                        value={formData.lugar_expedicion}
-                        onChange={(e) => setFormData({ ...formData, lugar_expedicion: e.target.value })}
-                        placeholder="C.P. expedición"
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="lugar_expedicion">Lugar de Expedición</Label>
+                          <Input
+                            id="lugar_expedicion"
+                            value={formData.lugar_expedicion}
+                            onChange={(e) => setFormData({ ...formData, lugar_expedicion: e.target.value })}
+                            placeholder="C.P. expedición"
+                          />
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="telefono">Teléfono</Label>
-                      <Input
-                        id="telefono"
-                        value={formData.telefono}
-                        onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
-                        placeholder="Teléfono de contacto"
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="telefono">Teléfono</Label>
+                          <Input
+                            id="telefono"
+                            value={formData.telefono}
+                            onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                            placeholder="Teléfono de contacto"
+                          />
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="correo@proveedor.com"
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            placeholder="correo@proveedor.com"
+                          />
+                        </div>
 
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="notes">Notas</Label>
-                      <Textarea
-                        id="notes"
-                        value={formData.notes}
-                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        placeholder="Notas adicionales sobre el proveedor"
-                        rows={3}
-                      />
-                    </div>
-                  </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label htmlFor="notes">Notas</Label>
+                          <Textarea
+                            id="notes"
+                            value={formData.notes}
+                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                            placeholder="Notas adicionales sobre el proveedor"
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
                   <div className="flex justify-end gap-2 pt-4">
                     <Button
