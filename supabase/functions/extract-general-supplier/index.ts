@@ -15,10 +15,13 @@ serve(async (req) => {
 
     if (!imageBase64) {
       return new Response(
-        JSON.stringify({ error: 'Se requiere una imagen' }),
+        JSON.stringify({ error: 'Se requiere una imagen o PDF' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const isPdf = mimeType === 'application/pdf';
+    const effectiveMimeType = mimeType || 'image/jpeg';
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -63,12 +66,14 @@ Responde ÚNICAMENTE con un objeto JSON válido con los campos encontrados. Si u
             content: [
               {
                 type: 'text',
-                text: 'Analiza esta factura y extrae la información del EMISOR (proveedor). Responde solo con JSON.'
+                text: isPdf 
+                  ? 'Analiza este PDF de factura y extrae la información del EMISOR (proveedor). Responde solo con JSON.'
+                  : 'Analiza esta imagen de factura y extrae la información del EMISOR (proveedor). Responde solo con JSON.'
               },
               {
                 type: 'image_url',
                 image_url: {
-                  url: `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`
+                  url: `data:${effectiveMimeType};base64,${imageBase64}`
                 }
               }
             ]
