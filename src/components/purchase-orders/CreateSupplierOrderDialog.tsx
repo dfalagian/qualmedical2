@@ -486,11 +486,10 @@ export const CreateSupplierOrderDialog = ({
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[40%]">Producto</TableHead>
-                        <TableHead className="w-[10%] text-center">Cant.</TableHead>
-                        <TableHead className="w-[12%] text-right">P. Guardado</TableHead>
-                        <TableHead className="w-[12%] text-center">P. Manual</TableHead>
-                        <TableHead className="w-[10%] text-center">IVA</TableHead>
-                        <TableHead className="w-[15%] text-right">Importe</TableHead>
+                        <TableHead className="w-[12%] text-center">Cant.</TableHead>
+                        <TableHead className="w-[15%] text-right">P. Guardado</TableHead>
+                        <TableHead className="w-[15%] text-center">P. Manual</TableHead>
+                        <TableHead className="w-[18%] text-right">Importe</TableHead>
                         <TableHead className="w-[5%]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -537,15 +536,6 @@ export const CreateSupplierOrderDialog = ({
                               placeholder="—"
                               className="w-24 h-8 text-center mx-auto"
                             />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {product.hasIva ? (
-                              <span className="text-xs text-primary font-medium">
-                                ${product.ivaAmount.toFixed(2)}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">0%</span>
-                            )}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             ${product.total.toFixed(2)}
