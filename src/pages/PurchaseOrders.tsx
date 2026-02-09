@@ -555,7 +555,7 @@ const PurchaseOrders = () => {
                         <div className="flex items-center gap-3 mb-2">
                           <h4 className="font-semibold text-lg">{order.order_number}</h4>
                           {getStatusBadge(order.status)}
-                          {order.invoice_id && (
+                          {(order.invoice_id || order.general_supplier_invoice_id) && (
                             <Badge variant="outline" className="gap-1 text-xs border-primary/30 text-primary">
                               <Link2 className="h-3 w-3" />
                               Factura vinculada
@@ -638,14 +638,14 @@ const PurchaseOrders = () => {
                               variant="ghost"
                               size="icon"
                               className={`h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity ${
-                                order.invoice_id ? 'text-primary' : 'text-muted-foreground'
+                                (order.invoice_id || order.general_supplier_invoice_id) ? 'text-primary' : 'text-muted-foreground'
                               }`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOrderToLink(order);
                                 setLinkInvoiceDialogOpen(true);
                               }}
-                              title={order.invoice_id ? "Factura vinculada" : "Vincular factura"}
+                              title={(order.invoice_id || order.general_supplier_invoice_id) ? "Factura vinculada" : "Vincular factura"}
                             >
                               <Link2 className="h-4 w-4" />
                             </Button>
