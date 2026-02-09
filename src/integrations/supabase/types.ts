@@ -1455,13 +1455,6 @@ export type Database = {
             referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "purchase_orders_supplier_id_fkey"
-            columns: ["supplier_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
         ]
       }
       quote_items: {
