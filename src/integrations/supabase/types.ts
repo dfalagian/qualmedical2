@@ -232,6 +232,92 @@ export type Database = {
           },
         ]
       }
+      general_supplier_invoices: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          descuento: number | null
+          emisor_nombre: string | null
+          emisor_rfc: string | null
+          fecha_emision: string | null
+          forma_pago: string | null
+          general_supplier_id: string
+          id: string
+          invoice_number: string
+          lugar_expedicion: string | null
+          metodo_pago: string | null
+          notes: string | null
+          pdf_url: string | null
+          receptor_nombre: string | null
+          receptor_rfc: string | null
+          subtotal: number | null
+          total_impuestos: number | null
+          updated_at: string
+          uuid: string | null
+          xml_url: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          descuento?: number | null
+          emisor_nombre?: string | null
+          emisor_rfc?: string | null
+          fecha_emision?: string | null
+          forma_pago?: string | null
+          general_supplier_id: string
+          id?: string
+          invoice_number: string
+          lugar_expedicion?: string | null
+          metodo_pago?: string | null
+          notes?: string | null
+          pdf_url?: string | null
+          receptor_nombre?: string | null
+          receptor_rfc?: string | null
+          subtotal?: number | null
+          total_impuestos?: number | null
+          updated_at?: string
+          uuid?: string | null
+          xml_url: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          descuento?: number | null
+          emisor_nombre?: string | null
+          emisor_rfc?: string | null
+          fecha_emision?: string | null
+          forma_pago?: string | null
+          general_supplier_id?: string
+          id?: string
+          invoice_number?: string
+          lugar_expedicion?: string | null
+          metodo_pago?: string | null
+          notes?: string | null
+          pdf_url?: string | null
+          receptor_nombre?: string | null
+          receptor_rfc?: string | null
+          subtotal?: number | null
+          total_impuestos?: number | null
+          updated_at?: string
+          uuid?: string | null
+          xml_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "general_supplier_invoices_general_supplier_id_fkey"
+            columns: ["general_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "general_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       general_suppliers: {
         Row: {
           codigo_postal: string | null
@@ -1260,6 +1346,7 @@ export type Database = {
           created_by: string | null
           currency: string | null
           description: string | null
+          general_supplier_invoice_id: string | null
           id: string
           invoice_id: string | null
           order_number: string
@@ -1274,6 +1361,7 @@ export type Database = {
           created_by?: string | null
           currency?: string | null
           description?: string | null
+          general_supplier_invoice_id?: string | null
           id?: string
           invoice_id?: string | null
           order_number: string
@@ -1288,6 +1376,7 @@ export type Database = {
           created_by?: string | null
           currency?: string | null
           description?: string | null
+          general_supplier_invoice_id?: string | null
           id?: string
           invoice_id?: string | null
           order_number?: string
@@ -1302,6 +1391,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_general_supplier_invoice_id_fkey"
+            columns: ["general_supplier_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "general_supplier_invoices"
             referencedColumns: ["id"]
           },
           {

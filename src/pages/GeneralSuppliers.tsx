@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -26,6 +26,7 @@ import {
   Check,
   X
 } from "lucide-react";
+import { GeneralSupplierInvoiceUpload } from "@/components/purchase-orders/GeneralSupplierInvoiceUpload";
 
 interface GeneralSupplier {
   id: string;
@@ -62,6 +63,8 @@ export default function GeneralSuppliers() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<GeneralSupplier | null>(null);
+  const [invoiceUploadOpen, setInvoiceUploadOpen] = useState(false);
+  const [invoiceUploadSupplier, setInvoiceUploadSupplier] = useState<GeneralSupplier | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -668,6 +671,17 @@ export default function GeneralSuppliers() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      title="Cargar factura"
+                      onClick={() => {
+                        setInvoiceUploadSupplier(supplier);
+                        setInvoiceUploadOpen(true);
+                      }}
+                    >
+                      <Upload className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleEdit(supplier)}
                     >
                       <Edit className="h-4 w-4" />
@@ -811,6 +825,16 @@ export default function GeneralSuppliers() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Invoice Upload Dialog */}
+      {invoiceUploadSupplier && (
+        <GeneralSupplierInvoiceUpload
+          open={invoiceUploadOpen}
+          onOpenChange={setInvoiceUploadOpen}
+          supplierId={invoiceUploadSupplier.id}
+          supplierName={invoiceUploadSupplier.nombre_comercial || invoiceUploadSupplier.razon_social}
+        />
+      )}
     </DashboardLayout>
   );
 }
