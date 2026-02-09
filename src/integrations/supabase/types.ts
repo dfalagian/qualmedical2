@@ -1393,6 +1393,7 @@ export type Database = {
           id: string
           invoice_id: string | null
           order_number: string
+          received_date: string | null
           status: string | null
           supplier_id: string
           supplier_type: string | null
@@ -1409,6 +1410,7 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           order_number: string
+          received_date?: string | null
           status?: string | null
           supplier_id: string
           supplier_type?: string | null
@@ -1425,6 +1427,7 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           order_number?: string
+          received_date?: string | null
           status?: string | null
           supplier_id?: string
           supplier_type?: string | null

@@ -52,6 +52,9 @@ const PurchaseOrders = () => {
   const [orderToLink, setOrderToLink] = useState<any>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [orderToEdit, setOrderToEdit] = useState<any>(null);
+  const [receivedDateDialogOpen, setReceivedDateDialogOpen] = useState(false);
+  const [receivedDate, setReceivedDate] = useState<Date | undefined>(undefined);
+  const [pendingReceivedOrder, setPendingReceivedOrder] = useState<any>(null);
   
   // Search/filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -348,10 +351,12 @@ const PurchaseOrders = () => {
 
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, orderNumber }: { id: string; status: string; orderNumber?: string }) => {
+    mutationFn: async ({ id, status, orderNumber, receivedDate }: { id: string; status: string; orderNumber?: string; receivedDate?: string }) => {
+      const updateData: any = { status };
+      if (receivedDate) updateData.received_date = receivedDate;
       const { error } = await supabase
         .from("purchase_orders")
-        .update({ status })
+        .update(updateData)
         .eq("id", id);
 
       if (error) throw error;
@@ -373,6 +378,28 @@ const PurchaseOrders = () => {
       toast.error(error.message || "Error al actualizar");
     },
   });
+
+  const handleStatusChange = (order: any, newStatus: string) => {
+    if (newStatus === "recibida") {
+      setPendingReceivedOrder(order);
+      setReceivedDate(order.received_date ? new Date(order.received_date + "T12:00:00") : new Date());
+      setReceivedDateDialogOpen(true);
+    } else {
+      updateStatusMutation.mutate({ id: order.id, status: newStatus, orderNumber: order.order_number });
+    }
+  };
+
+  const confirmReceivedStatus = () => {
+    if (!pendingReceivedOrder || !receivedDate) return;
+    updateStatusMutation.mutate({
+      id: pendingReceivedOrder.id,
+      status: "recibida",
+      orderNumber: pendingReceivedOrder.order_number,
+      receivedDate: format(receivedDate, "yyyy-MM-dd"),
+    });
+    setReceivedDateDialogOpen(false);
+    setPendingReceivedOrder(null);
+  };
 
   const deleteOrderMutation = useMutation({
     mutationFn: async ({ orderId, orderNumber }: { orderId: string; orderNumber?: string }) => {
@@ -796,9 +823,7 @@ const PurchaseOrders = () => {
                       {isAdmin && (
                         <Select
                           value={order.status}
-                          onValueChange={(value) =>
-                            updateStatusMutation.mutate({ id: order.id, status: value, orderNumber: order.order_number })
-                          }
+                          onValueChange={(value) => handleStatusChange(order, value)}
                         >
                           <SelectTrigger className="w-36" onClick={(e) => e.stopPropagation()}>
                             <SelectValue />
@@ -894,6 +919,36 @@ const PurchaseOrders = () => {
         onOpenChange={setEditDialogOpen}
         order={orderToEdit}
       />
+
+      {/* Received Date Dialog */}
+      <AlertDialog open={receivedDateDialogOpen} onOpenChange={setReceivedDateDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5" />
+              Fecha de Recepción
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Selecciona la fecha en que se recibió la mercancía de la orden <strong>{pendingReceivedOrder?.order_number}</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-center py-4">
+            <Calendar
+              mode="single"
+              selected={receivedDate}
+              onSelect={setReceivedDate}
+              locale={es}
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingReceivedOrder(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReceivedStatus} disabled={!receivedDate}>
+              Confirmar Recepción
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
