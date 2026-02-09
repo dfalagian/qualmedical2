@@ -134,15 +134,29 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
     }
   }
 
+  // Normalize text for fuzzy matching
+  const normalize = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+
   // Build reconciliation lines
+  const matchedInvoiceIds = new Set<string>();
   const lines: ReconciliationLine[] = (order.purchase_order_items || []).map((item) => {
-    // Try to match invoice items by description containing product name
     const productName = item.products?.name || "Producto";
-    const matchedInvoiceItem = invoiceItems.find(
-      (ii: any) =>
-        ii.descripcion?.toLowerCase().includes(productName.toLowerCase()) ||
-        productName.toLowerCase().includes(ii.descripcion?.toLowerCase() || "")
-    );
+    const normProduct = normalize(productName);
+
+    // Try to match invoice items: exact includes first, then token overlap
+    const matchedInvoiceItem = invoiceItems.find((ii: any) => {
+      if (matchedInvoiceIds.has(ii.id)) return false;
+      const normDesc = normalize(ii.descripcion || "");
+      // Direct substring match
+      if (normDesc.includes(normProduct) || normProduct.includes(normDesc)) return true;
+      // Token overlap: if >50% of product tokens appear in description
+      const productTokens = normProduct.match(/[a-z0-9]+/g) || [];
+      const matchCount = productTokens.filter((t) => t.length > 2 && normDesc.includes(t)).length;
+      return productTokens.length > 0 && matchCount / productTokens.length > 0.4;
+    });
+
+    if (matchedInvoiceItem) matchedInvoiceIds.add(matchedInvoiceItem.id);
 
     return {
       productName,
@@ -157,6 +171,14 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
       received: receivedByProduct.get(item.product_id) || (item.quantity_received || 0),
     };
   });
+
+  // If only 1 order item and 1 invoice item and no match was found, force-match them
+  if (lines.length === 1 && invoiceItems.length === 1 && matchedInvoiceIds.size === 0) {
+    const ii = invoiceItems[0] as any;
+    lines[0].invoiced = Number(ii.cantidad);
+    lines[0].invoicedPrice = Number(ii.valor_unitario);
+    lines[0].invoicedSubtotal = Number(ii.importe);
+  }
 
   // Totals
   const totalOrdered = lines.reduce((s, l) => s + l.ordered, 0);
