@@ -40,13 +40,25 @@ export const ImageViewer = ({
     return hasNoImages && isPdf && fileUrl;
   }, [imageUrls, fileUrl, fileName]);
 
+  // Detectar si es una imagen directa sin image_urls (JPG, PNG, etc.)
+  const isDirectImage = useMemo(() => {
+    const hasNoImages = !imageUrls || imageUrls.length === 0;
+    if (!hasNoImages || !fileUrl) return false;
+    const imageExtensions = /\.(jpg|jpeg|png|gif|webp|bmp)(\?|$)/i;
+    return imageExtensions.test(fileUrl) || imageExtensions.test(fileName || '');
+  }, [imageUrls, fileUrl, fileName]);
+
   const rawPaths = useMemo(() => {
     // Si es PDF sin imágenes, no intentamos cargar el PDF como imagen
     if (isPdfWithoutImages) {
       return [];
     }
+    // Si es imagen directa sin image_urls, usar fileUrl
+    if (isDirectImage && fileUrl) {
+      return [fileUrl];
+    }
     return imageUrls && imageUrls.length > 0 ? imageUrls : [];
-  }, [fileUrl, imageUrls]);
+  }, [fileUrl, imageUrls, isPdfWithoutImages, isDirectImage]);
 
   useEffect(() => {
     const loadSignedUrls = async () => {
