@@ -63,6 +63,10 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
   // Estado para el combobox de lotes
   const [batchSearchOpen, setBatchSearchOpen] = useState(false);
 
+  // Estado para el combobox de proveedores
+  const [proveedorSearchOpen, setProveedorSearchOpen] = useState(false);
+  const [proveedorSearch, setProveedorSearch] = useState("");
+
   // Estado para el modal de nuevo lote
   const [newBatchModalOpen, setNewBatchModalOpen] = useState(false);
 
@@ -613,21 +617,63 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Proveedor</Label>
-              <Select
-                value={formData.proveedor}
-                onValueChange={(value) => setFormData({ ...formData, proveedor: value })}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Seleccionar..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {proveedores.map((p) => (
-                    <SelectItem key={`${p.type}-${p.id}`} value={p.id}>
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={proveedorSearchOpen} onOpenChange={setProveedorSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={proveedorSearchOpen}
+                    className="w-full h-9 justify-between font-normal"
+                  >
+                    <span className="truncate">
+                      {formData.proveedor
+                        ? proveedores.find((p) => p.id === formData.proveedor)?.label || "Seleccionar..."
+                        : "Buscar proveedor..."}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Buscar proveedor..."
+                      value={proveedorSearch}
+                      onValueChange={setProveedorSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>No se encontró proveedor.</CommandEmpty>
+                      <CommandGroup className="max-h-[200px] overflow-auto">
+                        {proveedores
+                          .filter((p) =>
+                            !proveedorSearch || p.label.toLowerCase().includes(proveedorSearch.toLowerCase())
+                          )
+                          .map((p) => (
+                            <CommandItem
+                              key={`${p.type}-${p.id}`}
+                              value={p.id}
+                              onSelect={(val) => {
+                                setFormData((prev) => ({ ...prev, proveedor: val }));
+                                setProveedorSearchOpen(false);
+                                setProveedorSearch("");
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  formData.proveedor === p.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <span className="truncate">{p.label}</span>
+                              {p.type === "general" && (
+                                <span className="ml-auto text-[10px] text-muted-foreground">Oficial</span>
+                              )}
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Almacén</Label>
