@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logActivity } from "@/lib/activityLogger";
 
 interface QuoteItem {
   id: string;
@@ -106,9 +107,10 @@ export const useQuoteActions = () => {
 
       return quote;
     },
-    onSuccess: () => {
+    onSuccess: (quote) => {
       toast.success("Cotización guardada correctamente");
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      logActivity({ section: "cotizaciones", action: "crear", entityType: "cotización", entityId: quote?.id, entityName: quote?.folio, details: { amount: quote?.total } });
     },
     onError: (error: any) => {
       toast.error("Error al guardar: " + error.message);
@@ -174,9 +176,10 @@ export const useQuoteActions = () => {
 
       return quote;
     },
-    onSuccess: () => {
+    onSuccess: (quote) => {
       toast.success("Cotización actualizada correctamente");
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      logActivity({ section: "cotizaciones", action: "editar", entityType: "cotización", entityId: quote?.id, entityName: quote?.folio });
     },
     onError: (error: any) => {
       toast.error("Error al actualizar: " + error.message);
@@ -305,12 +308,13 @@ export const useQuoteActions = () => {
 
       return params.quoteId;
     },
-    onSuccess: () => {
+    onSuccess: (quoteId) => {
       toast.success("¡Cotización aprobada! Stock actualizado correctamente.");
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["product-batches"] });
+      logActivity({ section: "cotizaciones", action: "aprobar", entityType: "cotización", entityId: quoteId });
     },
     onError: (error: any) => {
       toast.error("Error al aprobar: " + error.message);

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { logActivity } from "@/lib/activityLogger";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -335,9 +336,17 @@ export const CreateSupplierOrderDialog = ({
 
       return order;
     },
-    onSuccess: () => {
+    onSuccess: (order) => {
       toast.success("Orden de compra creada correctamente");
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
+      logActivity({
+        section: "ordenes_compra",
+        action: "crear",
+        entityType: "orden_compra",
+        entityId: order?.id,
+        entityName: orderNumber,
+        details: { amount: total, items_count: selectedProducts.length, supplier: selectedSupplierData?.name },
+      });
       queryClient.invalidateQueries({ queryKey: ["next_qual_order_number"] });
 
       // Abrir PDF con el patrón HTML nativo + window.print()

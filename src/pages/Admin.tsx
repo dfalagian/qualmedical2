@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText, KeyRound } from "lucide-react";
+import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText, KeyRound, ClipboardList } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
@@ -18,6 +18,8 @@ import * as z from "zod";
 import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ImageViewer } from "@/components/admin/ImageViewer";
+import { ActivityLog } from "@/components/admin/ActivityLog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 const userFormSchema = z.object({
@@ -328,6 +330,19 @@ const Admin = () => {
           </p>
         </div>
 
+        <Tabs defaultValue="users">
+          <TabsList>
+            <TabsTrigger value="users" className="gap-1.5">
+              <Users className="h-3.5 w-3.5" />
+              Usuarios
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="gap-1.5">
+              <ClipboardList className="h-3.5 w-3.5" />
+              Bitácora
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="users" className="mt-4 space-y-6">
         <Card className="shadow-md">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -761,8 +776,13 @@ const Admin = () => {
             </div>
           </CardContent>
         </Card>
+          </TabsContent>
 
-        {/* Change Password Dialog */}
+          <TabsContent value="activity" className="mt-4">
+            <ActivityLog />
+          </TabsContent>
+        </Tabs>
+
         <Dialog open={passwordDialogOpen} onOpenChange={(open) => {
           setPasswordDialogOpen(open);
           if (!open) {
