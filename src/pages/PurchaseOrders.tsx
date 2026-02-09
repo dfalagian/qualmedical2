@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye, ArrowRight, Search, X, CalendarIcon, FileText, Link2 } from "lucide-react";
+import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye, ArrowRight, Search, X, CalendarIcon, FileText, Link2, Edit2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PurchaseOrderImportDialog } from "@/components/purchase-orders/PurchaseOrderImportDialog";
@@ -24,6 +24,7 @@ import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { openPurchaseOrderPrint } from "@/components/purchase-orders/purchaseOrderHtmlPrint";
 import { LinkInvoiceDialog } from "@/components/purchase-orders/LinkInvoiceDialog";
+import { EditPurchaseOrderDialog } from "@/components/purchase-orders/EditPurchaseOrderDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +49,8 @@ const PurchaseOrders = () => {
   const [orderToConvert, setOrderToConvert] = useState<any>(null);
   const [linkInvoiceDialogOpen, setLinkInvoiceDialogOpen] = useState(false);
   const [orderToLink, setOrderToLink] = useState<any>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [orderToEdit, setOrderToEdit] = useState<any>(null);
   
   // Search/filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -587,6 +590,21 @@ const PurchaseOrders = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOrderToEdit(order);
+                                setEditDialogOpen(true);
+                              }}
+                              title="Editar orden"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -808,6 +826,12 @@ const PurchaseOrders = () => {
         open={linkInvoiceDialogOpen}
         onOpenChange={setLinkInvoiceDialogOpen}
         order={orderToLink}
+      />
+
+      <EditPurchaseOrderDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        order={orderToEdit}
       />
     </DashboardLayout>
   );
