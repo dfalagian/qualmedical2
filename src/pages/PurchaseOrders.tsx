@@ -392,6 +392,8 @@ const PurchaseOrders = () => {
     switch (status) {
       case "completada":
         return <Badge className="bg-success">Completada</Badge>;
+      case "recibida":
+        return <Badge className="bg-blue-600 text-white">Recibida</Badge>;
       case "cancelada":
         return <Badge variant="destructive">Cancelada</Badge>;
       case "en_proceso":
@@ -736,6 +738,7 @@ const PurchaseOrders = () => {
                           <SelectContent>
                             <SelectItem value="pendiente">Pendiente</SelectItem>
                             <SelectItem value="en_proceso">En Proceso</SelectItem>
+                            <SelectItem value="recibida">Recibida</SelectItem>
                             <SelectItem value="completada">Completada</SelectItem>
                             <SelectItem value="cancelada">Cancelada</SelectItem>
                           </SelectContent>
