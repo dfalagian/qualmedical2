@@ -1261,6 +1261,7 @@ export type Database = {
           currency: string | null
           description: string | null
           id: string
+          invoice_id: string | null
           order_number: string
           status: string | null
           supplier_id: string
@@ -1274,6 +1275,7 @@ export type Database = {
           currency?: string | null
           description?: string | null
           id?: string
+          invoice_id?: string | null
           order_number: string
           status?: string | null
           supplier_id: string
@@ -1287,6 +1289,7 @@ export type Database = {
           currency?: string | null
           description?: string | null
           id?: string
+          invoice_id?: string | null
           order_number?: string
           status?: string | null
           supplier_id?: string
@@ -1299,6 +1302,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {

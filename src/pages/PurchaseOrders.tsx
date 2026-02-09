@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye, ArrowRight, Search, X, CalendarIcon, FileText } from "lucide-react";
+import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye, ArrowRight, Search, X, CalendarIcon, FileText, Link2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PurchaseOrderImportDialog } from "@/components/purchase-orders/PurchaseOrderImportDialog";
@@ -23,6 +23,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { openPurchaseOrderPrint } from "@/components/purchase-orders/purchaseOrderHtmlPrint";
+import { LinkInvoiceDialog } from "@/components/purchase-orders/LinkInvoiceDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +46,8 @@ const PurchaseOrders = () => {
   const [orderToDelete, setOrderToDelete] = useState<any>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [orderToConvert, setOrderToConvert] = useState<any>(null);
+  const [linkInvoiceDialogOpen, setLinkInvoiceDialogOpen] = useState(false);
+  const [orderToLink, setOrderToLink] = useState<any>(null);
   
   // Search/filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -552,6 +555,12 @@ const PurchaseOrders = () => {
                         <div className="flex items-center gap-3 mb-2">
                           <h4 className="font-semibold text-lg">{order.order_number}</h4>
                           {getStatusBadge(order.status)}
+                          {order.invoice_id && (
+                            <Badge variant="outline" className="gap-1 text-xs border-primary/30 text-primary">
+                              <Link2 className="h-3 w-3" />
+                              Factura vinculada
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground">
                           Proveedor: {formatSupplierName(order.profiles)}
@@ -624,6 +633,23 @@ const PurchaseOrders = () => {
                           >
                             <FileText className="h-4 w-4" />
                           </Button>
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={`h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity ${
+                                order.invoice_id ? 'text-primary' : 'text-muted-foreground'
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOrderToLink(order);
+                                setLinkInvoiceDialogOpen(true);
+                              }}
+                              title={order.invoice_id ? "Factura vinculada" : "Vincular factura"}
+                            >
+                              <Link2 className="h-4 w-4" />
+                            </Button>
+                          )}
                           {isAdmin && isCitioOrder && (
                             <Button
                               variant="ghost"
@@ -776,6 +802,12 @@ const PurchaseOrders = () => {
         open={convertDialogOpen}
         onOpenChange={setConvertDialogOpen}
         citioOrder={orderToConvert}
+      />
+
+      <LinkInvoiceDialog
+        open={linkInvoiceDialogOpen}
+        onOpenChange={setLinkInvoiceDialogOpen}
+        order={orderToLink}
       />
     </DashboardLayout>
   );
