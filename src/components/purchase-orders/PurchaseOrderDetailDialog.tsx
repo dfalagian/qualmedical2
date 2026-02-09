@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   ShoppingCart, 
   Package, 
@@ -26,10 +27,12 @@ import {
   X,
   History,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Scale
 } from "lucide-react";
 import { formatSupplierName } from "@/lib/formatters";
 import { PriceHistoryDialog } from "./PriceHistoryDialog";
+import { OrderReconciliation } from "./OrderReconciliation";
 
 interface PurchaseOrderItem {
   id: string;
@@ -241,261 +244,278 @@ export function PurchaseOrderDetailDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 120px)' }}>
-            <div className="space-y-6">
-              {/* Header Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <User className="h-4 w-4" />
-                    Proveedor
-                  </div>
-                  <p className="font-medium">{formatSupplierName(order.profiles)}</p>
-                </div>
-                
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    Fecha de Creación
-                  </div>
-                  <p className="font-medium">
-                    {new Date(order.created_at).toLocaleDateString('es-MX', {
-                      day: '2-digit',
-                      month: 'long',
-                      year: 'numeric'
-                    })}
-                  </p>
-                </div>
-                
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <DollarSign className="h-4 w-4" />
-                    Monto Total
-                  </div>
-                  <p className="text-xl font-bold text-primary">
-                    ${order.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} {order.currency}
-                  </p>
-                </div>
-                
-                <div className="space-y-1">
-                  <div className="text-sm text-muted-foreground">Estado</div>
-                  <div>{getStatusBadge(order.status)}</div>
-                </div>
-              </div>
+          <Tabs defaultValue="detail" className="flex-1 flex flex-col overflow-hidden">
+            <TabsList className="shrink-0">
+              <TabsTrigger value="detail" className="gap-1.5">
+                <Package className="h-3.5 w-3.5" />
+                Detalle
+              </TabsTrigger>
+              <TabsTrigger value="reconciliation" className="gap-1.5">
+                <Scale className="h-3.5 w-3.5" />
+                Conciliación
+              </TabsTrigger>
+            </TabsList>
 
-              {order.description && (
-                <>
-                  <Separator />
-                  <div className="space-y-2">
+            <TabsContent value="detail" className="flex-1 overflow-y-auto pr-2 mt-4" style={{ maxHeight: 'calc(90vh - 180px)' }}>
+              <div className="space-y-6">
+                {/* Header Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <FileText className="h-4 w-4" />
-                      Descripción
+                      <User className="h-4 w-4" />
+                      Proveedor
                     </div>
-                    <p className="text-sm">{order.description}</p>
+                    <p className="font-medium">{formatSupplierName(order.profiles)}</p>
                   </div>
-                </>
-              )}
-
-              <Separator />
-
-              {/* Progress */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Progreso de Recepción</span>
+                  
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="h-4 w-4" />
+                      Fecha de Creación
+                    </div>
+                    <p className="font-medium">
+                      {new Date(order.created_at).toLocaleDateString('es-MX', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
                   </div>
-                  <span className="text-sm text-muted-foreground">
-                    {totalReceived} / {totalOrdered} unidades ({progressPercentage}%)
-                  </span>
+                  
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <DollarSign className="h-4 w-4" />
+                      Monto Total
+                    </div>
+                    <p className="text-xl font-bold text-primary">
+                      ${order.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} {order.currency}
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div className="text-sm text-muted-foreground">Estado</div>
+                    <div>{getStatusBadge(order.status)}</div>
+                  </div>
                 </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary transition-all duration-300"
-                    style={{ width: `${progressPercentage}%` }}
-                  />
+
+                {order.description && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <FileText className="h-4 w-4" />
+                        Descripción
+                      </div>
+                      <p className="text-sm">{order.description}</p>
+                    </div>
+                  </>
+                )}
+
+                <Separator />
+
+                {/* Progress */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Progreso de Recepción</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {totalReceived} / {totalOrdered} unidades ({progressPercentage}%)
+                    </span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary transition-all duration-300"
+                      style={{ width: `${progressPercentage}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <Separator />
+                <Separator />
 
-              {/* Items List */}
-              <div className="space-y-3">
-                <h4 className="font-medium flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Productos ({order.purchase_order_items?.length || 0})
-                </h4>
-                
-                {order.purchase_order_items && order.purchase_order_items.length > 0 ? (
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/50">
-                        <tr>
-                          <th className="text-left p-3 font-medium">Producto</th>
-                          <th className="text-right p-3 font-medium w-44">Precio Unit.</th>
-                          <th className="text-center p-3 font-medium w-32">Cantidad</th>
-                          <th className="text-right p-3 font-medium w-28">Subtotal</th>
-                          <th className="text-center p-3 font-medium w-24">Progreso</th>
-                          <th className="text-center p-3 font-medium w-20">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {order.purchase_order_items.map((item) => {
-                          const itemProgress = item.quantity_ordered > 0
-                            ? Math.round(((item.quantity_received || 0) / item.quantity_ordered) * 100)
-                            : 0;
-                          const subtotal = (item.unit_price || 0) * item.quantity_ordered;
-                          const priceChange = getPriceChange(item.unit_price, item.original_price);
-                          const isEditing = editingItemId === item.id;
+                {/* Items List */}
+                <div className="space-y-3">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Productos ({order.purchase_order_items?.length || 0})
+                  </h4>
+                  
+                  {order.purchase_order_items && order.purchase_order_items.length > 0 ? (
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/50">
+                          <tr>
+                            <th className="text-left p-3 font-medium">Producto</th>
+                            <th className="text-right p-3 font-medium w-44">Precio Unit.</th>
+                            <th className="text-center p-3 font-medium w-32">Cantidad</th>
+                            <th className="text-right p-3 font-medium w-28">Subtotal</th>
+                            <th className="text-center p-3 font-medium w-24">Progreso</th>
+                            <th className="text-center p-3 font-medium w-20">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {order.purchase_order_items.map((item) => {
+                            const itemProgress = item.quantity_ordered > 0
+                              ? Math.round(((item.quantity_received || 0) / item.quantity_ordered) * 100)
+                              : 0;
+                            const subtotal = (item.unit_price || 0) * item.quantity_ordered;
+                            const priceChange = getPriceChange(item.unit_price, item.original_price);
+                            const isEditing = editingItemId === item.id;
 
-                          return (
-                            <tr key={item.id} className="hover:bg-muted/20">
-                              <td className="p-3">
-                                <p className="font-medium">
-                                  {item.products?.name || 'Producto no encontrado'}
-                                </p>
-                                {item.products?.sku && (
-                                  <p className="text-xs text-muted-foreground">
-                                    SKU: {item.products.sku}
+                            return (
+                              <tr key={item.id} className="hover:bg-muted/20">
+                                <td className="p-3">
+                                  <p className="font-medium">
+                                    {item.products?.name || 'Producto no encontrado'}
                                   </p>
-                                )}
-                              </td>
-                              <td className="p-3 text-right">
-                                {isEditing ? (
-                                  <div className="flex items-center justify-end gap-2">
-                                    <span className="text-muted-foreground">$</span>
-                                    <Input
-                                      type="number"
-                                      value={newPrice}
-                                      onChange={(e) => setNewPrice(e.target.value)}
-                                      className="w-24 h-8 text-right"
-                                      step="0.01"
-                                      min="0"
-                                      autoFocus
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="space-y-1">
+                                  {item.products?.sku && (
+                                    <p className="text-xs text-muted-foreground">
+                                      SKU: {item.products.sku}
+                                    </p>
+                                  )}
+                                </td>
+                                <td className="p-3 text-right">
+                                  {isEditing ? (
                                     <div className="flex items-center justify-end gap-2">
-                                      <span className="font-medium">
-                                        ${(item.unit_price || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                                      </span>
-                                      {priceChange !== null && (
-                                        <Badge 
-                                          variant={priceChange > 0 ? "destructive" : "default"}
-                                          className={`text-xs ${priceChange < 0 ? 'bg-success' : ''}`}
-                                        >
-                                          {priceChange > 0 ? (
-                                            <TrendingUp className="h-3 w-3 mr-1" />
-                                          ) : (
-                                            <TrendingDown className="h-3 w-3 mr-1" />
-                                          )}
-                                          {priceChange > 0 ? '+' : ''}{priceChange.toFixed(1)}%
-                                        </Badge>
+                                      <span className="text-muted-foreground">$</span>
+                                      <Input
+                                        type="number"
+                                        value={newPrice}
+                                        onChange={(e) => setNewPrice(e.target.value)}
+                                        className="w-24 h-8 text-right"
+                                        step="0.01"
+                                        min="0"
+                                        autoFocus
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-1">
+                                      <div className="flex items-center justify-end gap-2">
+                                        <span className="font-medium">
+                                          ${(item.unit_price || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                        </span>
+                                        {priceChange !== null && (
+                                          <Badge 
+                                            variant={priceChange > 0 ? "destructive" : "default"}
+                                            className={`text-xs ${priceChange < 0 ? 'bg-success' : ''}`}
+                                          >
+                                            {priceChange > 0 ? (
+                                              <TrendingUp className="h-3 w-3 mr-1" />
+                                            ) : (
+                                              <TrendingDown className="h-3 w-3 mr-1" />
+                                            )}
+                                            {priceChange > 0 ? '+' : ''}{priceChange.toFixed(1)}%
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      {item.original_price && item.original_price !== item.unit_price && (
+                                        <p className="text-xs text-muted-foreground line-through">
+                                          Original: ${item.original_price.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                        </p>
                                       )}
                                     </div>
-                                    {item.original_price && item.original_price !== item.unit_price && (
-                                      <p className="text-xs text-muted-foreground line-through">
-                                        Original: ${item.original_price.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                                      </p>
+                                  )}
+                                </td>
+                                <td className="p-3 text-center">
+                                  <span className="text-muted-foreground">
+                                    {item.quantity_received || 0}
+                                  </span>
+                                  <span className="mx-1">/</span>
+                                  <span className="font-medium">{item.quantity_ordered}</span>
+                                </td>
+                                <td className="p-3 text-right font-medium">
+                                  ${subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="p-3">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-12">
+                                      <div 
+                                        className={`h-full transition-all duration-300 ${
+                                          itemProgress === 100 ? 'bg-success' : 
+                                          itemProgress > 0 ? 'bg-warning' : 'bg-muted-foreground/30'
+                                        }`}
+                                        style={{ width: `${itemProgress}%` }}
+                                      />
+                                    </div>
+                                    <Badge 
+                                      variant={itemProgress === 100 ? "default" : "secondary"}
+                                      className="text-xs"
+                                    >
+                                      {itemProgress}%
+                                    </Badge>
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <div className="flex items-center justify-center gap-1">
+                                    {isEditing ? (
+                                      <>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-success hover:text-success"
+                                          onClick={() => handleSavePrice(item)}
+                                          disabled={updatePriceMutation.isPending}
+                                        >
+                                          <Check className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-destructive hover:text-destructive"
+                                          onClick={handleCancelEdit}
+                                          disabled={updatePriceMutation.isPending}
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7"
+                                          onClick={() => handleEditPrice(item)}
+                                          title="Editar precio"
+                                        >
+                                          <Edit2 className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7"
+                                          onClick={() => setPriceHistoryItem({
+                                            productId: item.product_id,
+                                            supplierId: order.supplier_id,
+                                            productName: item.products?.name || 'Producto',
+                                          })}
+                                          title="Ver histórico de precios"
+                                        >
+                                          <History className="h-4 w-4" />
+                                        </Button>
+                                      </>
                                     )}
                                   </div>
-                                )}
-                              </td>
-                              <td className="p-3 text-center">
-                                <span className="text-muted-foreground">
-                                  {item.quantity_received || 0}
-                                </span>
-                                <span className="mx-1">/</span>
-                                <span className="font-medium">{item.quantity_ordered}</span>
-                              </td>
-                              <td className="p-3 text-right font-medium">
-                                ${subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                              </td>
-                              <td className="p-3">
-                                <div className="flex items-center justify-center gap-2">
-                                  <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-12">
-                                    <div 
-                                      className={`h-full transition-all duration-300 ${
-                                        itemProgress === 100 ? 'bg-success' : 
-                                        itemProgress > 0 ? 'bg-warning' : 'bg-muted-foreground/30'
-                                      }`}
-                                      style={{ width: `${itemProgress}%` }}
-                                    />
-                                  </div>
-                                  <Badge 
-                                    variant={itemProgress === 100 ? "default" : "secondary"}
-                                    className="text-xs"
-                                  >
-                                    {itemProgress}%
-                                  </Badge>
-                                </div>
-                              </td>
-                              <td className="p-3">
-                                <div className="flex items-center justify-center gap-1">
-                                  {isEditing ? (
-                                    <>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 text-success hover:text-success"
-                                        onClick={() => handleSavePrice(item)}
-                                        disabled={updatePriceMutation.isPending}
-                                      >
-                                        <Check className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 text-destructive hover:text-destructive"
-                                        onClick={handleCancelEdit}
-                                        disabled={updatePriceMutation.isPending}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7"
-                                        onClick={() => handleEditPrice(item)}
-                                        title="Editar precio"
-                                      >
-                                        <Edit2 className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7"
-                                        onClick={() => setPriceHistoryItem({
-                                          productId: item.product_id,
-                                          supplierId: order.supplier_id,
-                                          productName: item.products?.name || 'Producto',
-                                        })}
-                                        title="Ver histórico de precios"
-                                      >
-                                        <History className="h-4 w-4" />
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No hay productos en esta orden
-                  </p>
-                )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No hay productos en esta orden
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
+            </TabsContent>
+
+            <TabsContent value="reconciliation" className="flex-1 overflow-y-auto pr-2 mt-4" style={{ maxHeight: 'calc(90vh - 180px)' }}>
+              <OrderReconciliation order={order} />
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
