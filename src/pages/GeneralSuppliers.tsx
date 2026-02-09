@@ -333,7 +333,7 @@ export default function GeneralSuppliers() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Building2 className="h-6 w-6" />
-              Proveedores Generales
+              Proveedores Oficiales
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
               Proveedores externos que no se registran en el portal (ej: Costco, Sam's)
@@ -605,7 +605,7 @@ export default function GeneralSuppliers() {
               <p className="text-muted-foreground text-center">
                 {searchTerm
                   ? "No se encontraron proveedores con ese criterio"
-                  : "Aún no hay proveedores generales. Agrega uno nuevo."}
+                  : "Aún no hay proveedores oficiales. Agrega uno nuevo."}
               </p>
             </CardContent>
           </Card>

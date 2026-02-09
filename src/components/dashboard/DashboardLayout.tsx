@@ -88,7 +88,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { name: "Inicio", href: "/dashboard", icon: Home },
     ...(isAdmin ? [
       { name: "Buscador de Proveedores", href: "/dashboard/supplier-documents", icon: Search },
-      { name: "Proveedores Generales", href: "/dashboard/general-suppliers", icon: Package },
+      { name: "Proveedores Oficiales", href: "/dashboard/general-suppliers", icon: Package },
     ] : []),
     { name: "Documentos", href: "/dashboard/documents", icon: FileText },
     { name: "Facturas", href: "/dashboard/invoices", icon: Receipt },
