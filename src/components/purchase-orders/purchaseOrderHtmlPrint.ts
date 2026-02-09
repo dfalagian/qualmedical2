@@ -16,6 +16,7 @@ export interface PrintOrderData {
   supplierName: string;
   supplierRfc?: string;
   createdAt: Date;
+  deliveryDate?: Date;
   items: PrintOrderItem[];
   total: number;
   description?: string;
@@ -29,6 +30,9 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
   }
 
   const fecha = orderData.createdAt.toLocaleDateString("es-MX");
+  const fechaEntrega = orderData.deliveryDate
+    ? orderData.deliveryDate.toLocaleDateString("es-MX")
+    : "—";
   // Logo desde public folder
   const logoUrl = `${window.location.origin}/images/qualmedical-logo-oc.jpg`;
 
@@ -266,7 +270,7 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
           </div>
           <div class="info-grid">
             <span class="info-label">FECHA ENTREGA:</span>
-            <span>${fecha}</span>
+            <span>${fechaEntrega}</span>
           </div>
         </div>
       </div>

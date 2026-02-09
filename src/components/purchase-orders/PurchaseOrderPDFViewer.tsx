@@ -14,6 +14,7 @@ interface OrderData {
   supplierName: string;
   supplierRfc?: string;
   createdAt: Date;
+  deliveryDate?: Date;
   items: OrderItem[];
   total: number;
   description?: string;
@@ -118,7 +119,10 @@ export const generateAndOpenPDF = (orderData: OrderData, targetWindow?: Window |
   doc.setFont("helvetica", "bold");
   doc.text("FECHA ENTREGA:", 100, currentY);
   doc.setFont("helvetica", "normal");
-  doc.text(orderData.createdAt.toLocaleDateString("es-MX"), 135, currentY);
+  const deliveryDateStr1 = orderData.deliveryDate
+    ? orderData.deliveryDate.toLocaleDateString("es-MX")
+    : "—";
+  doc.text(deliveryDateStr1, 135, currentY);
 
   currentY += 12;
 
@@ -327,7 +331,10 @@ export const generateAndDownloadPDF = (orderData: OrderData) => {
   doc.setFont("helvetica", "bold");
   doc.text("FECHA ENTREGA:", 100, currentY);
   doc.setFont("helvetica", "normal");
-  doc.text(orderData.createdAt.toLocaleDateString("es-MX"), 135, currentY);
+  const deliveryDateStr2 = orderData.deliveryDate
+    ? orderData.deliveryDate.toLocaleDateString("es-MX")
+    : "—";
+  doc.text(deliveryDateStr2, 135, currentY);
   currentY += 12;
 
   doc.setFillColor(0, 128, 105);
