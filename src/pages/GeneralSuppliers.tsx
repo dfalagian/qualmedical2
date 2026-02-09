@@ -179,21 +179,28 @@ export default function GeneralSuppliers() {
     setImagePreview(null);
   };
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Por favor selecciona una imagen");
+    const isImage = file.type.startsWith("image/");
+    const isPdf = file.type === "application/pdf";
+
+    if (!isImage && !isPdf) {
+      toast.error("Por favor selecciona una imagen o un archivo PDF");
       return;
     }
 
     setSelectedImage(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setImagePreview(null);
+    }
   };
 
   const handleExtractData = async () => {
@@ -368,16 +375,16 @@ export default function GeneralSuppliers() {
                     <CardContent className="space-y-4">
                       <div className="flex flex-col sm:flex-row gap-4">
                         <div className="flex-1">
-                          <Label htmlFor="invoice-image">Imagen de Factura</Label>
+                          <Label htmlFor="invoice-file">Imagen o PDF de Factura</Label>
                           <Input
-                            id="invoice-image"
+                            id="invoice-file"
                             type="file"
-                            accept="image/*"
-                            onChange={handleImageSelect}
+                            accept="image/*,application/pdf"
+                            onChange={handleFileSelect}
                             className="mt-1"
                           />
                           <p className="text-xs text-muted-foreground mt-1">
-                            Sube una imagen de una factura para extraer automáticamente los datos del proveedor
+                            Sube una imagen o PDF de una factura para extraer automáticamente los datos del proveedor
                           </p>
                         </div>
                         {selectedImage && (
@@ -402,13 +409,20 @@ export default function GeneralSuppliers() {
                         )}
                       </div>
 
-                      {imagePreview && (
+                      {selectedImage && (
                         <div className="relative">
-                          <img
-                            src={imagePreview}
-                            alt="Vista previa"
-                            className="max-h-48 rounded-lg border object-contain mx-auto"
-                          />
+                          {imagePreview ? (
+                            <img
+                              src={imagePreview}
+                              alt="Vista previa"
+                              className="max-h-48 rounded-lg border object-contain mx-auto"
+                            />
+                          ) : (
+                            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg border">
+                              <FileText className="h-5 w-5 text-muted-foreground" />
+                              <span className="text-sm">{selectedImage.name}</span>
+                            </div>
+                          )}
                         </div>
                       )}
 
