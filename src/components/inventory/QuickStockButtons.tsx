@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Plus, Minus, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logActivity } from "@/lib/activityLogger";
 
 interface QuickStockButtonsProps {
   productId: string;
@@ -111,6 +112,15 @@ export function QuickStockButtons({
       // Invalidate queries
       await queryClient.invalidateQueries({ queryKey: ["products"] });
       await queryClient.invalidateQueries({ queryKey: ["product_batches"] });
+
+      logActivity({
+        section: "inventario",
+        action: mode === "increment" ? "ingreso" : "salida",
+        entityType: "Producto",
+        entityId: productId,
+        entityName: productName,
+        details: { previous_value: currentStock, new_value: actualStock, note: "Ajuste rápido" },
+      });
 
       toast({
         title: mode === "increment" ? "+1" : "-1",

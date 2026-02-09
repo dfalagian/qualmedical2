@@ -26,6 +26,7 @@ import {
   Warehouse,
   Plus
 } from "lucide-react";
+import { logActivity } from "@/lib/activityLogger";
 
 interface Warehouse {
   id: string;
@@ -331,9 +332,19 @@ export function WarehouseTransferDialog({
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse_transfers"] });
       
+      const fromName = warehouses.find(w => w.id === fromWarehouseId)?.name || "";
+      const toName = warehouses.find(w => w.id === toWarehouseId)?.name || "";
       const parts = [];
       if (data.rfidCount > 0) parts.push(`${data.rfidCount} tag(s)`);
       if (data.manualCount > 0) parts.push(`${data.manualCount} unidades`);
+      
+      logActivity({
+        section: "inventario",
+        action: "transferencia",
+        entityType: "Transferencia Almacén",
+        entityName: `${fromName} → ${toName}`,
+        details: { items_count: data.rfidCount + data.manualCount, note: notes || undefined },
+      });
       
       toast({
         title: "Transferencia completada",

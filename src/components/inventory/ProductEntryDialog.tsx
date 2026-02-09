@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { logActivity } from "@/lib/activityLogger";
 import { NewBatchModal } from "./NewBatchModal";
 import { QuickTagAssignment } from "./QuickTagAssignment";
 interface EntryItem {
@@ -327,6 +328,15 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       }
     },
     onSuccess: () => {
+      for (const item of items) {
+        logActivity({
+          section: "inventario",
+          action: "ingreso",
+          entityType: "Producto",
+          entityName: item.producto,
+          details: { items_count: item.cantidad, note: `Lote: ${item.lote}` },
+        });
+      }
       toast({
         title: "Ingreso guardado",
         description: `Se guardaron ${items.length} productos correctamente`
