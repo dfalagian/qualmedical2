@@ -56,7 +56,7 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [manualPrice, setManualPrice] = useState<string>("");
-  const [hasIva, setHasIva] = useState(false);
+  const [hasIva] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   const filteredProducts = useMemo(() => {
@@ -87,7 +87,7 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
     setSelectedProduct(null);
     setQuantity(1);
     setManualPrice("");
-    setHasIva(false);
+    setSearchTerm("");
     setSearchTerm("");
   };
 
@@ -186,18 +186,14 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
                 className="w-28 h-9"
               />
             </div>
-            <div className="flex items-center gap-2 h-9">
-              <input
-                type="checkbox"
-                id="has-iva"
-                checked={hasIva}
-                onChange={(e) => setHasIva(e.target.checked)}
-                className="h-4 w-4 rounded border-border"
-              />
-              <Label htmlFor="has-iva" className="text-xs cursor-pointer">
-                +IVA (16%)
-              </Label>
-            </div>
+            <Button
+              onClick={handleAddProduct}
+              size="sm"
+              className="h-9 gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              Agregar
+            </Button>
             <Button
               onClick={handleAddProduct}
               size="sm"
