@@ -721,10 +721,52 @@ const PurchaseOrders = () => {
                       <p className="text-sm mb-2 text-muted-foreground">{order.description}</p>
                     )}
 
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                      <p className="text-xs text-muted-foreground">
-                        Creada: {new Date(order.created_at).toLocaleDateString('es-MX')}
-                      </p>
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t flex-wrap gap-2">
+                      <div className="flex items-center gap-4">
+                        <p className="text-xs text-muted-foreground">
+                          Creada: {new Date(order.created_at).toLocaleDateString('es-MX')}
+                        </p>
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-xs text-muted-foreground">Entrega:</span>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "h-7 px-2 text-xs gap-1",
+                                  !order.delivery_date && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="h-3 w-3" />
+                                {order.delivery_date
+                                  ? format(new Date(order.delivery_date + "T12:00:00"), "dd/MM/yyyy")
+                                  : "Sin fecha"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={order.delivery_date ? new Date(order.delivery_date + "T12:00:00") : undefined}
+                                onSelect={async (date) => {
+                                  const dateStr = date ? format(date, "yyyy-MM-dd") : null;
+                                  const { error } = await supabase
+                                    .from("purchase_orders")
+                                    .update({ delivery_date: dateStr } as any)
+                                    .eq("id", order.id);
+                                  if (error) {
+                                    toast.error("Error al actualizar fecha de entrega");
+                                  } else {
+                                    queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
+                                  }
+                                }}
+                                locale={es}
+                                className="p-3 pointer-events-auto"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
 
                       {isAdmin && (
                         <Select
