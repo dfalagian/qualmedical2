@@ -581,6 +581,8 @@ export default function Inventory() {
     },
     onSuccess: (product) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["products-list"] });
+      queryClient.invalidateQueries({ queryKey: ["product-batches"] });
       logActivity({
         section: "inventario",
         action: "eliminar",
