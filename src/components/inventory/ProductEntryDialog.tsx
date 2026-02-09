@@ -108,12 +108,45 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchase_orders")
-        .select("id, order_number, status, profiles!purchase_orders_supplier_id_fkey(full_name, company_name)")
+        .select("id, order_number, status, supplier_id, supplier_type")
         .in("status", ["pendiente", "en_proceso", "recibida"])
         .order("created_at", { ascending: false });
       
       if (error) throw error;
-      return data;
+
+      // Fetch supplier names for each order
+      const supplierIds = [...new Set(data.map((o: any) => o.supplier_id))];
+      const registeredIds = data.filter((o: any) => o.supplier_type !== "general").map((o: any) => o.supplier_id);
+      const generalIds = data.filter((o: any) => o.supplier_type === "general").map((o: any) => o.supplier_id);
+
+      let profilesMap: Record<string, any> = {};
+      let generalMap: Record<string, any> = {};
+
+      if (registeredIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, company_name")
+          .in("id", registeredIds);
+        for (const p of profiles || []) profilesMap[p.id] = p;
+      }
+      if (generalIds.length > 0) {
+        const { data: gs } = await supabase
+          .from("general_suppliers")
+          .select("id, razon_social, nombre_comercial")
+          .in("id", generalIds);
+        for (const g of gs || []) generalMap[g.id] = g;
+      }
+
+      return data.map((o: any) => {
+        const isGeneral = o.supplier_type === "general";
+        const supplier = isGeneral ? generalMap[o.supplier_id] : profilesMap[o.supplier_id];
+        return {
+          ...o,
+          profiles: isGeneral
+            ? { full_name: supplier?.nombre_comercial || supplier?.razon_social || "", company_name: supplier?.nombre_comercial || supplier?.razon_social || "" }
+            : { full_name: supplier?.full_name || "", company_name: supplier?.company_name || "" },
+        };
+      });
     }
   });
 

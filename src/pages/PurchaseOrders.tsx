@@ -61,6 +61,18 @@ const PurchaseOrders = () => {
   const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>("all");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
+  // Fetch general suppliers for resolving names
+  const { data: generalSuppliers } = useQuery({
+    queryKey: ["general_suppliers_for_orders"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("general_suppliers")
+        .select("id, razon_social, nombre_comercial, rfc");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: orders, isLoading } = useQuery({
     queryKey: ["purchase_orders"],
     queryFn: async () => {
@@ -68,7 +80,6 @@ const PurchaseOrders = () => {
         .from("purchase_orders")
         .select(`
           *,
-          profiles!purchase_orders_supplier_id_fkey(full_name, company_name, rfc),
           purchase_order_items(
             id, product_id, quantity_ordered, quantity_received, unit_price, original_price,
             products(id, name, sku)
@@ -87,21 +98,49 @@ const PurchaseOrders = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, company_name, email");
+        .select("id, full_name, company_name, email, rfc");
 
       if (error) throw error;
       return data;
     },
   });
 
+  // Enrich orders with supplier profile info
+  const enrichedOrders = useMemo(() => {
+    if (!orders) return [];
+    return orders.map((order: any) => {
+      let profiles = null;
+      if (order.supplier_type === "general") {
+        const gs = generalSuppliers?.find((s) => s.id === order.supplier_id);
+        if (gs) {
+          profiles = {
+            full_name: gs.nombre_comercial || gs.razon_social,
+            company_name: gs.nombre_comercial || gs.razon_social,
+            rfc: gs.rfc,
+          };
+        }
+      } else {
+        const sp = suppliers?.find((s: any) => s.id === order.supplier_id);
+        if (sp) {
+          profiles = {
+            full_name: sp.full_name,
+            company_name: sp.company_name,
+            rfc: sp.rfc,
+          };
+        }
+      }
+      return { ...order, profiles };
+    });
+  }, [orders, suppliers, generalSuppliers]);
+
   // Get existing order numbers to prevent duplicate imports
   const existingOrderNumbers = orders?.map(o => o.order_number) || [];
 
   // Filter orders based on search criteria
   const filteredOrders = useMemo(() => {
-    if (!orders) return [];
+    if (!enrichedOrders) return [];
     
-    return orders.filter((order: any) => {
+    return enrichedOrders.filter((order: any) => {
       // Filter by order number search
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -129,7 +168,7 @@ const PurchaseOrders = () => {
       
       return true;
     });
-  }, [orders, searchQuery, selectedSupplierFilter, selectedDate]);
+  }, [enrichedOrders, searchQuery, selectedSupplierFilter, selectedDate]);
 
   const clearFilters = () => {
     setSearchQuery("");
