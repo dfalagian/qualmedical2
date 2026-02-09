@@ -634,6 +634,7 @@ const PurchaseOrders = () => {
                                 supplierName: formatSupplierName(order.profiles),
                                 supplierRfc: order.profiles?.rfc,
                                 createdAt: new Date(order.created_at),
+                                deliveryDate: order.delivery_date ? new Date(order.delivery_date + "T12:00:00") : undefined,
                                 items,
                                 total,
                                 description: order.description,

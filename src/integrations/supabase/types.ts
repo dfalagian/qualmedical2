@@ -1345,6 +1345,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           currency: string | null
+          delivery_date: string | null
           description: string | null
           general_supplier_invoice_id: string | null
           id: string
@@ -1360,6 +1361,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
+          delivery_date?: string | null
           description?: string | null
           general_supplier_invoice_id?: string | null
           id?: string
@@ -1375,6 +1377,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
+          delivery_date?: string | null
           description?: string | null
           general_supplier_invoice_id?: string | null
           id?: string

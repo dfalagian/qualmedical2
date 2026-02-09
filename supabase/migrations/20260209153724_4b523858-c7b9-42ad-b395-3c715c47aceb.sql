@@ -1,0 +1,1 @@
+ALTER TABLE public.purchase_orders ADD COLUMN delivery_date date DEFAULT NULL;

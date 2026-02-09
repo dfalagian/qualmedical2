@@ -29,10 +29,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Package, Trash2, FileText, History, Building2, User } from "lucide-react";
+import { Package, Trash2, FileText, History, Building2, User, CalendarIcon } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
 import { openPurchaseOrderPrint } from "./purchaseOrderHtmlPrint";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface SelectedProduct {
   id: string;
@@ -61,6 +66,7 @@ export const CreateSupplierOrderDialog = ({
   const [orderNumber, setOrderNumber] = useState("");
   const [description, setDescription] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
+  const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(undefined);
 
   // Generate next order number automatically
   const { data: nextOrderNumber } = useQuery({
@@ -257,6 +263,7 @@ export const CreateSupplierOrderDialog = ({
           supplier_type: supplierType || "registered",
           amount: total,
           description: description || null,
+          delivery_date: deliveryDate ? format(deliveryDate, "yyyy-MM-dd") : null,
           created_by: user.id,
           status: "pendiente",
         } as any)
@@ -339,6 +346,7 @@ export const CreateSupplierOrderDialog = ({
         supplierName: selectedSupplierData?.name || "",
         supplierRfc: selectedSupplierData?.rfc ?? undefined,
         createdAt: new Date(),
+        deliveryDate: deliveryDate || undefined,
         items: selectedProducts,
         total,
         description,
@@ -361,6 +369,7 @@ export const CreateSupplierOrderDialog = ({
     setOrderNumber("");
     setDescription("");
     setSelectedProducts([]);
+    setDeliveryDate(undefined);
   };
 
   const handleClose = () => {
@@ -388,7 +397,7 @@ export const CreateSupplierOrderDialog = ({
 
           <div className="flex-1 overflow-y-auto flex flex-col gap-4">
             {/* Top row - Supplier and Order Info */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>Proveedor *</Label>
                 <Select value={selectedSupplier} onValueChange={handleSupplierChange}>
@@ -396,7 +405,6 @@ export const CreateSupplierOrderDialog = ({
                     <SelectValue placeholder="Selecciona proveedor" />
                   </SelectTrigger>
                   <SelectContent>
-                    {/* Registered Suppliers */}
                     {registeredSuppliers && registeredSuppliers.length > 0 && (
                       <>
                         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1">
@@ -412,8 +420,6 @@ export const CreateSupplierOrderDialog = ({
                         ))}
                       </>
                     )}
-                    
-                    {/* General Suppliers */}
                     {generalSuppliers && generalSuppliers.length > 0 && (
                       <>
                         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1 mt-2 border-t pt-2">
@@ -441,6 +447,32 @@ export const CreateSupplierOrderDialog = ({
                   onChange={(e) => setOrderNumber(e.target.value)}
                   placeholder="OC-2026-001"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Fecha de Entrega</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !deliveryDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {deliveryDate ? format(deliveryDate, "dd/MM/yyyy", { locale: es }) : "Seleccionar fecha"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={deliveryDate}
+                      onSelect={setDeliveryDate}
+                      locale={es}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">

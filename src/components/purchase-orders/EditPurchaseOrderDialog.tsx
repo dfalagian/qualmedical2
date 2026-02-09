@@ -21,8 +21,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Package, Trash2, Save, History } from "lucide-react";
+import { Package, Trash2, Save, History, CalendarIcon } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface SelectedProduct {
   id: string;
@@ -50,6 +55,7 @@ export const EditPurchaseOrderDialog = ({
   const queryClient = useQueryClient();
   const [description, setDescription] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
+  const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(undefined);
   const [initialized, setInitialized] = useState(false);
 
   // Fetch products from inventory
@@ -70,6 +76,7 @@ export const EditPurchaseOrderDialog = ({
   useEffect(() => {
     if (open && order && !initialized) {
       setDescription(order.description || "");
+      setDeliveryDate(order.delivery_date ? new Date(order.delivery_date + "T12:00:00") : undefined);
 
       const items: SelectedProduct[] = (order.purchase_order_items || []).map((item: any) => {
         const savedPrice = item.original_price ?? item.unit_price ?? 0;
@@ -179,6 +186,7 @@ export const EditPurchaseOrderDialog = ({
         .update({
           amount: total,
           description: description || null,
+          delivery_date: deliveryDate ? format(deliveryDate, "yyyy-MM-dd") : null,
         })
         .eq("id", order.id);
 
@@ -243,14 +251,41 @@ export const EditPurchaseOrderDialog = ({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto flex flex-col gap-4">
-          {/* Description */}
-          <div className="space-y-2">
-            <Label>Descripción</Label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Notas adicionales..."
-            />
+          {/* Description and Delivery Date */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Descripción</Label>
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Notas adicionales..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Fecha de Entrega</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !deliveryDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {deliveryDate ? format(deliveryDate, "dd/MM/yyyy", { locale: es }) : "Seleccionar fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={deliveryDate}
+                    onSelect={setDeliveryDate}
+                    locale={es}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
           {/* Product Combobox */}

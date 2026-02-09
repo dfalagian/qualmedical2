@@ -16,6 +16,7 @@ export interface PurchaseOrderPdfData {
   supplierName: string;
   supplierRfc?: string;
   createdAt: Date;
+  deliveryDate?: Date;
   items: PurchaseOrderPdfItem[];
   subtotal: number;
   totalIva: number;
@@ -126,7 +127,10 @@ function createDoc(orderData: PurchaseOrderPdfData) {
   doc.setFont("helvetica", "bold");
   doc.text("FECHA ENTREGA:", 100, currentY);
   doc.setFont("helvetica", "normal");
-  doc.text(orderData.createdAt.toLocaleDateString("es-MX"), 135, currentY);
+  const deliveryStr = orderData.deliveryDate
+    ? orderData.deliveryDate.toLocaleDateString("es-MX")
+    : "—";
+  doc.text(deliveryStr, 135, currentY);
 
   currentY += 12;
 
