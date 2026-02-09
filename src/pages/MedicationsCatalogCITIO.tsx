@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { logActivity } from "@/lib/activityLogger";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
@@ -120,6 +121,12 @@ const MedicationsCatalogCITIO = () => {
     },
     onSuccess: () => {
       toast.success('Medicamento actualizado correctamente');
+      logActivity({
+        section: "catalogo",
+        action: "editar",
+        entityType: "Medicamento CITIO",
+        entityName: editFormData.name || editingMedication?.name,
+      });
       queryClient.invalidateQueries({ queryKey: ['external-medications-catalog'] });
       setEditingMedication(null);
       setEditFormData({});
@@ -139,7 +146,15 @@ const MedicationsCatalogCITIO = () => {
       return data;
     },
     onSuccess: () => {
+      const deletedMed = medications?.find(m => m.id === deleteConfirmId);
       toast.success('Medicamento eliminado correctamente');
+      logActivity({
+        section: "catalogo",
+        action: "eliminar",
+        entityType: "Medicamento CITIO",
+        entityId: deleteConfirmId || undefined,
+        entityName: deletedMed?.name,
+      });
       queryClient.invalidateQueries({ queryKey: ['external-medications-catalog'] });
       setDeleteConfirmId(null);
     },

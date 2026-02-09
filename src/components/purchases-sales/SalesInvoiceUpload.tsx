@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Progress } from "@/components/ui/progress";
+import { logActivity } from "@/lib/activityLogger";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -283,6 +284,14 @@ export const SalesInvoiceUpload = ({ onSuccess }: SalesInvoiceUploadProps) => {
     if (successCount > 0) {
       queryClient.invalidateQueries({ queryKey: ["sales-invoices"] });
       onSuccess?.();
+      for (const r of results.filter(r => r.status === "success")) {
+        logActivity({
+          section: "compras_ventas",
+          action: "cargar",
+          entityType: "Factura de Venta",
+          entityName: r.folio || r.fileName,
+        });
+      }
     }
 
     if (successCount === results.length) {

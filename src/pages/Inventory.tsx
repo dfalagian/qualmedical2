@@ -51,6 +51,7 @@ import {
   ScanBarcode
 } from "lucide-react";
 
+import { logActivity } from "@/lib/activityLogger";
 import { RFIDScannerCard, ScanMode } from "@/components/inventory/RFIDScannerCard";
 import { MassRFIDScanner, MassScanMode } from "@/components/inventory/MassRFIDScanner";
 import { CITIOImportDialog } from "@/components/inventory/CITIOImportDialog";
@@ -400,6 +401,14 @@ export default function Inventory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      logActivity({
+        section: "inventario",
+        action: editingProduct ? "editar" : "crear",
+        entityType: "Producto",
+        entityId: editingProduct?.id,
+        entityName: productForm.name,
+        details: editingProduct ? { note: "Producto editado" } : { note: "Producto creado manualmente" },
+      });
       setProductDialogOpen(false);
       setEditingProduct(null);
       resetProductForm();
@@ -519,6 +528,13 @@ export default function Inventory() {
           description: `"${result.name}" ya está en el inventario.`
         });
       } else {
+        logActivity({
+          section: "inventario",
+          action: "importar",
+          entityType: "Producto",
+          entityName: result.name,
+          details: { note: "Importado desde CITIO", sku: result.sku, barcode: result.barcode },
+        });
         const skuInfo = result.sku ? ` SKU: ${result.sku}` : '';
         const barcodeInfo = result.barcode ? ` | CB: ${result.barcode}` : '';
         toast({
@@ -539,14 +555,23 @@ export default function Inventory() {
   // Delete product
   const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {
+      const product = products.find(p => p.id === id);
       const { error } = await supabase
         .from("products")
         .delete()
         .eq("id", id);
       if (error) throw error;
+      return product;
     },
-    onSuccess: () => {
+    onSuccess: (product) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      logActivity({
+        section: "inventario",
+        action: "eliminar",
+        entityType: "Producto",
+        entityId: product?.id,
+        entityName: product?.name,
+      });
       toast({
         title: "Producto eliminado",
         description: "El producto fue eliminado correctamente."
@@ -842,6 +867,18 @@ export default function Inventory() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["product_batches"] });
       queryClient.invalidateQueries({ queryKey: ["stock_alerts"] });
+
+      logActivity({
+        section: "inventario",
+        action: data.mode === "entrada" ? "ingreso" : "salida",
+        entityType: "Producto",
+        entityName: data.productName,
+        details: {
+          previous_value: data.previousStock,
+          new_value: data.newStock,
+          note: `Movimiento NFC - EPC: ${data.epc?.substring(0, 12)}...`,
+        },
+      });
       
       // Activar el efecto de parpadeo por 30 segundos (local)
       setRecentlyReadTagId(data.tagId);
