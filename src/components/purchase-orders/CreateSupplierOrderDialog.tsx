@@ -437,7 +437,7 @@ export const CreateSupplierOrderDialog = ({
                       <>
                         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1 mt-2 border-t pt-2">
                           <Building2 className="h-3 w-3" />
-                          Proveedores Generales
+                          Proveedores Oficiales
                         </div>
                         {generalSuppliers.map((s) => (
                           <SelectItem key={s.id} value={s.id}>
