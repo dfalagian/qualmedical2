@@ -51,6 +51,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
     numeroFactura: "",
     proveedor: "",
     almacenId: "",
+    ordenCompraId: "",
     isExistingBatch: false
   });
 
@@ -94,6 +95,21 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
         .select("id, code, name")
         .eq("is_active", true)
         .order("name");
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch órdenes de compra pendientes/en proceso
+  const { data: ordenesCompra = [] } = useQuery({
+    queryKey: ["purchase-orders-for-entry"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_orders")
+        .select("id, order_number, status, profiles!purchase_orders_supplier_id_fkey(full_name, company_name)")
+        .in("status", ["pendiente", "en_proceso", "recibida"])
+        .order("created_at", { ascending: false });
       
       if (error) throw error;
       return data;
@@ -341,6 +357,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       numeroFactura: "",
       proveedor: "",
       almacenId: "",
+      ordenCompraId: "",
       isExistingBatch: false
     });
     setItems([]);
@@ -505,8 +522,30 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
             </div>
           </div>
 
-          {/* Tercera fila: Nº Factura, Proveedor, Almacén, botón Ingresar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
+          {/* Tercera fila: Orden de Compra, Nº Factura, Proveedor, Almacén, botón Ingresar */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">Orden de Compra</Label>
+              <Select
+                value={formData.ordenCompraId}
+                onValueChange={(value) => setFormData({ ...formData, ordenCompraId: value })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Seleccionar OC..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sin_orden">Sin orden</SelectItem>
+                  {ordenesCompra.map((oc: any) => {
+                    const supplierName = oc.profiles?.company_name || oc.profiles?.full_name || "";
+                    return (
+                      <SelectItem key={oc.id} value={oc.id}>
+                        {oc.order_number}{supplierName ? ` — ${supplierName}` : ""}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1">
               <Label className="text-xs">Nº Factura</Label>
               <Input
