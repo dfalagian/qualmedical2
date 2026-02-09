@@ -25,6 +25,7 @@ interface Product {
   unit_price: number | null;
   current_stock: number | null;
   price_type_1?: number | null;
+  brand?: string | null;
 }
 
 interface ProductComboboxProps {
@@ -132,7 +133,7 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{product.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          SKU: {product.sku} · Stock: {product.current_stock || 0}
+                          SKU: {product.sku}{product.brand ? ` · Marca: ${product.brand}` : ''} · Stock: {product.current_stock || 0}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
