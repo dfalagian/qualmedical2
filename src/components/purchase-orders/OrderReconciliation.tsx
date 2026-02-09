@@ -216,7 +216,7 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
           </p>
         </div>
 
-        {/* Factura */}
+      {/* Factura */}
         <div className="border rounded-lg p-4 space-y-2">
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <FileText className="h-4 w-4" />
@@ -226,10 +226,15 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
             <>
               <p className="text-xl font-bold">{fmt(totalInvoicedAmount)}</p>
               <p className="text-xs text-muted-foreground">
-                {totalInvoiced > 0
-                  ? `${totalInvoiced} unidades`
-                  : "Sin desglose por producto"}
+                {invoiceItems.length > 0
+                  ? `${totalInvoiced} unidades · ${invoiceItems.length} conceptos`
+                  : `Folio: ${(invoice as any)?.invoice_number || (invoice as any)?.folio || "—"}`}
               </p>
+              {invoiceItems.length === 0 && (
+                <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+                  Sin desglose de conceptos
+                </Badge>
+              )}
               {totalInvoicedAmount !== totalOrderedAmount && (
                 <Badge
                   variant={
