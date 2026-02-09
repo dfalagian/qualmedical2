@@ -615,25 +615,17 @@ const PurchaseOrders = () => {
                               const items = order.purchase_order_items?.map((item: any) => {
                                 const unitPrice = item.unit_price || 0;
                                 const quantity = item.quantity_ordered || 0;
-                                // Asumimos IVA 16% si el monto total lo sugiere
-                                const subtotalItem = unitPrice * quantity;
-                                const hasIva = false; // Por defecto sin IVA individual
-                                const ivaAmount = 0;
-                                const total = subtotalItem + ivaAmount;
+                                const total = unitPrice * quantity;
                                 return {
                                   name: item.products?.name || 'Producto',
                                   sku: item.products?.sku || '-',
                                   quantity,
                                   unitPrice,
-                                  hasIva,
-                                  ivaAmount,
                                   total,
                                 };
                               }) || [];
                               
-                              const subtotal = items.reduce((sum: number, i: any) => sum + i.unitPrice * i.quantity, 0);
-                              const totalIva = items.reduce((sum: number, i: any) => sum + i.ivaAmount, 0);
-                              const total = order.amount || subtotal + totalIva;
+                              const total = order.amount || items.reduce((sum: number, i: any) => sum + i.total, 0);
 
                               openPurchaseOrderPrint({
                                 orderNumber: order.order_number,
@@ -641,8 +633,6 @@ const PurchaseOrders = () => {
                                 supplierRfc: order.profiles?.rfc,
                                 createdAt: new Date(order.created_at),
                                 items,
-                                subtotal,
-                                totalIva,
                                 total,
                                 description: order.description,
                               });
