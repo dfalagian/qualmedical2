@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_name: string | null
+          entity_type: string
+          id: string
+          section: string
+          user_email: string
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_name?: string | null
+          entity_type: string
+          id?: string
+          section: string
+          user_email: string
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_name?: string | null
+          entity_type?: string
+          id?: string
+          section?: string
+          user_email?: string
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           cfdi: string | null

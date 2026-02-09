@@ -1,3 +1,4 @@
+import { logActivity } from "@/lib/activityLogger";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -332,6 +333,13 @@ const PurchaseOrders = () => {
       toast.success(`${variables.length} orden(es) importada(s) correctamente`);
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
       setImportDialogOpen(false);
+      logActivity({
+        section: "ordenes_compra",
+        action: "importar",
+        entityType: "orden_compra",
+        entityName: variables.map((o: any) => o.order_number).join(", "),
+        details: { items_count: variables.length, note: "Importadas desde CITIO" },
+      });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al importar órdenes");
@@ -340,17 +348,26 @@ const PurchaseOrders = () => {
 
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({ id, status, orderNumber }: { id: string; status: string; orderNumber?: string }) => {
       const { error } = await supabase
         .from("purchase_orders")
         .update({ status })
         .eq("id", id);
 
       if (error) throw error;
+      return { id, status, orderNumber };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       toast.success("Estado actualizado");
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
+      logActivity({
+        section: "ordenes_compra",
+        action: "estado",
+        entityType: "orden_compra",
+        entityId: result.id,
+        entityName: result.orderNumber,
+        details: { new_value: result.status },
+      });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al actualizar");
@@ -358,18 +375,26 @@ const PurchaseOrders = () => {
   });
 
   const deleteOrderMutation = useMutation({
-    mutationFn: async (orderId: string) => {
+    mutationFn: async ({ orderId, orderNumber }: { orderId: string; orderNumber?: string }) => {
       const { error } = await supabase
         .from("purchase_orders")
         .delete()
         .eq("id", orderId);
 
       if (error) throw error;
+      return { orderId, orderNumber };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       toast.success("Orden eliminada correctamente");
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
       setDeleteDialogOpen(false);
+      logActivity({
+        section: "ordenes_compra",
+        action: "eliminar",
+        entityType: "orden_compra",
+        entityId: result.orderId,
+        entityName: result.orderNumber,
+      });
       setOrderToDelete(null);
     },
     onError: (error: any) => {
@@ -772,7 +797,7 @@ const PurchaseOrders = () => {
                         <Select
                           value={order.status}
                           onValueChange={(value) =>
-                            updateStatusMutation.mutate({ id: order.id, status: value })
+                            updateStatusMutation.mutate({ id: order.id, status: value, orderNumber: order.order_number })
                           }
                         >
                           <SelectTrigger className="w-36" onClick={(e) => e.stopPropagation()}>
@@ -838,7 +863,7 @@ const PurchaseOrders = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => orderToDelete && deleteOrderMutation.mutate(orderToDelete.id)}
+              onClick={() => orderToDelete && deleteOrderMutation.mutate({ orderId: orderToDelete.id, orderNumber: orderToDelete.order_number })}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Eliminar
