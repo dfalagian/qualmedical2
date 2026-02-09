@@ -73,17 +73,30 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
   // Lista de items ingresados
   const [items, setItems] = useState<EntryItem[]>([]);
 
-  // Fetch proveedores (profiles con rol proveedor)
+  // Fetch proveedores (profiles + general_suppliers)
   const { data: proveedores = [] } = useQuery({
-    queryKey: ["proveedores-list"],
+    queryKey: ["proveedores-list-combined"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name, company_name")
-        .order("company_name");
-      
-      if (error) throw error;
-      return data;
+      const [profilesRes, generalRes] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, company_name").order("company_name"),
+        supabase.from("general_suppliers").select("id, razon_social, nombre_comercial").eq("is_active", true).order("razon_social"),
+      ]);
+
+      if (profilesRes.error) throw profilesRes.error;
+      if (generalRes.error) throw generalRes.error;
+
+      const registered = (profilesRes.data || []).map((p) => ({
+        id: p.id,
+        label: p.company_name || p.full_name,
+        type: "registered" as const,
+      }));
+      const general = (generalRes.data || []).map((g) => ({
+        id: g.id,
+        label: g.nombre_comercial || g.razon_social,
+        type: "general" as const,
+      }));
+
+      return [...registered, ...general].sort((a, b) => a.label.localeCompare(b.label));
     }
   });
 
@@ -609,8 +622,8 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
                 </SelectTrigger>
                 <SelectContent>
                   {proveedores.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.company_name || p.full_name}
+                    <SelectItem key={`${p.type}-${p.id}`} value={p.id}>
+                      {p.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
