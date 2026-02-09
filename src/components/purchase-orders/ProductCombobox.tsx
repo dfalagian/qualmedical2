@@ -34,8 +34,7 @@ interface ProductComboboxProps {
     product: Product,
     quantity: number,
     savedPrice: number,
-    manualPrice: number | null,
-    hasIva: boolean
+    manualPrice: number | null
   ) => void;
 }
 
@@ -56,7 +55,6 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [manualPrice, setManualPrice] = useState<string>("");
-  const [hasIva] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   const filteredProducts = useMemo(() => {
@@ -80,9 +78,7 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
     if (!selectedProduct) return;
     const savedPrice = getProductPrice(selectedProduct);
     const parsedManual = manualPrice.trim() !== "" ? parseFloat(manualPrice) || 0 : null;
-    // Si hay precio manual, usarlo; si no, usar el precio guardado
-    const effectivePrice = parsedManual ?? savedPrice;
-    onAddProduct(selectedProduct, quantity, savedPrice, parsedManual, hasIva);
+    onAddProduct(selectedProduct, quantity, savedPrice, parsedManual);
     // Reset form
     setSelectedProduct(null);
     setQuantity(1);
@@ -186,14 +182,6 @@ export const ProductCombobox = ({ products, onAddProduct }: ProductComboboxProps
                 className="w-28 h-9"
               />
             </div>
-            <Button
-              onClick={handleAddProduct}
-              size="sm"
-              className="h-9 gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              Agregar
-            </Button>
             <Button
               onClick={handleAddProduct}
               size="sm"

@@ -6,8 +6,6 @@ interface OrderItem {
   sku: string;
   quantity: number;
   unitPrice: number;
-  hasIva: boolean;
-  ivaAmount: number;
   total: number;
 }
 
@@ -17,8 +15,6 @@ interface OrderData {
   supplierRfc?: string;
   createdAt: Date;
   items: OrderItem[];
-  subtotal: number;
-  totalIva: number;
   total: number;
   description?: string;
 }
@@ -146,14 +142,13 @@ export const generateAndOpenPDF = (orderData: OrderData, targetWindow?: Window |
     item.quantity.toString(),
     "PZA",
     `$${item.unitPrice.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`,
-    item.hasIva ? `$${item.ivaAmount.toLocaleString("es-MX", { minimumFractionDigits: 2 })}` : "$0.00",
     `$${item.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`,
     orderData.description || "",
   ]);
 
   autoTable(doc, {
     startY: currentY,
-    head: [["No.", "CAT", "DESCRIPCIÓN DEL PRODUCTO", "MARCA", "CANT", "UNIDAD", "PRECIO UNITARIO", "IVA", "IMPORTE", "OBSERVACIONES"]],
+    head: [["No.", "CAT", "DESCRIPCIÓN DEL PRODUCTO", "MARCA", "CANT", "UNIDAD", "PRECIO UNITARIO", "IMPORTE", "OBSERVACIONES"]],
     body: tableData,
     theme: "grid",
     headStyles: {
@@ -171,14 +166,13 @@ export const generateAndOpenPDF = (orderData: OrderData, targetWindow?: Window |
     columnStyles: {
       0: { cellWidth: 10, halign: "center" },
       1: { cellWidth: 20 },
-      2: { cellWidth: 45 },
+      2: { cellWidth: 50 },
       3: { cellWidth: 15, halign: "center" },
       4: { cellWidth: 12, halign: "center" },
       5: { cellWidth: 15, halign: "center" },
       6: { cellWidth: 25, halign: "right" },
-      7: { cellWidth: 18, halign: "right" },
-      8: { cellWidth: 22, halign: "right" },
-      9: { cellWidth: 20 },
+      7: { cellWidth: 25, halign: "right" },
+      8: { cellWidth: 20 },
     },
     margin: { left: 14, right: 14 },
   });
@@ -186,23 +180,12 @@ export const generateAndOpenPDF = (orderData: OrderData, targetWindow?: Window |
   const finalY = (doc as any).lastAutoTable.finalY + 5;
   const totalsX = pageWidth - 70;
   
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.text("SUBTOTAL:", totalsX, finalY);
-  doc.setFont("helvetica", "normal");
-  doc.text(`$${orderData.subtotal.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`, pageWidth - 14, finalY, { align: "right" });
-
-  doc.setFont("helvetica", "bold");
-  doc.text("IMPUESTOS:", totalsX, finalY + 6);
-  doc.setFont("helvetica", "normal");
-  doc.text(`$${orderData.totalIva.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`, pageWidth - 14, finalY + 6, { align: "right" });
-
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.text("TOTAL:", totalsX, finalY + 14);
-  doc.text(`$${orderData.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`, pageWidth - 14, finalY + 14, { align: "right" });
+  doc.text("TOTAL:", totalsX, finalY);
+  doc.text(`$${orderData.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`, pageWidth - 14, finalY, { align: "right" });
 
-  const sigY = finalY + 35;
+  const sigY = finalY + 20;
   
   doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
@@ -364,14 +347,13 @@ export const generateAndDownloadPDF = (orderData: OrderData) => {
     item.quantity.toString(),
     "PZA",
     `$${item.unitPrice.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`,
-    item.hasIva ? `$${item.ivaAmount.toLocaleString("es-MX", { minimumFractionDigits: 2 })}` : "$0.00",
     `$${item.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`,
     orderData.description || "",
   ]);
 
   autoTable(doc, {
     startY: currentY,
-    head: [["No.", "CAT", "DESCRIPCIÓN DEL PRODUCTO", "MARCA", "CANT", "UNIDAD", "PRECIO UNITARIO", "IVA", "IMPORTE", "OBSERVACIONES"]],
+    head: [["No.", "CAT", "DESCRIPCIÓN DEL PRODUCTO", "MARCA", "CANT", "UNIDAD", "PRECIO UNITARIO", "IMPORTE", "OBSERVACIONES"]],
     body: tableData,
     theme: "grid",
     headStyles: { fillColor: [0, 128, 105], textColor: [255, 255, 255], fontSize: 7, fontStyle: "bold", halign: "center", valign: "middle" },
@@ -379,35 +361,25 @@ export const generateAndDownloadPDF = (orderData: OrderData) => {
     columnStyles: {
       0: { cellWidth: 10, halign: "center" },
       1: { cellWidth: 20 },
-      2: { cellWidth: 45 },
+      2: { cellWidth: 50 },
       3: { cellWidth: 15, halign: "center" },
       4: { cellWidth: 12, halign: "center" },
       5: { cellWidth: 15, halign: "center" },
       6: { cellWidth: 25, halign: "right" },
-      7: { cellWidth: 18, halign: "right" },
-      8: { cellWidth: 22, halign: "right" },
-      9: { cellWidth: 20 },
+      7: { cellWidth: 25, halign: "right" },
+      8: { cellWidth: 20 },
     },
     margin: { left: 14, right: 14 },
   });
 
   const finalY = (doc as any).lastAutoTable.finalY + 5;
   const totalsX = pageWidth - 70;
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.text("SUBTOTAL:", totalsX, finalY);
-  doc.setFont("helvetica", "normal");
-  doc.text(`$${orderData.subtotal.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`, pageWidth - 14, finalY, { align: "right" });
-  doc.setFont("helvetica", "bold");
-  doc.text("IMPUESTOS:", totalsX, finalY + 6);
-  doc.setFont("helvetica", "normal");
-  doc.text(`$${orderData.totalIva.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`, pageWidth - 14, finalY + 6, { align: "right" });
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.text("TOTAL:", totalsX, finalY + 14);
-  doc.text(`$${orderData.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`, pageWidth - 14, finalY + 14, { align: "right" });
+  doc.text("TOTAL:", totalsX, finalY);
+  doc.text(`$${orderData.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`, pageWidth - 14, finalY, { align: "right" });
 
-  const sigY = finalY + 35;
+  const sigY = finalY + 20;
   doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
   doc.text("SOLICITÓ", 40, sigY, { align: "center" });

@@ -34,8 +34,6 @@ import { ProductCombobox } from "./ProductCombobox";
 import { openPurchaseOrderPrint } from "./purchaseOrderHtmlPrint";
 import { Badge } from "@/components/ui/badge";
 
-const IVA_RATE = 0.16;
-
 interface SelectedProduct {
   id: string;
   name: string;
@@ -44,8 +42,6 @@ interface SelectedProduct {
   unitPrice: number;
   savedPrice: number;
   manualPrice: number | null;
-  hasIva: boolean;
-  ivaAmount: number;
   total: number;
 }
 
@@ -150,10 +146,8 @@ export const CreateSupplierOrderDialog = ({
     product: { id: string; name: string; sku: string; unit_price: number | null },
     quantity: number,
     savedPrice: number,
-    manualPrice: number | null,
-    hasIva: boolean
+    manualPrice: number | null
   ) => {
-    // Check if product already exists
     const exists = selectedProducts.find((p) => p.id === product.id);
     if (exists) {
       toast.error("Este producto ya está en la lista");
@@ -161,8 +155,7 @@ export const CreateSupplierOrderDialog = ({
     }
 
     const effectivePrice = manualPrice ?? savedPrice;
-    const ivaAmount = hasIva ? effectivePrice * quantity * IVA_RATE : 0;
-    const total = effectivePrice * quantity + ivaAmount;
+    const total = effectivePrice * quantity;
 
     setSelectedProducts([
       ...selectedProducts,
@@ -174,8 +167,6 @@ export const CreateSupplierOrderDialog = ({
         unitPrice: effectivePrice,
         savedPrice,
         manualPrice,
-        hasIva,
-        ivaAmount,
         total,
       },
     ]);
@@ -190,9 +181,8 @@ export const CreateSupplierOrderDialog = ({
       selectedProducts.map((p) => {
         if (p.id === productId) {
           const effectivePrice = p.manualPrice ?? p.savedPrice;
-          const ivaAmount = p.hasIva ? effectivePrice * quantity * IVA_RATE : 0;
-          const total = effectivePrice * quantity + ivaAmount;
-          return { ...p, quantity, ivaAmount, total };
+          const total = effectivePrice * quantity;
+          return { ...p, quantity, total };
         }
         return p;
       })
@@ -205,26 +195,19 @@ export const CreateSupplierOrderDialog = ({
       selectedProducts.map((p) => {
         if (p.id === productId) {
           const effectivePrice = manualPrice ?? p.savedPrice;
-          const ivaAmount = p.hasIva ? effectivePrice * p.quantity * IVA_RATE : 0;
-          const total = effectivePrice * p.quantity + ivaAmount;
-          return { ...p, manualPrice, unitPrice: effectivePrice, ivaAmount, total };
+          const total = effectivePrice * p.quantity;
+          return { ...p, manualPrice, unitPrice: effectivePrice, total };
         }
         return p;
       })
     );
   };
 
-  const { subtotal, totalIva, total } = useMemo(() => {
-    const subtotal = selectedProducts.reduce(
-      (sum, p) => {
-        const effectivePrice = p.manualPrice ?? p.savedPrice;
-        return sum + effectivePrice * p.quantity;
-      },
-      0
-    );
-    const totalIva = selectedProducts.reduce((sum, p) => sum + p.ivaAmount, 0);
-    const total = subtotal + totalIva;
-    return { subtotal, totalIva, total };
+  const total = useMemo(() => {
+    return selectedProducts.reduce((sum, p) => {
+      const effectivePrice = p.manualPrice ?? p.savedPrice;
+      return sum + effectivePrice * p.quantity;
+    }, 0);
   }, [selectedProducts]);
 
   const selectedSupplierData = useMemo(() => {
@@ -357,8 +340,6 @@ export const CreateSupplierOrderDialog = ({
         supplierRfc: selectedSupplierData?.rfc ?? undefined,
         createdAt: new Date(),
         items: selectedProducts,
-        subtotal,
-        totalIva,
         total,
         description,
       });
@@ -568,15 +549,7 @@ export const CreateSupplierOrderDialog = ({
             {selectedProducts.length > 0 && (
               <div className="flex justify-end">
                 <div className="w-64 bg-muted/50 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Subtotal:</span>
-                    <span>${subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>IVA (16%):</span>
-                    <span>${totalIva.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                  <div className="flex justify-between font-bold text-lg">
                     <span>Total:</span>
                     <span className="text-primary">${total.toFixed(2)} MXN</span>
                   </div>

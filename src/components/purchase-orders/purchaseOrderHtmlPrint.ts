@@ -8,8 +8,6 @@ export interface PrintOrderItem {
   sku: string;
   quantity: number;
   unitPrice: number;
-  hasIva: boolean;
-  ivaAmount: number;
   total: number;
 }
 
@@ -19,8 +17,6 @@ export interface PrintOrderData {
   supplierRfc?: string;
   createdAt: Date;
   items: PrintOrderItem[];
-  subtotal: number;
-  totalIva: number;
   total: number;
   description?: string;
 }
@@ -47,7 +43,6 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
         <td style="text-align: center; border: 1px solid #ccc; padding: 6px;">${item.quantity}</td>
         <td style="text-align: center; border: 1px solid #ccc; padding: 6px;">PZAS</td>
         <td style="text-align: right; border: 1px solid #ccc; padding: 6px;">$${item.unitPrice.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</td>
-        <td style="text-align: right; border: 1px solid #ccc; padding: 6px;">${item.hasIva ? `$${item.ivaAmount.toLocaleString("es-MX", { minimumFractionDigits: 2 })}` : "$0.00"}</td>
         <td style="text-align: right; border: 1px solid #ccc; padding: 6px;">$${item.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</td>
       </tr>
     `
@@ -288,7 +283,6 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
               <th style="width: 6%;">CANT</th>
               <th style="width: 8%;">UNIDAD</th>
               <th style="width: 12%;">PRECIO UNITARIO</th>
-              <th style="width: 10%;">IVA</th>
               <th style="width: 10%;">IMPORTE</th>
             </tr>
           </thead>
@@ -300,14 +294,6 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
 
       <div class="totals-section">
         <div class="totals-box">
-          <div class="totals-row">
-            <span>SUBTOTAL:</span>
-            <span>$${orderData.subtotal.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</span>
-          </div>
-          <div class="totals-row">
-            <span>IMPUESTOS:</span>
-            <span>$${orderData.totalIva.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</span>
-          </div>
           <div class="totals-row total">
             <span>TOTAL:</span>
             <span>$${orderData.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</span>
