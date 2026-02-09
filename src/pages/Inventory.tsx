@@ -556,6 +556,22 @@ export default function Inventory() {
   const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {
       const product = products.find(p => p.id === id);
+
+      // Delete child records first to avoid FK constraint violations
+      const deletes = [
+        supabase.from("purchase_order_items").delete().eq("product_id", id),
+        supabase.from("inventory_movements").delete().eq("product_id", id),
+        supabase.from("rfid_tags").delete().eq("product_id", id),
+        supabase.from("product_batches").delete().eq("product_id", id),
+        supabase.from("product_price_history").delete().eq("product_id", id),
+        supabase.from("quote_items").delete().eq("product_id", id),
+        supabase.from("stock_alerts").delete().eq("product_id", id),
+      ];
+      const results = await Promise.all(deletes);
+      for (const r of results) {
+        if (r.error) throw r.error;
+      }
+
       const { error } = await supabase
         .from("products")
         .delete()
