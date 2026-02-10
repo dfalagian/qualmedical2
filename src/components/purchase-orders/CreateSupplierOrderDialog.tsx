@@ -311,10 +311,6 @@ export const CreateSupplierOrderDialog = ({
             if (lastError) throw lastError;
 
             const previousPrice = lastRows?.[0]?.price ?? null;
-            const priceChangePercentage =
-              previousPrice && previousPrice > 0
-                ? ((p.unitPrice - previousPrice) / previousPrice) * 100
-                : null;
 
             const { error: historyError } = await supabase
               .from("product_price_history")
@@ -324,10 +320,9 @@ export const CreateSupplierOrderDialog = ({
                 purchase_order_id: order.id,
                 price: p.unitPrice,
                 previous_price: previousPrice,
-                price_change_percentage: priceChangePercentage,
                 created_by: user.id,
                 notes: `Precio manual en OC ${orderNumber}`,
-              });
+              } as any);
 
             if (historyError) throw historyError;
           })
