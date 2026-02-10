@@ -128,10 +128,9 @@ export function PurchaseOrderDetailDialog({
           purchase_order_id: purchaseOrderId,
           price: price,
           previous_price: previousPrice,
-          price_change_percentage: priceChangePercentage,
           created_by: user?.id,
           notes: "Actualización manual en detalle de OC",
-        });
+        } as any);
 
       if (historyError) throw historyError;
 
