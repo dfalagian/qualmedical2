@@ -27,6 +27,8 @@ import Inventory from "./pages/Inventory";
 import MedicationsCatalogCITIO from "./pages/MedicationsCatalogCITIO";
 import Quotes from "./pages/Quotes";
 import PurchasesSales from "./pages/PurchasesSales";
+import SalesRequests from "./pages/SalesRequests";
+import PublicSalesRequest from "./pages/PublicSalesRequest";
 import GeneralSuppliers from "./pages/GeneralSuppliers";
 import NotFound from "./pages/NotFound";
 
@@ -210,6 +212,16 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/dashboard/sales-requests"
+              element={
+                <ProtectedRoute>
+                  <SalesRequests />
+                </ProtectedRoute>
+              }
+            />
+            {/* Public route - no auth */}
+            <Route path="/solicitud-venta" element={<PublicSalesRequest />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

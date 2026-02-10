@@ -1756,6 +1756,48 @@ export type Database = {
           },
         ]
       }
+      sales_requests: {
+        Row: {
+          created_at: string
+          extracted_data: Json | null
+          extraction_status: string | null
+          file_name: string | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          notes: string | null
+          raw_text: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          extracted_data?: Json | null
+          extraction_status?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          notes?: string | null
+          raw_text?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          extracted_data?: Json | null
+          extraction_status?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          notes?: string | null
+          raw_text?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       stock_alerts: {
         Row: {
           alert_type: string

@@ -107,6 +107,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       { name: "Inventario", href: "/dashboard/inventory", icon: Package },
       { name: "Cotizaciones", href: "/dashboard/quotes", icon: FileSpreadsheet },
       { name: "Compras-Ventas", href: "/dashboard/purchases-sales", icon: ArrowLeftRight },
+      { name: "Solicitud de Ventas", href: "/dashboard/sales-requests", icon: FileSpreadsheet },
       { name: "Catálogo", href: "/dashboard/medications-citio", icon: Pill },
       { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
       { name: "Administración", href: "/dashboard/admin", icon: Settings },
