@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Trash2, Plus, ChevronsUpDown, Check, Link2 } from "lucide-react";
+import { Trash2, Plus, ChevronsUpDown, Check, Link2, CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -38,7 +39,7 @@ interface ProductEntryDialogProps {
 export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const today = format(new Date(), "dd/MM/yyyy", { locale: es });
+  const [entryDate, setEntryDate] = useState<Date>(new Date());
 
   // Form state para la línea de ingreso
   const [formData, setFormData] = useState({
@@ -374,6 +375,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
             reference_type: formData.ordenCompraId ? "purchase_order" : null,
             location: formData.almacenId || null,
             created_by: user?.id || null,
+            created_at: entryDate.toISOString(),
             notes: formData.numeroFactura ? `Factura: ${formData.numeroFactura}` : `Ingreso de producto - Lote: ${item.lote}`
           });
 
@@ -459,6 +461,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       isExistingBatch: false
     });
     setItems([]);
+    setEntryDate(new Date());
     onOpenChange(false);
   };
 
@@ -467,7 +470,23 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle className="text-xl font-bold">Ingreso Producto</DialogTitle>
-          <span className="text-sm text-muted-foreground">Fecha: {today}</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 text-sm font-normal">
+                <CalendarIcon className="h-4 w-4" />
+                Fecha: {format(entryDate, "dd/MM/yyyy", { locale: es })}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={entryDate}
+                onSelect={(d) => d && setEntryDate(d)}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
         </DialogHeader>
 
         <div className="space-y-4">
