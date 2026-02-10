@@ -85,7 +85,7 @@ const PurchaseOrders = () => {
             products(id, name, sku)
           )
         `)
-        .order("created_at", { ascending: false });
+        .order("order_number", { ascending: false });
 
       if (error) throw error;
       return data;
