@@ -82,14 +82,13 @@ serve(async (req) => {
     
     // Mejorar extracción de Total - buscar en diferentes formatos posibles
     // El atributo Total está en el elemento cfdi:Comprobante
-    let totalMatch = xmlText.match(/cfdi:Comprobante[^>]*Total="([0-9.]+)"/);
+    let totalMatch = xmlText.match(/(?:[a-zA-Z0-9]+:)?Comprobante[^>]*Total="([0-9.]+)"/);
     if (!totalMatch) {
-      // Fallback: buscar cualquier Total="..." en el documento
       totalMatch = xmlText.match(/\bTotal="([0-9.]+)"/);
     }
     
     // Similar para SubTotal
-    let subtotalMatch = xmlText.match(/cfdi:Comprobante[^>]*SubTotal="([0-9.]+)"/);
+    let subtotalMatch = xmlText.match(/(?:[a-zA-Z0-9]+:)?Comprobante[^>]*SubTotal="([0-9.]+)"/);
     if (!subtotalMatch) {
       subtotalMatch = xmlText.match(/\bSubTotal="([0-9.]+)"/);
     }
@@ -105,13 +104,12 @@ serve(async (req) => {
     const uuidMatch = xmlText.match(/UUID="([^"]+)"/);
     
     // Extraer información del emisor
-    const emisorNombreMatch = xmlText.match(/cfdi:Emisor[^>]*Nombre="([^"]+)"/);
-    const emisorRfcMatch = xmlText.match(/cfdi:Emisor[^>]*Rfc="([^"]+)"/);
+    const emisorNombreMatch = xmlText.match(/(?:[a-zA-Z0-9]+:)?Emisor[^>]*Nombre="([^"]+)"/);
+    const emisorRfcMatch = xmlText.match(/(?:[a-zA-Z0-9]+:)?Emisor[^>]*Rfc="([^"]+)"/);
     const emisorRegimenMatch = xmlText.match(/RegimenFiscal="([^"]+)"/);
     
-    // Extraer información del receptor
-    const receptorNombreMatch = xmlText.match(/cfdi:Receptor[^>]*Nombre="([^"]+)"/);
-    const receptorRfcMatch = xmlText.match(/cfdi:Receptor[^>]*Rfc="([^"]+)"/);
+    const receptorNombreMatch = xmlText.match(/(?:[a-zA-Z0-9]+:)?Receptor[^>]*Nombre="([^"]+)"/);
+    const receptorRfcMatch = xmlText.match(/(?:[a-zA-Z0-9]+:)?Receptor[^>]*Rfc="([^"]+)"/);
     const receptorUsoCfdiMatch = xmlText.match(/UsoCFDI="([^"]+)"/);
 
     // VALIDACIÓN CRÍTICA: Verificar que el RFC del receptor sea de QualMedical
@@ -152,17 +150,17 @@ serve(async (req) => {
 
     // Buscar el bloque principal de Impuestos del Comprobante (al final del XML)
     // Este bloque contiene los totales consolidados, no los impuestos por concepto
-    const impuestosBloqueMatch = xmlText.match(/<cfdi:Impuestos[^>]*TotalImpuesto[^>]*>([\s\S]*?)<\/cfdi:Impuestos>/);
+    const impuestosBloqueMatch = xmlText.match(/<(?:[a-zA-Z0-9]+:)?Impuestos[^>]*TotalImpuesto[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Impuestos>/);
     
     if (impuestosBloqueMatch) {
       const impuestosBloque = impuestosBloqueMatch[0];
       console.log('Bloque de Impuestos consolidados encontrado');
       
       // Extraer traslados consolidados del bloque <cfdi:Traslados>
-      const trasladosBloqueMatch = impuestosBloque.match(/<cfdi:Traslados>([\s\S]*?)<\/cfdi:Traslados>/);
+      const trasladosBloqueMatch = impuestosBloque.match(/<(?:[a-zA-Z0-9]+:)?Traslados>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Traslados>/);
       if (trasladosBloqueMatch) {
         const trasladosBloque = trasladosBloqueMatch[1];
-        const trasladosRegex = /<cfdi:Traslado([^>]*)\/>/g;
+        const trasladosRegex = /<(?:[a-zA-Z0-9]+:)?Traslado\s([^>]*)\/>/g;
         let trasladoMatch;
         while ((trasladoMatch = trasladosRegex.exec(trasladosBloque)) !== null) {
           const trasladoText = trasladoMatch[1];
@@ -183,10 +181,10 @@ serve(async (req) => {
       }
       
       // Extraer retenciones consolidadas del bloque <cfdi:Retenciones>
-      const retencionesBloqueMatch = impuestosBloque.match(/<cfdi:Retenciones>([\s\S]*?)<\/cfdi:Retenciones>/);
+      const retencionesBloqueMatch = impuestosBloque.match(/<(?:[a-zA-Z0-9]+:)?Retenciones>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Retenciones>/);
       if (retencionesBloqueMatch) {
         const retencionesBloque = retencionesBloqueMatch[1];
-        const retencionesRegex = /<cfdi:Retencion([^>]*)\/>/g;
+        const retencionesRegex = /<(?:[a-zA-Z0-9]+:)?Retencion\s([^>]*)\/>/g;
         let retencionMatch;
         while ((retencionMatch = retencionesRegex.exec(retencionesBloque)) !== null) {
           const retencionText = retencionMatch[1];
@@ -207,7 +205,7 @@ serve(async (req) => {
       const trasladosMap: Record<string, { impuesto: string; tipo_factor: string | null; tasa_o_cuota: string | null; base: number; importe: number }> = {};
       const retencionesMap: Record<string, { impuesto: string; importe: number }> = {};
       
-      const trasladosRegex = /<cfdi:Traslado([^>]*)\/>/g;
+      const trasladosRegex = /<(?:[a-zA-Z0-9]+:)?Traslado\s([^>]*)\/>/g;
       let trasladoMatch;
       while ((trasladoMatch = trasladosRegex.exec(xmlText)) !== null) {
         const trasladoText = trasladoMatch[1];
@@ -235,7 +233,7 @@ serve(async (req) => {
         trasladosMap[key].importe += importeMatch ? parseFloat(importeMatch[1]) : 0;
       }
       
-      const retencionesRegex = /<cfdi:Retencion([^>]*)\/>/g;
+      const retencionesRegex = /<(?:[a-zA-Z0-9]+:)?Retencion\s([^>]*)\/>/g;
       let retencionMatch;
       while ((retencionMatch = retencionesRegex.exec(xmlText)) !== null) {
         const retencionText = retencionMatch[1];
@@ -262,8 +260,8 @@ serve(async (req) => {
       console.log('Retenciones acumuladas:', impuestosDetalle.retenciones);
     }
 
-    // Extraer conceptos/artículos
-    const conceptosRegex = /<cfdi:Concepto([^>]*)>/g;
+    // Extraer conceptos/artículos - soportar con o sin namespace (cfdi:Concepto, Concepto, o cualquier prefijo)
+    const conceptosRegex = /<(?:[a-zA-Z0-9]+:)?Concepto\s([^>]*)(?:>|\/\s*>)/g;
     const conceptos = [];
     let conceptoMatch;
     
