@@ -362,19 +362,57 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
           if (batchError) throw batchError;
         }
 
-        // Actualizar stock del producto
-        const { data: currentProduct } = await supabase
-          .from("products")
-          .select("current_stock")
-          .eq("id", item.productId)
-          .single();
+        // Registrar movimiento de inventario
+        const { data: { user } } = await supabase.auth.getUser();
+        const { error: movError } = await supabase
+          .from("inventory_movements")
+          .insert({
+            product_id: item.productId,
+            movement_type: "entrada",
+            quantity: item.cantidad,
+            reference_id: formData.ordenCompraId || null,
+            reference_type: formData.ordenCompraId ? "purchase_order" : null,
+            location: formData.almacenId || null,
+            created_by: user?.id || null,
+            notes: formData.numeroFactura ? `Factura: ${formData.numeroFactura}` : `Ingreso de producto - Lote: ${item.lote}`
+          });
 
-        await supabase
-          .from("products")
-          .update({
-            current_stock: (currentProduct?.current_stock || 0) + item.cantidad
-          })
-          .eq("id", item.productId);
+        if (movError) {
+          console.error("Error creating inventory_movement:", movError);
+          // El trigger update_product_stock se encarga del stock, si falla el movimiento
+          // actualizamos manualmente
+          const { data: currentProduct } = await supabase
+            .from("products")
+            .select("current_stock")
+            .eq("id", item.productId)
+            .single();
+
+          await supabase
+            .from("products")
+            .update({
+              current_stock: (currentProduct?.current_stock || 0) + item.cantidad
+            })
+            .eq("id", item.productId);
+        }
+
+        // Si hay OC vinculada, actualizar quantity_received en purchase_order_items
+        if (formData.ordenCompraId) {
+          const { data: poItem } = await supabase
+            .from("purchase_order_items")
+            .select("id, quantity_received")
+            .eq("purchase_order_id", formData.ordenCompraId)
+            .eq("product_id", item.productId)
+            .maybeSingle();
+
+          if (poItem) {
+            await supabase
+              .from("purchase_order_items")
+              .update({
+                quantity_received: (poItem.quantity_received || 0) + item.cantidad
+              })
+              .eq("id", poItem.id);
+          }
+        }
       }
     },
     onSuccess: () => {
