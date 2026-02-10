@@ -19,14 +19,22 @@ import { cn } from "@/lib/utils";
 
 interface ExternalPurchaseOrderItem {
   id: string;
-  product_id: string;
+  product_id?: string;
+  medication_id?: string;
+  medication_name?: string;
   quantity: number;
   unit_price: number;
+  subtotal?: number;
   products?: {
     id: string;
     name: string;
     brand?: string;
     presentacion?: string;
+  };
+  medications?: {
+    id: string;
+    name: string;
+    brand?: string;
   };
 }
 
@@ -42,6 +50,11 @@ interface ExternalPurchaseOrder {
   profiles?: {
     full_name?: string;
     company_name?: string;
+  };
+  suppliers?: {
+    id: string;
+    name: string;
+    rfc?: string;
   };
 }
 
@@ -89,6 +102,7 @@ export function PurchaseOrderImportDialog({
   const qualmedicalOrders = useMemo(() => {
     return orders.filter((order) => {
       const supplier = (
+        order.suppliers?.name ||
         order.supplier_name ||
         order.profiles?.company_name ||
         order.profiles?.full_name ||
@@ -208,7 +222,8 @@ export function PurchaseOrderImportDialog({
               {filteredOrders.map((order) => {
                 const imported = isAlreadyImported(order.order_number);
                 const selected = isSelected(order.id);
-                const supplierName = order.supplier_name || 
+                const supplierName = order.suppliers?.name ||
+                  order.supplier_name || 
                   order.profiles?.company_name || 
                   order.profiles?.full_name || 
                   "Sin proveedor";
