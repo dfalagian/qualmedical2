@@ -85,18 +85,31 @@ export function PurchaseOrderImportDialog({
     enabled: open,
   });
 
+  // Only show orders where supplier is QualMedical
+  const qualmedicalOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const supplier = (
+        order.supplier_name ||
+        order.profiles?.company_name ||
+        order.profiles?.full_name ||
+        ""
+      ).toLowerCase();
+      return supplier.includes("qualmedical") || supplier.includes("qual medical");
+    });
+  }, [orders]);
+
   const filteredOrders = useMemo(() => {
-    if (!searchTerm.trim()) return orders;
+    if (!searchTerm.trim()) return qualmedicalOrders;
     
     const term = searchTerm.toLowerCase();
-    return orders.filter(
+    return qualmedicalOrders.filter(
       (order) =>
         order.order_number?.toLowerCase().includes(term) ||
         order.supplier_name?.toLowerCase().includes(term) ||
         order.profiles?.company_name?.toLowerCase().includes(term) ||
         order.profiles?.full_name?.toLowerCase().includes(term)
     );
-  }, [orders, searchTerm]);
+  }, [qualmedicalOrders, searchTerm]);
 
   const handleToggleSelect = (order: ExternalPurchaseOrder) => {
     setSelectedOrders((prev) => {
@@ -154,14 +167,20 @@ export function PurchaseOrderImportDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por número de orden o proveedor..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por número de orden..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            Solo se muestran órdenes de compra con proveedor QualMedical
+          </p>
         </div>
 
         <ScrollArea className="h-[400px] border rounded-md">
