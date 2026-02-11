@@ -195,20 +195,49 @@ export function SalesRequestsCitioOrders() {
 
       // Insert items - first parents, then sub-products with parent references
       if (order.items && order.items.length > 0) {
+        // Fetch all local products to match by name
+        const { data: localProducts } = await supabase
+          .from("products")
+          .select("id, name, sku, brand, price_type_1, price_type_2, price_type_3, price_type_4, price_type_5, unit_price")
+          .eq("is_active", true);
+
+        // Helper to find matching local product by medication name
+        const findLocalProduct = (medicationName: string) => {
+          if (!localProducts || !medicationName) return null;
+          const normalizedName = medicationName.toLowerCase().trim();
+          // Try exact match first
+          let match = localProducts.find(p => p.name.toLowerCase().trim() === normalizedName);
+          if (match) return match;
+          // Try partial match (medication name contained in product name or vice versa)
+          match = localProducts.find(p => 
+            p.name.toLowerCase().includes(normalizedName) || 
+            normalizedName.includes(p.name.toLowerCase())
+          );
+          return match || null;
+        };
+
         const parentItems = order.items.filter(i => !i.is_sub_product);
         const subItems = order.items.filter(i => i.is_sub_product);
 
-        // Insert parent items first
-        const parentQuoteItems = parentItems.map(item => ({
-          quote_id: newQuote.id,
-          nombre_producto: item.medication_name,
-          marca: item.medications?.brand || null,
-          cantidad: item.quantity,
-          precio_unitario: item.unit_price || 0,
-          importe: item.subtotal || (item.unit_price * item.quantity) || 0,
-          tipo_precio: "1",
-          is_sub_product: false,
-        }));
+        let unmatchedCount = 0;
+
+        // Insert parent items first, with product_id linkage
+        const parentQuoteItems = parentItems.map(item => {
+          const localProduct = findLocalProduct(item.medication_name);
+          if (!localProduct) unmatchedCount++;
+          const precio = localProduct?.price_type_1 || item.unit_price || 0;
+          return {
+            quote_id: newQuote.id,
+            product_id: localProduct?.id || null,
+            nombre_producto: item.medication_name,
+            marca: item.medications?.brand || localProduct?.brand || null,
+            cantidad: item.quantity,
+            precio_unitario: precio,
+            importe: precio * item.quantity,
+            tipo_precio: "1",
+            is_sub_product: false,
+          };
+        });
 
         const { data: insertedParents, error: parentError } = await supabase
           .from("quote_items")
@@ -226,25 +255,38 @@ export function SalesRequestsCitioOrders() {
           }
         });
 
-        // Insert sub-items with parent reference
+        // Insert sub-items with parent reference and product_id linkage
         if (subItems.length > 0) {
-          const subQuoteItems = subItems.map(item => ({
-            quote_id: newQuote.id,
-            nombre_producto: item.medication_name,
-            marca: item.medications?.brand || null,
-            cantidad: item.quantity,
-            precio_unitario: item.unit_price || 0,
-            importe: item.subtotal || (item.unit_price * item.quantity) || 0,
-            tipo_precio: "1",
-            is_sub_product: true,
-            parent_item_id: item.parent_medication_id ? (parentMap.get(item.parent_medication_id) || null) : null,
-          }));
+          const subQuoteItems = subItems.map(item => {
+            const localProduct = findLocalProduct(item.medication_name);
+            if (!localProduct) unmatchedCount++;
+            const precio = localProduct?.price_type_1 || item.unit_price || 0;
+            return {
+              quote_id: newQuote.id,
+              product_id: localProduct?.id || null,
+              nombre_producto: item.medication_name,
+              marca: item.medications?.brand || localProduct?.brand || null,
+              cantidad: item.quantity,
+              precio_unitario: precio,
+              importe: precio * item.quantity,
+              tipo_precio: "1",
+              is_sub_product: true,
+              parent_item_id: item.parent_medication_id ? (parentMap.get(item.parent_medication_id) || null) : null,
+            };
+          });
 
           const { error: subError } = await supabase
             .from("quote_items")
             .insert(subQuoteItems);
 
           if (subError) throw subError;
+        }
+
+        if (unmatchedCount > 0) {
+          toast.warning(
+            `${unmatchedCount} producto(s) no se vincularon al inventario local. Revisa la cotización y vincúlalos manualmente antes de aprobar la venta.`,
+            { duration: 8000 }
+          );
         }
       }
 
