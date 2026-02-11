@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Search, AlertCircle, ShoppingCart, ChevronDown, ChevronUp, FileText, User, Package, ArrowRightCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -231,7 +231,7 @@ export function SalesRequestsCitioOrders() {
             No se encontraron órdenes de compra
           </p>
         ) : (
-          <ScrollArea className="max-h-[calc(100vh-280px)]">
+          <div>
             <div className="space-y-2">
               {filteredOrders.map((order) => {
                 const isExpanded = expandedOrderId === order.id;
@@ -382,7 +382,7 @@ export function SalesRequestsCitioOrders() {
                 );
               })}
             </div>
-          </ScrollArea>
+          </div>
         )}
       </CardContent>
     </Card>
