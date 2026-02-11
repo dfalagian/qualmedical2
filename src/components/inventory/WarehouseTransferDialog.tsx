@@ -495,10 +495,21 @@ export function WarehouseTransferDialog({
 
           {/* Manual Transfer Section */}
           <div className="space-y-3 p-4 border rounded-lg">
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-primary" />
-              <Label className="font-medium">Transferir por Cantidad</Label>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Package className="h-4 w-4 text-primary" />
+                <Label className="font-medium">Transferir Productos por Cantidad</Label>
+              </div>
+              {manualItems.length > 0 && (
+                <Badge variant="default" className="text-xs">
+                  {manualItems.length} producto{manualItems.length !== 1 ? "s" : ""} agregado{manualItems.length !== 1 ? "s" : ""}
+                </Badge>
+              )}
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              Seleccione un producto, indique la cantidad y presione <strong>+</strong> para agregarlo. Repita para agregar más productos.
+            </p>
             
             <div className="flex gap-2">
               <Select value={selectedProductId} onValueChange={setSelectedProductId}>
@@ -532,6 +543,7 @@ export function WarehouseTransferDialog({
                 size="icon"
                 onClick={addManualItem}
                 disabled={!selectedProductId}
+                title="Agregar producto a la lista"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -544,29 +556,33 @@ export function WarehouseTransferDialog({
             )}
 
             {manualItems.length > 0 && (
-              <ScrollArea className="h-24 border rounded-lg p-2">
-                <div className="space-y-1">
-                  {manualItems.map((item) => (
-                    <div 
-                      key={item.productId}
-                      className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
-                    >
-                      <div className="flex-1">
-                        <span>{item.productName}</span>
-                        <Badge variant="secondary" className="ml-2">{item.quantity} uds</Badge>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => removeManualItem(item.productId)}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Productos a transferir:</Label>
+                <ScrollArea className={manualItems.length > 3 ? "h-32" : ""}>
+                  <div className="space-y-1 border rounded-lg p-2">
+                    {manualItems.map((item, index) => (
+                      <div 
+                        key={item.productId}
+                        className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
                       >
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="text-xs text-muted-foreground font-mono w-5 shrink-0">{index + 1}.</span>
+                          <span className="truncate">{item.productName}</span>
+                          <Badge variant="secondary" className="shrink-0">{item.quantity} uds</Badge>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={() => removeManualItem(item.productId)}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
             )}
           </div>
 
