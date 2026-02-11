@@ -193,9 +193,13 @@ export function SalesRequestsCitioOrders() {
 
       if (quoteError) throw quoteError;
 
-      // Insert items
+      // Insert items - first parents, then sub-products with parent references
       if (order.items && order.items.length > 0) {
-        const quoteItems = order.items.map(item => ({
+        const parentItems = order.items.filter(i => !i.is_sub_product);
+        const subItems = order.items.filter(i => i.is_sub_product);
+
+        // Insert parent items first
+        const parentQuoteItems = parentItems.map(item => ({
           quote_id: newQuote.id,
           nombre_producto: item.medication_name,
           marca: item.medications?.brand || null,
@@ -203,13 +207,45 @@ export function SalesRequestsCitioOrders() {
           precio_unitario: item.unit_price || 0,
           importe: item.subtotal || (item.unit_price * item.quantity) || 0,
           tipo_precio: "1",
+          is_sub_product: false,
         }));
 
-        const { error: itemsError } = await supabase
+        const { data: insertedParents, error: parentError } = await supabase
           .from("quote_items")
-          .insert(quoteItems);
+          .insert(parentQuoteItems)
+          .select("id, nombre_producto");
 
-        if (itemsError) throw itemsError;
+        if (parentError) throw parentError;
+
+        // Build a map from parent medication_id/name to inserted quote_item id
+        const parentMap = new Map<string, string>();
+        parentItems.forEach((item, idx) => {
+          const key = item.medication_id || item.id;
+          if (insertedParents && insertedParents[idx]) {
+            parentMap.set(key, insertedParents[idx].id);
+          }
+        });
+
+        // Insert sub-items with parent reference
+        if (subItems.length > 0) {
+          const subQuoteItems = subItems.map(item => ({
+            quote_id: newQuote.id,
+            nombre_producto: item.medication_name,
+            marca: item.medications?.brand || null,
+            cantidad: item.quantity,
+            precio_unitario: item.unit_price || 0,
+            importe: item.subtotal || (item.unit_price * item.quantity) || 0,
+            tipo_precio: "1",
+            is_sub_product: true,
+            parent_item_id: item.parent_medication_id ? (parentMap.get(item.parent_medication_id) || null) : null,
+          }));
+
+          const { error: subError } = await supabase
+            .from("quote_items")
+            .insert(subQuoteItems);
+
+          if (subError) throw subError;
+        }
       }
 
       toast.success(`Cotización ${folio} creada exitosamente`);

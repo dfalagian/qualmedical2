@@ -10,6 +10,8 @@ interface QuoteItem {
   precio_unitario: number;
   importe: number;
   categoria: string | null;
+  is_sub_product?: boolean;
+  parent_item_id?: string | null;
 }
 
 interface Client {
@@ -70,9 +72,19 @@ export const printQuoteHtml = (data: QuotePrintData) => {
   const totalConIva = data.subtotal + iva;
 
   // Group items by category (simplified - using just one category for now)
-  const itemsHtml = itemsWithIva.map(item => `
-    <tr>
-      <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: left;">${item.nombre_producto}</td>
+  const itemsHtml = itemsWithIva.map(item => {
+    const isSubProduct = item.is_sub_product === true;
+    const namePrefix = isSubProduct ? "↳ " : "";
+    const nameStyle = isSubProduct
+      ? "padding-left: 24px; color: #6b7280; font-style: italic;"
+      : "";
+    const rowStyle = isSubProduct
+      ? "background-color: #f9fafb;"
+      : "";
+
+    return `
+    <tr style="${rowStyle}">
+      <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: left; ${nameStyle}">${namePrefix}${item.nombre_producto}</td>
       <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.marca || "-"}</td>
       <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.lote || "-"}</td>
       <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.fecha_caducidad ? format(item.fecha_caducidad, "MMM-yy", { locale: es }) : "-"}</td>
@@ -81,7 +93,8 @@ export const printQuoteHtml = (data: QuotePrintData) => {
       <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.exempt ? "Exento" : formatCurrency(item.ivaAmount)}</td>
       <td style="padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;">${formatCurrency(item.importe + item.ivaAmount)}</td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 
   const html = `
     <!DOCTYPE html>

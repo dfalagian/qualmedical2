@@ -1465,9 +1465,11 @@ export type Database = {
           fecha_caducidad: string | null
           id: string
           importe: number
+          is_sub_product: boolean
           lote: string | null
           marca: string | null
           nombre_producto: string
+          parent_item_id: string | null
           precio_unitario: number
           product_id: string | null
           quote_id: string
@@ -1480,9 +1482,11 @@ export type Database = {
           fecha_caducidad?: string | null
           id?: string
           importe?: number
+          is_sub_product?: boolean
           lote?: string | null
           marca?: string | null
           nombre_producto: string
+          parent_item_id?: string | null
           precio_unitario?: number
           product_id?: string | null
           quote_id: string
@@ -1495,9 +1499,11 @@ export type Database = {
           fecha_caducidad?: string | null
           id?: string
           importe?: number
+          is_sub_product?: boolean
           lote?: string | null
           marca?: string | null
           nombre_producto?: string
+          parent_item_id?: string | null
           precio_unitario?: number
           product_id?: string | null
           quote_id?: string
@@ -1509,6 +1515,13 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "product_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "quote_items"
             referencedColumns: ["id"]
           },
           {
