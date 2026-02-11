@@ -48,6 +48,8 @@ interface ManualTransferItem {
   productName: string;
   brand: string;
   unit: string;
+  batchNumber: string;
+  expirationDate: string;
   quantity: number;
   maxStock: number;
 }
@@ -199,7 +201,7 @@ export function WarehouseTransferDialog({
   };
 
   // Add manual transfer item
-  const addManualItem = () => {
+  const addManualItem = async () => {
     if (!selectedProductId || manualQuantity <= 0) return;
     
     const product = products.find(p => p.id === selectedProductId);
@@ -216,22 +218,37 @@ export function WarehouseTransferDialog({
       return;
     }
 
-    if (manualQuantity > product.current_stock) {
+    if (manualQuantity > (product as any).current_stock) {
       toast({
         title: "Stock insuficiente",
-        description: `Solo hay ${product.current_stock} disponibles.`,
+        description: `Solo hay ${(product as any).current_stock} disponibles.`,
         variant: "destructive",
       });
       return;
     }
 
+    // Fetch active batch info for this product
+    const { data: batchData } = await supabase
+      .from("product_batches")
+      .select("batch_number, expiration_date")
+      .eq("product_id", selectedProductId)
+      .eq("is_active", true)
+      .gt("current_quantity", 0)
+      .order("expiration_date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
     setManualItems(prev => [...prev, {
       productId: product.id,
-      productName: product.name,
-      brand: product.brand || "",
-      unit: product.unit || "pieza",
+      productName: (product as any).name,
+      brand: (product as any).brand || "",
+      unit: (product as any).unit || "pieza",
+      batchNumber: batchData?.batch_number || "",
+      expirationDate: batchData?.expiration_date
+        ? format(new Date(batchData.expiration_date), "dd/MM/yyyy")
+        : "",
       quantity: manualQuantity,
-      maxStock: product.current_stock,
+      maxStock: (product as any).current_stock,
     }]);
 
     setSelectedProductId("");
@@ -375,8 +392,8 @@ export function WarehouseTransferDialog({
           index: printItems.length + 1,
           productName: item.productName,
           brand: item.brand,
-          batchNumber: "",
-          expirationDate: "",
+          batchNumber: item.batchNumber,
+          expirationDate: item.expirationDate,
           quantity: item.quantity,
           unit: item.unit,
           type: "manual",
@@ -615,6 +632,9 @@ export function WarehouseTransferDialog({
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <span className="text-xs text-muted-foreground font-mono w-5 shrink-0">{index + 1}.</span>
                           <span className="truncate">{item.productName}</span>
+                          {item.batchNumber && (
+                            <span className="text-xs text-muted-foreground shrink-0">Lote: {item.batchNumber}</span>
+                          )}
                           <Badge variant="secondary" className="shrink-0">{item.quantity} uds</Badge>
                         </div>
                         <Button
