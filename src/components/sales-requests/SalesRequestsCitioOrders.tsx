@@ -195,25 +195,30 @@ export function SalesRequestsCitioOrders() {
 
       // Insert items - first parents, then sub-products with parent references
       if (order.items && order.items.length > 0) {
-        // Fetch all local products to match by name
+        // Collect all medication_ids from the order to match by citio_id
+        const allMedicationIds = order.items
+          .map(i => i.medication_id)
+          .filter(Boolean) as string[];
+
+        // Fetch local products matching by citio_id (the reliable link to CITIO)
         const { data: localProducts } = await supabase
           .from("products")
-          .select("id, name, sku, brand, price_type_1, price_type_2, price_type_3, price_type_4, price_type_5, unit_price")
-          .eq("is_active", true);
+          .select("id, name, sku, brand, citio_id, price_type_1, price_type_2, price_type_3, price_type_4, price_type_5, unit_price")
+          .eq("is_active", true)
+          .in("citio_id", allMedicationIds.length > 0 ? allMedicationIds : ["__none__"]);
 
-        // Helper to find matching local product by medication name
-        const findLocalProduct = (medicationName: string) => {
-          if (!localProducts || !medicationName) return null;
-          const normalizedName = medicationName.toLowerCase().trim();
-          // Try exact match first
-          let match = localProducts.find(p => p.name.toLowerCase().trim() === normalizedName);
-          if (match) return match;
-          // Try partial match (medication name contained in product name or vice versa)
-          match = localProducts.find(p => 
-            p.name.toLowerCase().includes(normalizedName) || 
-            normalizedName.includes(p.name.toLowerCase())
-          );
-          return match || null;
+        // Build a map: citio_id -> local product for O(1) lookups
+        const citioProductMap = new Map<string, typeof localProducts extends (infer T)[] | null ? T : never>();
+        if (localProducts) {
+          for (const p of localProducts) {
+            if (p.citio_id) citioProductMap.set(p.citio_id, p);
+          }
+        }
+
+        // Helper to find matching local product by medication_id -> citio_id
+        const findLocalProduct = (medicationId?: string) => {
+          if (!medicationId) return null;
+          return citioProductMap.get(medicationId) || null;
         };
 
         const parentItems = order.items.filter(i => !i.is_sub_product);
@@ -221,9 +226,9 @@ export function SalesRequestsCitioOrders() {
 
         let unmatchedCount = 0;
 
-        // Insert parent items first, with product_id linkage
+        // Insert parent items first, with product_id linkage via citio_id
         const parentQuoteItems = parentItems.map(item => {
-          const localProduct = findLocalProduct(item.medication_name);
+          const localProduct = findLocalProduct(item.medication_id);
           if (!localProduct) unmatchedCount++;
           const precio = localProduct?.price_type_1 || item.unit_price || 0;
           return {
@@ -246,7 +251,7 @@ export function SalesRequestsCitioOrders() {
 
         if (parentError) throw parentError;
 
-        // Build a map from parent medication_id/name to inserted quote_item id
+        // Build a map from parent medication_id to inserted quote_item id
         const parentMap = new Map<string, string>();
         parentItems.forEach((item, idx) => {
           const key = item.medication_id || item.id;
@@ -255,10 +260,28 @@ export function SalesRequestsCitioOrders() {
           }
         });
 
-        // Insert sub-items with parent reference and product_id linkage
+        // Insert sub-items with parent reference and product_id linkage via citio_id
         if (subItems.length > 0) {
+          // Fetch sub-product matches separately if they weren't in the first batch
+          const subMedicationIds = subItems
+            .map(i => i.medication_id)
+            .filter(id => id && !citioProductMap.has(id)) as string[];
+
+          if (subMedicationIds.length > 0) {
+            const { data: subLocalProducts } = await supabase
+              .from("products")
+              .select("id, name, sku, brand, citio_id, price_type_1, unit_price")
+              .eq("is_active", true)
+              .in("citio_id", subMedicationIds);
+            if (subLocalProducts) {
+              for (const p of subLocalProducts) {
+                if (p.citio_id) citioProductMap.set(p.citio_id, p as any);
+              }
+            }
+          }
+
           const subQuoteItems = subItems.map(item => {
-            const localProduct = findLocalProduct(item.medication_name);
+            const localProduct = findLocalProduct(item.medication_id);
             if (!localProduct) unmatchedCount++;
             const precio = localProduct?.price_type_1 || item.unit_price || 0;
             return {
@@ -284,7 +307,7 @@ export function SalesRequestsCitioOrders() {
 
         if (unmatchedCount > 0) {
           toast.warning(
-            `${unmatchedCount} producto(s) no se vincularon al inventario local. Revisa la cotización y vincúlalos manualmente antes de aprobar la venta.`,
+            `${unmatchedCount} producto(s) no se encontraron en el inventario local (posiblemente no importados desde CITIO). Vincúlalos manualmente antes de aprobar.`,
             { duration: 8000 }
           );
         }
