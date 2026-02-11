@@ -46,7 +46,7 @@ const PublicSalesRequest = () => {
         fileType = file.type;
       }
 
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from("sales_requests")
         .insert({
           file_url: fileUrl,
@@ -55,9 +55,18 @@ const PublicSalesRequest = () => {
           raw_text: rawText.trim() || null,
           extraction_status: "pending",
           status: "nueva",
-        });
+        })
+        .select('id')
+        .single();
 
       if (insertError) throw insertError;
+
+      // Trigger extraction in the background
+      if (inserted?.id) {
+        supabase.functions.invoke('extract-sales-request', {
+          body: { requestId: inserted.id },
+        }).catch(err => console.error('Extraction trigger error:', err));
+      }
 
       setSubmitted(true);
       toast.success("Solicitud enviada correctamente");
