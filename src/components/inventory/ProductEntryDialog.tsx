@@ -120,7 +120,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
     }
   });
 
-  // Fetch órdenes de compra pendientes/en proceso
+  // Fetch órdenes de compra pendientes/en proceso (excluyendo las ya usadas en ingresos)
   const { data: ordenesCompra = [] } = useQuery({
     queryKey: ["purchase-orders-for-entry"],
     queryFn: async () => {
@@ -132,10 +132,21 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       
       if (error) throw error;
 
+      // Fetch OC ids that already have inventory movements linked
+      const { data: usedMovements } = await supabase
+        .from("inventory_movements")
+        .select("reference_id")
+        .eq("reference_type", "purchase_order")
+        .not("reference_id", "is", null);
+
+      const usedOcIds = new Set((usedMovements || []).map((m: any) => m.reference_id));
+
+      // Filter out already-used purchase orders
+      const availableOrders = data.filter((o: any) => !usedOcIds.has(o.id));
+
       // Fetch supplier names for each order
-      const supplierIds = [...new Set(data.map((o: any) => o.supplier_id))];
-      const registeredIds = data.filter((o: any) => o.supplier_type !== "general").map((o: any) => o.supplier_id);
-      const generalIds = data.filter((o: any) => o.supplier_type === "general").map((o: any) => o.supplier_id);
+      const registeredIds = availableOrders.filter((o: any) => o.supplier_type !== "general").map((o: any) => o.supplier_id);
+      const generalIds = availableOrders.filter((o: any) => o.supplier_type === "general").map((o: any) => o.supplier_id);
 
       let profilesMap: Record<string, any> = {};
       let generalMap: Record<string, any> = {};
@@ -155,7 +166,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
         for (const g of gs || []) generalMap[g.id] = g;
       }
 
-      return data.map((o: any) => {
+      return availableOrders.map((o: any) => {
         const isGeneral = o.supplier_type === "general";
         const supplier = isGeneral ? generalMap[o.supplier_id] : profilesMap[o.supplier_id];
         return {
@@ -434,6 +445,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["product-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders-for-entry"] });
       handleClose();
     },
     onError: (error: any) => {
