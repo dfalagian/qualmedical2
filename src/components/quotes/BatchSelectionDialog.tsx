@@ -261,11 +261,12 @@ export const BatchSelectionDialog = ({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {quoteItems.filter(i => i.product_id).map(item => {
-                    const productBatches = batchesByProduct[item.product_id!] || [];
+                  {quoteItems.map(item => {
+                    const hasProductId = !!item.product_id;
+                    const productBatches = hasProductId ? (batchesByProduct[item.product_id!] || []) : [];
                     const selection = selections.find(s => s.itemId === item.id);
                     const hasEnoughStock = selection && selection.availableQuantity >= item.cantidad;
-                    const noBatches = productBatches.length === 0;
+                    const noBatches = hasProductId && productBatches.length === 0;
 
                     return (
                       <TableRow key={item.id}>
@@ -277,7 +278,9 @@ export const BatchSelectionDialog = ({
                           {item.cantidad}
                         </TableCell>
                         <TableCell>
-                          {noBatches ? (
+                          {!hasProductId ? (
+                            <span className="text-sm text-muted-foreground italic">Sin control de inventario</span>
+                          ) : noBatches ? (
                             <span className="text-sm text-destructive">Sin lotes disponibles</span>
                           ) : (
                             <Select
@@ -304,7 +307,9 @@ export const BatchSelectionDialog = ({
                           )}
                         </TableCell>
                         <TableCell className="text-center">
-                          {selection?.batchId ? (
+                          {!hasProductId ? (
+                            <span className="text-muted-foreground">-</span>
+                          ) : selection?.batchId ? (
                             <span className={cn(
                               "font-medium",
                               hasEnoughStock ? "text-emerald-600" : "text-amber-600"
@@ -314,7 +319,9 @@ export const BatchSelectionDialog = ({
                           ) : "-"}
                         </TableCell>
                         <TableCell>
-                          {noBatches ? (
+                          {!hasProductId ? (
+                            <Badge variant="secondary">N/A</Badge>
+                          ) : noBatches ? (
                             <Badge variant="destructive">Sin stock</Badge>
                           ) : !selection?.batchId ? (
                             <Badge variant="outline">Pendiente</Badge>
