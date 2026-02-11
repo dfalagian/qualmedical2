@@ -44,7 +44,10 @@ interface ScannedTag {
   id: string;
   epc: string;
   productName: string;
+  brand?: string;
+  unit?: string;
   batchNumber?: string;
+  expirationDate?: string;
 }
 
 interface ManualTransferItem {
@@ -149,8 +152,8 @@ export function WarehouseTransferDialog({
       .from("rfid_tags")
       .select(`
         id, epc, warehouse_id,
-        products:product_id (name),
-        product_batches:batch_id (batch_number)
+        products:product_id (name, brand, unit),
+        product_batches:batch_id (batch_number, expiration_date)
       `)
       .eq("epc", cleanEpc)
       .maybeSingle();
@@ -182,7 +185,10 @@ export function WarehouseTransferDialog({
       id: tag.id,
       epc: tag.epc,
       productName: (tag.products as any)?.name || "Sin producto",
+      brand: (tag.products as any)?.brand || "",
+      unit: (tag.products as any)?.unit || "pieza",
       batchNumber: (tag.product_batches as any)?.batch_number,
+      expirationDate: (tag.product_batches as any)?.expiration_date,
     }]);
 
     setScanInput("");
@@ -382,11 +388,11 @@ export function WarehouseTransferDialog({
         printItems.push({
           index: printItems.length + 1,
           productName: tag.productName,
-          brand: "",
+          brand: tag.brand || "",
           batchNumber: tag.batchNumber || "",
-          expirationDate: "",
+          expirationDate: tag.expirationDate ? format(new Date(tag.expirationDate + "T00:00:00"), "dd/MM/yyyy") : "",
           quantity: 1,
-          unit: "pieza",
+          unit: tag.unit || "pieza",
           epc: tag.epc,
           type: "rfid",
         });
