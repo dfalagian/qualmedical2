@@ -385,6 +385,14 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
           if (batchError) throw batchError;
         }
 
+        // Actualizar warehouse_id del producto al almacén seleccionado
+        if (formData.almacenId) {
+          await supabase
+            .from("products")
+            .update({ warehouse_id: formData.almacenId })
+            .eq("id", item.productId);
+        }
+
         // Registrar movimiento de inventario
         const { data: { user } } = await supabase.auth.getUser();
         const { error: movError } = await supabase
@@ -403,8 +411,6 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
 
         if (movError) {
           console.error("Error creating inventory_movement:", movError);
-          // El trigger update_product_stock se encarga del stock, si falla el movimiento
-          // actualizamos manualmente
           const { data: currentProduct } = await supabase
             .from("products")
             .select("current_stock")
