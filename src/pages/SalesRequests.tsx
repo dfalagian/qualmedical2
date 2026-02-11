@@ -36,10 +36,6 @@ const SalesRequests = () => {
               Solicitudes de proveedores y órdenes de compra de CITIO
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={copyPublicUrl} className="gap-2 self-start">
-            <Link2 className="h-4 w-4" />
-            Copiar URL pública
-          </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
