@@ -231,7 +231,7 @@ export function SalesRequestsCitioOrders() {
             No se encontraron órdenes de compra
           </p>
         ) : (
-          <ScrollArea className="max-h-[600px]">
+          <ScrollArea className="max-h-[calc(100vh-280px)]">
             <div className="space-y-2">
               {filteredOrders.map((order) => {
                 const isExpanded = expandedOrderId === order.id;
