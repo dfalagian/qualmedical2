@@ -124,15 +124,16 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
   const { data: ordenesCompra = [] } = useQuery({
     queryKey: ["purchase-orders-for-entry"],
     queryFn: async () => {
+      // Fetch all potentially available purchase orders
       const { data, error } = await supabase
         .from("purchase_orders")
         .select("id, order_number, status, supplier_id, supplier_type")
-        .in("status", ["pendiente", "en_proceso", "recibida"])
+        .in("status", ["pendiente", "en_proceso"])
         .order("created_at", { ascending: false });
       
       if (error) throw error;
 
-      // Fetch OC ids that already have inventory movements linked
+      // Fetch ALL OC ids that have been used in inventory movements
       const { data: usedMovements } = await supabase
         .from("inventory_movements")
         .select("reference_id")
@@ -141,8 +142,18 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
 
       const usedOcIds = new Set((usedMovements || []).map((m: any) => m.reference_id));
 
-      // Filter out already-used purchase orders
-      const availableOrders = data.filter((o: any) => !usedOcIds.has(o.id));
+      // Also fetch OC ids linked to medicine_counts (conteo de medicamentos)
+      const { data: usedInCounts } = await supabase
+        .from("medicine_counts")
+        .select("purchase_order_id")
+        .not("purchase_order_id", "is", null);
+
+      const usedInCountIds = new Set((usedInCounts || []).map((m: any) => m.purchase_order_id));
+
+      // Filter out purchase orders already used in inventory movements OR medicine counts
+      const availableOrders = data.filter((o: any) => 
+        !usedOcIds.has(o.id) && !usedInCountIds.has(o.id)
+      );
 
       // Fetch supplier names for each order
       const registeredIds = availableOrders.filter((o: any) => o.supplier_type !== "general").map((o: any) => o.supplier_id);
