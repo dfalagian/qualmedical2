@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.generate-recovery-link]
 verify_jwt = true
+
+[functions.extract-sales-request]
+verify_jwt = false
