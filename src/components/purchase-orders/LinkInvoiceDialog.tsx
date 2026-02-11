@@ -12,8 +12,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileText, Check, Link2, Unlink, Building2, User } from "lucide-react";
+import { Search, FileText, Check, Link2, Unlink, Building2, User, ChevronDown, ChevronRight, Package } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface LinkInvoiceDialogProps {
   open: boolean;
@@ -47,6 +52,22 @@ export const LinkInvoiceDialog = ({
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState<UnifiedInvoice | null>(null);
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
+
+  // Fetch items for expanded registered invoice
+  const { data: invoiceItems = [] } = useQuery({
+    queryKey: ["invoice_items_for_linking", expandedInvoiceId],
+    queryFn: async () => {
+      if (!expandedInvoiceId) return [];
+      const { data, error } = await supabase
+        .from("invoice_items")
+        .select("descripcion, cantidad, valor_unitario, importe")
+        .eq("invoice_id", expandedInvoiceId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!expandedInvoiceId,
+  });
 
   // Fetch invoices from registered suppliers
   const { data: registeredInvoices = [], isLoading: loadingRegistered } = useQuery({
@@ -230,10 +251,9 @@ export const LinkInvoiceDialog = ({
                   (invoice.source === "official" && order?.general_supplier_invoice_id === invoice.id);
                 const isSelected = selectedInvoice?.id === invoice.id;
                 return (
-                  <button
+                  <div
                     key={`${invoice.source}-${invoice.id}`}
-                    onClick={() => setSelectedInvoice(isSelected ? null : invoice)}
-                    className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                    className={`rounded-lg border transition-colors ${
                       isCurrentlyLinked
                         ? "border-primary/40 bg-primary/5"
                         : isSelected
@@ -241,41 +261,87 @@ export const LinkInvoiceDialog = ({
                         : "border-transparent hover:bg-muted/50"
                     }`}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          {invoice.source === "registered" ? (
-                            <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                          ) : (
-                            <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                          )}
-                          <span className="font-medium text-sm truncate">
-                            {invoice.invoice_number}
-                          </span>
-                          <Badge variant="outline" className="text-[10px] shrink-0">
-                            {invoice.source === "registered" ? "Proveedor" : "Oficial"}
-                          </Badge>
-                          {isCurrentlyLinked && (
-                            <Badge variant="outline" className="text-xs shrink-0 border-primary/40 text-primary">
-                              Vinculada
+                    <button
+                      onClick={() => setSelectedInvoice(isSelected ? null : invoice)}
+                      className="w-full text-left p-3"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            {invoice.source === "registered" ? (
+                              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                            ) : (
+                              <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                            )}
+                            <span className="font-medium text-sm truncate">
+                              {invoice.invoice_number}
+                            </span>
+                            <Badge variant="outline" className="text-[10px] shrink-0">
+                              {invoice.source === "registered" ? "Proveedor" : "Oficial"}
                             </Badge>
-                          )}
+                            {isCurrentlyLinked && (
+                              <Badge variant="outline" className="text-xs shrink-0 border-primary/40 text-primary">
+                                Vinculada
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 ml-6">
+                            {invoice.emisor_nombre || "Sin emisor"} ·{" "}
+                            {invoice.fecha_emision
+                              ? new Date(invoice.fecha_emision).toLocaleDateString("es-MX")
+                              : "Sin fecha"}
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1 ml-6">
-                          {invoice.emisor_nombre || "Sin emisor"} ·{" "}
-                          {invoice.fecha_emision
-                            ? new Date(invoice.fecha_emision).toLocaleDateString("es-MX")
-                            : "Sin fecha"}
-                        </p>
+                        <div className="text-right shrink-0 ml-3">
+                          <p className="font-semibold text-sm">
+                            ${invoice.amount.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                          </p>
+                          {invoice.source === "registered" && getStatusBadge(invoice.status || null)}
+                        </div>
                       </div>
-                      <div className="text-right shrink-0 ml-3">
-                        <p className="font-semibold text-sm">
-                          ${invoice.amount.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
-                        </p>
-                        {invoice.source === "registered" && getStatusBadge(invoice.status || null)}
-                      </div>
-                    </div>
-                  </button>
+                    </button>
+                    {invoice.source === "registered" && (
+                      <Collapsible
+                        open={expandedInvoiceId === invoice.id}
+                        onOpenChange={(open) => setExpandedInvoiceId(open ? invoice.id : null)}
+                      >
+                        <CollapsibleTrigger asChild>
+                          <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-3 pb-2 transition-colors">
+                            {expandedInvoiceId === invoice.id ? (
+                              <ChevronDown className="h-3 w-3" />
+                            ) : (
+                              <ChevronRight className="h-3 w-3" />
+                            )}
+                            <Package className="h-3 w-3" />
+                            Ver conceptos
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="px-3 pb-3">
+                            <div className="bg-muted/30 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto text-xs">
+                              {expandedInvoiceId === invoice.id && invoiceItems.length > 0 ? (
+                                invoiceItems.map((item, idx) => (
+                                  <div key={idx} className="flex justify-between gap-2">
+                                    <span className="truncate text-muted-foreground flex-1">
+                                      {item.descripcion}
+                                    </span>
+                                    <span className="shrink-0 text-muted-foreground">
+                                      {item.cantidad} × ${Number(item.valor_unitario).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                                    </span>
+                                    <span className="shrink-0 font-medium">
+                                      ${Number(item.importe).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                ))
+                              ) : expandedInvoiceId === invoice.id ? (
+                                <p className="text-muted-foreground italic">Sin conceptos disponibles</p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+                  </div>
                 );
               })}
             </div>
