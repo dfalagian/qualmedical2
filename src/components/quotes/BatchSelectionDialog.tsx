@@ -157,17 +157,21 @@ export const BatchSelectionDialog = ({
     }));
   };
 
-  // Check if all items have valid selections
-  const allSelected = selections.every(sel => sel.batchId !== null);
+  // Items that require batch selection (only those with product_id)
+  const itemsRequiringBatch = quoteItems.filter(i => i.product_id);
+  
+  // Check if all items that need selection have valid selections
+  const allSelected = selections.length === 0 || selections.every(sel => sel.batchId !== null);
   
   // Check for items with insufficient stock (including zero stock)
   const itemsWithInsufficientStock = selections.filter(sel => 
     sel.batchId && sel.availableQuantity < sel.requestedQuantity
   );
 
-  // Check for items without available batches (no stock at all)
+  // Check for items without available batches (no stock at all) - only for items WITH product_id
   const itemsWithoutBatches = quoteItems.filter(item => {
-    const productBatches = batchesByProduct[item.product_id!] || [];
+    if (!item.product_id) return false; // Skip items not linked to inventory
+    const productBatches = batchesByProduct[item.product_id] || [];
     return productBatches.length === 0;
   });
 
@@ -188,7 +192,7 @@ export const BatchSelectionDialog = ({
     }),
   ];
 
-  // Cannot approve if there's any stock issue
+  // Can approve if no stock issues exist (items without product_id are allowed)
   const canApprove = allSelected && allProductsWithoutStock.length === 0;
 
   const handleConfirm = () => {
