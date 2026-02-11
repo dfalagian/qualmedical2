@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,9 @@ interface ExternalOrderItem {
   quantity: number;
   unit_price: number;
   subtotal: number;
+  is_sub_product?: boolean;
+  parent_medication_id?: string | null;
+  medication_id?: string;
   medications?: {
     brand?: string;
     precio_type_1?: number;
@@ -46,6 +49,7 @@ export function SalesRequestsCitioOrders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -101,6 +105,31 @@ export function SalesRequestsCitioOrders() {
     completed: "Completada",
     cancelled: "Cancelada",
   };
+
+  const toggleParentExpand = useCallback((parentId: string) => {
+    setExpandedParents(prev => {
+      const next = new Set(prev);
+      if (next.has(parentId)) next.delete(parentId);
+      else next.add(parentId);
+      return next;
+    });
+  }, []);
+
+  /** Group items: parent items + their sub-products */
+  const getGroupedItems = useCallback((items: ExternalOrderItem[]) => {
+    const parentItems = items.filter(i => !i.is_sub_product);
+    const subItems = items.filter(i => i.is_sub_product);
+
+    // Build a map: parent_medication_id -> sub-products[]
+    const subMap = new Map<string, ExternalOrderItem[]>();
+    for (const sub of subItems) {
+      const key = sub.parent_medication_id || "_orphan";
+      if (!subMap.has(key)) subMap.set(key, []);
+      subMap.get(key)!.push(sub);
+    }
+
+    return { parentItems, subMap };
+  }, []);
 
   const toggleExpand = (id: string) => {
     setExpandedOrderId(prev => prev === id ? null : id);
@@ -325,7 +354,13 @@ export function SalesRequestsCitioOrders() {
                         )}
 
                         {/* Items table */}
-                        {order.items && order.items.length > 0 && (
+                        {order.items && order.items.length > 0 && (() => {
+                          const { parentItems, subMap } = getGroupedItems(order.items);
+                          const hasAnySubs = subMap.size > 0;
+                          // If no sub-products exist, render all items flat
+                          const displayItems = hasAnySubs ? parentItems : order.items;
+
+                          return (
                           <div>
                             <div className="flex items-center gap-2 mb-2">
                               <Package className="h-4 w-4 text-muted-foreground" />
@@ -343,20 +378,59 @@ export function SalesRequestsCitioOrders() {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {order.items.map((item) => (
-                                    <tr key={item.id} className="border-t">
-                                      <td className="p-2">{item.medication_name}</td>
-                                      <td className="p-2 text-muted-foreground">{item.medications?.brand || "—"}</td>
-                                      <td className="p-2 text-right">{item.quantity}</td>
-                                      <td className="p-2 text-right">{formatCurrency(item.unit_price)}</td>
-                                      <td className="p-2 text-right font-medium">{formatCurrency(item.subtotal)}</td>
-                                    </tr>
-                                  ))}
+                                  {displayItems.map((item) => {
+                                    const itemKey = item.medication_id || item.id;
+                                    const children = hasAnySubs ? (subMap.get(itemKey) || []) : [];
+                                    const hasChildren = children.length > 0;
+                                    const isParentExpanded = expandedParents.has(itemKey);
+
+                                    return (
+                                      <>
+                                        <tr
+                                          key={item.id}
+                                          className={`border-t ${hasChildren ? "cursor-pointer hover:bg-accent/10" : ""}`}
+                                          onClick={hasChildren ? () => toggleParentExpand(itemKey) : undefined}
+                                        >
+                                          <td className="p-2 flex items-center gap-1">
+                                            {hasChildren && (
+                                              isParentExpanded
+                                                ? <ChevronUp className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                                : <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                            )}
+                                            <span className={hasChildren ? "font-semibold" : ""}>
+                                              {item.medication_name}
+                                            </span>
+                                            {hasChildren && (
+                                              <Badge variant="secondary" className="text-[10px] ml-1">
+                                                {children.length} comp.
+                                              </Badge>
+                                            )}
+                                          </td>
+                                          <td className="p-2 text-muted-foreground">{item.medications?.brand || "—"}</td>
+                                          <td className="p-2 text-right">{item.quantity}</td>
+                                          <td className="p-2 text-right">{formatCurrency(item.unit_price)}</td>
+                                          <td className="p-2 text-right font-medium">{formatCurrency(item.subtotal)}</td>
+                                        </tr>
+                                        {hasChildren && isParentExpanded && children.map((sub) => (
+                                          <tr key={sub.id} className="border-t bg-muted/20">
+                                            <td className="p-2 pl-7 text-muted-foreground italic">
+                                              ↳ {sub.medication_name}
+                                            </td>
+                                            <td className="p-2 text-muted-foreground">{sub.medications?.brand || "—"}</td>
+                                            <td className="p-2 text-right text-muted-foreground">{sub.quantity}</td>
+                                            <td className="p-2 text-right text-muted-foreground">{formatCurrency(sub.unit_price)}</td>
+                                            <td className="p-2 text-right text-muted-foreground">{formatCurrency(sub.subtotal)}</td>
+                                          </tr>
+                                        ))}
+                                      </>
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>
                           </div>
-                        )}
+                          );
+                        })()}
 
                         {/* Convert to Quote button */}
                         <div className="flex justify-end pt-2">
