@@ -63,6 +63,7 @@ import { ProductEntryDialog } from "@/components/inventory/ProductEntryDialog";
 import { ProductRowWithBatches } from "@/components/inventory/ProductRowWithBatches";
 
 import { WarehouseTransferDialog } from "@/components/inventory/WarehouseTransferDialog";
+import { WarehouseTransferHistory } from "@/components/inventory/WarehouseTransferHistory";
 import { WarehouseFilter } from "@/components/inventory/WarehouseFilter";
 import { StockByWarehouseModal } from "@/components/dashboard/StockByWarehouseModal";
 import { PriceTypesEditor } from "@/components/inventory/PriceTypesEditor";
@@ -1268,7 +1269,7 @@ export default function Inventory() {
 
         {/* Tabs */}
         <Tabs defaultValue="batches" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
             <TabsTrigger value="batches" className="flex items-center gap-2">
               <Boxes className="h-4 w-4" />
               Lotes
@@ -1280,6 +1281,10 @@ export default function Inventory() {
             <TabsTrigger value="tags" className="flex items-center gap-2">
               <Tag className="h-4 w-4" />
               Tags RFID
+            </TabsTrigger>
+            <TabsTrigger value="transfers" className="flex items-center gap-2">
+              <ArrowRightLeft className="h-4 w-4" />
+              Transferencias
             </TabsTrigger>
             <TabsTrigger value="alerts" className="flex items-center gap-2 relative">
               <Bell className="h-4 w-4" />
@@ -2035,6 +2040,21 @@ export default function Inventory() {
                     </div>
                   )}
                 </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Transfers Tab */}
+          <TabsContent value="transfers" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ArrowRightLeft className="h-5 w-5 text-primary" />
+                  Historial de Transferencias
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <WarehouseTransferHistory />
               </CardContent>
             </Card>
           </TabsContent>

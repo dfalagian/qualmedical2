@@ -27,6 +27,8 @@ import {
   Plus
 } from "lucide-react";
 import { logActivity } from "@/lib/activityLogger";
+import { openWarehouseTransferPrint, TransferPrintItem, TransferPrintData } from "./warehouseTransferPrint";
+import { format } from "date-fns";
 
 interface Warehouse {
   id: string;
@@ -44,6 +46,8 @@ interface ScannedTag {
 interface ManualTransferItem {
   productId: string;
   productName: string;
+  brand: string;
+  unit: string;
   quantity: number;
   maxStock: number;
 }
@@ -90,7 +94,7 @@ export function WarehouseTransferDialog({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, sku, current_stock, warehouse_id")
+        .select("id, name, sku, current_stock, warehouse_id, brand, unit")
         .eq("warehouse_id", fromWarehouseId)
         .gt("current_stock", 0)
         .order("name");
@@ -224,6 +228,8 @@ export function WarehouseTransferDialog({
     setManualItems(prev => [...prev, {
       productId: product.id,
       productName: product.name,
+      brand: product.brand || "",
+      unit: product.unit || "pieza",
       quantity: manualQuantity,
       maxStock: product.current_stock,
     }]);
@@ -331,6 +337,7 @@ export function WarehouseTransferDialog({
       queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse_transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse_transfers_history"] });
       
       const fromName = warehouses.find(w => w.id === fromWarehouseId)?.name || "";
       const toName = warehouses.find(w => w.id === toWarehouseId)?.name || "";
@@ -345,6 +352,46 @@ export function WarehouseTransferDialog({
         entityName: `${fromName} → ${toName}`,
         details: { items_count: data.rfidCount + data.manualCount, note: notes || undefined },
       });
+
+      // Generate PDF report
+      const printItems: TransferPrintItem[] = [];
+      
+      for (const tag of scannedTags) {
+        printItems.push({
+          index: printItems.length + 1,
+          productName: tag.productName,
+          brand: "",
+          batchNumber: tag.batchNumber || "",
+          expirationDate: "",
+          quantity: 1,
+          unit: "pieza",
+          epc: tag.epc,
+          type: "rfid",
+        });
+      }
+      
+      for (const item of manualItems) {
+        printItems.push({
+          index: printItems.length + 1,
+          productName: item.productName,
+          brand: item.brand,
+          batchNumber: "",
+          expirationDate: "",
+          quantity: item.quantity,
+          unit: item.unit,
+          type: "manual",
+        });
+      }
+
+      const printData: TransferPrintData = {
+        transferDate: new Date(),
+        fromWarehouse: fromName,
+        toWarehouse: toName,
+        items: printItems,
+        notes: notes || undefined,
+      };
+
+      openWarehouseTransferPrint(printData);
       
       toast({
         title: "Transferencia completada",
