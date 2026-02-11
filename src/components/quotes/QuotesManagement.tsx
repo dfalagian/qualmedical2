@@ -109,6 +109,8 @@ interface QuoteItem {
   importe: number;
   tipo_precio: PriceType;
   categoria: string | null;
+  is_sub_product?: boolean;
+  parent_item_id?: string | null;
   // Store all prices for easy switching in grid
   precios_disponibles: {
     price_type_1: number;
@@ -272,6 +274,8 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
           importe: item.importe,
           tipo_precio: (item.tipo_precio as PriceType) || "1",
           categoria: product?.category || null,
+          is_sub_product: (item as any).is_sub_product || false,
+          parent_item_id: (item as any).parent_item_id || null,
           precios_disponibles: {
             price_type_1: product?.price_type_1 || 0,
             price_type_2: product?.price_type_2 || 0,
@@ -1040,12 +1044,21 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                     quoteItems.map((item) => {
                       const isMultiBatch = item.product_id && productsWithMultipleBatches.includes(item.product_id);
                       const isManual = item.tipo_precio === "manual";
+                      const isSubProduct = item.is_sub_product === true;
                       return (
-                        <TableRow key={item.id} className={isMultiBatch ? "bg-amber-50/50 dark:bg-amber-950/20" : ""}>
+                        <TableRow key={item.id} className={cn(
+                          isMultiBatch && "bg-amber-50/50 dark:bg-amber-950/20",
+                          isSubProduct && "bg-muted/30"
+                        )}>
                           <TableCell className="font-medium">
                             <div className="flex flex-col gap-0.5">
                               <div className="flex items-center gap-2">
-                                <span className="truncate max-w-[180px]">{item.nombre_producto}</span>
+                                <span className={cn(
+                                  "truncate max-w-[180px]",
+                                  isSubProduct && "pl-4 text-muted-foreground italic"
+                                )}>
+                                  {isSubProduct ? `↳ ${item.nombre_producto}` : item.nombre_producto}
+                                </span>
                                 {isMultiBatch && (
                                   <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
                                     <AlertTriangle className="h-3 w-3" />
