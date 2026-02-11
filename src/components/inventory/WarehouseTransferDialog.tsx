@@ -24,8 +24,12 @@ import {
   Package, 
   Tag as TagIcon,
   Warehouse,
-  Plus
+  Plus,
+  CalendarIcon
 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { logActivity } from "@/lib/activityLogger";
 import { openWarehouseTransferPrint, TransferPrintItem, TransferPrintData } from "./warehouseTransferPrint";
 import { format } from "date-fns";
@@ -75,6 +79,7 @@ export function WarehouseTransferDialog({
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [manualQuantity, setManualQuantity] = useState<number>(1);
   const [notes, setNotes] = useState("");
+  const [transferDate, setTransferDate] = useState<Date>(new Date());
 
   // Fetch warehouses
   const { data: warehouses = [] } = useQuery({
@@ -401,7 +406,7 @@ export function WarehouseTransferDialog({
       }
 
       const printData: TransferPrintData = {
-        transferDate: new Date(),
+        transferDate: transferDate,
         fromWarehouse: fromName,
         toWarehouse: toName,
         items: printItems,
@@ -433,6 +438,7 @@ export function WarehouseTransferDialog({
     setSelectedProductId("");
     setManualQuantity(1);
     setNotes("");
+    setTransferDate(new Date());
   };
 
   const swapWarehouses = () => {
@@ -653,7 +659,34 @@ export function WarehouseTransferDialog({
             )}
           </div>
 
-          {/* Notes */}
+          {/* Date & Notes */}
+          <div className="space-y-2">
+            <Label>Fecha del movimiento</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !transferDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {transferDate ? format(transferDate, "dd/MM/yyyy") : "Seleccionar fecha"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={transferDate}
+                  onSelect={(d) => d && setTransferDate(d)}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
           <div className="space-y-2">
             <Label>Notas (opcional)</Label>
             <Textarea
