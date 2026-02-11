@@ -96,6 +96,8 @@ interface QuoteItem {
   importe: number;
   tipo_precio?: string | null;
   categoria?: string | null;
+  is_sub_product?: boolean;
+  parent_item_id?: string | null;
 }
 
 interface QuoteToEdit {
@@ -127,6 +129,8 @@ interface QuoteToEdit {
     precio_unitario: number;
     importe: number;
     tipo_precio: string | null;
+    is_sub_product?: boolean;
+    parent_item_id?: string | null;
   }>;
 }
 
@@ -303,6 +307,8 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
           lote: item.lote || "",
           fecha_caducidad: item.fecha_caducidad ? new Date(item.fecha_caducidad) : null,
           categoria: item.categoria || null,
+          is_sub_product: item.is_sub_product || false,
+          parent_item_id: item.parent_item_id || null,
         })),
         subtotal: quote.subtotal,
         total: quote.total,
@@ -741,21 +747,26 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {quoteItems.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.nombre_producto}</TableCell>
-                        <TableCell>{item.marca || "-"}</TableCell>
-                        <TableCell>{item.lote || "-"}</TableCell>
-                        <TableCell>
-                          {item.fecha_caducidad 
-                            ? format(new Date(item.fecha_caducidad), "dd/MM/yyyy") 
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-right">{item.cantidad}</TableCell>
-                        <TableCell className="text-right">${item.precio_unitario.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-medium">${item.importe.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {quoteItems.map((item) => {
+                      const isSubProduct = item.is_sub_product === true;
+                      return (
+                        <TableRow key={item.id} className={isSubProduct ? "bg-muted/30" : ""}>
+                          <TableCell className={cn("font-medium", isSubProduct && "pl-8 text-muted-foreground italic")}>
+                            {isSubProduct ? `↳ ${item.nombre_producto}` : item.nombre_producto}
+                          </TableCell>
+                          <TableCell>{item.marca || "-"}</TableCell>
+                          <TableCell>{item.lote || "-"}</TableCell>
+                          <TableCell>
+                            {item.fecha_caducidad 
+                              ? format(new Date(item.fecha_caducidad), "dd/MM/yyyy") 
+                              : "-"}
+                          </TableCell>
+                          <TableCell className="text-right">{item.cantidad}</TableCell>
+                          <TableCell className="text-right">${item.precio_unitario.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-medium">${item.importe.toFixed(2)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
