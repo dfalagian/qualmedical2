@@ -55,6 +55,7 @@ interface ManualTransferItem {
   productName: string;
   brand: string;
   unit: string;
+  batchId?: string;
   batchNumber: string;
   expirationDate: string;
   quantity: number;
@@ -80,6 +81,7 @@ export function WarehouseTransferDialog({
   const [scanInput, setScanInput] = useState("");
   const [manualItems, setManualItems] = useState<ManualTransferItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [selectedBatchId, setSelectedBatchId] = useState<string>("");
   const [manualQuantity, setManualQuantity] = useState<number>(1);
   const [notes, setNotes] = useState("");
   const [transferDate, setTransferDate] = useState<Date>(new Date());
@@ -112,6 +114,23 @@ export function WarehouseTransferDialog({
       return data;
     },
     enabled: !!fromWarehouseId,
+  });
+
+  // Fetch batches for selected product
+  const { data: productBatches = [] } = useQuery({
+    queryKey: ["batches_for_transfer", selectedProductId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("product_batches")
+        .select("id, batch_number, expiration_date, current_quantity")
+        .eq("product_id", selectedProductId)
+        .eq("is_active", true)
+        .gt("current_quantity", 0)
+        .order("expiration_date", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedProductId,
   });
 
   // Set default warehouses when loaded
@@ -212,18 +231,30 @@ export function WarehouseTransferDialog({
   };
 
   // Add manual transfer item
-  const addManualItem = async () => {
+  const addManualItem = () => {
     if (!selectedProductId || manualQuantity <= 0) return;
     
     const product = products.find(p => p.id === selectedProductId);
     if (!product) return;
 
-    // Check if already added
-    const existing = manualItems.find(i => i.productId === selectedProductId);
+    // Check if already added (same product + same batch)
+    const batchKey = selectedBatchId || "no-batch";
+    const existing = manualItems.find(i => i.productId === selectedProductId && (i.batchId || "no-batch") === batchKey);
     if (existing) {
       toast({
-        title: "Producto ya agregado",
+        title: "Producto/lote ya agregado",
         description: "Elimínalo primero si deseas cambiar la cantidad.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate against batch stock if batch selected
+    const selectedBatch = productBatches.find(b => b.id === selectedBatchId);
+    if (selectedBatch && manualQuantity > selectedBatch.current_quantity) {
+      toast({
+        title: "Stock insuficiente en lote",
+        description: `El lote ${selectedBatch.batch_number} solo tiene ${selectedBatch.current_quantity} disponibles.`,
         variant: "destructive",
       });
       return;
@@ -238,37 +269,28 @@ export function WarehouseTransferDialog({
       return;
     }
 
-    // Fetch active batch info for this product
-    const { data: batchData } = await supabase
-      .from("product_batches")
-      .select("batch_number, expiration_date")
-      .eq("product_id", selectedProductId)
-      .eq("is_active", true)
-      .gt("current_quantity", 0)
-      .order("expiration_date", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
     setManualItems(prev => [...prev, {
       productId: product.id,
       productName: (product as any).name,
       brand: (product as any).brand || "",
       unit: (product as any).unit || "pieza",
-      batchNumber: batchData?.batch_number || "",
-      expirationDate: batchData?.expiration_date
-        ? format(new Date(batchData.expiration_date), "dd/MM/yyyy")
+      batchId: selectedBatch?.id || undefined,
+      batchNumber: selectedBatch?.batch_number || "",
+      expirationDate: selectedBatch?.expiration_date
+        ? format(new Date(selectedBatch.expiration_date + "T00:00:00"), "dd/MM/yyyy")
         : "",
       quantity: manualQuantity,
-      maxStock: (product as any).current_stock,
+      maxStock: selectedBatch?.current_quantity || (product as any).current_stock,
     }]);
 
     setSelectedProductId("");
+    setSelectedBatchId("");
     setManualQuantity(1);
   };
 
   // Remove manual item
-  const removeManualItem = (productId: string) => {
-    setManualItems(prev => prev.filter(i => i.productId !== productId));
+  const removeManualItem = (productId: string, batchId?: string) => {
+    setManualItems(prev => prev.filter(i => !(i.productId === productId && (i.batchId || undefined) === batchId)));
   };
 
   // Transfer mutation
@@ -442,6 +464,7 @@ export function WarehouseTransferDialog({
     setManualItems([]);
     setScanInput("");
     setSelectedProductId("");
+    setSelectedBatchId("");
     setManualQuantity(1);
     setNotes("");
     setTransferDate(new Date());
@@ -584,52 +607,86 @@ export function WarehouseTransferDialog({
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Seleccione un producto, indique la cantidad y presione <strong>+</strong> para agregarlo. Repita para agregar más productos.
+              Seleccione un producto, elija el lote, indique la cantidad y presione <strong>+</strong> para agregarlo.
             </p>
             
-            <div className="flex gap-2">
-              <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Seleccionar producto..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.filter(p => !manualItems.some(i => i.productId === p.id)).map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      <div className="flex items-center justify-between gap-2 w-full">
-                        <span className="truncate">{p.name}</span>
-                        <Badge variant="secondary" className="ml-2">{p.current_stock}</Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <Input
-                type="number"
-                min={1}
-                max={selectedProduct?.current_stock || 1}
-                value={manualQuantity}
-                onChange={(e) => setManualQuantity(parseInt(e.target.value) || 1)}
-                className="w-20"
-                placeholder="Cant."
-              />
-              
-              <Button 
-                variant="outline" 
-                size="icon"
-                onClick={addManualItem}
-                disabled={!selectedProductId}
-                title="Agregar producto a la lista"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Select value={selectedProductId} onValueChange={(v) => {
+                  setSelectedProductId(v);
+                  setSelectedBatchId("");
+                }}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Seleccionar producto..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        <div className="flex items-center justify-between gap-2 w-full">
+                          <span className="truncate">{p.name}</span>
+                          <Badge variant="secondary" className="ml-2">{p.current_stock}</Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedProductId && (
+                <div className="flex gap-2">
+                  <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder={productBatches.length > 0 ? "Seleccionar lote..." : "Sin lotes disponibles"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {productBatches.map(b => (
+                        <SelectItem key={b.id} value={b.id}>
+                          <div className="flex items-center gap-2 w-full">
+                            <span className="font-mono text-xs">{b.batch_number}</span>
+                            <span className="text-xs text-muted-foreground">
+                              Cad: {format(new Date(b.expiration_date + "T00:00:00"), "dd/MM/yyyy")}
+                            </span>
+                            <Badge variant="secondary" className="text-xs">{b.current_quantity} uds</Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Input
+                    type="number"
+                    min={1}
+                    max={selectedBatchId 
+                      ? productBatches.find(b => b.id === selectedBatchId)?.current_quantity || 1 
+                      : selectedProduct?.current_stock || 1
+                    }
+                    value={manualQuantity}
+                    onChange={(e) => setManualQuantity(parseInt(e.target.value) || 1)}
+                    className="w-20"
+                    placeholder="Cant."
+                  />
+                  
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={addManualItem}
+                    disabled={!selectedProductId}
+                    title="Agregar producto a la lista"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              {selectedProduct && selectedBatchId && (() => {
+                const batch = productBatches.find(b => b.id === selectedBatchId);
+                return batch ? (
+                  <p className="text-xs text-muted-foreground">
+                    Stock en lote <strong>{batch.batch_number}</strong>: {batch.current_quantity} uds
+                  </p>
+                ) : null;
+              })()}
             </div>
-            
-            {selectedProduct && (
-              <p className="text-xs text-muted-foreground">
-                Stock disponible: {selectedProduct.current_stock}
-              </p>
-            )}
 
             {manualItems.length > 0 && (
               <div className="space-y-2">
@@ -638,7 +695,7 @@ export function WarehouseTransferDialog({
                   <div className="space-y-1 border rounded-lg p-2">
                     {manualItems.map((item, index) => (
                       <div 
-                        key={item.productId}
+                        key={`${item.productId}-${item.batchId || 'no-batch'}`}
                         className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
                       >
                         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -647,13 +704,16 @@ export function WarehouseTransferDialog({
                           {item.batchNumber && (
                             <span className="text-xs text-muted-foreground shrink-0">Lote: {item.batchNumber}</span>
                           )}
+                          {item.expirationDate && (
+                            <span className="text-xs text-muted-foreground shrink-0">Cad: {item.expirationDate}</span>
+                          )}
                           <Badge variant="secondary" className="shrink-0">{item.quantity} uds</Badge>
                         </div>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6 shrink-0"
-                          onClick={() => removeManualItem(item.productId)}
+                          onClick={() => removeManualItem(item.productId, item.batchId)}
                         >
                           <Trash2 className="h-3 w-3 text-destructive" />
                         </Button>
