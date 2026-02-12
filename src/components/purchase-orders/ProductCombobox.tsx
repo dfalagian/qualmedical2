@@ -26,6 +26,7 @@ interface Product {
   current_stock: number | null;
   price_type_1?: number | null;
   brand?: string | null;
+  category?: string | null;
 }
 
 interface ProductComboboxProps {
