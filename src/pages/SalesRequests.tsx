@@ -3,11 +3,10 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShoppingCart, Inbox, Link2 } from "lucide-react";
+import { ShoppingCart, Inbox, FileSpreadsheet } from "lucide-react";
 import { SalesRequestsCitioOrders } from "@/components/sales-requests/SalesRequestsCitioOrders";
 import { SalesRequestsList } from "@/components/sales-requests/SalesRequestsList";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { CipiRequestsList } from "@/components/sales-requests/CipiRequestsList";
 
 const SalesRequests = () => {
   const { isAdmin } = useAuth();
@@ -16,13 +15,6 @@ const SalesRequests = () => {
   if (!isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
-
-  const publicUrl = `${window.location.origin}/solicitud-venta`;
-
-  const copyPublicUrl = () => {
-    navigator.clipboard.writeText(publicUrl);
-    toast.success("URL copiada al portapapeles");
-  };
 
   return (
     <DashboardLayout>
@@ -33,13 +25,13 @@ const SalesRequests = () => {
               Solicitud de Ventas
             </h2>
             <p className="text-sm md:text-base text-muted-foreground">
-              Solicitudes de proveedores y órdenes de compra de CITIO
+              Solicitudes de proveedores, órdenes CITIO, CIPI y CIPI Pro
             </p>
           </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-lg">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
             <TabsTrigger value="requests" className="flex items-center gap-2">
               <Inbox className="h-4 w-4" />
               <span className="hidden sm:inline">Solicitudes</span>
@@ -47,6 +39,14 @@ const SalesRequests = () => {
             <TabsTrigger value="citio" className="flex items-center gap-2">
               <ShoppingCart className="h-4 w-4" />
               <span className="hidden sm:inline">Órdenes CITIO</span>
+            </TabsTrigger>
+            <TabsTrigger value="cipi" className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              <span className="hidden sm:inline">CIPI</span>
+            </TabsTrigger>
+            <TabsTrigger value="cipi_pro" className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              <span className="hidden sm:inline">CIPI Pro</span>
             </TabsTrigger>
           </TabsList>
 
@@ -56,6 +56,14 @@ const SalesRequests = () => {
 
           <TabsContent value="citio" className="mt-4">
             <SalesRequestsCitioOrders />
+          </TabsContent>
+
+          <TabsContent value="cipi" className="mt-4">
+            <CipiRequestsList type="cipi" title="Solicitudes CIPI" />
+          </TabsContent>
+
+          <TabsContent value="cipi_pro" className="mt-4">
+            <CipiRequestsList type="cipi_pro" title="Solicitudes CIPI Pro" />
           </TabsContent>
         </Tabs>
       </div>

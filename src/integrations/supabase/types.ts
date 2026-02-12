@@ -56,6 +56,170 @@ export type Database = {
         }
         Relationships: []
       }
+      cipi_request_items: {
+        Row: {
+          caducidad: string | null
+          cantidad: number
+          categoria: string | null
+          cipi_request_id: string
+          created_at: string
+          descripcion: string
+          id: string
+          iva: number | null
+          lote: string | null
+          marca: string | null
+          matched_product_name: string | null
+          precio: number | null
+          precio_unitario: number | null
+          product_id: string | null
+        }
+        Insert: {
+          caducidad?: string | null
+          cantidad?: number
+          categoria?: string | null
+          cipi_request_id: string
+          created_at?: string
+          descripcion: string
+          id?: string
+          iva?: number | null
+          lote?: string | null
+          marca?: string | null
+          matched_product_name?: string | null
+          precio?: number | null
+          precio_unitario?: number | null
+          product_id?: string | null
+        }
+        Update: {
+          caducidad?: string | null
+          cantidad?: number
+          categoria?: string | null
+          cipi_request_id?: string
+          created_at?: string
+          descripcion?: string
+          id?: string
+          iva?: number | null
+          lote?: string | null
+          marca?: string | null
+          matched_product_name?: string | null
+          precio?: number | null
+          precio_unitario?: number | null
+          product_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cipi_request_items_cipi_request_id_fkey"
+            columns: ["cipi_request_id"]
+            isOneToOne: false
+            referencedRelation: "cipi_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cipi_request_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cipi_requests: {
+        Row: {
+          cfdi: string | null
+          concepto: string | null
+          created_at: string
+          created_by: string | null
+          empresa: string | null
+          extracted_data: Json | null
+          extraction_status: string | null
+          factura_anterior: string | null
+          fecha_cotizacion: string | null
+          fecha_entrega: string | null
+          fecha_ultima_factura: string | null
+          file_name: string | null
+          file_type: string | null
+          file_url: string | null
+          folio: string | null
+          id: string
+          impuestos: number | null
+          monto_ultima_factura: number | null
+          quote_id: string | null
+          raw_text: string | null
+          razon_social: string | null
+          rfc: string | null
+          status: string
+          subtotal: number | null
+          total: number | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          cfdi?: string | null
+          concepto?: string | null
+          created_at?: string
+          created_by?: string | null
+          empresa?: string | null
+          extracted_data?: Json | null
+          extraction_status?: string | null
+          factura_anterior?: string | null
+          fecha_cotizacion?: string | null
+          fecha_entrega?: string | null
+          fecha_ultima_factura?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          folio?: string | null
+          id?: string
+          impuestos?: number | null
+          monto_ultima_factura?: number | null
+          quote_id?: string | null
+          raw_text?: string | null
+          razon_social?: string | null
+          rfc?: string | null
+          status?: string
+          subtotal?: number | null
+          total?: number | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          cfdi?: string | null
+          concepto?: string | null
+          created_at?: string
+          created_by?: string | null
+          empresa?: string | null
+          extracted_data?: Json | null
+          extraction_status?: string | null
+          factura_anterior?: string | null
+          fecha_cotizacion?: string | null
+          fecha_entrega?: string | null
+          fecha_ultima_factura?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          folio?: string | null
+          id?: string
+          impuestos?: number | null
+          monto_ultima_factura?: number | null
+          quote_id?: string | null
+          raw_text?: string | null
+          razon_social?: string | null
+          rfc?: string | null
+          status?: string
+          subtotal?: number | null
+          total?: number | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cipi_requests_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           cfdi: string | null
