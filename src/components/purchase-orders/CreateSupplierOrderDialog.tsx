@@ -49,7 +49,11 @@ interface SelectedProduct {
   savedPrice: number;
   manualPrice: number | null;
   total: number;
+  category: string | null;
 }
+
+const IVA_RATE = 0.16;
+const IVA_EXEMPT_CATEGORIES = ["medicamentos", "inmunoterapia", "oncologicos"];
 
 interface CreateSupplierOrderDialogProps {
   open: boolean;
@@ -141,7 +145,7 @@ export const CreateSupplierOrderDialog = ({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, sku, unit_price, current_stock, price_type_1, brand")
+        .select("id, name, sku, unit_price, current_stock, price_type_1, brand, category")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -150,7 +154,7 @@ export const CreateSupplierOrderDialog = ({
   });
 
   const handleAddProduct = (
-    product: { id: string; name: string; sku: string; unit_price: number | null },
+    product: { id: string; name: string; sku: string; unit_price: number | null; category?: string | null },
     quantity: number,
     savedPrice: number,
     manualPrice: number | null
@@ -175,6 +179,7 @@ export const CreateSupplierOrderDialog = ({
         savedPrice,
         manualPrice,
         total,
+        category: product.category || null,
       },
     ]);
   };
@@ -210,12 +215,23 @@ export const CreateSupplierOrderDialog = ({
     );
   };
 
-  const total = useMemo(() => {
+  const subtotal = useMemo(() => {
     return selectedProducts.reduce((sum, p) => {
       const effectivePrice = p.manualPrice ?? p.savedPrice;
       return sum + effectivePrice * p.quantity;
     }, 0);
   }, [selectedProducts]);
+
+  const ivaTotal = useMemo(() => {
+    return selectedProducts.reduce((sum, p) => {
+      const cat = (p.category || "").toLowerCase();
+      if (IVA_EXEMPT_CATEGORIES.includes(cat)) return sum;
+      const effectivePrice = p.manualPrice ?? p.savedPrice;
+      return sum + effectivePrice * p.quantity * IVA_RATE;
+    }, 0);
+  }, [selectedProducts]);
+
+  const total = subtotal + ivaTotal;
 
   const selectedSupplierData = useMemo(() => {
     if (supplierType === "registered") {
@@ -584,8 +600,18 @@ export const CreateSupplierOrderDialog = ({
             {/* Totals */}
             {selectedProducts.length > 0 && (
               <div className="flex justify-end">
-                <div className="w-64 bg-muted/50 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between font-bold text-lg">
+                <div className="w-72 bg-muted/50 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal:</span>
+                    <span>${subtotal.toFixed(2)}</span>
+                  </div>
+                  {ivaTotal > 0 && (
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>IVA (16%):</span>
+                      <span>${ivaTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-lg border-t pt-2">
                     <span>Total:</span>
                     <span className="text-primary">${total.toFixed(2)} MXN</span>
                   </div>

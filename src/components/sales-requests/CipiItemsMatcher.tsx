@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Check, ChevronsUpDown, Save } from "lucide-react";
+import { Check, ChevronsUpDown, Save, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Command,
@@ -80,6 +80,20 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
     }
   };
 
+  const handleClearLote = async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from("cipi_request_items")
+        .update({ lote: null })
+        .eq("id", itemId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["cipi-request-items", requestId] });
+      toast.success("Lote eliminado");
+    } catch (err: any) {
+      toast.error(err.message || "Error al eliminar lote");
+    }
+  };
+
   const categoryColors: Record<string, string> = {
     MEDICAMENTOS: "bg-blue-100 text-blue-800",
     ONCOLOGICOS: "bg-red-100 text-red-800",
@@ -130,7 +144,20 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
                   )}
                 </TableCell>
                 <TableCell className="text-xs">{item.marca || "—"}</TableCell>
-                <TableCell className="text-xs">{item.lote || "—"}</TableCell>
+                <TableCell className="text-xs">
+                  {item.lote ? (
+                    <span className="flex items-center gap-1">
+                      {item.lote}
+                      <button
+                        onClick={() => handleClearLote(item.id)}
+                        className="text-destructive hover:text-destructive/80 p-0.5 rounded"
+                        title="Eliminar lote"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ) : "—"}
+                </TableCell>
                 <TableCell className="text-xs text-center">{item.cantidad}</TableCell>
                 <TableCell className="text-xs text-right">
                   ${Number(item.precio_unitario).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
