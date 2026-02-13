@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { toast } from "sonner";
 import { Plus, FileSpreadsheet, ChevronDown, ChevronUp, Trash2, FileText, ArrowRight } from "lucide-react";
 import { CipiUploadDialog } from "./CipiUploadDialog";
@@ -200,86 +200,84 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
               No hay solicitudes {type.toUpperCase()} aún.
             </p>
           ) : (
-            <ScrollArea className="max-h-[600px]">
-              <div className="space-y-3">
-                {requests.map((req: any) => (
-                  <div key={req.id} className="rounded-lg border">
-                    <div className="p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-primary" />
-                          <span className="font-medium text-sm">
-                            {req.folio || req.file_name || "Solicitud sin folio"}
-                          </span>
-                          {req.concepto && (
-                            <span className="text-xs text-muted-foreground">— {req.concepto}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge className={statusColors[req.status] || "bg-muted"}>
-                            {statusLabels[req.status] || req.status}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        {req.empresa && <span>Empresa: {req.empresa}</span>}
-                        {req.razon_social && <span>Razón Social: {req.razon_social}</span>}
-                        {req.total > 0 && (
-                          <span className="font-medium text-foreground">
-                            Total: ${Number(req.total).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
-                          </span>
-                        )}
-                        <span>{formatDate(req.created_at)}</span>
-                      </div>
-
+            <div className="space-y-3">
+              {requests.map((req: any) => (
+                <div key={req.id} className="rounded-lg border">
+                  <div className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1 h-7 text-xs"
-                          onClick={() => setExpandedId(expandedId === req.id ? null : req.id)}
-                        >
-                          {expandedId === req.id ? (
-                            <ChevronUp className="h-3 w-3" />
-                          ) : (
-                            <ChevronDown className="h-3 w-3" />
-                          )}
-                          Ver productos
-                        </Button>
-                        {req.status !== "convertida" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1 h-7 text-xs"
-                            disabled={convertingId === req.id}
-                            onClick={() => handleConvertToQuote(req)}
-                          >
-                            <ArrowRight className="h-3 w-3" />
-                            {convertingId === req.id ? "Convirtiendo..." : "Convertir a cotización"}
-                          </Button>
+                        <FileText className="h-4 w-4 text-primary" />
+                        <span className="font-medium text-sm">
+                          {req.folio || req.file_name || "Solicitud sin folio"}
+                        </span>
+                        {req.concepto && (
+                          <span className="text-xs text-muted-foreground">— {req.concepto}</span>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1 h-7 text-xs text-destructive hover:text-destructive"
-                          onClick={() => setDeletingId(req.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          Eliminar
-                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className={statusColors[req.status] || "bg-muted"}>
+                          {statusLabels[req.status] || req.status}
+                        </Badge>
                       </div>
                     </div>
 
-                    {expandedId === req.id && (
-                      <div className="border-t p-4">
-                        <CipiItemsMatcher requestId={req.id} />
-                      </div>
-                    )}
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      {req.empresa && <span>Empresa: {req.empresa}</span>}
+                      {req.razon_social && <span>Razón Social: {req.razon_social}</span>}
+                      {req.total > 0 && (
+                        <span className="font-medium text-foreground">
+                          Total: ${Number(req.total).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
+                      <span>{formatDate(req.created_at)}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 h-7 text-xs"
+                        onClick={() => setExpandedId(expandedId === req.id ? null : req.id)}
+                      >
+                        {expandedId === req.id ? (
+                          <ChevronUp className="h-3 w-3" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3" />
+                        )}
+                        Ver productos
+                      </Button>
+                      {req.status !== "convertida" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 h-7 text-xs"
+                          disabled={convertingId === req.id}
+                          onClick={() => handleConvertToQuote(req)}
+                        >
+                          <ArrowRight className="h-3 w-3" />
+                          {convertingId === req.id ? "Convirtiendo..." : "Convertir a cotización"}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 h-7 text-xs text-destructive hover:text-destructive"
+                        onClick={() => setDeletingId(req.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Eliminar
+                      </Button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
+
+                  {expandedId === req.id && (
+                    <div className="border-t p-4">
+                      <CipiItemsMatcher requestId={req.id} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
