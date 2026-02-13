@@ -28,11 +28,13 @@ import {
   History,
   TrendingUp,
   TrendingDown,
-  Scale
+  Scale,
+  Link2
 } from "lucide-react";
 import { formatSupplierName } from "@/lib/formatters";
 import { PriceHistoryDialog } from "./PriceHistoryDialog";
 import { OrderReconciliation } from "./OrderReconciliation";
+import { LinkOrphanMovements } from "./LinkOrphanMovements";
 
 interface PurchaseOrderItem {
   id: string;
@@ -252,6 +254,10 @@ export function PurchaseOrderDetailDialog({
               <TabsTrigger value="reconciliation" className="gap-1.5">
                 <Scale className="h-3.5 w-3.5" />
                 Conciliación
+              </TabsTrigger>
+              <TabsTrigger value="link-movements" className="gap-1.5">
+                <Link2 className="h-3.5 w-3.5" />
+                Vincular Ingresos
               </TabsTrigger>
             </TabsList>
 
@@ -513,6 +519,10 @@ export function PurchaseOrderDetailDialog({
 
             <TabsContent value="reconciliation" className="flex-1 overflow-y-auto pr-2 mt-4" style={{ maxHeight: 'calc(90vh - 180px)' }}>
               <OrderReconciliation order={order} />
+            </TabsContent>
+
+            <TabsContent value="link-movements" className="flex-1 overflow-y-auto pr-2 mt-4" style={{ maxHeight: 'calc(90vh - 180px)' }}>
+              <LinkOrphanMovements order={order} />
             </TabsContent>
           </Tabs>
         </DialogContent>
