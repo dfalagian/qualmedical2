@@ -102,6 +102,9 @@ serve(async (req) => {
     contentParts.unshift({
       type: 'text',
       text: `Analiza el documento/texto de una solicitud médica CIPI y extrae la información.
+
+IMPORTANTE: Excluye cualquier fila que NO sea un producto real. Las filas que contienen textos informativos como condiciones de pago, métodos de pago, datos bancarios, notas legales, avisos, cláusulas o instrucciones NO son productos y NO deben incluirse en el listado. Solo incluye filas que representen medicamentos, insumos, soluciones u otros productos médicos concretos con descripción de producto real.
+
 Responde ÚNICAMENTE con JSON válido:
 {
   "datos_encabezado": {
@@ -162,18 +165,31 @@ Si algún campo no está disponible, omítelo. No inventes datos.`,
 
     // Save extracted items to cipi_request_items
     if (extractedData.productos && Array.isArray(extractedData.productos)) {
-      const items = extractedData.productos.map((p: any) => ({
-        cipi_request_id: requestId,
-        categoria: p.categoria || null,
-        descripcion: p.descripcion || 'Sin descripción',
-        marca: p.marca || null,
-        lote: p.lote || null,
-        caducidad: p.caducidad || null,
-        cantidad: p.cantidad || 1,
-        precio_unitario: p.precio_unitario || 0,
-        iva: p.iva || 0,
-        precio: p.precio || 0,
-      }));
+      const items = extractedData.productos
+        .filter((p: any) => {
+          // Filter out informational rows: no price, no brand, and very long description (likely notes/terms)
+          const desc = (p.descripcion || '').toLowerCase();
+          const isInformational = (
+            (!p.precio_unitario || p.precio_unitario === 0) &&
+            (!p.precio || p.precio === 0) &&
+            (!p.marca || p.marca === '') &&
+            desc.length > 100
+          );
+          const hasPaymentKeywords = /m[eé]todos?\s+de\s+pago|transferencia\s+electr[oó]nica|datos?\s+bancari|clabe|n[uú]mero\s+de\s+cuenta|condiciones\s+de\s+pago/i.test(desc);
+          return !isInformational && !hasPaymentKeywords;
+        })
+        .map((p: any) => ({
+          cipi_request_id: requestId,
+          categoria: p.categoria || null,
+          descripcion: p.descripcion || 'Sin descripción',
+          marca: p.marca || null,
+          lote: p.lote || null,
+          caducidad: p.caducidad || null,
+          cantidad: p.cantidad || 1,
+          precio_unitario: p.precio_unitario || 0,
+          iva: p.iva || 0,
+          precio: p.precio || 0,
+        }));
 
       if (items.length > 0) {
         await supabase.from('cipi_request_items').insert(items);
