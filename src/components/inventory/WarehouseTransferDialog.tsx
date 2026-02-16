@@ -624,6 +624,7 @@ export function WarehouseTransferDialog({
                       <SelectItem key={p.id} value={p.id}>
                         <div className="flex items-center justify-between gap-2 w-full">
                           <span className="truncate">{p.name}</span>
+                          {p.brand && <span className="text-xs text-muted-foreground shrink-0">{p.brand}</span>}
                           <Badge variant="secondary" className="ml-2">{p.current_stock}</Badge>
                         </div>
                       </SelectItem>
@@ -701,6 +702,9 @@ export function WarehouseTransferDialog({
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <span className="text-xs text-muted-foreground font-mono w-5 shrink-0">{index + 1}.</span>
                           <span className="truncate">{item.productName}</span>
+                          {item.brand && (
+                            <span className="text-xs text-muted-foreground shrink-0">{item.brand}</span>
+                          )}
                           {item.batchNumber && (
                             <span className="text-xs text-muted-foreground shrink-0">Lote: {item.batchNumber}</span>
                           )}
