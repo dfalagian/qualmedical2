@@ -782,7 +782,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
 
             <div className="space-y-2">
               <Label>Folio Cotización</Label>
-              <Input value={folio} readOnly className="bg-muted" />
+              <Input value={folio} onChange={(e) => setFolio(e.target.value)} readOnly={!isEditMode} className={!isEditMode ? "bg-muted" : ""} />
             </div>
 
             <div className="space-y-2">
