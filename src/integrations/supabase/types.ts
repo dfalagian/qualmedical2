@@ -950,6 +950,42 @@ export type Database = {
           },
         ]
       }
+      notification_recipients: {
+        Row: {
+          channel: string
+          created_at: string
+          created_by: string | null
+          event_type: string
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          event_type?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          event_type?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string
+        }
+        Relationships: []
+      }
       pagos: {
         Row: {
           amount: number
