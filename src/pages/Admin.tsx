@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText, KeyRound, ClipboardList } from "lucide-react";
+import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText, KeyRound, ClipboardList, Bell } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
@@ -20,6 +20,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { ActivityLog } from "@/components/admin/ActivityLog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NotificationRecipientsManager } from "@/components/admin/NotificationRecipientsManager";
 
 
 const userFormSchema = z.object({
@@ -339,6 +340,10 @@ const Admin = () => {
             <TabsTrigger value="activity" className="gap-1.5">
               <ClipboardList className="h-3.5 w-3.5" />
               Bitácora
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-1.5">
+              <Bell className="h-3.5 w-3.5" />
+              Notificaciones
             </TabsTrigger>
           </TabsList>
 
@@ -780,6 +785,10 @@ const Admin = () => {
 
           <TabsContent value="activity" className="mt-4">
             <ActivityLog />
+          </TabsContent>
+
+          <TabsContent value="notifications" className="mt-4">
+            <NotificationRecipientsManager />
           </TabsContent>
         </Tabs>
 
