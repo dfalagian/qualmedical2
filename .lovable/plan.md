@@ -1,73 +1,96 @@
 
-# Plan: Corrección del Bug de Desaparición de Productos en la Grilla
 
-## Resumen del Problema
+# Plan: Integrar WhatsApp via Twilio
 
-Cuando agregas un producto a la orden de compra y luego seleccionas un segundo producto del Combobox, el primer producto desaparece visualmente de la grilla, aunque el estado interno se mantiene correctamente (los totales siguen sumando).
+## Resumen
 
-## Diagnóstico
+Crear una funcion backend para enviar mensajes de WhatsApp usando la API de Twilio, y conectarla al sistema de notificaciones existente para que los proveedores y clientes reciban confirmaciones por WhatsApp ademas de por email.
 
-Después de analizar el código, identifiqué las siguientes causas:
+## Paso 1 - Configurar credenciales de Twilio
 
-1. **ScrollArea con altura dinámica conflictiva**: El componente `ScrollArea` de Radix UI tiene un viewport interno con `h-full w-full` que depende del contenedor padre. Cuando el Popover del buscador se abre/cierra, el layout recalcula las dimensiones y el viewport puede colapsar momentáneamente.
+Se necesitan 3 secretos:
+- **TWILIO_ACCOUNT_SID** - Tu Account SID de Twilio
+- **TWILIO_AUTH_TOKEN** - Tu Auth Token de Twilio  
+- **TWILIO_WHATSAPP_FROM** - El numero de WhatsApp de Twilio (formato: `whatsapp:+14155238886`)
 
-2. **Estructura de flex conflictiva**: El contenedor usa `flex-1` con `overflow-hidden` que puede interferir con el cálculo de altura del ScrollArea cuando hay cambios en otros elementos del flex.
+Para obtenerlos: Ir a [twilio.com](https://www.twilio.com), crear cuenta, y en la consola obtener Account SID y Auth Token. Para WhatsApp, activar el Sandbox de WhatsApp en Twilio (para pruebas) o solicitar un numero de WhatsApp Business (para produccion).
 
-3. **Errores HMR residuales**: Los logs muestran intentos de cargar archivos inexistentes (`SelectedProductsTable.tsx`, `PurchaseOrderTotalsCard.tsx`), lo que indica caché corrupta del Hot Module Replacement.
+## Paso 2 - Crear Edge Function `send-whatsapp`
 
-## Solución Propuesta
+Nueva funcion en `supabase/functions/send-whatsapp/index.ts` que:
 
-### Archivo a modificar: `CreateSupplierOrderDialog.tsx`
+1. Recibe `to` (numero de telefono), `message` (texto del mensaje) y opcionalmente `template_type` (tipo de plantilla predefinida)
+2. Usa la API REST de Twilio para enviar el mensaje via WhatsApp
+3. Formatea el numero destino con prefijo `whatsapp:+52...`
+4. Incluye plantillas de mensajes para los eventos principales:
+   - Documento aprobado/rechazado
+   - Factura validada/rechazada
+   - Pago completado
+   - Evidencia aprobada/rechazada
 
-Reestructurar el contenedor de la tabla de productos para usar una altura fija estable que no dependa de flexbox:
+## Paso 3 - Agregar campo de telefono al perfil de proveedores
 
-1. **Eliminar la dependencia de flex-1**: Cambiar el contenedor de la tabla para usar altura fija en lugar de `flex-1`
-2. **Usar un contenedor wrapper estable**: Envolver la tabla en un div con `overflow-auto` en lugar de depender solo de ScrollArea
-3. **Agregar una key al contenedor de la tabla**: Forzar que React mantenga la identidad del componente
+La tabla `profiles` ya tiene un campo `phone`. Se verificara que este disponible y se usara para enviar los mensajes de WhatsApp.
 
-### Cambios específicos:
+## Paso 4 - Actualizar hook `useNotifications`
 
-```tsx
-// ANTES (líneas 337-412):
-<div className="flex-1 border rounded-lg overflow-hidden bg-background min-h-0">
-  <ScrollArea className="h-[280px]">
-    {selectedProducts.length > 0 ? (
-      <Table>...</Table>
-    ) : (
-      <div>...</div>
-    )}
-  </ScrollArea>
-</div>
+Modificar `src/hooks/useNotifications.tsx` para:
+- Agregar funcion `notifySupplierWhatsApp` que llama a la nueva edge function
+- Opcionalmente enviar notificacion dual (email + WhatsApp) cuando el proveedor tenga telefono registrado
 
-// DESPUÉS:
-<div className="border rounded-lg bg-background">
-  <div className="h-[280px] overflow-auto">
-    {selectedProducts.length > 0 ? (
-      <Table>...</Table>
-    ) : (
-      <div>...</div>
-    )}
-  </div>
-</div>
+## Paso 5 - Agregar configuracion en `config.toml`
+
+```toml
+[functions.send-whatsapp]
+verify_jwt = false
 ```
 
-## Beneficios
+## Detalles Tecnicos
 
-- **Altura estable**: El contenedor tendrá siempre 280px independientemente del estado del Popover
-- **Sin dependencia de ScrollArea**: Usar `overflow-auto` nativo es más predecible
-- **Compatibilidad con Popover**: El portal del Popover no afectará el layout de la tabla
+### API de Twilio (REST, sin SDK)
 
-## Pasos de Implementación
+```text
+POST https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Messages.json
 
-1. Modificar el contenedor de la tabla en `CreateSupplierOrderDialog.tsx`
-2. Reemplazar `ScrollArea` por un div con `overflow-auto`
-3. Ajustar las clases CSS para mantener el mismo aspecto visual
-4. Probar agregando múltiples productos para verificar que ya no desaparecen
+Headers:
+  Authorization: Basic base64(AccountSid:AuthToken)
+  Content-Type: application/x-www-form-urlencoded
 
----
+Body:
+  From=whatsapp:+14155238886
+  To=whatsapp:+521234567890
+  Body=Tu documento ha sido aprobado
+```
 
-**Sección Técnica**
+### Flujo de la notificacion
 
-El problema ocurre porque Radix UI ScrollArea crea un viewport interno (`ScrollAreaPrimitive.Viewport`) que usa `h-full w-full`. Cuando el Popover del Combobox se abre, React puede disparar un re-render del árbol y el viewport recalcula sus dimensiones basándose en el contenedor flex, que momentáneamente puede tener altura 0 durante la transición.
+```text
+Evento del sistema (ej: documento aprobado)
+  |
+  v
+useNotifications.notifySupplier()
+  |
+  +---> notify-supplier (email) [existente]
+  |
+  +---> send-whatsapp (WhatsApp) [nuevo]
+         |
+         v
+      Twilio API -> WhatsApp del proveedor
+```
 
-La solución elimina esta dependencia usando un contenedor con altura fija (`h-[280px]`) y scroll nativo del navegador (`overflow-auto`), que es más robusto ante cambios de layout.
+### Plantillas de mensajes WhatsApp (texto plano)
+
+Como WhatsApp no soporta HTML, se crearan plantillas en texto plano con emojis para cada tipo de evento, por ejemplo:
+
+- **Documento aprobado**: "QualMedical: Tu documento [tipo] ha sido aprobado. Accede al portal: qualmedical.lovable.app"
+- **Factura rechazada**: "QualMedical: Tu factura [numero] fue rechazada. Razon: [motivo]. Revisa el portal."
+- **Pago completado**: "QualMedical: Se ha registrado tu pago de $[monto] MXN para la factura [numero]."
+
+## Archivos a crear/modificar
+
+| Archivo | Accion |
+|---------|--------|
+| `supabase/functions/send-whatsapp/index.ts` | Crear - Edge function para enviar WhatsApp |
+| `src/hooks/useNotifications.tsx` | Modificar - Agregar envio dual email+WhatsApp |
+| `supabase/config.toml` | Modificar - Registrar nueva funcion |
+
