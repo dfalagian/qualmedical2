@@ -144,19 +144,55 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
         .single();
       if (quoteError) throw quoteError;
 
-      // Create quote items
+      // Create quote items - attempt to match product_id from catalog if missing
       if (items && items.length > 0) {
-        const quoteItems = items.map((item: any) => ({
-          quote_id: quote.id,
-          product_id: item.product_id || null,
-          nombre_producto: item.matched_product_name || item.descripcion,
-          marca: item.marca,
-          lote: item.lote,
-          fecha_caducidad: item.caducidad,
-          cantidad: item.cantidad,
-          precio_unitario: item.precio_unitario,
-          importe: item.precio,
-        }));
+        // Fetch all active products for fallback matching when product_id is missing
+        let productsCatalog: Array<{ id: string; name: string; brand: string | null }> = [];
+        const itemsMissingProductId = items.filter((item: any) => !item.product_id);
+        if (itemsMissingProductId.length > 0) {
+          const { data: prods } = await supabase
+            .from("products")
+            .select("id, name, brand")
+            .eq("is_active", true);
+          productsCatalog = prods || [];
+        }
+
+        const normalizeForMatch = (str: string) =>
+          str.toLowerCase().replace(/\s+/g, '').replace(/\./g, '').replace(/\//g, '').trim();
+
+        const quoteItems = items.map((item: any) => {
+          let productId = item.product_id || null;
+          const itemName = item.matched_product_name || item.descripcion;
+
+          // If no product_id, try to find a match by normalized name + brand
+          if (!productId && itemName) {
+            const normalizedItemName = normalizeForMatch(itemName);
+            const matches = productsCatalog.filter(
+              p => normalizeForMatch(p.name) === normalizedItemName
+            );
+            if (matches.length === 1) {
+              productId = matches[0].id;
+            } else if (matches.length > 1 && item.marca) {
+              // Disambiguate by brand
+              const brandMatch = matches.find(
+                p => p.brand && p.brand.toLowerCase().trim() === item.marca.toLowerCase().trim()
+              );
+              if (brandMatch) productId = brandMatch.id;
+            }
+          }
+
+          return {
+            quote_id: quote.id,
+            product_id: productId,
+            nombre_producto: itemName,
+            marca: item.marca,
+            lote: item.lote,
+            fecha_caducidad: item.caducidad,
+            cantidad: item.cantidad,
+            precio_unitario: item.precio_unitario,
+            importe: item.precio,
+          };
+        });
 
         const { error: itemsInsertError } = await supabase.from("quote_items").insert(quoteItems);
         if (itemsInsertError) throw itemsInsertError;
