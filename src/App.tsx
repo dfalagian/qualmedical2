@@ -30,6 +30,7 @@ import PurchasesSales from "./pages/PurchasesSales";
 import SalesRequests from "./pages/SalesRequests";
 import PublicSalesRequest from "./pages/PublicSalesRequest";
 import GeneralSuppliers from "./pages/GeneralSuppliers";
+import PointOfSale from "./pages/PointOfSale";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -217,6 +218,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <SalesRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/pos"
+              element={
+                <ProtectedRoute>
+                  <PointOfSale />
                 </ProtectedRoute>
               }
             />

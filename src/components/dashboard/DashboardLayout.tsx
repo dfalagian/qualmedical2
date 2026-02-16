@@ -17,7 +17,8 @@ import {
   Package,
   Pill,
   FileSpreadsheet,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Store
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "react-router-dom";
@@ -67,6 +68,11 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     return <Navigate to="/dashboard/inventory" replace />;
   }
 
+  // Para rol vendedor, forzamos que solo pueda estar en Punto de Venta
+  if (userRole === "vendedor" && location.pathname !== "/dashboard/pos") {
+    return <Navigate to="/dashboard/pos" replace />;
+  }
+
   // Navegación para rol Contador (interno) - solo acceso a Contador de Medicamentos
   const contadorNavigation = [
     { name: "Contador de Medicamentos", href: "/dashboard/medicine-counter", icon: Camera },
@@ -81,6 +87,11 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   // Navegación para rol Inventario RFID - solo acceso a Inventario
   const inventarioRfidNavigation = [
     { name: "Inventario", href: "/dashboard/inventory", icon: Package },
+  ];
+
+  // Navegación para rol Vendedor - solo acceso a Punto de Venta
+  const vendedorNavigation = [
+    { name: "Punto de Venta", href: "/dashboard/pos", icon: Store },
   ];
 
   // Navegación completa para Admin y Proveedor
@@ -106,6 +117,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       { name: "Pagos", href: "/dashboard/payments", icon: CreditCard },
       { name: "Inventario", href: "/dashboard/inventory", icon: Package },
       { name: "Cotizaciones", href: "/dashboard/quotes", icon: FileSpreadsheet },
+      { name: "Punto de Venta", href: "/dashboard/pos", icon: Store },
       { name: "Compras-Ventas", href: "/dashboard/purchases-sales", icon: ArrowLeftRight },
       { name: "Solicitud de Ventas", href: "/dashboard/sales-requests", icon: FileSpreadsheet },
       { name: "Catálogo", href: "/dashboard/medications-citio", icon: Pill },
@@ -126,6 +138,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       break;
     case "inventario_rfid":
       navigation = inventarioRfidNavigation;
+      break;
+    case "vendedor":
+      navigation = vendedorNavigation;
       break;
     default:
       navigation = fullNavigation;
