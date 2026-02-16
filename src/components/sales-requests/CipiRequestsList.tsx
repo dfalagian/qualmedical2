@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Plus, FileSpreadsheet, ChevronDown, ChevronUp, Trash2, FileText, ArrowRight } from "lucide-react";
 import { CipiUploadDialog } from "./CipiUploadDialog";
 import { CipiItemsMatcher } from "./CipiItemsMatcher";
+import { CipiConversionDialog } from "./CipiConversionDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,7 +45,7 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
-
+  const [conversionRequest, setConversionRequest] = useState<any | null>(null);
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["cipi-requests", type],
     queryFn: async () => {
@@ -288,10 +289,10 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
                           size="sm"
                           className="gap-1 h-7 text-xs"
                           disabled={convertingId === req.id}
-                          onClick={() => handleConvertToQuote(req)}
+                          onClick={() => setConversionRequest(req)}
                         >
                           <ArrowRight className="h-3 w-3" />
-                          {convertingId === req.id ? "Convirtiendo..." : "Convertir a cotización"}
+                          Convertir a cotización
                         </Button>
                       )}
                       <Button
@@ -326,6 +327,19 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
           queryClient.invalidateQueries({ queryKey: ["cipi-requests", type] });
         }}
       />
+
+      {conversionRequest && (
+        <CipiConversionDialog
+          open={!!conversionRequest}
+          onOpenChange={(open) => !open && setConversionRequest(null)}
+          request={conversionRequest}
+          onConfirm={() => {
+            handleConvertToQuote(conversionRequest);
+            setConversionRequest(null);
+          }}
+          converting={convertingId === conversionRequest?.id}
+        />
+      )}
 
       <AlertDialog open={!!deletingId} onOpenChange={() => setDeletingId(null)}>
         <AlertDialogContent>
