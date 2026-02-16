@@ -2204,6 +2204,7 @@ export type Database = {
       is_contador: { Args: { _user_id: string }; Returns: boolean }
       is_contador_proveedor: { Args: { _user_id: string }; Returns: boolean }
       is_inventario_rfid: { Args: { _user_id: string }; Returns: boolean }
+      is_vendedor: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       document_status: "pendiente" | "aprobado" | "rechazado"
@@ -2232,6 +2233,7 @@ export type Database = {
         | "contador"
         | "contador_proveedor"
         | "inventario_rfid"
+        | "vendedor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2387,6 +2389,7 @@ export const Constants = {
         "contador",
         "contador_proveedor",
         "inventario_rfid",
+        "vendedor",
       ],
     },
   },
