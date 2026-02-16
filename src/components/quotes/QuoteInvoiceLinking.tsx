@@ -5,15 +5,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Link2, Unlink, FileText, Receipt, Check, Loader2 } from "lucide-react";
+import { Link2, Unlink, FileText, Receipt, Check, Loader2, Eye, EyeOff } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
+interface InvoiceItem {
+  descripcion?: string;
+  cantidad?: number;
+  valor_unitario?: number;
+  importe?: number;
+}
 
 export function QuoteInvoiceLinking() {
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch approved quotes
@@ -184,8 +192,7 @@ export function QuoteInvoiceLinking() {
             </CardTitle>
             <CardDescription>Selecciona una cotización para vincular</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 p-0">
-            <ScrollArea className="h-[400px] px-4 pb-4">
+          <CardContent className="px-4 pb-4">
               {loadingQuotes ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -236,7 +243,6 @@ export function QuoteInvoiceLinking() {
                   ))}
                 </div>
               )}
-            </ScrollArea>
           </CardContent>
         </Card>
 
@@ -249,8 +255,7 @@ export function QuoteInvoiceLinking() {
             </CardTitle>
             <CardDescription>Selecciona una factura para vincular</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 p-0">
-            <ScrollArea className="h-[400px] px-4 pb-4">
+          <CardContent className="px-4 pb-4">
               {loadingInvoices ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -262,48 +267,90 @@ export function QuoteInvoiceLinking() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {unlinkedInvoices?.map((invoice) => (
-                    <div
-                      key={invoice.id}
-                      onClick={() => setSelectedInvoiceId(invoice.id === selectedInvoiceId ? null : invoice.id)}
-                      className={cn(
-                        "p-3 rounded-lg border cursor-pointer transition-all",
-                        "hover:border-primary/50 hover:bg-accent/50",
-                        selectedInvoiceId === invoice.id
-                          ? "border-primary bg-primary/10 ring-2 ring-primary/20"
-                          : "border-border"
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="font-mono text-xs">
-                              {invoice.folio}
-                            </Badge>
-                            {selectedInvoiceId === invoice.id && (
-                              <Check className="h-4 w-4 text-primary" />
-                            )}
+                  {unlinkedInvoices?.map((invoice) => {
+                    const items = Array.isArray(invoice.items) ? (invoice.items as InvoiceItem[]) : [];
+                    const isExpanded = expandedInvoiceId === invoice.id;
+                    return (
+                      <Collapsible key={invoice.id} open={isExpanded}>
+                        <div
+                          onClick={() => setSelectedInvoiceId(invoice.id === selectedInvoiceId ? null : invoice.id)}
+                          className={cn(
+                            "p-3 rounded-lg border cursor-pointer transition-all",
+                            "hover:border-primary/50 hover:bg-accent/50",
+                            selectedInvoiceId === invoice.id
+                              ? "border-primary bg-primary/10 ring-2 ring-primary/20"
+                              : "border-border",
+                            isExpanded && "rounded-b-none"
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="font-mono text-xs">
+                                  {invoice.folio}
+                                </Badge>
+                                {selectedInvoiceId === invoice.id && (
+                                  <Check className="h-4 w-4 text-primary" />
+                                )}
+                              </div>
+                              <p className="text-sm font-medium mt-1 truncate">
+                                {invoice.receptor_nombre || "Sin receptor"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {invoice.fecha_emision
+                                  ? format(new Date(invoice.fecha_emision), "dd MMM yyyy", { locale: es })
+                                  : "Sin fecha"}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <p className="font-semibold text-sm">
+                                {formatCurrency(invoice.total)}
+                              </p>
+                              {items.length > 0 && (
+                                <CollapsibleTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2 text-xs gap-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setExpandedInvoiceId(isExpanded ? null : invoice.id);
+                                    }}
+                                  >
+                                    {isExpanded ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                                    {isExpanded ? "Ocultar" : "Ver"}
+                                  </Button>
+                                </CollapsibleTrigger>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-sm font-medium mt-1 truncate">
-                            {invoice.receptor_nombre || "Sin receptor"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {invoice.fecha_emision
-                              ? format(new Date(invoice.fecha_emision), "dd MMM yyyy", { locale: es })
-                              : "Sin fecha"}
-                          </p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-sm">
-                            {formatCurrency(invoice.total)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                        <CollapsibleContent>
+                          <div className={cn(
+                            "border border-t-0 rounded-b-lg p-3 bg-muted/30 space-y-1",
+                            selectedInvoiceId === invoice.id
+                              ? "border-primary"
+                              : "border-border"
+                          )}>
+                            <p className="text-xs font-medium text-muted-foreground mb-2">Conceptos ({items.length})</p>
+                            {items.map((item, idx) => (
+                              <div key={idx} className="flex items-start justify-between gap-2 text-xs py-1 border-b border-border/50 last:border-0">
+                                <div className="flex-1 min-w-0">
+                                  <p className="truncate">{item.descripcion || "—"}</p>
+                                  <p className="text-muted-foreground">
+                                    Cant: {item.cantidad ?? 0} × {formatCurrency(item.valor_unitario ?? 0)}
+                                  </p>
+                                </div>
+                                <p className="font-medium shrink-0">{formatCurrency(item.importe ?? 0)}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    );
+                  })}
                 </div>
               )}
-            </ScrollArea>
           </CardContent>
         </Card>
       </div>
