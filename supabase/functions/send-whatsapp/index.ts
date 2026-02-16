@@ -4,14 +4,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-interface WhatsAppRequest {
+interface MessageRequest {
   to: string;
   message?: string;
   template_type?: string;
   data?: Record<string, string>;
+  channel?: "whatsapp" | "sms" | "both";
 }
 
-const TEMPLATES: Record<string, (data: Record<string, string>) => string> = {
+const TEMPLATES: Record<string, (d: Record<string, string>) => string> = {
   document_approved: (d) =>
     `✅ *QualMedical* - Tu documento ${d.type || ""} ha sido aprobado. Accede al portal: qualmedical.lovable.app`,
   document_rejected: (d) =>
@@ -32,29 +33,48 @@ const TEMPLATES: Record<string, (data: Record<string, string>) => string> = {
     `🎉 *QualMedical* - Tu cuenta de proveedor ha sido aprobada. Ya puedes acceder al portal: qualmedical.lovable.app`,
   account_rejected: (d) =>
     `❌ *QualMedical* - Tu solicitud de registro fue rechazada.${d.reason ? ` Razón: ${d.reason}.` : ""} Contacta al administrador.`,
+  pos_sale: (d) =>
+    `🛒 *QualMedical - Nueva Venta POS*\n\n📋 Folio: ${d.folio || "N/A"}\n👤 Vendedor: ${d.vendedor || "N/A"}\n🏢 Cliente: ${d.cliente || "Mostrador"}\n📦 Productos: ${d.productos || "N/A"}\n💰 Total: $${d.total || "0"} MXN\n\n📝 Detalle:\n${d.detalle || "Sin detalle"}`,
 };
 
-function formatPhoneNumber(phone: string): string {
-  // Remove all non-digit characters
+function formatPhoneNumber(phone: string, channel: "whatsapp" | "sms"): string {
   let digits = phone.replace(/\D/g, "");
 
-  // If it already starts with country code for Mexico
   if (digits.startsWith("52") && digits.length === 12) {
-    return `whatsapp:+${digits}`;
+    return channel === "whatsapp" ? `whatsapp:+${digits}` : `+${digits}`;
   }
 
-  // If it's a 10-digit Mexican number, add country code
   if (digits.length === 10) {
-    return `whatsapp:+52${digits}`;
+    return channel === "whatsapp" ? `whatsapp:+52${digits}` : `+52${digits}`;
   }
 
-  // If it already has a + prefix or full international format
   if (phone.startsWith("+")) {
-    return `whatsapp:${phone}`;
+    return channel === "whatsapp" ? `whatsapp:${phone}` : phone;
   }
 
-  // Default: assume Mexican number
-  return `whatsapp:+${digits}`;
+  return channel === "whatsapp" ? `whatsapp:+${digits}` : `+${digits}`;
+}
+
+async function sendViaTwilio(
+  accountSid: string,
+  authToken: string,
+  from: string,
+  to: string,
+  body: string
+): Promise<{ ok: boolean; result: any }> {
+  const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+
+  const response = await fetch(twilioUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({ From: from, To: to, Body: body }),
+  });
+
+  const result = await response.json();
+  return { ok: response.ok, result };
 }
 
 Deno.serve(async (req) => {
@@ -63,7 +83,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { to, message, template_type, data }: WhatsAppRequest = await req.json();
+    const { to, message, template_type, data, channel = "whatsapp" }: MessageRequest = await req.json();
 
     if (!to) {
       return new Response(
@@ -87,46 +107,44 @@ Deno.serve(async (req) => {
 
     const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID")!;
     const authToken = Deno.env.get("TWILIO_AUTH_TOKEN")!;
-    // Default to Twilio Sandbox number for free accounts
-    const fromNumber = Deno.env.get("TWILIO_WHATSAPP_FROM") || "whatsapp:+14155238886";
+    const whatsappFrom = Deno.env.get("TWILIO_WHATSAPP_FROM") || "whatsapp:+14155238886";
+    const smsFrom = Deno.env.get("TWILIO_SMS_FROM") || "";
 
-    const toFormatted = formatPhoneNumber(to);
+    const results: Record<string, any> = {};
 
-    console.log(`Sending WhatsApp to: ${toFormatted}, template: ${template_type || "custom"}`);
-
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-
-    const response = await fetch(twilioUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        From: fromNumber,
-        To: toFormatted,
-        Body: body,
-      }),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      console.error("Twilio error:", result);
-      return new Response(
-        JSON.stringify({ error: result.message || "Failed to send WhatsApp message", details: result }),
-        { status: response.status, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+    // Send WhatsApp
+    if (channel === "whatsapp" || channel === "both") {
+      const toFormatted = formatPhoneNumber(to, "whatsapp");
+      console.log(`Sending WhatsApp to: ${toFormatted}, template: ${template_type || "custom"}`);
+      const wa = await sendViaTwilio(accountSid, authToken, whatsappFrom, toFormatted, body);
+      results.whatsapp = wa;
+      if (!wa.ok) console.error("WhatsApp error:", wa.result);
+      else console.log("WhatsApp sent, SID:", wa.result.sid);
     }
 
-    console.log("WhatsApp sent successfully, SID:", result.sid);
+    // Send SMS
+    if ((channel === "sms" || channel === "both") && smsFrom) {
+      const toFormatted = formatPhoneNumber(to, "sms");
+      // Strip markdown-style formatting for SMS
+      const smsBody = body.replace(/\*/g, "");
+      console.log(`Sending SMS to: ${toFormatted}`);
+      const sms = await sendViaTwilio(accountSid, authToken, smsFrom, toFormatted, smsBody);
+      results.sms = sms;
+      if (!sms.ok) console.error("SMS error:", sms.result);
+      else console.log("SMS sent, SID:", sms.result.sid);
+    } else if ((channel === "sms" || channel === "both") && !smsFrom) {
+      console.warn("SMS requested but TWILIO_SMS_FROM not configured, skipping SMS");
+      results.sms = { ok: false, result: { message: "TWILIO_SMS_FROM not configured" } };
+    }
+
+    const anySuccess = Object.values(results).some((r: any) => r.ok);
 
     return new Response(
-      JSON.stringify({ success: true, sid: result.sid }),
-      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      JSON.stringify({ success: anySuccess, results }),
+      { status: anySuccess ? 200 : 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: any) {
-    console.error("Error sending WhatsApp:", error);
+    console.error("Error sending message:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }

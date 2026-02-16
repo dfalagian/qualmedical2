@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -42,6 +43,7 @@ export const POSCart = ({
   onClose,
 }: POSCartProps) => {
   const { user } = useAuth();
+  const { notifyRecipientsByEvent } = useNotifications();
   const queryClient = useQueryClient();
 
   const updateQuantity = (productId: string, delta: number) => {
@@ -143,6 +145,36 @@ export const POSCart = ({
     },
     onSuccess: (data) => {
       toast.success(`Cotización ${data.folio} creada exitosamente`);
+
+      // Notify managers about new POS sale
+      const clientName = items.length > 0 ? "" : "Mostrador";
+      const detalle = items
+        .map((i) => `• ${i.name} x${i.cantidad} = $${i.importe.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`)
+        .join("\n");
+
+      // Fetch client name for notification
+      const sendNotification = async () => {
+        let cName = "Venta Mostrador";
+        if (selectedClientId) {
+          const { data: client } = await supabase
+            .from("clients")
+            .select("nombre_cliente")
+            .eq("id", selectedClientId)
+            .single();
+          if (client) cName = client.nombre_cliente;
+        }
+
+        await notifyRecipientsByEvent("pos_sale", "pos_sale", {
+          folio: data.folio,
+          vendedor: user?.email || "N/A",
+          cliente: cName,
+          productos: `${items.length} producto(s)`,
+          total: total.toLocaleString("es-MX", { minimumFractionDigits: 2 }),
+          detalle,
+        });
+      };
+      sendNotification().catch(console.error);
+
       setItems([]);
       setSelectedClientId("");
       queryClient.invalidateQueries({ queryKey: ["pos-products"] });

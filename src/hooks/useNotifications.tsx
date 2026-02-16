@@ -120,9 +120,52 @@ export const useNotifications = () => {
     await sendWhatsApp(phone, templateType, data);
   };
 
+  const notifyRecipientsByEvent = async (
+    eventType: string,
+    templateType: string,
+    data?: Record<string, string>
+  ) => {
+    try {
+      const { data: recipients, error } = await supabase
+        .from("notification_recipients")
+        .select("phone, channel, name")
+        .eq("event_type", eventType)
+        .eq("is_active", true);
+
+      if (error) {
+        console.error("Error fetching notification recipients:", error);
+        return;
+      }
+
+      if (!recipients || recipients.length === 0) {
+        console.log(`No active recipients for event: ${eventType}`);
+        return;
+      }
+
+      for (const recipient of recipients) {
+        try {
+          await supabase.functions.invoke("send-whatsapp", {
+            body: {
+              to: recipient.phone,
+              template_type: templateType,
+              data,
+              channel: recipient.channel || "both",
+            },
+          });
+          console.log(`Notification sent to ${recipient.name} (${recipient.phone})`);
+        } catch (err) {
+          console.error(`Failed to notify ${recipient.name}:`, err);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to notify recipients:", error);
+    }
+  };
+
   return {
     notifySupplier,
     notifyAdmin,
     notifySupplierWhatsApp,
+    notifyRecipientsByEvent,
   };
 };
