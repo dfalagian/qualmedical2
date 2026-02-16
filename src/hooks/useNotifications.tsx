@@ -26,24 +26,71 @@ type AdminNotificationType =
   | 'new_message'
   | 'payment_proof_uploaded';
 
+// Map notification types to WhatsApp template types
+const WHATSAPP_TEMPLATE_MAP: Partial<Record<NotificationType, string>> = {
+  account_approved: 'account_approved',
+  account_rejected: 'account_rejected',
+  document_approved: 'document_approved',
+  document_rejected: 'document_rejected',
+  invoice_validated: 'invoice_validated',
+  invoice_rejected: 'invoice_rejected',
+  payment_completed: 'payment_completed',
+  payment_pending: 'payment_pending',
+  evidence_approved: 'evidence_approved',
+  evidence_rejected: 'evidence_rejected',
+};
+
 export const useNotifications = () => {
+  const sendWhatsApp = async (
+    phone: string,
+    templateType: string,
+    data?: Record<string, string>
+  ) => {
+    try {
+      const { error } = await supabase.functions.invoke("send-whatsapp", {
+        body: { to: phone, template_type: templateType, data },
+      });
+      if (error) {
+        console.error("Error sending WhatsApp:", error);
+      }
+    } catch (error) {
+      console.error("Failed to send WhatsApp:", error);
+    }
+  };
+
   const notifySupplier = async (
     supplierId: string,
     type: NotificationType,
     data?: any
   ) => {
     try {
+      // Send email notification
       const { error } = await supabase.functions.invoke("notify-supplier", {
-        body: {
-          supplier_id: supplierId,
-          type,
-          data,
-        },
+        body: { supplier_id: supplierId, type, data },
       });
 
       if (error) {
         console.error("Error sending supplier notification:", error);
         throw error;
+      }
+
+      // Send WhatsApp if template exists for this type
+      const templateType = WHATSAPP_TEMPLATE_MAP[type];
+      if (templateType) {
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("phone")
+            .eq("id", supplierId)
+            .single();
+
+          if (profile?.phone) {
+            await sendWhatsApp(profile.phone, templateType, data);
+          }
+        } catch (whatsappError) {
+          // Don't fail the main notification if WhatsApp fails
+          console.error("WhatsApp notification failed (non-blocking):", whatsappError);
+        }
       }
     } catch (error) {
       console.error("Failed to notify supplier:", error);
@@ -53,10 +100,7 @@ export const useNotifications = () => {
   const notifyAdmin = async (type: AdminNotificationType, data?: any) => {
     try {
       const { error } = await supabase.functions.invoke("notify-admin", {
-        body: {
-          type,
-          data,
-        },
+        body: { type, data },
       });
 
       if (error) {
@@ -68,8 +112,17 @@ export const useNotifications = () => {
     }
   };
 
+  const notifySupplierWhatsApp = async (
+    phone: string,
+    templateType: string,
+    data?: Record<string, string>
+  ) => {
+    await sendWhatsApp(phone, templateType, data);
+  };
+
   return {
     notifySupplier,
     notifyAdmin,
+    notifySupplierWhatsApp,
   };
 };
