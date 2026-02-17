@@ -46,56 +46,34 @@ export function StockByWarehouseModal() {
 
       if (whError) throw whError;
 
-      // Fetch products with warehouse info
-      const { data: products, error: prodError } = await supabase
-        .from("products")
-        .select("id, name, sku, current_stock, minimum_stock, warehouse_id")
-        .eq("is_active", true)
-        .order("name");
+      // Fetch stock desde warehouse_stock (stock real por almacén)
+      const { data: wsData, error: wsError } = await supabase
+        .from("warehouse_stock")
+        .select("product_id, warehouse_id, current_stock, products:product_id(id, name, sku, minimum_stock)")
+        .gt("current_stock", 0);
 
-      if (prodError) throw prodError;
+      if (wsError) throw wsError;
 
-      // Group products by warehouse
+      // Agrupar por almacén usando warehouse_stock
       const result: WarehouseStock[] = warehouses.map((wh) => {
-        const whProducts = products.filter((p) => p.warehouse_id === wh.id);
+        const whStocks = (wsData || []).filter((ws: any) => ws.warehouse_id === wh.id);
         return {
           id: wh.id,
           name: wh.name,
           code: wh.code,
-          products: whProducts.map((p) => ({
-            id: p.id,
-            name: p.name,
-            sku: p.sku,
-            current_stock: p.current_stock ?? 0,
-            minimum_stock: p.minimum_stock ?? 0,
-          })),
-          totalProducts: whProducts.length,
-          lowStockCount: whProducts.filter(
-            (p) => (p.current_stock ?? 0) <= (p.minimum_stock ?? 0)
+          products: whStocks.map((ws: any) => ({
+            id: ws.products?.id || ws.product_id,
+            name: ws.products?.name || "Sin nombre",
+            sku: ws.products?.sku || "",
+            current_stock: ws.current_stock ?? 0,
+            minimum_stock: ws.products?.minimum_stock ?? 0,
+          })).sort((a: any, b: any) => a.name.localeCompare(b.name)),
+          totalProducts: whStocks.length,
+          lowStockCount: whStocks.filter(
+            (ws: any) => (ws.current_stock ?? 0) <= (ws.products?.minimum_stock ?? 0)
           ).length,
         };
       });
-
-      // Add products without warehouse
-      const noWarehouseProducts = products.filter((p) => !p.warehouse_id);
-      if (noWarehouseProducts.length > 0) {
-        result.push({
-          id: "sin-almacen",
-          name: "Sin Almacén",
-          code: "N/A",
-          products: noWarehouseProducts.map((p) => ({
-            id: p.id,
-            name: p.name,
-            sku: p.sku,
-            current_stock: p.current_stock ?? 0,
-            minimum_stock: p.minimum_stock ?? 0,
-          })),
-          totalProducts: noWarehouseProducts.length,
-          lowStockCount: noWarehouseProducts.filter(
-            (p) => (p.current_stock ?? 0) <= (p.minimum_stock ?? 0)
-          ).length,
-        });
-      }
 
       return result;
     },

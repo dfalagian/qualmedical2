@@ -100,18 +100,26 @@ export function WarehouseTransferDialog({
     },
   });
 
-  // Fetch products for manual transfer
+  // Fetch products for manual transfer - usando warehouse_stock
   const { data: products = [] } = useQuery({
     queryKey: ["products_for_transfer", fromWarehouseId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("products")
-        .select("id, name, sku, current_stock, warehouse_id, brand, unit")
+        .from("warehouse_stock")
+        .select("product_id, current_stock, products:product_id(id, name, sku, brand, unit, warehouse_id)")
         .eq("warehouse_id", fromWarehouseId)
-        .gt("current_stock", 0)
-        .order("name");
+        .gt("current_stock", 0);
       if (error) throw error;
-      return data;
+      // Flatten to match expected shape
+      return (data || []).map((ws: any) => ({
+        id: ws.products?.id,
+        name: ws.products?.name,
+        sku: ws.products?.sku,
+        brand: ws.products?.brand,
+        unit: ws.products?.unit,
+        warehouse_id: ws.warehouse_id,
+        current_stock: ws.current_stock,
+      })).filter(p => p.id).sort((a: any, b: any) => a.name?.localeCompare(b.name));
     },
     enabled: !!fromWarehouseId,
   });
@@ -330,29 +338,70 @@ export function WarehouseTransferDialog({
         results.rfidCount = scannedTags.length;
       }
 
-      // Transfer manual items
+      // Transfer manual items - usando warehouse_stock (stock por almacén independiente)
       for (const item of manualItems) {
-        const { data: product, error: productError } = await supabase
-          .from("products")
-          .select("id, name, current_stock")
-          .eq("id", item.productId)
-          .single();
+        // 1. Verificar stock disponible en almacén origen
+        const { data: sourceStock, error: sourceError } = await supabase
+          .from("warehouse_stock")
+          .select("current_stock")
+          .eq("product_id", item.productId)
+          .eq("warehouse_id", fromWarehouseId)
+          .maybeSingle();
 
-        if (productError || !product) continue;
+        if (sourceError || !sourceStock || sourceStock.current_stock < item.quantity) {
+          throw new Error(`Stock insuficiente para ${item.productName} en almacén origen`);
+        }
 
-        // Since SKU is unique across all warehouses, the product record is shared.
-        // On transfer: decrement stock from source, then update warehouse_id to destination.
-        // The net effect is the product moves to the new warehouse with reduced stock.
+        // 2. Decrementar stock en almacén ORIGEN
+        const { error: decrementError } = await supabase
+          .from("warehouse_stock")
+          .update({ current_stock: sourceStock.current_stock - item.quantity })
+          .eq("product_id", item.productId)
+          .eq("warehouse_id", fromWarehouseId);
+
+        if (decrementError) throw decrementError;
+
+        // 3. Incrementar (o crear) stock en almacén DESTINO
+        const { data: destStock } = await supabase
+          .from("warehouse_stock")
+          .select("current_stock")
+          .eq("product_id", item.productId)
+          .eq("warehouse_id", toWarehouseId)
+          .maybeSingle();
+
+        if (destStock) {
+          // Ya existe el registro en destino, incrementar
+          const { error: incrementError } = await supabase
+            .from("warehouse_stock")
+            .update({ current_stock: destStock.current_stock + item.quantity })
+            .eq("product_id", item.productId)
+            .eq("warehouse_id", toWarehouseId);
+          if (incrementError) throw incrementError;
+        } else {
+          // Crear nuevo registro de stock en almacén destino
+          const { error: insertError } = await supabase
+            .from("warehouse_stock")
+            .insert({
+              product_id: item.productId,
+              warehouse_id: toWarehouseId,
+              current_stock: item.quantity,
+            });
+          if (insertError) throw insertError;
+        }
+
+        // 4. Actualizar products.current_stock como total global (suma de todos los almacenes)
+        const { data: allStocks } = await supabase
+          .from("warehouse_stock")
+          .select("current_stock")
+          .eq("product_id", item.productId);
+
+        const totalStock = (allStocks || []).reduce((sum: number, ws: any) => sum + (ws.current_stock || 0), 0);
         await supabase
           .from("products")
-          .update({
-            current_stock: product.current_stock - item.quantity,
-            warehouse_id: toWarehouseId,
-            updated_at: new Date().toISOString(),
-          })
+          .update({ current_stock: totalStock, updated_at: new Date().toISOString() })
           .eq("id", item.productId);
 
-        // Record transfer with batch_id and selected transferDate
+        // 5. Registrar la transferencia en el historial
         await supabase
           .from("warehouse_transfers")
           .insert({
