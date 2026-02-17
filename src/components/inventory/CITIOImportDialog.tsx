@@ -178,7 +178,12 @@ export function CITIOImportDialog({
               description: med.description,
               barcode: barcode, // Código de barras original
               brand: med.brand || null,
-              category: med.medication_families?.name || null,
+              category: med.medication_families?.name
+                ? med.medication_families.name
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                : null,
               grupo_sat: med.grupo_sat || null,
               unit: med.presentacion || 'pieza',
               price_type_1: med.price_type_1 || null,
