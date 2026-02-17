@@ -349,32 +349,16 @@ export function WarehouseTransferDialog({
           })
           .eq("id", item.productId);
 
-        // Check if product exists in destination warehouse — match by sku first, then name
-        const { data: destProductBySku } = await supabase
+        // Since SKU is unique across all warehouses, move the product to the destination warehouse
+        // and update its warehouse_id. Stock was already decremented from source above.
+        // We update the warehouse_id of the transferred product to the destination warehouse.
+        await supabase
           .from("products")
-          .select("id, current_stock")
-          .eq("warehouse_id", toWarehouseId)
-          .eq("sku", (await supabase.from("products").select("sku").eq("id", item.productId).single()).data?.sku || "")
-          .maybeSingle();
-
-        const destProductFallback = !destProductBySku ? await supabase
-          .from("products")
-          .select("id, current_stock")
-          .eq("warehouse_id", toWarehouseId)
-          .eq("name", product.name)
-          .maybeSingle() : null;
-
-        const destProduct = destProductBySku || destProductFallback?.data;
-
-        if (destProduct) {
-          await supabase
-            .from("products")
-            .update({ 
-              current_stock: destProduct.current_stock + item.quantity,
-              updated_at: new Date().toISOString()
-            })
-            .eq("id", destProduct.id);
-        }
+          .update({
+            warehouse_id: toWarehouseId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", item.productId);
 
         // Record transfer with batch_id and selected transferDate
         await supabase
