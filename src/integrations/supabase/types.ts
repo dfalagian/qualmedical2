@@ -1360,6 +1360,7 @@ export type Database = {
           description: string | null
           grupo_sat: string | null
           id: string
+          image_url: string | null
           is_active: boolean | null
           minimum_stock: number | null
           name: string
@@ -1391,6 +1392,7 @@ export type Database = {
           description?: string | null
           grupo_sat?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean | null
           minimum_stock?: number | null
           name: string
@@ -1422,6 +1424,7 @@ export type Database = {
           description?: string | null
           grupo_sat?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean | null
           minimum_stock?: number | null
           name?: string

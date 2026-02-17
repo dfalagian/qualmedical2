@@ -43,7 +43,7 @@ export const POSInterface = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, sku, brand, category, current_stock, price_type_1, price_type_2, price_type_3, price_type_4, price_type_5, unit_price, grupo_sat")
+        .select("id, name, sku, brand, category, current_stock, price_type_1, price_type_2, price_type_3, price_type_4, price_type_5, unit_price, grupo_sat, image_url")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
