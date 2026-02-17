@@ -16,6 +16,7 @@ interface TransferRecord {
   to_warehouse_id: string;
   product_id: string | null;
   rfid_tag_id: string | null;
+  batch_id: string | null;
   quantity: number | null;
   transfer_type: string;
   notes: string | null;
@@ -23,6 +24,7 @@ interface TransferRecord {
   from_warehouse?: { name: string } | null;
   to_warehouse?: { name: string } | null;
   products?: { name: string; brand: string | null; unit: string | null } | null;
+  product_batches?: { batch_number: string; expiration_date: string } | null;
   rfid_tags?: {
     epc: string;
     products?: { name: string; brand: string | null; unit: string | null } | null;
@@ -50,6 +52,7 @@ export function WarehouseTransferHistory() {
           from_warehouse:warehouses!warehouse_transfers_from_warehouse_id_fkey(name),
           to_warehouse:warehouses!warehouse_transfers_to_warehouse_id_fkey(name),
           products:product_id(name, brand, unit),
+          product_batches:batch_id(batch_number, expiration_date),
           rfid_tags:rfid_tag_id(
             epc,
             products:product_id(name, brand, unit),
@@ -109,12 +112,15 @@ export function WarehouseTransferHistory() {
         };
       } else {
         const prod = item.products as any;
+        const batch = item.product_batches as any;
         return {
           index: idx + 1,
           productName: prod?.name || "Sin producto",
           brand: prod?.brand || "",
-          batchNumber: "",
-          expirationDate: "",
+          batchNumber: batch?.batch_number || "",
+          expirationDate: batch?.expiration_date
+            ? format(new Date(batch.expiration_date + "T00:00:00"), "dd/MM/yyyy")
+            : "",
           quantity: item.quantity || 0,
           unit: prod?.unit || "pieza",
           type: "manual" as const,

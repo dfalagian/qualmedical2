@@ -319,6 +319,7 @@ export function WarehouseTransferDialog({
           rfid_tag_id: tag.id,
           transfer_type: "rfid",
           notes: notes || null,
+          created_at: transferDate.toISOString(),
         }));
 
         const { error: transferError } = await supabase
@@ -348,13 +349,22 @@ export function WarehouseTransferDialog({
           })
           .eq("id", item.productId);
 
-        // Check if product exists in destination or create reference
-        const { data: destProduct } = await supabase
+        // Check if product exists in destination warehouse — match by sku first, then name
+        const { data: destProductBySku } = await supabase
+          .from("products")
+          .select("id, current_stock")
+          .eq("warehouse_id", toWarehouseId)
+          .eq("sku", (await supabase.from("products").select("sku").eq("id", item.productId).single()).data?.sku || "")
+          .maybeSingle();
+
+        const destProductFallback = !destProductBySku ? await supabase
           .from("products")
           .select("id, current_stock")
           .eq("warehouse_id", toWarehouseId)
           .eq("name", product.name)
-          .maybeSingle();
+          .maybeSingle() : null;
+
+        const destProduct = destProductBySku || destProductFallback?.data;
 
         if (destProduct) {
           await supabase
@@ -366,16 +376,18 @@ export function WarehouseTransferDialog({
             .eq("id", destProduct.id);
         }
 
-        // Record transfer
+        // Record transfer with batch_id and selected transferDate
         await supabase
           .from("warehouse_transfers")
           .insert({
             from_warehouse_id: fromWarehouseId,
             to_warehouse_id: toWarehouseId,
             product_id: item.productId,
+            batch_id: item.batchId || null,
             quantity: item.quantity,
             transfer_type: "manual",
             notes: notes || null,
+            created_at: transferDate.toISOString(),
           });
 
         results.manualCount += item.quantity;
