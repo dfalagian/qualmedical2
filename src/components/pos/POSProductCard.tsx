@@ -10,6 +10,7 @@ interface POSProductCardProps {
     brand: string | null;
     category: string | null;
     current_stock: number | null;
+    image_url?: string | null;
   };
   price: number;
   cartQuantity: number;
@@ -33,6 +34,22 @@ export const POSProductCard = ({ product, price, cartQuantity, onAdd }: POSProdu
       }`}
     >
       <div className="flex flex-col h-full gap-3">
+        {/* Product Image */}
+        {product.image_url ? (
+          <div className="w-full h-24 rounded-lg overflow-hidden bg-muted">
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </div>
+        ) : (
+          <div className="w-full h-24 rounded-lg bg-muted/50 flex items-center justify-center">
+            <Package className="h-8 w-8 text-muted-foreground/30" />
+          </div>
+        )}
+
         {/* Top: Category + Stock */}
         <div className="flex items-start justify-between">
           <Badge variant="outline" className="text-xs font-normal">

@@ -211,7 +211,8 @@ export default function Inventory() {
     price_type_4: 0,
     price_type_5: 0,
     rfid_required: false,
-    warehouse_id: ""
+    warehouse_id: "",
+    image_url: ""
   });
 
   const [tagForm, setTagForm] = useState({
@@ -373,7 +374,8 @@ export default function Inventory() {
             price_type_4: product.price_type_4 || null,
             price_type_5: product.price_type_5 || null,
             rfid_required: product.rfid_required,
-            warehouse_id: warehouseId || null
+            warehouse_id: warehouseId || null,
+            image_url: product.image_url || null
           })
           .eq("id", product.id);
         if (error) throw error;
@@ -395,7 +397,8 @@ export default function Inventory() {
             price_type_4: product.price_type_4 || null,
             price_type_5: product.price_type_5 || null,
             rfid_required: product.rfid_required,
-            warehouse_id: warehouseId || null
+            warehouse_id: warehouseId || null,
+            image_url: product.image_url || null
           });
         if (error) throw error;
       }
@@ -1041,7 +1044,8 @@ export default function Inventory() {
       price_type_4: 0,
       price_type_5: 0,
       rfid_required: false,
-      warehouse_id: ""
+      warehouse_id: "",
+      image_url: ""
     });
   };
 
@@ -1081,7 +1085,8 @@ export default function Inventory() {
             price_type_4: data.price_type_4 || 0,
             price_type_5: data.price_type_5 || 0,
             rfid_required: data.rfid_required || false,
-            warehouse_id: data.warehouse_id || ""
+            warehouse_id: data.warehouse_id || "",
+            image_url: data.image_url || ""
           });
           setProductDialogOpen(true);
         }
@@ -2372,9 +2377,58 @@ export default function Inventory() {
                           <p className="text-xs text-muted-foreground">
                             Desactiva ajustes manuales (+/-) y obliga escaneo de etiquetas RFID.
                           </p>
-                        </div>
                       </div>
                     </div>
+
+                    {/* Imagen del producto */}
+                    <div className="space-y-1">
+                      <Label className="text-xs">Imagen del producto (visible en POS)</Label>
+                      <div className="flex items-center gap-3">
+                        {productForm.image_url && (
+                          <img
+                            src={productForm.image_url}
+                            alt="Producto"
+                            className="h-16 w-16 rounded-lg object-cover border"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            className="h-9"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const ext = file.name.split('.').pop();
+                              const path = `${crypto.randomUUID()}.${ext}`;
+                              const { error: uploadError } = await supabase.storage
+                                .from('product-images')
+                                .upload(path, file);
+                              if (uploadError) {
+                                toast({ title: "Error al subir imagen", description: uploadError.message, variant: "destructive" });
+                                return;
+                              }
+                              const { data: urlData } = supabase.storage
+                                .from('product-images')
+                                .getPublicUrl(path);
+                              setProductForm({ ...productForm, image_url: urlData.publicUrl });
+                              toast({ title: "Imagen subida correctamente" });
+                            }}
+                          />
+                        </div>
+                        {productForm.image_url && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => setProductForm({ ...productForm, image_url: "" })}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                   </div>
 
                   {/* Stock y precios */}
