@@ -38,6 +38,14 @@ type UnifiedInvoice = {
   invoice_number: string;
   amount: number;
   emisor_nombre: string | null;
+  emisor_rfc?: string | null;
+  receptor_nombre?: string | null;
+  receptor_rfc?: string | null;
+  subtotal?: number | null;
+  total_impuestos?: number | null;
+  descuento?: number | null;
+  forma_pago?: string | null;
+  metodo_pago?: string | null;
   fecha_emision: string | null;
   currency: string | null;
   status?: string | null;
@@ -96,7 +104,7 @@ export const LinkInvoiceDialog = ({
       // For registered supplier orders, also show all official invoices
       const { data, error } = await supabase
         .from("general_supplier_invoices")
-        .select("id, invoice_number, amount, emisor_nombre, fecha_emision, currency")
+        .select("id, invoice_number, amount, emisor_nombre, emisor_rfc, receptor_nombre, receptor_rfc, subtotal, total_impuestos, descuento, forma_pago, metodo_pago, fecha_emision, currency")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []).map((inv) => ({
@@ -300,26 +308,26 @@ export const LinkInvoiceDialog = ({
                         </div>
                       </div>
                     </button>
-                    {invoice.source === "registered" && (
-                      <Collapsible
-                        open={expandedInvoiceId === invoice.id}
-                        onOpenChange={(open) => setExpandedInvoiceId(open ? invoice.id : null)}
-                      >
-                        <CollapsibleTrigger asChild>
-                          <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-3 pb-2 transition-colors">
-                            {expandedInvoiceId === invoice.id ? (
-                              <ChevronDown className="h-3 w-3" />
-                            ) : (
-                              <ChevronRight className="h-3 w-3" />
-                            )}
-                            <Package className="h-3 w-3" />
-                            Ver conceptos
-                          </button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <div className="px-3 pb-3">
-                            <div className="bg-muted/30 rounded-md p-2 space-y-1 max-h-32 overflow-y-auto text-xs">
-                              {expandedInvoiceId === invoice.id && invoiceItems.length > 0 ? (
+                    <Collapsible
+                      open={expandedInvoiceId === invoice.id}
+                      onOpenChange={(open) => setExpandedInvoiceId(open ? invoice.id : null)}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-3 pb-2 transition-colors">
+                          {expandedInvoiceId === invoice.id ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronRight className="h-3 w-3" />
+                          )}
+                          <Package className="h-3 w-3" />
+                          Ver conceptos
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="px-3 pb-3">
+                          <div className="bg-muted/30 rounded-md p-2 space-y-1 max-h-40 overflow-y-auto text-xs">
+                            {invoice.source === "registered" ? (
+                              expandedInvoiceId === invoice.id && invoiceItems.length > 0 ? (
                                 invoiceItems.map((item, idx) => (
                                   <div key={idx} className="flex justify-between gap-2">
                                     <span className="truncate text-muted-foreground flex-1">
@@ -335,12 +343,54 @@ export const LinkInvoiceDialog = ({
                                 ))
                               ) : expandedInvoiceId === invoice.id ? (
                                 <p className="text-muted-foreground italic">Sin conceptos disponibles</p>
-                              ) : null}
-                            </div>
+                              ) : null
+                            ) : (
+                              /* Official invoice: show fiscal summary */
+                              <div className="space-y-1">
+                                <div className="flex justify-between gap-2">
+                                  <span className="text-muted-foreground">Emisor:</span>
+                                  <span className="font-medium text-right">{invoice.emisor_nombre || "—"} {invoice.emisor_rfc ? `(${invoice.emisor_rfc})` : ""}</span>
+                                </div>
+                                {invoice.receptor_nombre && (
+                                  <div className="flex justify-between gap-2">
+                                    <span className="text-muted-foreground">Receptor:</span>
+                                    <span className="font-medium text-right">{invoice.receptor_nombre} {invoice.receptor_rfc ? `(${invoice.receptor_rfc})` : ""}</span>
+                                  </div>
+                                )}
+                                {invoice.subtotal != null && (
+                                  <div className="flex justify-between gap-2">
+                                    <span className="text-muted-foreground">Subtotal:</span>
+                                    <span className="font-medium">${Number(invoice.subtotal).toLocaleString("es-MX", { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                )}
+                                {invoice.descuento != null && invoice.descuento > 0 && (
+                                  <div className="flex justify-between gap-2">
+                                    <span className="text-muted-foreground">Descuento:</span>
+                                    <span className="font-medium">-${Number(invoice.descuento).toLocaleString("es-MX", { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                )}
+                                {invoice.total_impuestos != null && (
+                                  <div className="flex justify-between gap-2">
+                                    <span className="text-muted-foreground">Impuestos:</span>
+                                    <span className="font-medium">${Number(invoice.total_impuestos).toLocaleString("es-MX", { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between gap-2 border-t border-border pt-1 mt-1">
+                                  <span className="text-muted-foreground font-medium">Total:</span>
+                                  <span className="font-semibold">${Number(invoice.amount).toLocaleString("es-MX", { minimumFractionDigits: 2 })} {invoice.currency || "MXN"}</span>
+                                </div>
+                                {(invoice.forma_pago || invoice.metodo_pago) && (
+                                  <div className="flex justify-between gap-2 text-muted-foreground">
+                                    <span>Pago:</span>
+                                    <span>{[invoice.forma_pago, invoice.metodo_pago].filter(Boolean).join(" / ")}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    )}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   </div>
                 );
               })}

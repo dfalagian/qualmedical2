@@ -243,15 +243,21 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     enabled: !!selectedProduct,
   });
 
+  // Helper: parse a date string (YYYY-MM-DD) without timezone shift
+  const parseDateLocal = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   // Load quote data when editing
   useEffect(() => {
     if (quoteToEdit && products.length > 0) {
       setFolio(quoteToEdit.folio);
       setConcepto(quoteToEdit.concepto || "");
-      setFechaCotizacion(new Date(quoteToEdit.fecha_cotizacion));
-      setFechaEntrega(quoteToEdit.fecha_entrega ? new Date(quoteToEdit.fecha_entrega) : undefined);
+      setFechaCotizacion(parseDateLocal(quoteToEdit.fecha_cotizacion));
+      setFechaEntrega(quoteToEdit.fecha_entrega ? parseDateLocal(quoteToEdit.fecha_entrega) : undefined);
       setFacturaAnterior(quoteToEdit.factura_anterior || "");
-      setFechaFacturaAnterior(quoteToEdit.fecha_factura_anterior ? new Date(quoteToEdit.fecha_factura_anterior) : undefined);
+      setFechaFacturaAnterior(quoteToEdit.fecha_factura_anterior ? parseDateLocal(quoteToEdit.fecha_factura_anterior) : undefined);
       setMontoFacturaAnterior(quoteToEdit.monto_factura_anterior?.toString() || "");
       setSelectedClient(quoteToEdit.client);
       setSavedQuoteId(quoteToEdit.id);
@@ -782,7 +788,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
 
             <div className="space-y-2">
               <Label>Folio Cotización</Label>
-              <Input value={folio} onChange={(e) => setFolio(e.target.value)} readOnly={!isEditMode} className={!isEditMode ? "bg-muted" : ""} />
+              <Input value={folio} onChange={(e) => setFolio(e.target.value)} placeholder="Ej. COT-QUAL-2025-001" />
             </div>
 
             <div className="space-y-2">
