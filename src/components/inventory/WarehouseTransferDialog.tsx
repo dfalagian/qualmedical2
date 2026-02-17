@@ -340,21 +340,13 @@ export function WarehouseTransferDialog({
 
         if (productError || !product) continue;
 
-        // Update source product stock
-        await supabase
-          .from("products")
-          .update({ 
-            current_stock: product.current_stock - item.quantity,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", item.productId);
-
-        // Since SKU is unique across all warehouses, move the product to the destination warehouse
-        // and update its warehouse_id. Stock was already decremented from source above.
-        // We update the warehouse_id of the transferred product to the destination warehouse.
+        // Since SKU is unique across all warehouses, the product record is shared.
+        // On transfer: decrement stock from source, then update warehouse_id to destination.
+        // The net effect is the product moves to the new warehouse with reduced stock.
         await supabase
           .from("products")
           .update({
+            current_stock: product.current_stock - item.quantity,
             warehouse_id: toWarehouseId,
             updated_at: new Date().toISOString(),
           })
