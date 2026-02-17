@@ -39,7 +39,7 @@ export const POSInterface = () => {
 
   // Fetch products
   const { data: products = [] } = useQuery({
-    queryKey: ["pos-products"],
+    queryKey: ["products"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
