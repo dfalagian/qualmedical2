@@ -41,11 +41,18 @@ const WHATSAPP_TEMPLATE_MAP: Partial<Record<NotificationType, string>> = {
 };
 
 export const useNotifications = () => {
+  // WhatsApp/SMS desactivado temporalmente - código listo para cuando se active Twilio
+  const WHATSAPP_ENABLED = false;
+
   const sendWhatsApp = async (
     phone: string,
     templateType: string,
     data?: Record<string, string>
   ) => {
+    if (!WHATSAPP_ENABLED) {
+      console.log(`[WhatsApp DISABLED] Would send "${templateType}" to ${phone}`);
+      return;
+    }
     try {
       const { error } = await supabase.functions.invoke("send-whatsapp", {
         body: { to: phone, template_type: templateType, data },
