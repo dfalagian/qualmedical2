@@ -2110,6 +2110,45 @@ export type Database = {
           },
         ]
       }
+      warehouse_stock: {
+        Row: {
+          current_stock: number
+          id: string
+          product_id: string
+          updated_at: string
+          warehouse_id: string
+        }
+        Insert: {
+          current_stock?: number
+          id?: string
+          product_id: string
+          updated_at?: string
+          warehouse_id: string
+        }
+        Update: {
+          current_stock?: number
+          id?: string
+          product_id?: string
+          updated_at?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_stock_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_stock_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warehouse_transfers: {
         Row: {
           batch_id: string | null
