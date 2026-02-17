@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Package, AlertTriangle } from "lucide-react";
+import { useState } from "react";
 
 interface POSProductCardProps {
   product: {
@@ -22,6 +24,7 @@ export const POSProductCard = ({ product, price, cartQuantity, onAdd }: POSProdu
   const isOutOfStock = stock <= 0;
   const isLowStock = stock > 0 && stock <= 5;
   const remaining = stock - cartQuantity;
+  const [imageOpen, setImageOpen] = useState(false);
 
   return (
     <div
@@ -36,14 +39,29 @@ export const POSProductCard = ({ product, price, cartQuantity, onAdd }: POSProdu
       <div className="flex flex-col h-full gap-3">
         {/* Product Image */}
         {product.image_url ? (
-          <div className="w-full h-24 rounded-lg overflow-hidden bg-muted">
-            <img
-              src={product.image_url}
-              alt={product.name}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
-          </div>
+          <>
+            <div
+              className="w-full h-24 rounded-lg overflow-hidden bg-muted cursor-pointer"
+              onClick={() => setImageOpen(true)}
+            >
+              <img
+                src={product.image_url}
+                alt={product.name}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            </div>
+            <Dialog open={imageOpen} onOpenChange={setImageOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogTitle className="text-sm truncate">{product.name}</DialogTitle>
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  className="w-full h-auto rounded-lg"
+                />
+              </DialogContent>
+            </Dialog>
+          </>
         ) : (
           <div className="w-full h-24 rounded-lg bg-muted/50 flex items-center justify-center">
             <Package className="h-8 w-8 text-muted-foreground/30" />
