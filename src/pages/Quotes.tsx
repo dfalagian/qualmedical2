@@ -7,7 +7,8 @@ import { ClientsManagement } from "@/components/quotes/ClientsManagement";
 import { QuotesManagement } from "@/components/quotes/QuotesManagement";
 import { QuotesList } from "@/components/quotes/QuotesList";
 import { QuoteInvoiceLinking } from "@/components/quotes/QuoteInvoiceLinking";
-import { Users, List, PlusCircle, Link2 } from "lucide-react";
+import { BudgetsList } from "@/components/quotes/BudgetsList";
+import { Users, List, PlusCircle, Link2, ClipboardList } from "lucide-react";
 
 interface QuoteToEdit {
   id: string;
@@ -43,7 +44,7 @@ interface QuoteToEdit {
 
 const Quotes = () => {
   const { isAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState("list");
+  const [activeTab, setActiveTab] = useState("budgets");
   const [quoteToEdit, setQuoteToEdit] = useState<QuoteToEdit | null>(null);
 
   if (!isAdmin) {
@@ -78,7 +79,11 @@ const Quotes = () => {
             setQuoteToEdit(null);
           }
         }} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
+            <TabsTrigger value="budgets" className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              <span className="hidden sm:inline">Presupuestos</span>
+            </TabsTrigger>
             <TabsTrigger value="list" className="flex items-center gap-2">
               <List className="h-4 w-4" />
               <span className="hidden sm:inline">Listado</span>
@@ -96,6 +101,10 @@ const Quotes = () => {
               <span className="hidden sm:inline">Clientes</span>
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="budgets" className="mt-4">
+            <BudgetsList />
+          </TabsContent>
 
           <TabsContent value="list" className="mt-4">
             <QuotesList onEditQuote={handleEditQuote} />

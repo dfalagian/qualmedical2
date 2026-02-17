@@ -118,7 +118,7 @@ export const POSCart = ({
           fecha_cotizacion: new Date().toISOString().split("T")[0],
           subtotal,
           total,
-          status: "borrador",
+          status: "presupuesto",
           concepto: "Venta POS",
         })
         .select("id")
@@ -144,7 +144,7 @@ export const POSCart = ({
       return { folio: folioData, id: quote.id };
     },
     onSuccess: (data) => {
-      toast.success(`Cotización ${data.folio} creada exitosamente`);
+      toast.success(`Presupuesto ${data.folio} creado exitosamente`);
 
       // Notify managers about new POS sale
       const clientName = items.length > 0 ? "" : "Mostrador";
@@ -181,7 +181,7 @@ export const POSCart = ({
       onClose?.();
     },
     onError: (err: any) => {
-      toast.error(err.message || "Error al guardar cotización");
+      toast.error(err.message || "Error al guardar presupuesto");
     },
   });
 
@@ -292,7 +292,7 @@ export const POSCart = ({
             disabled={saveMutation.isPending || items.length === 0}
           >
             <Save className="h-5 w-5 mr-2" />
-            {saveMutation.isPending ? "Guardando..." : "Guardar Cotización"}
+            {saveMutation.isPending ? "Guardando..." : "Guardar Presupuesto"}
           </Button>
         </div>
       )}
