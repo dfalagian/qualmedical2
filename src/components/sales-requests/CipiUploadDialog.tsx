@@ -115,7 +115,7 @@ export function CipiUploadDialog({ open, onOpenChange, type, onSuccess }: CipiUp
           let impuestos = 0;
           let total = 0;
 
-          const CATEGORY_NAMES = ['MEDICAMENTOS', 'ONCOLOGICOS', 'INMUNOTERAPIA', 'SOLUCIONES', 'INSUMOS'];
+          const CATEGORY_NAMES = ['MEDICAMENTOS', 'ONCOLOGICOS', 'INMUNOTERAPIA', 'INMUNOLOGICOS', 'SOLUCIONES', 'INSUMOS', 'SERVICIOS'];
 
           for (let r = headerRow + 1; r <= range.e.r; r++) {
             const firstCell = sheet[XLSX.utils.encode_cell({ r, c: 0 })];
@@ -169,6 +169,9 @@ export function CipiUploadDialog({ open, onOpenChange, type, onSuccess }: CipiUp
 
             // Skip empty rows
             if (!firstVal) continue;
+
+            // Skip long text rows (legal notes, payment info, etc. > 80 chars)
+            if (firstVal.length > 80) continue;
 
             // This should be a product row
             const item: Record<string, any> = { categoria: currentCategory };
