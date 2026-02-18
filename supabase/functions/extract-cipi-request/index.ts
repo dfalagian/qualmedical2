@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
       type: 'text',
       text: `Analiza el documento/texto de una solicitud médica CIPI y extrae la información.
 
-IMPORTANTE: Excluye cualquier fila que NO sea un producto real. Las filas que contienen textos informativos como condiciones de pago, métodos de pago, datos bancarios, notas legales, avisos, cláusulas o instrucciones NO son productos y NO deben incluirse en el listado. Solo incluye filas que representen medicamentos, insumos, soluciones u otros productos médicos concretos con descripción de producto real.
+IMPORTANTE: Excluye cualquier fila que NO sea un producto real. Las filas que contienen textos informativos como condiciones de pago, métodos de pago, datos bancarios (CLABE, cuenta, banco), notas legales, avisos sobre IVA, honorarios médicos, cláusulas, instrucciones de pago o cualquier texto que no sea un producto médico concreto, NO deben incluirse en el listado. Ejemplos de filas a EXCLUIR: "Los precios ya incluyen IVA en los rubros de servicios e insumos médicos...", "Los métodos de pago son: pago con terminal y transferencia electrónica: BANCOMER...", "La cotización incluye honorarios médicos, preparación, suministro y aplicación de infusión.". Solo incluye filas que representen medicamentos, insumos, soluciones u otros productos médicos concretos con descripción de producto real, cantidad y precio.
 
 Responde ÚNICAMENTE con JSON válido:
 {

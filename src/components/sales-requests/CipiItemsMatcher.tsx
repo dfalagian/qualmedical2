@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Check, ChevronsUpDown, Save, X } from "lucide-react";
+import { Check, ChevronsUpDown, Save, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Command,
@@ -80,6 +80,20 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
     }
   };
 
+  const handleDeleteItem = async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from("cipi_request_items")
+        .delete()
+        .eq("id", itemId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["cipi-request-items", requestId] });
+      toast.success("Línea eliminada");
+    } catch (err: any) {
+      toast.error(err.message || "Error al eliminar");
+    }
+  };
+
   const handleClearLote = async (itemId: string) => {
     try {
       const { error } = await supabase
@@ -123,6 +137,7 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
               <TableHead className="w-[70px]">IVA</TableHead>
               <TableHead className="w-[90px]">Precio</TableHead>
               <TableHead className="w-[250px]">Producto inventario</TableHead>
+              <TableHead className="w-[40px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -232,6 +247,15 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
                       </Command>
                     </PopoverContent>
                   </Popover>
+                </TableCell>
+                <TableCell>
+                  <button
+                    onClick={() => handleDeleteItem(item.id)}
+                    className="text-destructive hover:text-destructive/80 p-1 rounded hover:bg-destructive/10 transition-colors"
+                    title="Eliminar línea"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </TableCell>
               </TableRow>
             ))}
