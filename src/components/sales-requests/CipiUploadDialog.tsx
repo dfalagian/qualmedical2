@@ -115,46 +115,57 @@ export function CipiUploadDialog({ open, onOpenChange, type, onSuccess }: CipiUp
           let impuestos = 0;
           let total = 0;
 
+          const CATEGORY_NAMES = ['MEDICAMENTOS', 'ONCOLOGICOS', 'INMUNOTERAPIA', 'SOLUCIONES', 'INSUMOS'];
+
           for (let r = headerRow + 1; r <= range.e.r; r++) {
             const firstCell = sheet[XLSX.utils.encode_cell({ r, c: 0 })];
             const firstVal = firstCell ? String(firstCell.v || '').trim() : '';
 
-            // Check for subtotal/total rows
-            if (firstVal.toUpperCase().includes('SUB TOTAL') || firstVal.toUpperCase().includes('SUBTOTAL')) continue;
-            if (firstVal.toUpperCase().includes('IMPUESTOS')) continue;
-            if (firstVal.toUpperCase() === 'TOTAL') continue;
-
-            // Check for totals in other columns
+            // Scan ALL cells in this row to detect category headers or totals
+            // (categories can appear in any column due to merged cells)
+            let isCategoryRow = false;
+            let detectedCategory = '';
             let isTotalRow = false;
+
             for (let c = 0; c <= range.e.c; c++) {
               const cell = sheet[XLSX.utils.encode_cell({ r, c })];
-              if (cell && typeof cell.v === 'string') {
-                const v = cell.v.toUpperCase().trim();
-                if (v === 'SUB TOTAL:' || v === 'SUBTOTAL:') {
+              if (!cell || cell.v === undefined) continue;
+              const cellVal = String(cell.v).trim().toUpperCase();
+
+              // Check for category headers in any column
+              if (CATEGORY_NAMES.includes(cellVal)) {
+                isCategoryRow = true;
+                detectedCategory = cellVal;
+                break;
+              }
+
+              // Check for total rows
+              if (typeof cell.v === 'string') {
+                if (cellVal === 'SUB TOTAL:' || cellVal === 'SUBTOTAL:') {
                   const nextCell = sheet[XLSX.utils.encode_cell({ r, c: c + 1 })];
                   if (nextCell) subtotal = Number(nextCell.v) || 0;
                   isTotalRow = true;
                 }
-                if (v === 'IMPUESTOS:') {
+                if (cellVal === 'IMPUESTOS:') {
                   const nextCell = sheet[XLSX.utils.encode_cell({ r, c: c + 1 })];
                   if (nextCell) impuestos = Number(nextCell.v) || 0;
                   isTotalRow = true;
                 }
-                if (v === 'TOTAL:') {
+                if (cellVal === 'TOTAL:') {
                   const nextCell = sheet[XLSX.utils.encode_cell({ r, c: c + 1 })];
                   if (nextCell) total = Number(nextCell.v) || 0;
                   isTotalRow = true;
                 }
               }
             }
+
+            if (isCategoryRow) { currentCategory = detectedCategory; continue; }
             if (isTotalRow) continue;
 
-            // Check if this is a category header (e.g., MEDICAMENTOS, ONCOLOGICOS, etc.)
-            const categories = ['MEDICAMENTOS', 'ONCOLOGICOS', 'INMUNOTERAPIA', 'SOLUCIONES', 'INSUMOS'];
-            if (categories.includes(firstVal.toUpperCase())) {
-              currentCategory = firstVal.toUpperCase();
-              continue;
-            }
+            // Check for subtotal/total rows by first cell value
+            if (firstVal.toUpperCase().includes('SUB TOTAL') || firstVal.toUpperCase().includes('SUBTOTAL')) continue;
+            if (firstVal.toUpperCase().includes('IMPUESTOS')) continue;
+            if (firstVal.toUpperCase() === 'TOTAL') continue;
 
             // Skip empty rows
             if (!firstVal) continue;
