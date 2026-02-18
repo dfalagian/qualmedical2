@@ -128,6 +128,7 @@ export const useQuoteActions = () => {
         .from("quotes")
         .update({
           client_id: params.clientId,
+          folio: params.folio,
           concepto: params.concepto,
           fecha_cotizacion: params.fechaCotizacion.toISOString().split('T')[0],
           fecha_entrega: params.fechaEntrega?.toISOString().split('T')[0] || null,
