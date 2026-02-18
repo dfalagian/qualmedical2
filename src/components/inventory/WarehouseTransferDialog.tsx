@@ -389,31 +389,11 @@ export function WarehouseTransferDialog({
           if (insertError) throw insertError;
         }
 
-        // 4. Actualizar products.current_stock como total global (suma de todos los almacenes)
-        // IMPORTANTE: usamos la suma de warehouse_stock para no perder stock de lotes no sincronizados.
-        // El total NO puede bajar de la suma de current_quantity de lotes activos.
-        const [allStocksResult, allBatchesResult] = await Promise.all([
-          supabase
-            .from("warehouse_stock")
-            .select("current_stock")
-            .eq("product_id", item.productId),
-          supabase
-            .from("product_batches")
-            .select("current_quantity")
-            .eq("product_id", item.productId)
-            .eq("is_active", true),
-        ]);
+        // NOTA: products.current_stock NO se modifica en traspasos.
+        // El stock global solo cambia al aprobar una cotización (venta).
+        // Un traspaso es un movimiento interno: resta en origen, suma en destino. El total no varía.
 
-        const warehouseTotal = (allStocksResult.data || []).reduce((sum: number, ws: any) => sum + (ws.current_stock || 0), 0);
-        const batchTotal = (allBatchesResult.data || []).reduce((sum: number, pb: any) => sum + (pb.current_quantity || 0), 0);
-        // Usar el máximo entre ambas fuentes para no perder stock real
-        const totalStock = Math.max(warehouseTotal, batchTotal);
-        await supabase
-          .from("products")
-          .update({ current_stock: totalStock, updated_at: new Date().toISOString() })
-          .eq("id", item.productId);
-
-        // 5. Registrar la transferencia en el historial
+        // 4. Registrar la transferencia en el historial
         await supabase
           .from("warehouse_transfers")
           .insert({
