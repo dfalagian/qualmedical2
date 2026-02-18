@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -26,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle2, Package, AlertCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Package, AlertCircle, Warehouse } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -65,7 +66,7 @@ interface BatchSelectionDialogProps {
   onOpenChange: (open: boolean) => void;
   quoteId: string;
   quoteItems: QuoteItem[];
-  onConfirm: (selections: BatchSelection[]) => void;
+  onConfirm: (selections: BatchSelection[], warehouseId: string) => void;
   isApproving: boolean;
 }
 
@@ -78,11 +79,57 @@ export const BatchSelectionDialog = ({
   isApproving,
 }: BatchSelectionDialogProps) => {
   const [selections, setSelections] = useState<BatchSelection[]>([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("");
 
   // Get unique product IDs from quote items
   const productIds = useMemo(() => {
     return [...new Set(quoteItems.filter(i => i.product_id).map(i => i.product_id as string))];
   }, [quoteItems]);
+
+  // Fetch active warehouses
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ["warehouses-for-sale"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouses")
+        .select("id, name, code")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Auto-select first warehouse when list loads
+  useEffect(() => {
+    if (warehouses.length > 0 && !selectedWarehouseId) {
+      setSelectedWarehouseId(warehouses[0].id);
+    }
+  }, [warehouses, selectedWarehouseId]);
+
+  // Reset warehouse selection when dialog closes
+  useEffect(() => {
+    if (!open) setSelectedWarehouseId("");
+  }, [open]);
+
+  // Fetch warehouse stock for selected warehouse
+  const { data: warehouseStockMap = {} } = useQuery({
+    queryKey: ["warehouse-stock-for-sale", selectedWarehouseId, productIds],
+    queryFn: async () => {
+      if (!selectedWarehouseId || productIds.length === 0) return {};
+      const { data, error } = await supabase
+        .from("warehouse_stock")
+        .select("product_id, current_stock")
+        .eq("warehouse_id", selectedWarehouseId)
+        .in("product_id", productIds);
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      (data || []).forEach(ws => { map[ws.product_id] = ws.current_stock; });
+      return map;
+    },
+    enabled: open && !!selectedWarehouseId && productIds.length > 0,
+  });
 
   // Fetch batches for all products in the quote
   const { data: batchesByProduct = {}, isLoading } = useQuery({
@@ -157,20 +204,24 @@ export const BatchSelectionDialog = ({
     }));
   };
 
-  // Items that require batch selection (only those with product_id)
-  const itemsRequiringBatch = quoteItems.filter(i => i.product_id);
-  
   // Check if all items that need selection have valid selections
   const allSelected = selections.length === 0 || selections.every(sel => sel.batchId !== null);
   
-  // Check for items with insufficient stock (including zero stock)
+  // Check for items with insufficient stock in the selected warehouse
+  const itemsWithInsufficientWarehouseStock = quoteItems.filter(item => {
+    if (!item.product_id) return false;
+    const warehouseStock = warehouseStockMap[item.product_id] ?? 0;
+    return warehouseStock < item.cantidad;
+  });
+
+  // Check for items with insufficient stock in batch (including zero stock)
   const itemsWithInsufficientStock = selections.filter(sel => 
     sel.batchId && sel.availableQuantity < sel.requestedQuantity
   );
 
   // Check for items without available batches (no stock at all) - only for items WITH product_id
   const itemsWithoutBatches = quoteItems.filter(item => {
-    if (!item.product_id) return false; // Skip items not linked to inventory
+    if (!item.product_id) return false;
     const productBatches = batchesByProduct[item.product_id] || [];
     return productBatches.length === 0;
   });
@@ -192,15 +243,15 @@ export const BatchSelectionDialog = ({
     }),
   ];
 
-  // Can approve if no stock issues exist (items without product_id are allowed)
-  const canApprove = allSelected && allProductsWithoutStock.length === 0;
+  // Can approve if no stock issues exist and warehouse is selected
+  const canApprove = allSelected && allProductsWithoutStock.length === 0 && !!selectedWarehouseId;
 
   const handleConfirm = () => {
-    if (!canApprove) {
-      return;
-    }
-    onConfirm(selections);
+    if (!canApprove || !selectedWarehouseId) return;
+    onConfirm(selections, selectedWarehouseId);
   };
+
+  const selectedWarehouse = warehouses.find(w => w.id === selectedWarehouseId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -211,9 +262,53 @@ export const BatchSelectionDialog = ({
             Seleccionar Lotes para Aprobar Venta
           </DialogTitle>
           <DialogDescription>
-            Seleccione el lote de cada producto. El stock se verificará en tiempo real.
+            Seleccione el almacén de origen y el lote de cada producto.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Warehouse Selector */}
+        <div className="border rounded-lg p-4 bg-muted/30 space-y-2">
+          <Label className="flex items-center gap-2 font-semibold text-base">
+            <Warehouse className="h-4 w-4" />
+            Almacén de origen de la venta
+          </Label>
+          <p className="text-sm text-muted-foreground">
+            El stock se descontará de este almacén al aprobar.
+          </p>
+          <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
+            <SelectTrigger className="w-full sm:w-80">
+              <SelectValue placeholder="Seleccionar almacén..." />
+            </SelectTrigger>
+            <SelectContent>
+              {warehouses.map(wh => (
+                <SelectItem key={wh.id} value={wh.id}>
+                  <div className="flex items-center gap-2">
+                    <Warehouse className="h-4 w-4" />
+                    {wh.name}
+                    {wh.code && <span className="text-muted-foreground text-xs">({wh.code})</span>}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Stock availability in selected warehouse */}
+          {selectedWarehouseId && itemsWithInsufficientWarehouseStock.length > 0 && (
+            <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+              <p className="font-medium flex items-center gap-1 mb-1">
+                <AlertTriangle className="h-4 w-4" />
+                Stock insuficiente en {selectedWarehouse?.name}:
+              </p>
+              <ul className="list-disc pl-5 space-y-0.5">
+                {itemsWithInsufficientWarehouseStock.map(item => (
+                  <li key={item.id}>
+                    {item.nombre_producto}: disponible {warehouseStockMap[item.product_id!] ?? 0}, solicitado {item.cantidad}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
 
         {isLoading ? (
           <div className="py-8 text-center text-muted-foreground">
@@ -256,7 +351,7 @@ export const BatchSelectionDialog = ({
                     <TableHead>Producto</TableHead>
                     <TableHead className="text-center">Cantidad</TableHead>
                     <TableHead>Seleccionar Lote</TableHead>
-                    <TableHead className="text-center">Stock</TableHead>
+                    <TableHead className="text-center">Stock Lote</TableHead>
                     <TableHead>Estado</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -267,12 +362,23 @@ export const BatchSelectionDialog = ({
                     const selection = selections.find(s => s.itemId === item.id);
                     const hasEnoughStock = selection && selection.availableQuantity >= item.cantidad;
                     const noBatches = hasProductId && productBatches.length === 0;
+                    const warehouseStock = hasProductId ? (warehouseStockMap[item.product_id!] ?? null) : null;
 
                     return (
                       <TableRow key={item.id}>
                         <TableCell>
                           <div className="font-medium">{item.nombre_producto}</div>
-                          <div className="text-xs text-muted-foreground">{item.marca || "-"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {item.marca || "-"}
+                            {warehouseStock !== null && (
+                              <span className={cn(
+                                "ml-2 font-medium",
+                                warehouseStock >= item.cantidad ? "text-emerald-600" : "text-amber-600"
+                              )}>
+                                · Almacén: {warehouseStock}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-center font-medium">
                           {item.cantidad}
