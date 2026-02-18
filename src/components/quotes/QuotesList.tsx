@@ -340,7 +340,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
     expirationDate: string | null;
     availableQuantity: number;
     requestedQuantity: number;
-  }>) => {
+  }>, warehouseId: string) => {
     if (!quoteToApprove) return;
     
     try {
@@ -374,6 +374,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
       await approveQuote({
         quoteId: quoteToApprove.id,
         items: itemsWithBatches,
+        warehouseId,
         forceApprove: hasStockWarnings,
       });
       

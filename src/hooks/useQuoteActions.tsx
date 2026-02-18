@@ -38,6 +38,7 @@ interface UpdateQuoteParams extends SaveQuoteParams {
 
 interface ApproveQuoteParams {
   quoteId: string;
+  warehouseId: string;
   items: Array<{
     product_id: string;
     batch_id: string;
@@ -257,7 +258,7 @@ export const useQuoteActions = () => {
           .single();
 
         if (product) {
-          // Actualizar stock del producto
+          // Actualizar stock global del producto
           const newProductStock = (product.current_stock || 0) - item.cantidad;
           await supabase
             .from("products")
@@ -265,7 +266,23 @@ export const useQuoteActions = () => {
             .eq("id", item.product_id);
         }
 
-        // Crear movimiento de inventario (salida)
+        // Descontar stock del almacén seleccionado en warehouse_stock
+        const { data: warehouseStockRow } = await supabase
+          .from("warehouse_stock")
+          .select("id, current_stock")
+          .eq("product_id", item.product_id)
+          .eq("warehouse_id", params.warehouseId)
+          .single();
+
+        if (warehouseStockRow) {
+          const newWhStock = Math.max(0, (warehouseStockRow.current_stock || 0) - item.cantidad);
+          await supabase
+            .from("warehouse_stock")
+            .update({ current_stock: newWhStock })
+            .eq("id", warehouseStockRow.id);
+        }
+
+        // Crear movimiento de inventario (salida) con referencia al almacén
         const { error: movementError } = await supabase
           .from("inventory_movements")
           .insert({
@@ -276,6 +293,7 @@ export const useQuoteActions = () => {
             new_stock: newBatchQuantity,
             reference_type: "venta",
             reference_id: params.quoteId,
+            location: params.warehouseId,
             notes: `Venta - Cotización ${params.quoteId}`,
             created_by: user.id,
           });
@@ -315,6 +333,7 @@ export const useQuoteActions = () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["product-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse-stock"] });
       logActivity({ section: "cotizaciones", action: "aprobar", entityType: "cotización", entityId: quoteId });
     },
     onError: (error: any) => {
@@ -336,6 +355,18 @@ export const useQuoteActions = () => {
 
       if (itemsError) throw itemsError;
       if (!items || items.length === 0) throw new Error("No se encontraron items");
+
+      // Obtener el almacén origen desde los movimientos de inventario de esta venta
+      const { data: saleMovements } = await supabase
+        .from("inventory_movements")
+        .select("location, product_id")
+        .eq("reference_id", quoteId)
+        .eq("reference_type", "venta");
+
+      const warehouseIdByProduct: Record<string, string> = {};
+      (saleMovements || []).forEach(m => {
+        if (m.product_id && m.location) warehouseIdByProduct[m.product_id] = m.location;
+      });
 
       // Devolver stock para cada item
       for (const item of items) {
@@ -373,6 +404,24 @@ export const useQuoteActions = () => {
             .eq("id", item.product_id);
         }
 
+        // Devolver stock al almacén origen en warehouse_stock
+        const warehouseId = warehouseIdByProduct[item.product_id];
+        if (warehouseId) {
+          const { data: wsRow } = await supabase
+            .from("warehouse_stock")
+            .select("id, current_stock")
+            .eq("product_id", item.product_id)
+            .eq("warehouse_id", warehouseId)
+            .single();
+
+          if (wsRow) {
+            await supabase
+              .from("warehouse_stock")
+              .update({ current_stock: wsRow.current_stock + item.cantidad })
+              .eq("id", wsRow.id);
+          }
+        }
+
         // Crear movimiento de inventario (entrada por cancelación)
         await supabase
           .from("inventory_movements")
@@ -384,6 +433,7 @@ export const useQuoteActions = () => {
             new_stock: newBatchQuantity,
             reference_type: "cancelacion_venta",
             reference_id: quoteId,
+            location: warehouseId || null,
             notes: `Cancelación de venta - Cotización ${quoteId}`,
             created_by: user.id,
           });
@@ -409,6 +459,7 @@ export const useQuoteActions = () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["product-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse-stock"] });
     },
     onError: (error: any) => {
       toast.error("Error al cancelar: " + error.message);
