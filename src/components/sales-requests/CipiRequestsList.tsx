@@ -147,45 +147,59 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
 
       // Create quote items - attempt to match product_id from catalog if missing
       if (items && items.length > 0) {
-        // Fetch all active products for fallback matching when product_id is missing
-        let productsCatalog: Array<{ id: string; name: string; brand: string | null }> = [];
-        const itemsMissingProductId = items.filter((item: any) => !item.product_id);
-        if (itemsMissingProductId.length > 0) {
-          const { data: prods } = await supabase
-            .from("products")
-            .select("id, name, brand")
-            .eq("is_active", true);
-          productsCatalog = prods || [];
-        }
+        // Always fetch catalog to get OFFICIAL names and for fallback matching
+        const { data: prods } = await supabase
+          .from("products")
+          .select("id, name, brand")
+          .eq("is_active", true);
+        const productsCatalog: Array<{ id: string; name: string; brand: string | null }> = prods || [];
+
+        // Build a lookup map for quick access by id
+        const catalogById = new Map(productsCatalog.map(p => [p.id, p]));
 
         const normalizeForMatch = (str: string) =>
           str.toLowerCase().replace(/\s+/g, '').replace(/\./g, '').replace(/\//g, '').trim();
 
         const quoteItems = items.map((item: any) => {
           let productId = item.product_id || null;
-          const itemName = item.matched_product_name || item.descripcion;
+          let officialName: string | null = null;
+
+          // If already linked, use the OFFICIAL catalog name (never the extracted name)
+          if (productId) {
+            const catalogProduct = catalogById.get(productId);
+            if (catalogProduct) {
+              officialName = catalogProduct.name;
+            }
+          }
 
           // If no product_id, try to find a match by normalized name + brand
-          if (!productId && itemName) {
+          if (!productId) {
+            const itemName = item.matched_product_name || item.descripcion;
             const normalizedItemName = normalizeForMatch(itemName);
             const matches = productsCatalog.filter(
               p => normalizeForMatch(p.name) === normalizedItemName
             );
             if (matches.length === 1) {
               productId = matches[0].id;
+              officialName = matches[0].name; // Use official catalog name
             } else if (matches.length > 1 && item.marca) {
-              // Disambiguate by brand
               const brandMatch = matches.find(
                 p => p.brand && p.brand.toLowerCase().trim() === item.marca.toLowerCase().trim()
               );
-              if (brandMatch) productId = brandMatch.id;
+              if (brandMatch) {
+                productId = brandMatch.id;
+                officialName = brandMatch.name; // Use official catalog name
+              }
             }
           }
+
+          // Use official catalog name if found, otherwise fall back to extracted description
+          const nombreFinal = officialName || item.matched_product_name || item.descripcion;
 
           return {
             quote_id: quote.id,
             product_id: productId,
-            nombre_producto: itemName,
+            nombre_producto: nombreFinal,
             marca: item.marca,
             lote: item.lote,
             fecha_caducidad: item.caducidad,
