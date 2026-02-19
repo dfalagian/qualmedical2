@@ -61,6 +61,7 @@ import { VirginTagAssignment } from "@/components/inventory/VirginTagAssignment"
 import { RFIDConsultaDialog } from "@/components/inventory/RFIDConsultaDialog";
 import { ProductEntryDialog } from "@/components/inventory/ProductEntryDialog";
 import { ProductRowWithBatches } from "@/components/inventory/ProductRowWithBatches";
+import { ProductsByCategory } from "@/components/inventory/ProductsByCategory";
 
 import { WarehouseTransferDialog } from "@/components/inventory/WarehouseTransferDialog";
 import { WarehouseTransferHistory } from "@/components/inventory/WarehouseTransferHistory";
@@ -98,6 +99,7 @@ interface Product {
   name: string;
   description: string | null;
   category: string | null;
+  brand?: string | null;
   unit: string;
   minimum_stock: number;
   current_stock: number;
@@ -1138,6 +1140,7 @@ export default function Inventory() {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.category?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+      (p.brand?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
       productIdsWithMatchingTags.includes(p.id);
     
     // Warehouse filter: use warehouse_stock to check actual physical location
@@ -1387,53 +1390,27 @@ export default function Inventory() {
 
             <Card>
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">Tag</TableHead>
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Categoría</TableHead>
-                      <TableHead className="text-center">Stock</TableHead>
-                      <TableHead className="text-right">Precio</TableHead>
-                      {canEdit && <TableHead className="text-right">Acciones</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loadingProducts ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8">
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                            Cargando...
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : filteredProducts.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          No hay productos registrados
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredProducts.map((product) => {
-                        const hasTag = rfidTags?.some(tag => tag.product_id === product.id);
-                        return (
-                          <ProductRowWithBatches
-                            key={product.id}
-                            product={product}
-                            hasTag={hasTag}
-                            canEdit={canEdit}
-                            isAdmin={isAdmin}
-                            isInventarioRfid={isInventarioRfid}
-                            onEdit={handleEditProduct}
-                            onDelete={(id) => deleteProductMutation.mutate(id)}
-                          />
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
+                {loadingProducts ? (
+                  <div className="flex items-center justify-center gap-2 py-8">
+                    <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    Cargando...
+                  </div>
+                ) : filteredProducts.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No hay productos registrados
+                  </div>
+                ) : (
+                  <ProductsByCategory
+                    products={filteredProducts}
+                    rfidTags={rfidTags}
+                    canEdit={canEdit}
+                    isAdmin={isAdmin}
+                    isInventarioRfid={isInventarioRfid}
+                    onEdit={handleEditProduct}
+                    onDelete={(id) => deleteProductMutation.mutate(id)}
+                    searchTerm={searchTerm}
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>

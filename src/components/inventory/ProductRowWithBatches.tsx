@@ -29,6 +29,7 @@ interface Product {
   name: string;
   description: string | null;
   category: string | null;
+  brand?: string | null;
   unit: string;
   minimum_stock: number;
   current_stock: number;
@@ -115,7 +116,7 @@ export function ProductRowWithBatches({
     return acc;
   }, {} as Record<string, typeof productTags>);
 
-  const colSpan = canEdit ? 7 : 6;
+  const colSpan = canEdit ? 8 : 7;
 
   const handleRowClick = (e: React.MouseEvent) => {
     // Don't toggle if clicking on buttons
@@ -166,10 +167,8 @@ export function ProductRowWithBatches({
         </TableCell>
         <TableCell className="font-mono text-sm">{product.sku}</TableCell>
         <TableCell className="font-medium">{product.name}</TableCell>
-        <TableCell>
-          {product.category && (
-            <Badge variant="secondary">{product.category}</Badge>
-          )}
+        <TableCell className="text-muted-foreground text-sm">
+          {product.brand || "—"}
         </TableCell>
         <TableCell className="text-center">
           <Badge
