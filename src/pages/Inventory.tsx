@@ -1114,14 +1114,34 @@ export default function Inventory() {
         .filter((id): id is string => id !== null)
     : [];
 
+  // Fetch warehouse_stock for filtering products by actual location
+  const { data: warehouseStockMap = {} } = useQuery({
+    queryKey: ["warehouse-stock-map", warehouseFilter],
+    queryFn: async () => {
+      if (warehouseFilter === "all") return {};
+      const { data, error } = await supabase
+        .from("warehouse_stock")
+        .select("product_id, current_stock")
+        .eq("warehouse_id", warehouseFilter)
+        .gt("current_stock", 0);
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      for (const row of data || []) {
+        map[row.product_id] = row.current_stock;
+      }
+      return map;
+    },
+    enabled: warehouseFilter !== "all",
+  });
+
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.category?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
       productIdsWithMatchingTags.includes(p.id);
     
-    // Warehouse filter
-    const matchesWarehouse = warehouseFilter === "all" || p.warehouse_id === warehouseFilter;
+    // Warehouse filter: use warehouse_stock to check actual physical location
+    const matchesWarehouse = warehouseFilter === "all" || (p.id in warehouseStockMap);
     
     return matchesSearch && matchesWarehouse;
   });
