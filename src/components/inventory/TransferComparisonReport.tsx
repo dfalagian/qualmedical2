@@ -109,35 +109,9 @@ function openComparisonReport() {
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="header-left">
-      <img src="${logoUrl}" alt="Qual Medical" class="logo" />
-      <div class="header-title">
-        <h1>REPORTE COMPARATIVO DE TRANSFERENCIA</h1>
-        <h2>Remisión CITIO vs Registro en Sistema</h2>
-      </div>
-    </div>
-    <div class="header-right">
-      <div class="date">11/02/2026</div>
-      <div>Almacén Principal → Almacén CITIO</div>
-      <div style="font-size:9px; color:#888; margin-top:4px;">Generado: ${new Date().toLocaleDateString("es-MX")} ${new Date().toLocaleTimeString("es-MX", { hour: '2-digit', minute: '2-digit' })}</div>
-    </div>
-  </div>
-
-  <div class="summary">
-    <div class="summary-card info">
-      <div class="num">${totalItems}</div>
-      <div class="label">TOTAL PARTIDAS</div>
-    </div>
-    <div class="summary-card ok">
-      <div class="num">${matchCount}</div>
-      <div class="label">COINCIDEN ✅</div>
-    </div>
-    <div class="summary-card error">
-      <div class="num">${mismatchCount}</div>
-      <div class="label">DISCREPANCIAS ❌</div>
-    </div>
-  </div>
+  <h1 style="font-size:14px; color:#0071a3; margin-bottom:4px;">REPORTE COMPARATIVO DE TRANSFERENCIA</h1>
+  <div style="font-size:11px; color:#666; margin-bottom:4px;">Remisión CITIO vs Registro en Sistema — 11/02/2026 — Almacén Principal → Almacén CITIO</div>
+  <div style="font-size:9px; color:#888; margin-bottom:15px;">Generado: ${new Date().toLocaleDateString("es-MX")} ${new Date().toLocaleTimeString("es-MX", { hour: '2-digit', minute: '2-digit' })}</div>
 
   <div class="section-title">TABLA COMPARATIVA DETALLADA</div>
   <table>
