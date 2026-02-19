@@ -65,6 +65,7 @@ import { ProductsByCategory } from "@/components/inventory/ProductsByCategory";
 
 import { WarehouseTransferDialog } from "@/components/inventory/WarehouseTransferDialog";
 import { WarehouseTransferHistory } from "@/components/inventory/WarehouseTransferHistory";
+import TransferComparisonReportButton from "@/components/inventory/TransferComparisonReport";
 import { WarehouseFilter } from "@/components/inventory/WarehouseFilter";
 import { StockByWarehouseModal } from "@/components/dashboard/StockByWarehouseModal";
 import { PriceTypesEditor } from "@/components/inventory/PriceTypesEditor";
@@ -2069,10 +2070,13 @@ export default function Inventory() {
           <TabsContent value="transfers" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ArrowRightLeft className="h-5 w-5 text-primary" />
-                  Historial de Transferencias
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <ArrowRightLeft className="h-5 w-5 text-primary" />
+                    Historial de Transferencias
+                  </CardTitle>
+                  <TransferComparisonReportButton />
+                </div>
               </CardHeader>
               <CardContent>
                 <WarehouseTransferHistory />
