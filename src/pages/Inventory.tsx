@@ -1116,25 +1116,32 @@ export default function Inventory() {
         .filter((id): id is string => id !== null)
     : [];
 
-  // Fetch warehouse_stock for filtering products by actual location
-  const { data: warehouseStockMap = {} } = useQuery({
-    queryKey: ["warehouse-stock-map", warehouseFilter],
+  // Fetch ALL warehouse_stock to show location info on products
+  const { data: allWarehouseStock = [] } = useQuery({
+    queryKey: ["all-warehouse-stock"],
     queryFn: async () => {
-      if (warehouseFilter === "all") return {};
       const { data, error } = await supabase
         .from("warehouse_stock")
-        .select("product_id, current_stock")
-        .eq("warehouse_id", warehouseFilter)
+        .select("product_id, warehouse_id, current_stock")
         .gt("current_stock", 0);
       if (error) throw error;
-      const map: Record<string, number> = {};
-      for (const row of data || []) {
-        map[row.product_id] = row.current_stock;
-      }
-      return map;
+      return data;
     },
-    enabled: warehouseFilter !== "all",
   });
+
+  // Build maps from warehouse stock data
+  const warehouseStockMap: Record<string, number> = {};
+  const productWarehouseMap: Record<string, { warehouse_id: string; stock: number }[]> = {};
+  
+  for (const row of allWarehouseStock) {
+    // Map for filtering by selected warehouse
+    if (warehouseFilter !== "all" && row.warehouse_id === warehouseFilter) {
+      warehouseStockMap[row.product_id] = row.current_stock;
+    }
+    // Map for showing all warehouses per product
+    if (!productWarehouseMap[row.product_id]) productWarehouseMap[row.product_id] = [];
+    productWarehouseMap[row.product_id].push({ warehouse_id: row.warehouse_id, stock: row.current_stock });
+  }
 
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1234,10 +1241,12 @@ export default function Inventory() {
                 <div className="p-2 bg-primary/10 rounded-lg">
                   <Package className="h-5 w-5 text-primary" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{products.length}</p>
-                  <p className="text-sm text-muted-foreground">Productos</p>
-                </div>
+                 <div>
+                   <p className="text-2xl font-bold">
+                     {warehouseFilter !== "all" ? `${filteredProducts.length}/${products.length}` : products.length}
+                   </p>
+                   <p className="text-sm text-muted-foreground">Productos</p>
+                 </div>
               </div>
             </CardContent>
           </Card>
@@ -1395,21 +1404,31 @@ export default function Inventory() {
                     <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     Cargando...
                   </div>
-                ) : filteredProducts.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No hay productos registrados
-                  </div>
+                 ) : filteredProducts.length === 0 ? (
+                   <div className="text-center py-8 text-muted-foreground">
+                     {warehouseFilter !== "all" ? (
+                       <div className="space-y-2">
+                         <Package className="h-8 w-8 mx-auto opacity-50" />
+                         <p>No hay productos con stock en este almacén</p>
+                         <p className="text-xs">Prueba seleccionando "Todos los almacenes" para ver el catálogo completo</p>
+                       </div>
+                     ) : (
+                       "No hay productos registrados"
+                     )}
+                   </div>
                 ) : (
-                  <ProductsByCategory
-                    products={filteredProducts}
-                    rfidTags={rfidTags}
-                    canEdit={canEdit}
-                    isAdmin={isAdmin}
-                    isInventarioRfid={isInventarioRfid}
-                    onEdit={handleEditProduct}
-                    onDelete={(id) => deleteProductMutation.mutate(id)}
-                    searchTerm={searchTerm}
-                  />
+                   <ProductsByCategory
+                     products={filteredProducts}
+                     rfidTags={rfidTags}
+                     canEdit={canEdit}
+                     isAdmin={isAdmin}
+                     isInventarioRfid={isInventarioRfid}
+                     onEdit={handleEditProduct}
+                     onDelete={(id) => deleteProductMutation.mutate(id)}
+                     searchTerm={searchTerm}
+                     productWarehouseMap={productWarehouseMap}
+                     warehouses={warehouses}
+                   />
                 )}
               </CardContent>
             </Card>
