@@ -391,6 +391,29 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
             .from("products")
             .update({ warehouse_id: formData.almacenId })
             .eq("id", item.productId);
+
+          // Sincronizar warehouse_stock (upsert)
+          const { data: existingWs } = await supabase
+            .from("warehouse_stock")
+            .select("id, current_stock")
+            .eq("product_id", item.productId)
+            .eq("warehouse_id", formData.almacenId)
+            .maybeSingle();
+
+          if (existingWs) {
+            await supabase
+              .from("warehouse_stock")
+              .update({ current_stock: existingWs.current_stock + item.cantidad })
+              .eq("id", existingWs.id);
+          } else {
+            await supabase
+              .from("warehouse_stock")
+              .insert({
+                product_id: item.productId,
+                warehouse_id: formData.almacenId,
+                current_stock: item.cantidad,
+              });
+          }
         }
 
         // Registrar movimiento de inventario
@@ -462,6 +485,8 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["product-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse-stock-map"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-by-warehouse"] });
       queryClient.invalidateQueries({ queryKey: ["purchase-orders-for-entry"] });
       handleClose();
     },
