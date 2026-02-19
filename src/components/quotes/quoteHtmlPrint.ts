@@ -226,11 +226,7 @@ export const printQuoteHtml = (data: QuotePrintData) => {
       </style>
     </head>
     <body>
-      ${data.isRemision ? `
-      <div style="background: #f97316; color: white; text-align: center; padding: 10px; font-size: 18px; font-weight: bold; letter-spacing: 2px; margin-bottom: 10px;">
-        REMISIÓN
-      </div>
-      ` : ''}
+      
       <div class="header">
         <div class="logo-section">
           <h1>QUAL MEDICAL</h1>
@@ -250,6 +246,7 @@ export const printQuoteHtml = (data: QuotePrintData) => {
         <div class="info-item"><span class="info-label">FECHA ULTIMA FACTURA:</span> ${formatDate(data.fechaFacturaAnterior)}</div>
         <div class="info-item"><span class="info-label">CONCEPTO:</span> ${data.concepto || "S/D"}</div>
         <div class="info-item"><span class="info-label">MONTO ULTIMA FACTURA:</span> ${data.montoFacturaAnterior ? formatCurrency(data.montoFacturaAnterior) : "S/D"}</div>
+        ${data.isRemision ? `<div class="info-item"><span style="color: #f97316; font-weight: bold; font-size: 11px;">RE</span></div>` : ''}
         <div class="info-item"><span class="info-label">FECHA DE ENTREGA:</span> ${formatDateLong(data.fechaEntrega)}</div>
         <div class="info-item"></div>
       </div>
