@@ -41,6 +41,8 @@ interface ProductsByCategoryProps {
   onEdit: (product: Product) => void;
   onDelete: (id: string) => void;
   searchTerm: string;
+  productWarehouseMap?: Record<string, { warehouse_id: string; stock: number }[]>;
+  warehouses?: { id: string; code: string; name: string }[];
 }
 
 export function ProductsByCategory({
@@ -52,6 +54,8 @@ export function ProductsByCategory({
   onEdit,
   onDelete,
   searchTerm,
+  productWarehouseMap,
+  warehouses,
 }: ProductsByCategoryProps) {
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
 
@@ -115,6 +119,7 @@ export function ProductsByCategory({
                     <TableHead>SKU</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Marca</TableHead>
+                    <TableHead>Almacén</TableHead>
                     <TableHead className="text-center">Stock</TableHead>
                     <TableHead className="text-right">Precio</TableHead>
                     {canEdit && <TableHead className="text-right">Acciones</TableHead>}
@@ -135,6 +140,8 @@ export function ProductsByCategory({
                         isInventarioRfid={isInventarioRfid}
                         onEdit={onEdit}
                         onDelete={onDelete}
+                        warehouseLocations={productWarehouseMap?.[product.id]}
+                        warehouses={warehouses}
                       />
                     );
                   })}

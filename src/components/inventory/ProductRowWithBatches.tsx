@@ -15,7 +15,8 @@ import {
   Boxes,
   Link2,
   Cpu,
-  ScanBarcode
+  ScanBarcode,
+  Warehouse
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -61,6 +62,8 @@ interface ProductRowWithBatchesProps {
   isInventarioRfid: boolean;
   onEdit: (product: Product) => void;
   onDelete: (id: string) => void;
+  warehouseLocations?: { warehouse_id: string; stock: number }[];
+  warehouses?: { id: string; code: string; name: string }[];
 }
 
 export function ProductRowWithBatches({
@@ -72,6 +75,8 @@ export function ProductRowWithBatches({
   onEdit,
   onDelete,
   showQuickStock = true,
+  warehouseLocations,
+  warehouses,
 }: ProductRowWithBatchesProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [tagAssignmentOpen, setTagAssignmentOpen] = useState(false);
@@ -116,7 +121,7 @@ export function ProductRowWithBatches({
     return acc;
   }, {} as Record<string, typeof productTags>);
 
-  const colSpan = canEdit ? 8 : 7;
+  const colSpan = canEdit ? 9 : 8;
 
   const handleRowClick = (e: React.MouseEvent) => {
     // Don't toggle if clicking on buttons
@@ -169,6 +174,23 @@ export function ProductRowWithBatches({
         <TableCell className="font-medium">{product.name}</TableCell>
         <TableCell className="text-muted-foreground text-sm">
           {product.brand || "—"}
+        </TableCell>
+        <TableCell>
+          {warehouseLocations && warehouseLocations.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {warehouseLocations.map((loc) => {
+                const wh = warehouses?.find(w => w.id === loc.warehouse_id);
+                return wh ? (
+                  <Badge key={loc.warehouse_id} variant="outline" className="text-xs gap-1">
+                    <Warehouse className="h-3 w-3" />
+                    {wh.name} ({loc.stock})
+                  </Badge>
+                ) : null;
+              })}
+            </div>
+          ) : (
+            <span className="text-muted-foreground text-xs">Sin ubicación</span>
+          )}
         </TableCell>
         <TableCell className="text-center">
           <Badge
