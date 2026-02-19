@@ -33,6 +33,7 @@ interface QuotePrintData {
   items: QuoteItem[];
   subtotal: number;
   total: number;
+  isRemision?: boolean;
 }
 
 export const printQuoteHtml = (data: QuotePrintData) => {
@@ -225,6 +226,11 @@ export const printQuoteHtml = (data: QuotePrintData) => {
       </style>
     </head>
     <body>
+      ${data.isRemision ? `
+      <div style="background: #f97316; color: white; text-align: center; padding: 10px; font-size: 18px; font-weight: bold; letter-spacing: 2px; margin-bottom: 10px;">
+        REMISIÓN
+      </div>
+      ` : ''}
       <div class="header">
         <div class="logo-section">
           <h1>QUAL MEDICAL</h1>

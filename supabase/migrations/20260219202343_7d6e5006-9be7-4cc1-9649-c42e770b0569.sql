@@ -1,0 +1,1 @@
+ALTER TABLE public.quotes ADD COLUMN is_remision boolean NOT NULL DEFAULT false;

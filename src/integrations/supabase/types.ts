@@ -1760,6 +1760,7 @@ export type Database = {
           folio: string
           id: string
           inventory_exit_status: string | null
+          is_remision: boolean
           monto_factura_anterior: number | null
           notes: string | null
           status: string
@@ -1783,6 +1784,7 @@ export type Database = {
           folio: string
           id?: string
           inventory_exit_status?: string | null
+          is_remision?: boolean
           monto_factura_anterior?: number | null
           notes?: string | null
           status?: string
@@ -1806,6 +1808,7 @@ export type Database = {
           folio?: string
           id?: string
           inventory_exit_status?: string | null
+          is_remision?: boolean
           monto_factura_anterior?: number | null
           notes?: string | null
           status?: string
