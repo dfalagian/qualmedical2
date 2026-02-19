@@ -71,6 +71,7 @@ interface Quote {
   monto_factura_anterior?: number | null;
   status: string;
   inventory_exit_status: string | null;
+  is_remision: boolean;
   subtotal: number;
   total: number;
   created_at: string;
@@ -172,6 +173,10 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
     rfid_required: boolean;
   }>>([]);
   
+  // Invoice question dialog (before approval)
+  const [invoiceQuestionOpen, setInvoiceQuestionOpen] = useState(false);
+  const [pendingApproveQuote, setPendingApproveQuote] = useState<Quote | null>(null);
+  
   // Cancel confirmation
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [quoteToCancel, setQuoteToCancel] = useState<Quote | null>(null);
@@ -198,6 +203,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
           monto_factura_anterior,
           status,
           inventory_exit_status,
+          is_remision,
           subtotal,
           total,
           created_at,
@@ -312,18 +318,37 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
         })),
         subtotal: quote.subtotal,
         total: quote.total,
+        isRemision: quote.is_remision,
       });
     } catch (error) {
       toast.error("Error al generar el PDF");
     }
   };
 
-  // Start approve process - open batch selection dialog
-  const handleStartApprove = async (quote: Quote) => {
-    setQuoteToApprove(quote);
+  // Start approve process - first ask about invoicing
+  const handleStartApprove = (quote: Quote) => {
+    setPendingApproveQuote(quote);
+    setInvoiceQuestionOpen(true);
+  };
+
+  // Handle invoice question answer
+  const handleInvoiceAnswer = async (willInvoice: boolean) => {
+    if (!pendingApproveQuote) return;
+    setInvoiceQuestionOpen(false);
+    
+    // Save is_remision flag
+    const isRemision = !willInvoice;
+    await supabase
+      .from("quotes")
+      .update({ is_remision: isRemision })
+      .eq("id", pendingApproveQuote.id);
+    
+    // Continue with batch selection
+    setQuoteToApprove({ ...pendingApproveQuote, is_remision: isRemision });
+    setPendingApproveQuote(null);
     
     try {
-      const items = await fetchQuoteItems(quote.id);
+      const items = await fetchQuoteItems(pendingApproveQuote.id);
       setQuoteItems(items);
       setBatchSelectionOpen(true);
     } catch (error) {
@@ -595,6 +620,15 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                             >
                               {config.label}
                             </Badge>
+                            {/* Remisión badge */}
+                            {quote.is_remision && (
+                              <Badge 
+                                variant="outline" 
+                                className="text-orange-700 border-orange-400 bg-orange-50"
+                              >
+                                Remisión
+                              </Badge>
+                            )}
                             {/* Alert for pending inventory exit */}
                             {quote.status === "aprobada" && quote.inventory_exit_status !== "completed" && (
                               <Badge 
@@ -831,6 +865,38 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
           isApproving={isApproving}
         />
       )}
+
+      {/* Invoice Question Dialog */}
+      <AlertDialog open={invoiceQuestionOpen} onOpenChange={(open) => {
+        if (!open) {
+          setInvoiceQuestionOpen(false);
+          setPendingApproveQuote(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Se facturará esta cotización?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cotización <strong>{pendingApproveQuote?.folio}</strong> — Si no se factura, se marcará como <strong>Remisión</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setPendingApproveQuote(null);
+            }}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => handleInvoiceAnswer(false)}
+              className="border-orange-400 text-orange-700 hover:bg-orange-50"
+            >
+              No, es Remisión
+            </Button>
+            <AlertDialogAction onClick={() => handleInvoiceAnswer(true)}>
+              Sí, se factura
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Inventory Exit Scan Dialog */}
       {approvedQuoteId && (
