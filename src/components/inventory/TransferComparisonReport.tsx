@@ -109,9 +109,6 @@ function openComparisonReport() {
   </style>
 </head>
 <body>
-  <h1 style="font-size:14px; color:#0071a3; margin-bottom:4px;">REPORTE COMPARATIVO DE TRANSFERENCIA</h1>
-  <div style="font-size:11px; color:#666; margin-bottom:4px;">Remisión CITIO vs Registro en Sistema — 11/02/2026 — Almacén Principal → Almacén CITIO</div>
-  <div style="font-size:9px; color:#888; margin-bottom:15px;">Generado: ${new Date().toLocaleDateString("es-MX")} ${new Date().toLocaleTimeString("es-MX", { hour: '2-digit', minute: '2-digit' })}</div>
 
   <div class="section-title">TABLA COMPARATIVA DETALLADA</div>
   <table>
