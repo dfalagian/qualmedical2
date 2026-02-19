@@ -139,14 +139,6 @@ function openComparisonReport() {
     </div>
   </div>
 
-  <div class="legend">
-    <div class="legend-title">📋 Instrucciones de lectura:</div>
-    <div class="legend-item">• <strong>Columnas "REMISIÓN (EXCEL)"</strong>: datos del documento físico de remisión entregado por Carlos Sorroza.</div>
-    <div class="legend-item">• <strong>Columnas "SISTEMA"</strong>: datos registrados en el sistema al momento de la transferencia digital.</div>
-    <div class="legend-item">• Las filas en <span style="background:#f0fdf4; padding:2px 6px; border-radius:3px;">verde</span> coinciden. Las filas en <span style="background:#fef2f2; padding:2px 6px; border-radius:3px;">rojo</span> tienen discrepancias en el lote.</div>
-    <div class="legend-item">• <strong>El dato correcto es el de la remisión (Excel)</strong>, ya que refleja el producto físicamente entregado.</div>
-  </div>
-
   <div class="section-title">TABLA COMPARATIVA DETALLADA</div>
   <table>
     <thead>
@@ -192,28 +184,6 @@ function openComparisonReport() {
     `).join("")}
   </div>
 
-  <div style="padding:10px; border:1px solid #e5e7eb; border-radius:6px; background:#fffbeb; margin-bottom:30px; font-size:10px;">
-    <strong>⚡ Causa probable:</strong> Al registrar la transferencia en el sistema, se seleccionaron lotes diferentes (probablemente los primeros de la lista o los más antiguos) en lugar de los lotes físicamente entregados según la remisión.
-    <br/><strong>📌 Acción recomendada:</strong> Corregir los batch_id en los registros de transferencia del sistema para que coincidan con los lotes reales de la remisión.
-  </div>
-
-  <div class="signatures">
-    <div class="signature-block">
-      <div class="signature-line"></div>
-      <div class="signature-label">ELABORÓ</div>
-      <div class="signature-sub">NOMBRE Y FIRMA</div>
-    </div>
-    <div class="signature-block">
-      <div class="signature-line"></div>
-      <div class="signature-label">REVISÓ</div>
-      <div class="signature-sub">NOMBRE Y FIRMA</div>
-    </div>
-    <div class="signature-block">
-      <div class="signature-line"></div>
-      <div class="signature-label">Vo. Bo.</div>
-      <div class="signature-sub">NOMBRE Y FIRMA</div>
-    </div>
-  </div>
 
   <script>
     window.onload = function() {
