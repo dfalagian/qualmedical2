@@ -65,7 +65,7 @@ import { ProductsByCategory } from "@/components/inventory/ProductsByCategory";
 
 import { WarehouseTransferDialog } from "@/components/inventory/WarehouseTransferDialog";
 import { WarehouseTransferHistory } from "@/components/inventory/WarehouseTransferHistory";
-import TransferComparisonReportButton from "@/components/inventory/TransferComparisonReport";
+
 import { WarehouseFilter } from "@/components/inventory/WarehouseFilter";
 import { StockByWarehouseModal } from "@/components/dashboard/StockByWarehouseModal";
 import { PriceTypesEditor } from "@/components/inventory/PriceTypesEditor";
@@ -2075,7 +2075,7 @@ export default function Inventory() {
                     <ArrowRightLeft className="h-5 w-5 text-primary" />
                     Historial de Transferencias
                   </CardTitle>
-                  <TransferComparisonReportButton />
+                  
                 </div>
               </CardHeader>
               <CardContent>
