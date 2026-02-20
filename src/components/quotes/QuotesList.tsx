@@ -215,7 +215,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
             cfdi
           )
         `)
-        .order("created_at", { ascending: false });
+        .order("folio", { ascending: false });
       
       if (error) throw error;
       return data as Quote[];
