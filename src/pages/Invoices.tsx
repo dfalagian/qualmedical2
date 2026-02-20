@@ -1,3 +1,4 @@
+import { todayLocalStr } from "@/lib/formatters";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -446,7 +447,7 @@ const Invoices = () => {
       
       if (status === "pagado") {
         const invoiceTotal = calculateInvoiceTotal(invoice);
-        updates.payment_date = new Date().toISOString().split('T')[0];
+        updates.payment_date = todayLocalStr();
         
         // Verificar si ya existe un registro de pago para esta factura
         const { data: existingPago } = await supabase
@@ -483,7 +484,7 @@ const Invoices = () => {
               invoice_id: invoice.id,
               amount: invoiceTotal,
               original_amount: invoiceTotal,
-              fecha_pago: new Date().toISOString().split('T')[0],
+              fecha_pago: todayLocalStr(),
               status: "pendiente",
               nombre_banco: datosBancarios.nombre_banco,
               created_by: user?.id
@@ -521,7 +522,7 @@ const Invoices = () => {
           break;
         case "pagado":
           notificationType = 'invoice_status_paid';
-          notificationData.payment_date = new Date().toISOString().split('T')[0];
+          notificationData.payment_date = todayLocalStr();
           break;
         case "rechazado":
           notificationType = 'invoice_status_rejected';
@@ -794,7 +795,7 @@ const Invoices = () => {
               invoice_id: invoice.id,
               amount: invoiceTotal,
               original_amount: invoiceTotal,
-              fecha_pago: new Date().toISOString().split('T')[0],
+              fecha_pago: todayLocalStr(),
               status: "pendiente",
               nombre_banco: datosBancarios.nombre_banco,
               created_by: user?.id
