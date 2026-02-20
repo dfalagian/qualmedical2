@@ -180,7 +180,16 @@ export function CipiConversionDialog({
                   {stats?.unlinked} producto(s) no tienen correspondencia en el catálogo.
                   Se crearán en la cotización <strong>sin control de inventario</strong> (no se deducirá stock al aprobar la venta).
                 </p>
-                <p className="text-red-700 mt-1 font-medium">
+                <ul className="mt-1.5 space-y-0.5 text-red-700 list-disc list-inside">
+                  {items
+                    .filter((i) => i.status === "unlinked")
+                    .map((i) => (
+                      <li key={i.itemId} className="truncate">
+                        {i.descripcion}{i.marca ? ` (${i.marca})` : ""}
+                      </li>
+                    ))}
+                </ul>
+                <p className="text-red-700 mt-1.5 font-medium">
                   Se recomienda vincularlos manualmente antes de convertir.
                 </p>
               </div>
