@@ -1151,11 +1151,18 @@ export default function Inventory() {
       (p.brand?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
       productIdsWithMatchingTags.includes(p.id);
     
-    // Warehouse filter: use warehouse_stock to check actual physical location
-    const matchesWarehouse = warehouseFilter === "all" || (p.id in warehouseStockMap);
-    
-    return matchesSearch && matchesWarehouse;
+    return matchesSearch;
   });
+
+  // Set of product IDs that have zero stock in the selected warehouse (for dimming)
+  const zeroStockProductIds = new Set<string>();
+  if (warehouseFilter !== "all") {
+    for (const p of filteredProducts) {
+      if (!(p.id in warehouseStockMap)) {
+        zeroStockProductIds.add(p.id);
+      }
+    }
+  }
 
   // Use local tag search term if available, otherwise use global search
   const effectiveTagSearch = tagSearchTerm || searchTerm;
@@ -1244,7 +1251,9 @@ export default function Inventory() {
                 </div>
                  <div>
                    <p className="text-2xl font-bold">
-                     {warehouseFilter !== "all" ? `${filteredProducts.length}/${products.length}` : products.length}
+                     {warehouseFilter !== "all" 
+                       ? `${filteredProducts.length - zeroStockProductIds.size}/${filteredProducts.length}` 
+                       : products.length}
                    </p>
                    <p className="text-sm text-muted-foreground">Productos</p>
                  </div>
@@ -1429,6 +1438,7 @@ export default function Inventory() {
                      searchTerm={searchTerm}
                      productWarehouseMap={productWarehouseMap}
                      warehouses={warehouses}
+                     zeroStockProductIds={zeroStockProductIds}
                    />
                 )}
               </CardContent>
