@@ -64,6 +64,7 @@ interface ProductRowWithBatchesProps {
   onDelete: (id: string) => void;
   warehouseLocations?: { warehouse_id: string; stock: number }[];
   warehouses?: { id: string; code: string; name: string }[];
+  isDimmed?: boolean;
 }
 
 export function ProductRowWithBatches({
@@ -77,6 +78,7 @@ export function ProductRowWithBatches({
   showQuickStock = true,
   warehouseLocations,
   warehouses,
+  isDimmed = false,
 }: ProductRowWithBatchesProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [tagAssignmentOpen, setTagAssignmentOpen] = useState(false);
@@ -152,7 +154,8 @@ export function ProductRowWithBatches({
         className={cn(
           "cursor-pointer transition-colors hover:bg-muted/50",
           hasTag && "bg-green-50 dark:bg-green-950/20",
-          isExpanded && "bg-muted/30"
+          isExpanded && "bg-muted/30",
+          isDimmed && "opacity-40"
         )}
         onClick={handleRowClick}
       >

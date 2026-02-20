@@ -43,6 +43,7 @@ interface ProductsByCategoryProps {
   searchTerm: string;
   productWarehouseMap?: Record<string, { warehouse_id: string; stock: number }[]>;
   warehouses?: { id: string; code: string; name: string }[];
+  zeroStockProductIds?: Set<string>;
 }
 
 export function ProductsByCategory({
@@ -56,6 +57,7 @@ export function ProductsByCategory({
   searchTerm,
   productWarehouseMap,
   warehouses,
+  zeroStockProductIds,
 }: ProductsByCategoryProps) {
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
 
@@ -126,10 +128,11 @@ export function ProductsByCategory({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {categoryProducts.map((product) => {
+                {categoryProducts.map((product) => {
                     const hasTag = rfidTags?.some(
                       (tag) => tag.product_id === product.id
                     );
+                    const isDimmed = zeroStockProductIds?.has(product.id) ?? false;
                     return (
                       <ProductRowWithBatches
                         key={product.id}
@@ -142,6 +145,7 @@ export function ProductsByCategory({
                         onDelete={onDelete}
                         warehouseLocations={productWarehouseMap?.[product.id]}
                         warehouses={warehouses}
+                        isDimmed={isDimmed}
                       />
                     );
                   })}
