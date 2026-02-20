@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { toLocalDateStr } from "@/lib/formatters";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -251,7 +252,7 @@ export function CipiUploadDialog({ open, onOpenChange, type, onSuccess }: CipiUp
         }
         if (typeof val === 'string') {
           const d = new Date(val);
-          if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+          if (!isNaN(d.getTime())) return toLocalDateStr(d);
         }
         return null;
       };

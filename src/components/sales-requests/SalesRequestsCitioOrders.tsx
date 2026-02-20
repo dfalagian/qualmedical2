@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { todayLocalStr } from "@/lib/formatters";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -176,7 +177,7 @@ export function SalesRequestsCitioOrders() {
       const quoteData = {
         folio,
         client_id: clientId,
-        fecha_cotizacion: order.order_date || new Date().toISOString().split("T")[0],
+        fecha_cotizacion: order.order_date || todayLocalStr(),
         concepto: `Orden CITIO ${order.order_number}${patientName ? ` - Paciente: ${patientName}` : ""}${order.quotations?.folio ? ` - Cotización: ${order.quotations.folio}` : ""}`,
         subtotal: order.subtotal || order.total_amount || 0,
         total: order.total_amount || 0,

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { todayLocalStr } from "@/lib/formatters";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -131,7 +132,7 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
           client_id: clientId,
           folio,
           concepto: request.concepto || `Solicitud ${type.toUpperCase()} - ${request.folio || ''}`,
-          fecha_cotizacion: request.fecha_cotizacion || new Date().toISOString().split('T')[0],
+          fecha_cotizacion: request.fecha_cotizacion || todayLocalStr(),
           fecha_entrega: request.fecha_entrega,
           factura_anterior: request.factura_anterior,
           fecha_factura_anterior: request.fecha_ultima_factura,

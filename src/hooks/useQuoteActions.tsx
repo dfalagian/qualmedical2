@@ -2,14 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activityLogger";
-
-// Format Date to YYYY-MM-DD using local timezone (avoids UTC shift)
-const toLocalDateStr = (d: Date): string => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+import { toLocalDateStr } from "@/lib/formatters";
 
 interface QuoteItem {
   id: string;
