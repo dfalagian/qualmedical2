@@ -3,6 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activityLogger";
 
+// Format Date to YYYY-MM-DD using local timezone (avoids UTC shift)
+const toLocalDateStr = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 interface QuoteItem {
   id: string;
   product_id: string | null;
@@ -69,10 +77,10 @@ export const useQuoteActions = () => {
           client_id: params.clientId,
           folio: params.folio,
           concepto: params.concepto,
-          fecha_cotizacion: params.fechaCotizacion.toISOString().split('T')[0],
-          fecha_entrega: params.fechaEntrega?.toISOString().split('T')[0] || null,
+          fecha_cotizacion: toLocalDateStr(params.fechaCotizacion),
+          fecha_entrega: params.fechaEntrega ? toLocalDateStr(params.fechaEntrega) : null,
           factura_anterior: params.facturaAnterior || null,
-          fecha_factura_anterior: params.fechaFacturaAnterior?.toISOString().split('T')[0] || null,
+          fecha_factura_anterior: params.fechaFacturaAnterior ? toLocalDateStr(params.fechaFacturaAnterior) : null,
           monto_factura_anterior: params.montoFacturaAnterior || null,
           subtotal: params.subtotal,
           total: params.total,
@@ -93,7 +101,7 @@ export const useQuoteActions = () => {
         nombre_producto: item.nombre_producto,
         marca: item.marca,
         lote: item.lote,
-        fecha_caducidad: item.fecha_caducidad?.toISOString().split('T')[0] || null,
+        fecha_caducidad: item.fecha_caducidad ? toLocalDateStr(item.fecha_caducidad) : null,
         cantidad: item.cantidad,
         precio_unitario: item.precio_unitario,
         importe: item.importe,
@@ -131,10 +139,10 @@ export const useQuoteActions = () => {
           client_id: params.clientId,
           folio: params.folio,
           concepto: params.concepto,
-          fecha_cotizacion: params.fechaCotizacion.toISOString().split('T')[0],
-          fecha_entrega: params.fechaEntrega?.toISOString().split('T')[0] || null,
+          fecha_cotizacion: toLocalDateStr(params.fechaCotizacion),
+          fecha_entrega: params.fechaEntrega ? toLocalDateStr(params.fechaEntrega) : null,
           factura_anterior: params.facturaAnterior || null,
-          fecha_factura_anterior: params.fechaFacturaAnterior?.toISOString().split('T')[0] || null,
+          fecha_factura_anterior: params.fechaFacturaAnterior ? toLocalDateStr(params.fechaFacturaAnterior) : null,
           monto_factura_anterior: params.montoFacturaAnterior || null,
           subtotal: params.subtotal,
           total: params.total,
@@ -163,7 +171,7 @@ export const useQuoteActions = () => {
         nombre_producto: item.nombre_producto,
         marca: item.marca,
         lote: item.lote,
-        fecha_caducidad: item.fecha_caducidad?.toISOString().split('T')[0] || null,
+        fecha_caducidad: item.fecha_caducidad ? toLocalDateStr(item.fecha_caducidad) : null,
         cantidad: item.cantidad,
         precio_unitario: item.precio_unitario,
         importe: item.importe,
