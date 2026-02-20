@@ -36,6 +36,7 @@ export function QuoteInvoiceLinking() {
           fecha_cotizacion,
           total,
           status,
+          is_remision,
           client:clients(nombre_cliente)
         `)
         .eq("status", "aprobada")
@@ -222,6 +223,11 @@ export function QuoteInvoiceLinking() {
                             <Badge variant="secondary" className="font-mono text-xs">
                               {quote.folio}
                             </Badge>
+                            {quote.is_remision && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-orange-400 text-orange-600 bg-orange-50">
+                                RE
+                              </Badge>
+                            )}
                             {selectedQuoteId === quote.id && (
                               <Check className="h-4 w-4 text-primary" />
                             )}
