@@ -1,96 +1,98 @@
 
+# Corrección Crítica: Eliminar Descuento Doble de Stock
 
-# Plan: Integrar WhatsApp via Twilio
+## Problema Confirmado
 
-## Resumen
+El trigger de base de datos `update_product_stock` se ejecuta automáticamente al insertar en `inventory_movements` y actualiza `products.current_stock`. Pero el código en `useQuoteActions.tsx` TAMBIEN actualiza manualmente ese mismo campo justo antes de insertar el movimiento. Resultado: cada venta descuenta el doble, cada cancelación devuelve el doble.
 
-Crear una funcion backend para enviar mensajes de WhatsApp usando la API de Twilio, y conectarla al sistema de notificaciones existente para que los proveedores y clientes reciban confirmaciones por WhatsApp ademas de por email.
+## Alcance de Cambios
 
-## Paso 1 - Configurar credenciales de Twilio
+**Un solo archivo**: `src/hooks/useQuoteActions.tsx`
 
-Se necesitan 3 secretos:
-- **TWILIO_ACCOUNT_SID** - Tu Account SID de Twilio
-- **TWILIO_AUTH_TOKEN** - Tu Auth Token de Twilio  
-- **TWILIO_WHATSAPP_FROM** - El numero de WhatsApp de Twilio (formato: `whatsapp:+14155238886`)
+Los demás archivos ya funcionan correctamente:
+- `ProductEntryDialog.tsx`: solo actualiza manualmente como fallback si el movimiento falla (correcto)
+- `WarehouseTransferDialog.tsx`: solo toca `warehouse_stock`, no `products.current_stock` (correcto)
+- `QuickStockButtons.tsx`: solo inserta movimiento y lee resultado del trigger (correcto)
 
-Para obtenerlos: Ir a [twilio.com](https://www.twilio.com), crear cuenta, y en la consola obtener Account SID y Auth Token. Para WhatsApp, activar el Sandbox de WhatsApp en Twilio (para pruebas) o solicitar un numero de WhatsApp Business (para produccion).
+## Cambios Específicos
 
-## Paso 2 - Crear Edge Function `send-whatsapp`
+### 1. En la aprobación de venta (approveQuoteMutation, líneas 254-268)
 
-Nueva funcion en `supabase/functions/send-whatsapp/index.ts` que:
+**ELIMINAR** el bloque que obtiene stock del producto y lo actualiza manualmente:
+```
+// ELIMINAR ESTO (líneas 254-268):
+const { data: product } = await supabase
+  .from("products")
+  .select("current_stock")
+  .eq("id", item.product_id)
+  .single();
 
-1. Recibe `to` (numero de telefono), `message` (texto del mensaje) y opcionalmente `template_type` (tipo de plantilla predefinida)
-2. Usa la API REST de Twilio para enviar el mensaje via WhatsApp
-3. Formatea el numero destino con prefijo `whatsapp:+52...`
-4. Incluye plantillas de mensajes para los eventos principales:
-   - Documento aprobado/rechazado
-   - Factura validada/rechazada
-   - Pago completado
-   - Evidencia aprobada/rechazada
-
-## Paso 3 - Agregar campo de telefono al perfil de proveedores
-
-La tabla `profiles` ya tiene un campo `phone`. Se verificara que este disponible y se usara para enviar los mensajes de WhatsApp.
-
-## Paso 4 - Actualizar hook `useNotifications`
-
-Modificar `src/hooks/useNotifications.tsx` para:
-- Agregar funcion `notifySupplierWhatsApp` que llama a la nueva edge function
-- Opcionalmente enviar notificacion dual (email + WhatsApp) cuando el proveedor tenga telefono registrado
-
-## Paso 5 - Agregar configuracion en `config.toml`
-
-```toml
-[functions.send-whatsapp]
-verify_jwt = false
+if (product) {
+  const newProductStock = (product.current_stock || 0) - item.cantidad;
+  await supabase
+    .from("products")
+    .update({ current_stock: newProductStock })
+    .eq("id", item.product_id);
+}
 ```
 
-## Detalles Tecnicos
+El trigger `update_product_stock` ya hace esto al insertar el `inventory_movements` de tipo "salida" (líneas 287-300).
 
-### API de Twilio (REST, sin SDK)
+### 2. En la aprobación - validación estricta de almacén (línea 279)
 
-```text
-POST https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Messages.json
+**CAMBIAR** `Math.max(0, ...)` por validación real:
+```
+// ANTES (oculta faltantes):
+const newWhStock = Math.max(0, (warehouseStockRow.current_stock || 0) - item.cantidad);
 
-Headers:
-  Authorization: Basic base64(AccountSid:AuthToken)
-  Content-Type: application/x-www-form-urlencoded
-
-Body:
-  From=whatsapp:+14155238886
-  To=whatsapp:+521234567890
-  Body=Tu documento ha sido aprobado
+// DESPUÉS (bloquea si no hay stock):
+const availableWhStock = warehouseStockRow.current_stock || 0;
+if (availableWhStock < item.cantidad) {
+  throw new Error(
+    `Stock insuficiente en almacén para ${item.nombre_producto}: disponible ${availableWhStock}, solicitado ${item.cantidad}`
+  );
+}
+const newWhStock = availableWhStock - item.cantidad;
 ```
 
-### Flujo de la notificacion
+### 3. En la cancelación de venta (cancelQuoteMutation, líneas 393-406)
 
-```text
-Evento del sistema (ej: documento aprobado)
-  |
-  v
-useNotifications.notifySupplier()
-  |
-  +---> notify-supplier (email) [existente]
-  |
-  +---> send-whatsapp (WhatsApp) [nuevo]
-         |
-         v
-      Twilio API -> WhatsApp del proveedor
+**ELIMINAR** el bloque que obtiene stock del producto y lo actualiza manualmente:
+```
+// ELIMINAR ESTO (líneas 393-406):
+const { data: product } = await supabase
+  .from("products")
+  .select("current_stock")
+  .eq("id", item.product_id)
+  .single();
+
+if (product) {
+  const newProductStock = (product.current_stock || 0) + item.cantidad;
+  await supabase
+    .from("products")
+    .update({ current_stock: newProductStock })
+    .eq("id", item.product_id);
+}
 ```
 
-### Plantillas de mensajes WhatsApp (texto plano)
+El trigger ya hace esto al insertar el `inventory_movements` de tipo "entrada" (líneas 427-440).
 
-Como WhatsApp no soporta HTML, se crearan plantillas en texto plano con emojis para cada tipo de evento, por ejemplo:
+## Lo que NO se toca (preservar registro actual)
 
-- **Documento aprobado**: "QualMedical: Tu documento [tipo] ha sido aprobado. Accede al portal: qualmedical.lovable.app"
-- **Factura rechazada**: "QualMedical: Tu factura [numero] fue rechazada. Razon: [motivo]. Revisa el portal."
-- **Pago completado**: "QualMedical: Se ha registrado tu pago de $[monto] MXN para la factura [numero]."
+- **No se modifican datos existentes** en la base de datos. Los valores actuales incorrectos de `products.current_stock` quedan intactos como evidencia para la reconciliación posterior.
+- **No se eliminan movimientos históricos** en `inventory_movements`. Todo el historial de movimientos queda disponible para calcular exactamente cuánto se desvió cada producto.
+- **No se altera el trigger** `update_product_stock`. Es la fuente única de verdad y funciona correctamente.
 
-## Archivos a crear/modificar
+## Resultado esperado
 
-| Archivo | Accion |
-|---------|--------|
-| `supabase/functions/send-whatsapp/index.ts` | Crear - Edge function para enviar WhatsApp |
-| `src/hooks/useNotifications.tsx` | Modificar - Agregar envio dual email+WhatsApp |
-| `supabase/config.toml` | Modificar - Registrar nueva funcion |
+A partir de esta corrección:
+- Cada venta nueva descuenta exactamente 1 vez (no 2)
+- Cada cancelación devuelve exactamente 1 vez (no 2)
+- Los datos históricos incorrectos quedan preservados para reconciliación controlada posterior
 
+## Sección Técnica
+
+Archivos modificados: 1 (`src/hooks/useQuoteActions.tsx`)
+- Líneas 254-268: eliminar update manual de `products.current_stock` en aprobación
+- Línea 279: reemplazar `Math.max(0, ...)` por validación con error
+- Líneas 393-406: eliminar update manual de `products.current_stock` en cancelación
