@@ -251,21 +251,8 @@ export const useQuoteActions = () => {
 
         if (batchError) throw batchError;
 
-        // Obtener stock actual del producto
-        const { data: product } = await supabase
-          .from("products")
-          .select("current_stock")
-          .eq("id", item.product_id)
-          .single();
-
-        if (product) {
-          // Actualizar stock global del producto
-          const newProductStock = (product.current_stock || 0) - item.cantidad;
-          await supabase
-            .from("products")
-            .update({ current_stock: newProductStock })
-            .eq("id", item.product_id);
-        }
+        // NO actualizar products.current_stock manualmente aquí.
+        // El trigger update_product_stock lo hace automáticamente al insertar en inventory_movements.
 
         // Descontar stock del almacén seleccionado en warehouse_stock
         const { data: warehouseStockRow } = await supabase
@@ -276,7 +263,13 @@ export const useQuoteActions = () => {
           .single();
 
         if (warehouseStockRow) {
-          const newWhStock = Math.max(0, (warehouseStockRow.current_stock || 0) - item.cantidad);
+          const availableWhStock = warehouseStockRow.current_stock || 0;
+          if (availableWhStock < item.cantidad) {
+            throw new Error(
+              `Stock insuficiente en almacén para ${item.nombre_producto}: disponible ${availableWhStock}, solicitado ${item.cantidad}`
+            );
+          }
+          const newWhStock = availableWhStock - item.cantidad;
           await supabase
             .from("warehouse_stock")
             .update({ current_stock: newWhStock })
@@ -390,20 +383,8 @@ export const useQuoteActions = () => {
           .update({ current_quantity: newBatchQuantity })
           .eq("id", item.batch_id);
 
-        // Obtener y actualizar stock del producto
-        const { data: product } = await supabase
-          .from("products")
-          .select("current_stock")
-          .eq("id", item.product_id)
-          .single();
-
-        if (product) {
-          const newProductStock = (product.current_stock || 0) + item.cantidad;
-          await supabase
-            .from("products")
-            .update({ current_stock: newProductStock })
-            .eq("id", item.product_id);
-        }
+        // NO actualizar products.current_stock manualmente aquí.
+        // El trigger update_product_stock lo hace automáticamente al insertar en inventory_movements.
 
         // Devolver stock al almacén origen en warehouse_stock
         const warehouseId = warehouseIdByProduct[item.product_id];
