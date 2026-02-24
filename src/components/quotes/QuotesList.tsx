@@ -807,18 +807,35 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
               </div>
 
               {/* Totals */}
-              <div className="flex justify-end">
-                <div className="w-full max-w-xs space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal:</span>
-                    <span>${selectedQuote.subtotal.toFixed(2)}</span>
+              {(() => {
+                const EXEMPT_CATS = ["medicamentos", "oncologicos", "inmunoterapia"];
+                const calcIva = quoteItems.reduce((sum, item) => {
+                  const cat = (item.categoria || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                  if (EXEMPT_CATS.includes(cat)) return sum;
+                  return sum + item.importe * 0.16;
+                }, 0);
+                const calcTotal = selectedQuote.subtotal + calcIva;
+                return (
+                  <div className="flex justify-end">
+                    <div className="w-full max-w-xs space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Subtotal:</span>
+                        <span>${selectedQuote.subtotal.toFixed(2)}</span>
+                      </div>
+                      {calcIva > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">IVA (16% insumos):</span>
+                          <span>${calcIva.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-lg font-bold border-t pt-2">
+                        <span>Total:</span>
+                        <span className="text-primary">${calcTotal.toFixed(2)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-lg font-bold border-t pt-2">
-                    <span>Total:</span>
-                    <span className="text-primary">${selectedQuote.total.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           )}
           
