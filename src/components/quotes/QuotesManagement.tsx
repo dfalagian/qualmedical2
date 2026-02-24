@@ -25,6 +25,7 @@ import {
   Printer,
   AlertTriangle,
   DollarSign,
+  Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -196,6 +197,10 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
 
   // Quote items
   const [quoteItems, setQuoteItems] = useState<QuoteItem[]>([]);
+  
+  // Linking unmatched items state
+  const [linkingItemId, setLinkingItemId] = useState<string | null>(null);
+  const [linkSearch, setLinkSearch] = useState("");
 
   // Fetch clients
   const { data: clients = [] } = useQuery({
@@ -526,7 +531,45 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     }));
   };
 
-  // Calculate totals
+  // Link an unmatched item to a catalog product
+  const handleLinkItemToProduct = (itemId: string, product: Product) => {
+    setQuoteItems(quoteItems.map(item => {
+      if (item.id === itemId) {
+        const precio = getProductPrice(product, item.tipo_precio);
+        return {
+          ...item,
+          product_id: product.id,
+          nombre_producto: product.name,
+          marca: product.brand || "",
+          categoria: product.category || null,
+          precio_unitario: precio || item.precio_unitario,
+          importe: (precio || item.precio_unitario) * item.cantidad,
+          precios_disponibles: {
+            price_type_1: product.price_type_1 || 0,
+            price_type_2: product.price_type_2 || 0,
+            price_type_3: product.price_type_3 || 0,
+            price_type_4: product.price_type_4 || 0,
+            price_type_5: product.price_type_5 || 0,
+          },
+        };
+      }
+      return item;
+    }));
+    setLinkingItemId(null);
+    setLinkSearch("");
+    toast.success(`Vinculado a: ${product.name}`);
+  };
+
+  // Filter products for linking search
+  const filteredLinkProducts = useMemo(() => {
+    if (!linkSearch.trim()) return products.slice(0, 30);
+    const term = linkSearch.toLowerCase();
+    return products.filter(p =>
+      p.name.toLowerCase().includes(term) ||
+      p.sku.toLowerCase().includes(term) ||
+      p.brand?.toLowerCase().includes(term)
+    ).slice(0, 30);
+  }, [products, linkSearch]);
   const subtotal = useMemo(() => {
     return quoteItems.reduce((sum, item) => sum + item.importe, 0);
   }, [quoteItems]);
@@ -1054,7 +1097,8 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                       return (
                         <TableRow key={item.id} className={cn(
                           isMultiBatch && "bg-amber-50/50 dark:bg-amber-950/20",
-                          isSubProduct && "bg-muted/30"
+                          isSubProduct && "bg-muted/30",
+                          !item.product_id && "bg-destructive/5"
                         )}>
                           <TableCell className="font-medium">
                             <div className="flex flex-col gap-0.5">
@@ -1070,8 +1114,56 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                                     <AlertTriangle className="h-3 w-3" />
                                   </span>
                                 )}
+                                {!item.product_id && (
+                                  <Popover 
+                                    open={linkingItemId === item.id} 
+                                    onOpenChange={(open) => {
+                                      setLinkingItemId(open ? item.id : null);
+                                      if (!open) setLinkSearch("");
+                                    }}
+                                  >
+                                    <PopoverTrigger asChild>
+                                      <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 px-2 border-destructive/50 text-destructive hover:bg-destructive/10">
+                                        <Link2 className="h-3 w-3" />
+                                        Vincular
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[400px] p-0" align="start">
+                                      <Command shouldFilter={false}>
+                                        <CommandInput
+                                          placeholder="Buscar producto del catálogo..."
+                                          value={linkSearch}
+                                          onValueChange={setLinkSearch}
+                                        />
+                                        <CommandList>
+                                          <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                          <CommandGroup>
+                                            {filteredLinkProducts.map((product) => (
+                                              <CommandItem
+                                                key={product.id}
+                                                value={product.id}
+                                                onSelect={() => handleLinkItemToProduct(item.id, product)}
+                                                className="flex items-center justify-between py-2"
+                                              >
+                                                <div className="flex-1 min-w-0">
+                                                  <p className="text-sm font-medium truncate">{product.name}</p>
+                                                  <p className="text-xs text-muted-foreground">
+                                                    SKU: {product.sku} · {product.brand || "Sin marca"} · Stock: {product.current_stock || 0}
+                                                  </p>
+                                                </div>
+                                              </CommandItem>
+                                            ))}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                )}
                               </div>
-                              <span className="text-xs text-muted-foreground">{item.marca || ""}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {item.marca || ""}
+                                {!item.product_id && <span className="text-destructive ml-1">(Sin control de inventario)</span>}
+                              </span>
                             </div>
                           </TableCell>
                           <TableCell>
