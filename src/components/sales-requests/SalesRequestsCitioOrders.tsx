@@ -8,9 +8,23 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
-import { Search, AlertCircle, ShoppingCart, ChevronDown, ChevronUp, FileText, User, Package, ArrowRightCircle, Loader2 } from "lucide-react";
+import { Search, AlertCircle, ShoppingCart, ChevronDown, ChevronUp, FileText, User, Package, ArrowRightCircle, Loader2, Trash2, Plus, Link2, Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface ExternalOrderItem {
   id: string;
@@ -26,6 +40,10 @@ interface ExternalOrderItem {
     precio_type_1?: number;
     [key: string]: any;
   };
+  // Local editing fields
+  _linked_product_id?: string | null;
+  _linked_product_name?: string | null;
+  _linked_brand?: string | null;
 }
 
 interface ExternalOrder {
@@ -46,11 +64,30 @@ interface ExternalOrder {
   suppliers?: { id: string; name: string; rfc?: string };
 }
 
+interface LocalProduct {
+  id: string;
+  name: string;
+  sku: string;
+  brand: string | null;
+  citio_id: string | null;
+  current_stock: number | null;
+  price_type_1: number | null;
+  unit_price: number | null;
+}
+
 export function SalesRequestsCitioOrders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  // Local edits state: orderId -> modified items array
+  const [editedOrders, setEditedOrders] = useState<Map<string, ExternalOrderItem[]>>(new Map());
+  // Product linking popover state
+  const [linkingItemId, setLinkingItemId] = useState<string | null>(null);
+  const [linkSearch, setLinkSearch] = useState("");
+  // Add product popover state
+  const [addingToOrderId, setAddingToOrderId] = useState<string | null>(null);
+  const [addProductSearch, setAddProductSearch] = useState("");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -64,6 +101,20 @@ export function SalesRequestsCitioOrders() {
       if (result?.purchase_orders && Array.isArray(result.purchase_orders)) return result.purchase_orders as ExternalOrder[];
       if (Array.isArray(result)) return result as ExternalOrder[];
       return [] as ExternalOrder[];
+    },
+  });
+
+  // Fetch local products for linking
+  const { data: localProducts = [] } = useQuery({
+    queryKey: ["local-products-for-citio-link"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, sku, brand, citio_id, current_stock, price_type_1, unit_price")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data as LocalProduct[];
     },
   });
 
@@ -86,6 +137,76 @@ export function SalesRequestsCitioOrders() {
         getPatientName(o)?.toLowerCase().includes(term)
     );
   }, [qualmedicalOrders, searchTerm]);
+
+  // Get the effective items for an order (edited or original)
+  const getOrderItems = useCallback((order: ExternalOrder): ExternalOrderItem[] => {
+    return editedOrders.get(order.id) || order.items || [];
+  }, [editedOrders]);
+
+  // Initialize edits for an order if not already done
+  const ensureEditable = useCallback((order: ExternalOrder): ExternalOrderItem[] => {
+    if (editedOrders.has(order.id)) return editedOrders.get(order.id)!;
+    const items = [...(order.items || [])].map(i => ({ ...i }));
+    setEditedOrders(prev => new Map(prev).set(order.id, items));
+    return items;
+  }, [editedOrders]);
+
+  // Update quantity of an item
+  const handleUpdateItemQuantity = useCallback((orderId: string, itemId: string, newQty: number, order: ExternalOrder) => {
+    const items = ensureEditable(order);
+    const updated = items.map(i => 
+      i.id === itemId ? { ...i, quantity: Math.max(1, newQty), subtotal: i.unit_price * Math.max(1, newQty) } : i
+    );
+    setEditedOrders(prev => new Map(prev).set(orderId, updated));
+  }, [ensureEditable]);
+
+  // Delete an item
+  const handleDeleteItem = useCallback((orderId: string, itemId: string, order: ExternalOrder) => {
+    const items = ensureEditable(order);
+    const updated = items.filter(i => i.id !== itemId);
+    setEditedOrders(prev => new Map(prev).set(orderId, updated));
+    toast.success("Producto eliminado de la orden");
+  }, [ensureEditable]);
+
+  // Link an item to a local product
+  const handleLinkProduct = useCallback((orderId: string, itemId: string, product: LocalProduct, order: ExternalOrder) => {
+    const items = ensureEditable(order);
+    const updated = items.map(i => 
+      i.id === itemId ? { 
+        ...i, 
+        _linked_product_id: product.id, 
+        _linked_product_name: product.name,
+        _linked_brand: product.brand,
+        medication_id: product.citio_id || i.medication_id,
+      } : i
+    );
+    setEditedOrders(prev => new Map(prev).set(orderId, updated));
+    setLinkingItemId(null);
+    setLinkSearch("");
+    toast.success(`Vinculado a: ${product.name}`);
+  }, [ensureEditable]);
+
+  // Add a product from catalog to the order
+  const handleAddProduct = useCallback((orderId: string, product: LocalProduct, order: ExternalOrder) => {
+    const items = ensureEditable(order);
+    const newItem: ExternalOrderItem = {
+      id: crypto.randomUUID(),
+      medication_name: product.name,
+      quantity: 1,
+      unit_price: product.price_type_1 || product.unit_price || 0,
+      subtotal: product.price_type_1 || product.unit_price || 0,
+      is_sub_product: false,
+      medication_id: product.citio_id || undefined,
+      medications: { brand: product.brand || undefined },
+      _linked_product_id: product.id,
+      _linked_product_name: product.name,
+      _linked_brand: product.brand,
+    };
+    setEditedOrders(prev => new Map(prev).set(orderId, [...items, newItem]));
+    setAddingToOrderId(null);
+    setAddProductSearch("");
+    toast.success(`${product.name} agregado a la orden`);
+  }, [ensureEditable]);
 
   const formatDate = (d: string) => {
     try { return new Date(d).toLocaleDateString("es-MX"); } catch { return d; }
@@ -120,15 +241,12 @@ export function SalesRequestsCitioOrders() {
   const getGroupedItems = useCallback((items: ExternalOrderItem[]) => {
     const parentItems = items.filter(i => !i.is_sub_product);
     const subItems = items.filter(i => i.is_sub_product);
-
-    // Build a map: parent_medication_id -> sub-products[]
     const subMap = new Map<string, ExternalOrderItem[]>();
     for (const sub of subItems) {
       const key = sub.parent_medication_id || "_orphan";
       if (!subMap.has(key)) subMap.set(key, []);
       subMap.get(key)!.push(sub);
     }
-
     return { parentItems, subMap };
   }, []);
 
@@ -136,15 +254,31 @@ export function SalesRequestsCitioOrders() {
     setExpandedOrderId(prev => prev === id ? null : id);
   };
 
+  // Filtered products for linking/adding
+  const getFilteredProducts = useCallback((search: string) => {
+    if (!search.trim()) return localProducts.slice(0, 30);
+    const term = search.toLowerCase();
+    return localProducts.filter(p =>
+      p.name.toLowerCase().includes(term) ||
+      p.sku.toLowerCase().includes(term) ||
+      p.brand?.toLowerCase().includes(term)
+    ).slice(0, 30);
+  }, [localProducts]);
+
+  // Compute effective totals for an order
+  const getOrderTotal = useCallback((order: ExternalOrder) => {
+    const items = getOrderItems(order);
+    return items.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0);
+  }, [getOrderItems]);
+
   const handleConvertToQuote = async (order: ExternalOrder) => {
     setConvertingId(order.id);
     try {
-      // Generate folio
+      const effectiveItems = getOrderItems(order);
+      
       const { data: folio, error: folioError } = await supabase.rpc("generate_quote_folio");
       if (folioError) throw folioError;
 
-      // We need a client. Let's check if a client matching the patient exists or use the first available
-      // For now, we'll look for a client or ask user to pick one
       const { data: clients } = await supabase
         .from("clients")
         .select("id, nombre_cliente")
@@ -157,8 +291,6 @@ export function SalesRequestsCitioOrders() {
       }
 
       const patientName = getPatientName(order);
-      
-      // Try to find a client matching the patient name or CITIO supplier
       let clientId = clients[0].id;
       if (patientName) {
         const { data: matchingClients } = await supabase
@@ -172,15 +304,15 @@ export function SalesRequestsCitioOrders() {
         }
       }
 
-      // Create quote
       const { data: { user } } = await supabase.auth.getUser();
+      const effectiveTotal = getOrderTotal(order);
       const quoteData = {
         folio,
         client_id: clientId,
         fecha_cotizacion: order.order_date || todayLocalStr(),
         concepto: `Orden CITIO ${order.order_number}${patientName ? ` - Paciente: ${patientName}` : ""}${order.quotations?.folio ? ` - Cotización: ${order.quotations.folio}` : ""}`,
-        subtotal: order.subtotal || order.total_amount || 0,
-        total: order.total_amount || 0,
+        subtotal: effectiveTotal,
+        total: effectiveTotal,
         status: "borrador",
         created_by: user?.id,
         notes: order.notes || null,
@@ -194,49 +326,46 @@ export function SalesRequestsCitioOrders() {
 
       if (quoteError) throw quoteError;
 
-      // Insert items - first parents, then sub-products with parent references
-      if (order.items && order.items.length > 0) {
-        // Collect all medication_ids from the order to match by citio_id
-        const allMedicationIds = order.items
+      if (effectiveItems.length > 0) {
+        // Collect all medication_ids
+        const allMedicationIds = effectiveItems
           .map(i => i.medication_id)
           .filter(Boolean) as string[];
 
-        // Fetch local products matching by citio_id (the reliable link to CITIO)
-        const { data: localProducts } = await supabase
+        // Fetch local products matching by citio_id
+        const { data: matchedProducts } = await supabase
           .from("products")
           .select("id, name, sku, brand, citio_id, price_type_1, price_type_2, price_type_3, price_type_4, price_type_5, unit_price")
           .eq("is_active", true)
           .in("citio_id", allMedicationIds.length > 0 ? allMedicationIds : ["__none__"]);
 
-        // Build a map: citio_id -> local product for O(1) lookups
-        const citioProductMap = new Map<string, typeof localProducts extends (infer T)[] | null ? T : never>();
-        if (localProducts) {
-          for (const p of localProducts) {
+        const citioProductMap = new Map<string, typeof matchedProducts extends (infer T)[] | null ? T : never>();
+        if (matchedProducts) {
+          for (const p of matchedProducts) {
             if (p.citio_id) citioProductMap.set(p.citio_id, p);
           }
         }
 
-        // Helper to find matching local product by medication_id -> citio_id
-        const findLocalProduct = (medicationId?: string) => {
-          if (!medicationId) return null;
-          return citioProductMap.get(medicationId) || null;
+        const findLocalProduct = (item: ExternalOrderItem) => {
+          // First check if user manually linked a product
+          if (item._linked_product_id) return { id: item._linked_product_id } as any;
+          if (!item.medication_id) return null;
+          return citioProductMap.get(item.medication_id) || null;
         };
 
-        const parentItems = order.items.filter(i => !i.is_sub_product);
-        const subItems = order.items.filter(i => i.is_sub_product);
-
+        const parentItems = effectiveItems.filter(i => !i.is_sub_product);
+        const subItems = effectiveItems.filter(i => i.is_sub_product);
         let unmatchedCount = 0;
 
-        // Insert parent items first, with product_id linkage via citio_id
         const parentQuoteItems = parentItems.map(item => {
-          const localProduct = findLocalProduct(item.medication_id);
+          const localProduct = findLocalProduct(item);
           if (!localProduct) unmatchedCount++;
           const precio = localProduct?.price_type_1 || item.unit_price || 0;
           return {
             quote_id: newQuote.id,
             product_id: localProduct?.id || null,
-            nombre_producto: item.medication_name,
-            marca: item.medications?.brand || localProduct?.brand || null,
+            nombre_producto: item._linked_product_name || item.medication_name,
+            marca: item._linked_brand || item.medications?.brand || localProduct?.brand || null,
             cantidad: item.quantity,
             precio_unitario: precio,
             importe: precio * item.quantity,
@@ -252,7 +381,6 @@ export function SalesRequestsCitioOrders() {
 
         if (parentError) throw parentError;
 
-        // Build a map from parent medication_id to inserted quote_item id
         const parentMap = new Map<string, string>();
         parentItems.forEach((item, idx) => {
           const key = item.medication_id || item.id;
@@ -261,9 +389,7 @@ export function SalesRequestsCitioOrders() {
           }
         });
 
-        // Insert sub-items with parent reference and product_id linkage via citio_id
         if (subItems.length > 0) {
-          // Fetch sub-product matches separately if they weren't in the first batch
           const subMedicationIds = subItems
             .map(i => i.medication_id)
             .filter(id => id && !citioProductMap.has(id)) as string[];
@@ -282,14 +408,14 @@ export function SalesRequestsCitioOrders() {
           }
 
           const subQuoteItems = subItems.map(item => {
-            const localProduct = findLocalProduct(item.medication_id);
+            const localProduct = findLocalProduct(item);
             if (!localProduct) unmatchedCount++;
             const precio = localProduct?.price_type_1 || item.unit_price || 0;
             return {
               quote_id: newQuote.id,
               product_id: localProduct?.id || null,
-              nombre_producto: item.medication_name,
-              marca: item.medications?.brand || localProduct?.brand || null,
+              nombre_producto: item._linked_product_name || item.medication_name,
+              marca: item._linked_brand || item.medications?.brand || localProduct?.brand || null,
               cantidad: item.quantity,
               precio_unitario: precio,
               importe: precio * item.quantity,
@@ -308,7 +434,7 @@ export function SalesRequestsCitioOrders() {
 
         if (unmatchedCount > 0) {
           toast.warning(
-            `${unmatchedCount} producto(s) no se encontraron en el inventario local (posiblemente no importados desde CITIO). Vincúlalos manualmente antes de aprobar.`,
+            `${unmatchedCount} producto(s) no se encontraron en el inventario local. Vincúlalos manualmente antes de aprobar.`,
             { duration: 8000 }
           );
         }
@@ -316,8 +442,6 @@ export function SalesRequestsCitioOrders() {
 
       toast.success(`Cotización ${folio} creada exitosamente`);
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      
-      // Navigate to quotes page
       navigate("/dashboard/quotes");
     } catch (err: any) {
       console.error("Error converting to quote:", err);
@@ -326,6 +450,67 @@ export function SalesRequestsCitioOrders() {
       setConvertingId(null);
     }
   };
+
+  // Product search popover component
+  const ProductSearchPopover = ({ 
+    open, 
+    onOpenChange, 
+    search, 
+    onSearchChange, 
+    onSelect,
+    triggerLabel,
+    triggerVariant = "outline" as const,
+    triggerSize = "sm" as const,
+    triggerIcon,
+  }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    search: string;
+    onSearchChange: (s: string) => void;
+    onSelect: (product: LocalProduct) => void;
+    triggerLabel: string;
+    triggerVariant?: "outline" | "ghost" | "default";
+    triggerSize?: "sm" | "icon" | "default";
+    triggerIcon: React.ReactNode;
+  }) => (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button variant={triggerVariant} size={triggerSize} className="gap-1 text-xs h-7">
+          {triggerIcon}
+          <span className="hidden sm:inline">{triggerLabel}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[400px] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Buscar por nombre, SKU o marca..."
+            value={search}
+            onValueChange={onSearchChange}
+          />
+          <CommandList>
+            <CommandEmpty>No se encontraron productos.</CommandEmpty>
+            <CommandGroup>
+              {getFilteredProducts(search).map((product) => (
+                <CommandItem
+                  key={product.id}
+                  value={product.id}
+                  onSelect={() => onSelect(product)}
+                  className="flex items-center justify-between py-2"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{product.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      SKU: {product.sku} · {product.brand || "Sin marca"} · Stock: {product.current_stock || 0}
+                    </p>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 
   return (
     <Card>
@@ -348,7 +533,7 @@ export function SalesRequestsCitioOrders() {
 
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <AlertCircle className="h-4 w-4" />
-          <span>Solo se muestran órdenes de compra con proveedor QualMedical</span>
+          <span>Solo se muestran órdenes de compra con proveedor QualMedical. Puede editar antes de convertir.</span>
         </div>
 
         {isLoading ? (
@@ -367,11 +552,17 @@ export function SalesRequestsCitioOrders() {
               {filteredOrders.map((order) => {
                 const isExpanded = expandedOrderId === order.id;
                 const patientName = getPatientName(order);
+                const effectiveItems = getOrderItems(order);
+                const isEdited = editedOrders.has(order.id);
+                const effectiveTotal = isEdited ? getOrderTotal(order) : order.total_amount;
 
                 return (
                   <div
                     key={order.id}
-                    className="rounded-lg border overflow-hidden transition-colors"
+                    className={cn(
+                      "rounded-lg border overflow-hidden transition-colors",
+                      isEdited && "border-primary/50"
+                    )}
                   >
                     {/* Header - clickable */}
                     <div
@@ -386,6 +577,9 @@ export function SalesRequestsCitioOrders() {
                               {order.quotations.folio}
                             </Badge>
                           )}
+                          {isEdited && (
+                            <Badge variant="secondary" className="text-xs">Editada</Badge>
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {order.suppliers?.name || order.supplier_name || "QualMedical"} • {formatDate(order.order_date || order.created_at)}
@@ -393,7 +587,7 @@ export function SalesRequestsCitioOrders() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-sm font-semibold">{formatCurrency(order.total_amount)}</span>
+                        <span className="text-sm font-semibold">{formatCurrency(effectiveTotal)}</span>
                         {order.status && (
                           <Badge variant="outline" className="text-xs capitalize">
                             {statusLabels[order.status] || order.status}
@@ -414,7 +608,7 @@ export function SalesRequestsCitioOrders() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                           <div>
                             <p className="text-muted-foreground text-xs">Subtotal</p>
-                            <p className="font-medium">{formatCurrency(order.subtotal || 0)}</p>
+                            <p className="font-medium">{formatCurrency(isEdited ? effectiveTotal : (order.subtotal || 0))}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground text-xs">IVA</p>
@@ -422,7 +616,7 @@ export function SalesRequestsCitioOrders() {
                           </div>
                           <div>
                             <p className="text-muted-foreground text-xs">Total</p>
-                            <p className="font-semibold">{formatCurrency(order.total_amount)}</p>
+                            <p className="font-semibold">{formatCurrency(effectiveTotal)}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground text-xs">Fecha</p>
@@ -455,18 +649,32 @@ export function SalesRequestsCitioOrders() {
                           <p className="text-sm text-muted-foreground italic">{order.notes}</p>
                         )}
 
-                        {/* Items table */}
-                        {order.items && order.items.length > 0 && (() => {
-                          const { parentItems, subMap } = getGroupedItems(order.items);
+                        {/* Items table - editable */}
+                        {effectiveItems.length > 0 && (() => {
+                          const { parentItems, subMap } = getGroupedItems(effectiveItems);
                           const hasAnySubs = subMap.size > 0;
-                          // If no sub-products exist, render all items flat
-                          const displayItems = hasAnySubs ? parentItems : order.items;
+                          const displayItems = hasAnySubs ? parentItems : effectiveItems;
 
                           return (
                           <div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <Package className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm font-medium">{order.items.length} producto(s)</span>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <Package className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm font-medium">{effectiveItems.length} producto(s)</span>
+                              </div>
+                              <ProductSearchPopover
+                                open={addingToOrderId === order.id}
+                                onOpenChange={(open) => {
+                                  setAddingToOrderId(open ? order.id : null);
+                                  if (!open) setAddProductSearch("");
+                                }}
+                                search={addProductSearch}
+                                onSearchChange={setAddProductSearch}
+                                onSelect={(product) => handleAddProduct(order.id, product, order)}
+                                triggerLabel="Agregar Producto"
+                                triggerVariant="outline"
+                                triggerIcon={<Plus className="h-3 w-3" />}
+                              />
                             </div>
                             <div className="rounded border overflow-hidden">
                               <table className="w-full text-xs">
@@ -474,9 +682,10 @@ export function SalesRequestsCitioOrders() {
                                   <tr className="bg-muted/50">
                                     <th className="text-left p-2 font-medium">Producto</th>
                                     <th className="text-left p-2 font-medium">Marca</th>
-                                    <th className="text-right p-2 font-medium">Cant.</th>
+                                    <th className="text-center p-2 font-medium">Cant.</th>
                                     <th className="text-right p-2 font-medium">P. Unit.</th>
                                     <th className="text-right p-2 font-medium">Subtotal</th>
+                                    <th className="text-center p-2 font-medium w-20">Acciones</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -485,45 +694,136 @@ export function SalesRequestsCitioOrders() {
                                     const children = hasAnySubs ? (subMap.get(itemKey) || []) : [];
                                     const hasChildren = children.length > 0;
                                     const isParentExpanded = expandedParents.has(itemKey);
+                                    const isLinked = !!item._linked_product_id;
 
                                     return (
                                       <>
                                         <tr
                                           key={item.id}
-                                          className={`border-t ${hasChildren ? "cursor-pointer hover:bg-accent/10" : ""}`}
-                                          onClick={hasChildren ? () => toggleParentExpand(itemKey) : undefined}
+                                          className={cn(
+                                            "border-t",
+                                            hasChildren ? "cursor-pointer hover:bg-accent/10" : "",
+                                            isLinked && "bg-emerald-50/50 dark:bg-emerald-950/20"
+                                          )}
                                         >
-                                          <td className="p-2 flex items-center gap-1">
-                                            {hasChildren && (
-                                              isParentExpanded
-                                                ? <ChevronUp className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                                : <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                            )}
-                                            <span className={hasChildren ? "font-semibold" : ""}>
-                                              {item.medication_name}
-                                            </span>
-                                            {hasChildren && (
-                                              <Badge variant="secondary" className="text-[10px] ml-1">
-                                                {children.length} comp.
-                                              </Badge>
-                                            )}
+                                          <td className="p-2" onClick={hasChildren ? () => toggleParentExpand(itemKey) : undefined}>
+                                            <div className="flex items-center gap-1">
+                                              {hasChildren && (
+                                                isParentExpanded
+                                                  ? <ChevronUp className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                                  : <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                              )}
+                                              <span className={hasChildren ? "font-semibold" : ""}>
+                                                {item._linked_product_name || item.medication_name}
+                                              </span>
+                                              {hasChildren && (
+                                                <Badge variant="secondary" className="text-[10px] ml-1">
+                                                  {children.length} comp.
+                                                </Badge>
+                                              )}
+                                              {isLinked && (
+                                                <Badge variant="default" className="text-[10px] ml-1 bg-emerald-600">
+                                                  Vinculado
+                                                </Badge>
+                                              )}
+                                            </div>
                                           </td>
-                                          <td className="p-2 text-muted-foreground">{item.medications?.brand || "—"}</td>
-                                          <td className="p-2 text-right">{item.quantity}</td>
+                                          <td className="p-2 text-muted-foreground">{item._linked_brand || item.medications?.brand || "—"}</td>
+                                          <td className="p-2 text-center">
+                                            <Input
+                                              type="number"
+                                              min={1}
+                                              value={item.quantity}
+                                              onChange={(e) => handleUpdateItemQuantity(order.id, item.id, parseInt(e.target.value) || 1, order)}
+                                              className="w-14 h-7 text-center text-xs"
+                                              onClick={(e) => e.stopPropagation()}
+                                            />
+                                          </td>
                                           <td className="p-2 text-right">{formatCurrency(item.unit_price)}</td>
-                                          <td className="p-2 text-right font-medium">{formatCurrency(item.subtotal)}</td>
+                                          <td className="p-2 text-right font-medium">{formatCurrency(item.unit_price * item.quantity)}</td>
+                                          <td className="p-2 text-center">
+                                            <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                              <ProductSearchPopover
+                                                open={linkingItemId === item.id}
+                                                onOpenChange={(open) => {
+                                                  setLinkingItemId(open ? item.id : null);
+                                                  if (!open) setLinkSearch("");
+                                                }}
+                                                search={linkSearch}
+                                                onSearchChange={setLinkSearch}
+                                                onSelect={(product) => handleLinkProduct(order.id, item.id, product, order)}
+                                                triggerLabel="Vincular"
+                                                triggerVariant="ghost"
+                                                triggerIcon={<Link2 className="h-3 w-3" />}
+                                              />
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7"
+                                                onClick={() => handleDeleteItem(order.id, item.id, order)}
+                                              >
+                                                <Trash2 className="h-3 w-3 text-destructive" />
+                                              </Button>
+                                            </div>
+                                          </td>
                                         </tr>
-                                        {hasChildren && isParentExpanded && children.map((sub) => (
-                                          <tr key={sub.id} className="border-t bg-muted/20">
-                                            <td className="p-2 pl-7 text-muted-foreground italic">
-                                              ↳ {sub.medication_name}
-                                            </td>
-                                            <td className="p-2 text-muted-foreground">{sub.medications?.brand || "—"}</td>
-                                            <td className="p-2 text-right text-muted-foreground">{sub.quantity}</td>
-                                            <td className="p-2 text-right text-muted-foreground">{formatCurrency(sub.unit_price)}</td>
-                                            <td className="p-2 text-right text-muted-foreground">{formatCurrency(sub.subtotal)}</td>
-                                          </tr>
-                                        ))}
+                                        {hasChildren && isParentExpanded && children.map((sub) => {
+                                          const subIsLinked = !!sub._linked_product_id;
+                                          return (
+                                            <tr key={sub.id} className={cn(
+                                              "border-t bg-muted/20",
+                                              subIsLinked && "bg-emerald-50/30 dark:bg-emerald-950/10"
+                                            )}>
+                                              <td className="p-2 pl-7 text-muted-foreground italic">
+                                                <div className="flex items-center gap-1">
+                                                  <span>↳ {sub._linked_product_name || sub.medication_name}</span>
+                                                  {subIsLinked && (
+                                                    <Badge variant="default" className="text-[10px] ml-1 bg-emerald-600">
+                                                      Vinculado
+                                                    </Badge>
+                                                  )}
+                                                </div>
+                                              </td>
+                                              <td className="p-2 text-muted-foreground">{sub._linked_brand || sub.medications?.brand || "—"}</td>
+                                              <td className="p-2 text-center">
+                                                <Input
+                                                  type="number"
+                                                  min={1}
+                                                  value={sub.quantity}
+                                                  onChange={(e) => handleUpdateItemQuantity(order.id, sub.id, parseInt(e.target.value) || 1, order)}
+                                                  className="w-14 h-7 text-center text-xs"
+                                                />
+                                              </td>
+                                              <td className="p-2 text-right text-muted-foreground">{formatCurrency(sub.unit_price)}</td>
+                                              <td className="p-2 text-right text-muted-foreground">{formatCurrency(sub.unit_price * sub.quantity)}</td>
+                                              <td className="p-2 text-center">
+                                                <div className="flex items-center justify-center gap-1">
+                                                  <ProductSearchPopover
+                                                    open={linkingItemId === sub.id}
+                                                    onOpenChange={(open) => {
+                                                      setLinkingItemId(open ? sub.id : null);
+                                                      if (!open) setLinkSearch("");
+                                                    }}
+                                                    search={linkSearch}
+                                                    onSearchChange={setLinkSearch}
+                                                    onSelect={(product) => handleLinkProduct(order.id, sub.id, product, order)}
+                                                    triggerLabel="Vincular"
+                                                    triggerVariant="ghost"
+                                                    triggerIcon={<Link2 className="h-3 w-3" />}
+                                                  />
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7"
+                                                    onClick={() => handleDeleteItem(order.id, sub.id, order)}
+                                                  >
+                                                    <Trash2 className="h-3 w-3 text-destructive" />
+                                                  </Button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
                                       </>
                                     );
                                   })}
@@ -535,7 +835,23 @@ export function SalesRequestsCitioOrders() {
                         })()}
 
                         {/* Convert to Quote button */}
-                        <div className="flex justify-end pt-2">
+                        <div className="flex justify-end pt-2 gap-2">
+                          {isEdited && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditedOrders(prev => {
+                                  const next = new Map(prev);
+                                  next.delete(order.id);
+                                  return next;
+                                });
+                                toast.info("Cambios descartados");
+                              }}
+                            >
+                              Descartar cambios
+                            </Button>
+                          )}
                           <Button
                             onClick={(e) => {
                               e.stopPropagation();
