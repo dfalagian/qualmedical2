@@ -570,11 +570,21 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
       p.brand?.toLowerCase().includes(term)
     ).slice(0, 30);
   }, [products, linkSearch]);
+  const CATEGORIAS_EXENTAS_IVA = ["medicamentos", "oncologicos", "inmunoterapia"];
+
   const subtotal = useMemo(() => {
     return quoteItems.reduce((sum, item) => sum + item.importe, 0);
   }, [quoteItems]);
 
-  const total = subtotal; // Por ahora igual al subtotal, se puede agregar IVA después
+  const iva = useMemo(() => {
+    return quoteItems.reduce((sum, item) => {
+      const cat = (item.categoria || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (CATEGORIAS_EXENTAS_IVA.includes(cat)) return sum;
+      return sum + item.importe * 0.16;
+    }, 0);
+  }, [quoteItems]);
+
+  const total = subtotal + iva;
 
   // Detect products with multiple batches in the quote
   const productsWithMultipleBatches = useMemo(() => {
@@ -1261,6 +1271,10 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Sub-Total:</span>
                 <span className="font-medium">${subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">IVA (16% insumos):</span>
+                <span className="font-medium">${iva.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>Total:</span>
