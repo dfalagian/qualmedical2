@@ -43,22 +43,26 @@ export const BudgetsList = () => {
 
   const approveMutation = useMutation({
     mutationFn: async (budgetId: string) => {
+      // Generate a proper quote folio when approving
+      const { data: newFolio, error: folioError } = await supabase.rpc("generate_quote_folio");
+      if (folioError) throw folioError;
+
       const { error } = await supabase
         .from("quotes")
-        .update({ status: "borrador" })
+        .update({ status: "borrador", folio: newFolio })
         .eq("id", budgetId);
       if (error) throw error;
-      return budgetId;
+      return { budgetId, newFolio };
     },
-    onSuccess: () => {
-      toast.success(`Presupuesto ${confirmFolio} aprobado y convertido a cotización`);
+    onSuccess: (data) => {
+      toast.success(`Presupuesto ${confirmFolio} aprobado → Cotización ${data.newFolio}`);
       logActivity({
         section: "cotizaciones",
         action: "aprobar",
         entityType: "presupuesto",
         entityId: confirmId || undefined,
         entityName: confirmFolio,
-        details: { convertido_a: "cotización (borrador)" },
+        details: { convertido_a: "cotización (borrador)", nuevo_folio: data.newFolio },
       });
       queryClient.invalidateQueries({ queryKey: ["budgets-list"] });
       queryClient.invalidateQueries({ queryKey: ["quotes"] });

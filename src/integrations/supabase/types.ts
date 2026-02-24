@@ -2272,6 +2272,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_budget_folio: { Args: never; Returns: string }
       generate_quote_folio: { Args: never; Returns: string }
       get_parent_supplier_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
