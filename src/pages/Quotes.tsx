@@ -39,6 +39,8 @@ interface QuoteToEdit {
     precio_unitario: number;
     importe: number;
     tipo_precio: string | null;
+    is_sub_product?: boolean;
+    parent_item_id?: string | null;
   }>;
 }
 
