@@ -16,6 +16,8 @@ interface QuoteItem {
   precio_unitario: number;
   importe: number;
   tipo_precio: string; // "1", "2", "3", "4", or "manual"
+  is_sub_product?: boolean;
+  parent_item_id?: string | null;
 }
 
 interface SaveQuoteParams {
@@ -87,7 +89,11 @@ export const useQuoteActions = () => {
       if (quoteError) throw quoteError;
 
       // Insertar items
-      const itemsToInsert = params.items.map(item => ({
+      // First pass: insert parent items to get their DB ids
+      const parentItems = params.items.filter(item => !item.is_sub_product);
+      const subItems = params.items.filter(item => item.is_sub_product);
+
+      const parentItemsToInsert = parentItems.map(item => ({
         quote_id: quote.id,
         product_id: item.product_id,
         batch_id: item.batch_id,
@@ -99,13 +105,52 @@ export const useQuoteActions = () => {
         precio_unitario: item.precio_unitario,
         importe: item.importe,
         tipo_precio: item.tipo_precio || "1",
+        is_sub_product: false,
       }));
 
-      const { error: itemsError } = await supabase
-        .from("quote_items")
-        .insert(itemsToInsert);
+      let parentIdMap = new Map<string, string>();
 
-      if (itemsError) throw itemsError;
+      if (parentItemsToInsert.length > 0) {
+        const { data: insertedParents, error: parentError } = await supabase
+          .from("quote_items")
+          .insert(parentItemsToInsert)
+          .select("id");
+        if (parentError) throw parentError;
+        // Map local item id to DB id
+        parentItems.forEach((item, idx) => {
+          if (insertedParents?.[idx]) {
+            parentIdMap.set(item.id, insertedParents[idx].id);
+          }
+        });
+      }
+
+      // Second pass: insert sub-items with resolved parent_item_id
+      if (subItems.length > 0) {
+        const subItemsToInsert = subItems.map(item => ({
+          quote_id: quote.id,
+          product_id: item.product_id,
+          batch_id: item.batch_id,
+          nombre_producto: item.nombre_producto,
+          marca: item.marca,
+          lote: item.lote,
+          fecha_caducidad: item.fecha_caducidad ? toLocalDateStr(item.fecha_caducidad) : null,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio_unitario,
+          importe: item.importe,
+          tipo_precio: item.tipo_precio || "1",
+          is_sub_product: true,
+          parent_item_id: item.parent_item_id ? (parentIdMap.get(item.parent_item_id) || item.parent_item_id) : null,
+        }));
+
+        const { error: subError } = await supabase
+          .from("quote_items")
+          .insert(subItemsToInsert);
+        if (subError) throw subError;
+      }
+
+      const itemsInserted = true;
+
+      // Items already inserted above
 
       return quote;
     },
@@ -156,26 +201,62 @@ export const useQuoteActions = () => {
 
       if (deleteError) throw deleteError;
 
-      // Insertar nuevos items
-      const itemsToInsert = params.items.map(item => ({
-        quote_id: params.quoteId,
-        product_id: item.product_id,
-        batch_id: item.batch_id,
-        nombre_producto: item.nombre_producto,
-        marca: item.marca,
-        lote: item.lote,
-        fecha_caducidad: item.fecha_caducidad ? toLocalDateStr(item.fecha_caducidad) : null,
-        cantidad: item.cantidad,
-        precio_unitario: item.precio_unitario,
-        importe: item.importe,
-        tipo_precio: item.tipo_precio || "1",
-      }));
+      // Insert parent items first, then sub-items with resolved parent_item_id
+      const parentItems = params.items.filter(item => !item.is_sub_product);
+      const subItems = params.items.filter(item => item.is_sub_product);
 
-      const { error: itemsError } = await supabase
-        .from("quote_items")
-        .insert(itemsToInsert);
+      let parentIdMap = new Map<string, string>();
 
-      if (itemsError) throw itemsError;
+      if (parentItems.length > 0) {
+        const parentItemsToInsert = parentItems.map(item => ({
+          quote_id: params.quoteId,
+          product_id: item.product_id,
+          batch_id: item.batch_id,
+          nombre_producto: item.nombre_producto,
+          marca: item.marca,
+          lote: item.lote,
+          fecha_caducidad: item.fecha_caducidad ? toLocalDateStr(item.fecha_caducidad) : null,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio_unitario,
+          importe: item.importe,
+          tipo_precio: item.tipo_precio || "1",
+          is_sub_product: false,
+        }));
+
+        const { data: insertedParents, error: parentError } = await supabase
+          .from("quote_items")
+          .insert(parentItemsToInsert)
+          .select("id");
+        if (parentError) throw parentError;
+        parentItems.forEach((item, idx) => {
+          if (insertedParents?.[idx]) {
+            parentIdMap.set(item.id, insertedParents[idx].id);
+          }
+        });
+      }
+
+      if (subItems.length > 0) {
+        const subItemsToInsert = subItems.map(item => ({
+          quote_id: params.quoteId,
+          product_id: item.product_id,
+          batch_id: item.batch_id,
+          nombre_producto: item.nombre_producto,
+          marca: item.marca,
+          lote: item.lote,
+          fecha_caducidad: item.fecha_caducidad ? toLocalDateStr(item.fecha_caducidad) : null,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio_unitario,
+          importe: item.importe,
+          tipo_precio: item.tipo_precio || "1",
+          is_sub_product: true,
+          parent_item_id: item.parent_item_id ? (parentIdMap.get(item.parent_item_id) || item.parent_item_id) : null,
+        }));
+
+        const { error: subError } = await supabase
+          .from("quote_items")
+          .insert(subItemsToInsert);
+        if (subError) throw subError;
+      }
 
       return quote;
     },
