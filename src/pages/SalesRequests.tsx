@@ -31,7 +31,7 @@ const SalesRequests = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
             <TabsTrigger value="requests" className="flex items-center gap-2">
               <Inbox className="h-4 w-4" />
               <span className="hidden sm:inline">Solicitudes</span>
@@ -47,6 +47,10 @@ const SalesRequests = () => {
             <TabsTrigger value="cipi_pro" className="flex items-center gap-2">
               <FileSpreadsheet className="h-4 w-4" />
               <span className="hidden sm:inline">CIPI Pro</span>
+            </TabsTrigger>
+            <TabsTrigger value="cemi" className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              <span className="hidden sm:inline">CEMI</span>
             </TabsTrigger>
           </TabsList>
 
@@ -64,6 +68,10 @@ const SalesRequests = () => {
 
           <TabsContent value="cipi_pro" className="mt-4">
             <CipiRequestsList type="cipi_pro" title="Solicitudes CIPI Pro" />
+          </TabsContent>
+
+          <TabsContent value="cemi" className="mt-4">
+            <CipiRequestsList type="cemi" title="Solicitudes CEMI" />
           </TabsContent>
         </Tabs>
       </div>

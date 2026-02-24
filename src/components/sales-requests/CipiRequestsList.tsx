@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface CipiRequestsListProps {
-  type: "cipi" | "cipi_pro";
+  type: "cipi" | "cipi_pro" | "cemi";
   title: string;
 }
 

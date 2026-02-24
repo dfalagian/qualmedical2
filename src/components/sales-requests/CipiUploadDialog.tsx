@@ -14,7 +14,7 @@ import * as XLSX from "xlsx";
 interface CipiUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  type: "cipi" | "cipi_pro";
+  type: "cipi" | "cipi_pro" | "cemi";
   onSuccess: () => void;
 }
 
