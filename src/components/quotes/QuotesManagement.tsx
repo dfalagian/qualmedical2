@@ -1114,7 +1114,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                             <div className="flex flex-col gap-0.5">
                               <div className="flex items-center gap-2">
                                 <span className={cn(
-                                  "truncate max-w-[180px]",
+                                  "break-words",
                                   isSubProduct && "pl-4 text-muted-foreground italic"
                                 )}>
                                   {isSubProduct ? `↳ ${item.nombre_producto}` : item.nombre_producto}
