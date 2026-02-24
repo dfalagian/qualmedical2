@@ -468,9 +468,9 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     setBatchOpen(false);
   };
 
-  // Remove item from quote
+  // Remove item from quote (and its sub-products if it's a parent)
   const handleRemoveItem = (id: string) => {
-    setQuoteItems(quoteItems.filter((item) => item.id !== id));
+    setQuoteItems(quoteItems.filter((item) => item.id !== id && item.parent_item_id !== id));
   };
 
   // Update item quantity
