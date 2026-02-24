@@ -82,7 +82,7 @@ export const POSCart = ({
       if (items.length === 0) throw new Error("El carrito está vacío");
 
       // Generate folio
-      const { data: folioData, error: folioError } = await supabase.rpc("generate_quote_folio");
+      const { data: folioData, error: folioError } = await supabase.rpc("generate_budget_folio");
       if (folioError) throw folioError;
 
       // Use selected client or create a generic "Mostrador" client
