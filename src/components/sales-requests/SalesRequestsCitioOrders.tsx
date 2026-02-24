@@ -75,6 +75,70 @@ interface LocalProduct {
   unit_price: number | null;
 }
 
+// Extracted outside the main component to prevent re-creation on re-renders
+// which was causing the search input to lose focus after each keystroke.
+const ProductSearchPopover = ({ 
+  open, 
+  onOpenChange, 
+  search, 
+  onSearchChange, 
+  onSelect,
+  triggerLabel,
+  triggerVariant = "outline" as const,
+  triggerSize = "sm" as const,
+  triggerIcon,
+  filteredProducts,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  search: string;
+  onSearchChange: (s: string) => void;
+  onSelect: (product: LocalProduct) => void;
+  triggerLabel: string;
+  triggerVariant?: "outline" | "ghost" | "default";
+  triggerSize?: "sm" | "icon" | "default";
+  triggerIcon: React.ReactNode;
+  filteredProducts: LocalProduct[];
+}) => (
+  <Popover open={open} onOpenChange={onOpenChange}>
+    <PopoverTrigger asChild>
+      <Button variant={triggerVariant} size={triggerSize} className="gap-1 text-xs h-7">
+        {triggerIcon}
+        <span className="hidden sm:inline">{triggerLabel}</span>
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent className="w-[400px] p-0" align="start">
+      <Command shouldFilter={false}>
+        <CommandInput
+          placeholder="Buscar por nombre, SKU o marca..."
+          value={search}
+          onValueChange={onSearchChange}
+        />
+        <CommandList>
+          <CommandEmpty>No se encontraron productos.</CommandEmpty>
+          <CommandGroup>
+            {filteredProducts.map((product) => (
+              <CommandItem
+                key={product.id}
+                value={product.id}
+                onSelect={() => onSelect(product)}
+                className="flex items-center justify-between py-2"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{product.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    SKU: {product.sku} · {product.brand || "Sin marca"} · Stock: {product.current_stock || 0}
+                  </p>
+                </div>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+    </PopoverContent>
+  </Popover>
+);
+
 export function SalesRequestsCitioOrders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
@@ -451,66 +515,8 @@ export function SalesRequestsCitioOrders() {
     }
   };
 
-  // Product search popover component
-  const ProductSearchPopover = ({ 
-    open, 
-    onOpenChange, 
-    search, 
-    onSearchChange, 
-    onSelect,
-    triggerLabel,
-    triggerVariant = "outline" as const,
-    triggerSize = "sm" as const,
-    triggerIcon,
-  }: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    search: string;
-    onSearchChange: (s: string) => void;
-    onSelect: (product: LocalProduct) => void;
-    triggerLabel: string;
-    triggerVariant?: "outline" | "ghost" | "default";
-    triggerSize?: "sm" | "icon" | "default";
-    triggerIcon: React.ReactNode;
-  }) => (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <Button variant={triggerVariant} size={triggerSize} className="gap-1 text-xs h-7">
-          {triggerIcon}
-          <span className="hidden sm:inline">{triggerLabel}</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Buscar por nombre, SKU o marca..."
-            value={search}
-            onValueChange={onSearchChange}
-          />
-          <CommandList>
-            <CommandEmpty>No se encontraron productos.</CommandEmpty>
-            <CommandGroup>
-              {getFilteredProducts(search).map((product) => (
-                <CommandItem
-                  key={product.id}
-                  value={product.id}
-                  onSelect={() => onSelect(product)}
-                  className="flex items-center justify-between py-2"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{product.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      SKU: {product.sku} · {product.brand || "Sin marca"} · Stock: {product.current_stock || 0}
-                    </p>
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
+  // ProductSearchPopover is now extracted outside the component to prevent
+  // re-creation on every render which causes the search input to lose focus.
 
   return (
     <Card>
@@ -674,6 +680,7 @@ export function SalesRequestsCitioOrders() {
                                 triggerLabel="Agregar Producto"
                                 triggerVariant="outline"
                                 triggerIcon={<Plus className="h-3 w-3" />}
+                                filteredProducts={getFilteredProducts(addProductSearch)}
                               />
                             </div>
                             <div className="rounded border overflow-hidden">
@@ -752,6 +759,7 @@ export function SalesRequestsCitioOrders() {
                                                 search={linkSearch}
                                                 onSearchChange={setLinkSearch}
                                                 onSelect={(product) => handleLinkProduct(order.id, item.id, product, order)}
+                                                filteredProducts={getFilteredProducts(linkSearch)}
                                                 triggerLabel="Vincular"
                                                 triggerVariant="ghost"
                                                 triggerIcon={<Link2 className="h-3 w-3" />}
@@ -807,6 +815,7 @@ export function SalesRequestsCitioOrders() {
                                                     search={linkSearch}
                                                     onSearchChange={setLinkSearch}
                                                     onSelect={(product) => handleLinkProduct(order.id, sub.id, product, order)}
+                                                    filteredProducts={getFilteredProducts(linkSearch)}
                                                     triggerLabel="Vincular"
                                                     triggerVariant="ghost"
                                                     triggerIcon={<Link2 className="h-3 w-3" />}
