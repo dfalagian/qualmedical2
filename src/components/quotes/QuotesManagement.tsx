@@ -457,9 +457,20 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     setBatchOpen(false);
   };
 
-  // Remove item from quote
+  // Remove item from quote — if it's a parent, convert its sub-products to independent items
   const handleRemoveItem = (id: string) => {
-    setQuoteItems(quoteItems.filter((item) => item.id !== id));
+    setQuoteItems(prev => {
+      const removedItem = prev.find(item => item.id === id);
+      return prev
+        .filter(item => item.id !== id)
+        .map(item => {
+          // If this is a sub-product whose parent is being removed, make it independent
+          if (item.is_sub_product && item.parent_item_id === id) {
+            return { ...item, is_sub_product: false, parent_item_id: null };
+          }
+          return item;
+        });
+    });
   };
 
   // Update item quantity
