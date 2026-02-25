@@ -11,7 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Printer, ArrowRightLeft, Package, Tag as TagIcon, Check, X, Pencil, Trash2, ChevronDown, ChevronUp, Plus, Search } from "lucide-react";
+import { Printer, ArrowRightLeft, Package, Tag as TagIcon, Check, X, Pencil, Trash2, ChevronDown, ChevronUp, Plus, Search, Eye } from "lucide-react";
 import { openWarehouseTransferPrint, TransferPrintItem, TransferPrintData } from "./warehouseTransferPrint";
 import { useToast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLogger";
@@ -436,7 +436,7 @@ export function WarehouseTransferHistory() {
               <TableHead>Estado</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Notas</TableHead>
-              <TableHead className="w-[160px]">Acciones</TableHead>
+              <TableHead className="w-[200px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -483,40 +483,63 @@ export function WarehouseTransferHistory() {
                       {group.notes || "—"}
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-1">
+                      <div className="flex items-center gap-1">
+                        {/* Ver */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          onClick={() => setExpandedGroup(isExpanded ? null : group.key)}
+                          title="Ver transferencia"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {/* Editar (solo pendientes) */}
                         {isPending && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
-                              onClick={() => setConfirmAction({ type: "approve", group })}
-                              title="Aprobar transferencia"
-                              disabled={approveMutation.isPending}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => setConfirmAction({ type: "cancel", group })}
-                              title="Cancelar transferencia"
-                              disabled={cancelMutation.isPending}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                        {group.status === "aprobada" && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7"
-                            onClick={() => handlePrint(group)}
-                            title="Imprimir reporte"
+                            className="h-7 w-7 text-primary hover:text-primary"
+                            onClick={() => setExpandedGroup(group.key)}
+                            title="Editar transferencia"
                           >
-                            <Printer className="h-4 w-4" />
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {/* Imprimir */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          onClick={() => handlePrint(group)}
+                          title="Imprimir reporte"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        {/* Confirmar (solo pendientes) */}
+                        {isPending && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={() => setConfirmAction({ type: "approve", group })}
+                            title="Confirmar transferencia"
+                            disabled={approveMutation.isPending}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {/* Eliminar / Cancelar (solo pendientes) */}
+                        {isPending && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => setConfirmAction({ type: "cancel", group })}
+                            title="Eliminar transferencia"
+                            disabled={cancelMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
