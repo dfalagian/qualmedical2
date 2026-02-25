@@ -6,10 +6,12 @@ import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Printer, ArrowRightLeft, Package, Tag as TagIcon, Check, X, Pencil, Trash2, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { Printer, ArrowRightLeft, Package, Tag as TagIcon, Check, X, Pencil, Trash2, ChevronDown, ChevronUp, Plus, Search } from "lucide-react";
 import { openWarehouseTransferPrint, TransferPrintItem, TransferPrintData } from "./warehouseTransferPrint";
 import { useToast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLogger";
@@ -69,7 +71,9 @@ export function WarehouseTransferHistory() {
   const [editingItem, setEditingItem] = useState<{ id: string; quantity: number } | null>(null);
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
   const [newProductId, setNewProductId] = useState<string>("");
+  const [newBatchId, setNewBatchId] = useState<string>("");
   const [newQuantity, setNewQuantity] = useState<number>(1);
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ["warehouse_transfers_history"],
@@ -150,13 +154,31 @@ export function WarehouseTransferHistory() {
     enabled: !!addingGroup?.fromWarehouseId,
   });
 
+  // Batches for selected product
+  const { data: newProductBatches = [] } = useQuery({
+    queryKey: ["batches_for_transfer_add", newProductId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("product_batches")
+        .select("id, batch_number, expiration_date, current_quantity")
+        .eq("product_id", newProductId)
+        .eq("is_active", true)
+        .gt("current_quantity", 0)
+        .order("expiration_date", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!newProductId,
+  });
+
   // Add product to pending transfer mutation
   const addProductMutation = useMutation({
-    mutationFn: async ({ group, productId, quantity }: { group: GroupedTransfer; productId: string; quantity: number }) => {
+    mutationFn: async ({ group, productId, batchId, quantity }: { group: GroupedTransfer; productId: string; batchId?: string; quantity: number }) => {
       const { error } = await supabase.from("warehouse_transfers").insert({
         from_warehouse_id: group.fromWarehouseId,
         to_warehouse_id: group.toWarehouseId,
         product_id: productId,
+        batch_id: batchId || null,
         quantity,
         transfer_type: "manual",
         status: "pendiente",
@@ -168,6 +190,7 @@ export function WarehouseTransferHistory() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["warehouse_transfers_history"] });
       setNewProductId("");
+      setNewBatchId("");
       setNewQuantity(1);
       setAddingToGroup(null);
       toast({ title: "Producto agregado a la transferencia" });
@@ -585,18 +608,64 @@ export function WarehouseTransferHistory() {
                       <TableCell colSpan={5} className="text-xs">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Plus className="h-3 w-3 text-muted-foreground" />
-                          <Select value={newProductId} onValueChange={setNewProductId}>
-                            <SelectTrigger className="h-7 w-[220px] text-xs">
-                              <SelectValue placeholder="Seleccionar producto..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableProducts.map((p: any) => (
-                                <SelectItem key={p.id} value={p.id} className="text-xs">
-                                  {p.name} {p.brand ? `(${p.brand})` : ""} — Stock: {p.current_stock}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          
+                          {/* Searchable product selector */}
+                          <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-7 w-[220px] text-xs justify-start font-normal">
+                                <Search className="h-3 w-3 mr-1 shrink-0" />
+                                {newProductId
+                                  ? availableProducts.find((p: any) => p.id === newProductId)?.name || "Producto"
+                                  : "Buscar producto..."}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[280px] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Buscar por nombre..." className="text-xs" />
+                                <CommandList>
+                                  <CommandEmpty className="text-xs p-2">No se encontraron productos</CommandEmpty>
+                                  <CommandGroup>
+                                    {availableProducts.map((p: any) => (
+                                      <CommandItem
+                                        key={p.id}
+                                        value={`${p.name} ${p.brand || ""}`}
+                                        onSelect={() => {
+                                          setNewProductId(p.id);
+                                          setNewBatchId("");
+                                          setProductSearchOpen(false);
+                                        }}
+                                        className="text-xs"
+                                      >
+                                        <div className="flex flex-col">
+                                          <span className="font-medium">{p.name}</span>
+                                          <span className="text-muted-foreground">
+                                            {p.brand ? `${p.brand} · ` : ""}Stock: {p.current_stock} {p.unit || "uds"}
+                                          </span>
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+
+                          {/* Batch selector (appears after product is selected) */}
+                          {newProductId && newProductBatches.length > 0 && (
+                            <Select value={newBatchId} onValueChange={setNewBatchId}>
+                              <SelectTrigger className="h-7 w-[180px] text-xs">
+                                <SelectValue placeholder="Lote (opcional)" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {newProductBatches.map((b: any) => (
+                                  <SelectItem key={b.id} value={b.id} className="text-xs">
+                                    {b.batch_number} — Cad: {format(new Date(b.expiration_date + "T00:00:00"), "dd/MM/yyyy")} ({b.current_quantity} uds)
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+
                           <Input
                             type="number"
                             min={1}
@@ -610,7 +679,7 @@ export function WarehouseTransferHistory() {
                             size="icon"
                             className="h-7 w-7 text-green-600"
                             disabled={!newProductId || newQuantity < 1 || addProductMutation.isPending}
-                            onClick={() => addProductMutation.mutate({ group, productId: newProductId, quantity: newQuantity })}
+                            onClick={() => addProductMutation.mutate({ group, productId: newProductId, batchId: newBatchId || undefined, quantity: newQuantity })}
                             title="Confirmar"
                           >
                             <Check className="h-3 w-3" />
@@ -619,7 +688,7 @@ export function WarehouseTransferHistory() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            onClick={() => { setAddingToGroup(null); setNewProductId(""); setNewQuantity(1); }}
+                            onClick={() => { setAddingToGroup(null); setNewProductId(""); setNewBatchId(""); setNewQuantity(1); }}
                             title="Cancelar"
                           >
                             <X className="h-3 w-3" />
