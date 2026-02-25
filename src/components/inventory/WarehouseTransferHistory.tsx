@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -6,9 +6,10 @@ import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Printer, ArrowRightLeft, Package, Tag as TagIcon, Check, X, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Printer, ArrowRightLeft, Package, Tag as TagIcon, Check, X, Pencil, Trash2, ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { openWarehouseTransferPrint, TransferPrintItem, TransferPrintData } from "./warehouseTransferPrint";
 import { useToast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLogger";
@@ -66,6 +67,9 @@ export function WarehouseTransferHistory() {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: "approve" | "cancel" | "deleteItem"; group?: GroupedTransfer; itemId?: string } | null>(null);
   const [editingItem, setEditingItem] = useState<{ id: string; quantity: number } | null>(null);
+  const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
+  const [newProductId, setNewProductId] = useState<string>("");
+  const [newQuantity, setNewQuantity] = useState<number>(1);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ["warehouse_transfers_history"],
@@ -121,6 +125,57 @@ export function WarehouseTransferHistory() {
       });
     }
   }
+
+  // Derive the group being added to (after grouped is built)
+  const addingGroup = addingToGroup ? grouped.find(g => g.key === addingToGroup) : null;
+
+  // Products available in source warehouse for adding to pending transfer
+  const { data: availableProducts = [] } = useQuery({
+    queryKey: ["products_for_transfer_add", addingGroup?.fromWarehouseId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouse_stock")
+        .select("product_id, current_stock, products:product_id(id, name, sku, brand, unit)")
+        .eq("warehouse_id", addingGroup!.fromWarehouseId)
+        .gt("current_stock", 0);
+      if (error) throw error;
+      return (data || []).map((ws: any) => ({
+        id: ws.products?.id,
+        name: ws.products?.name,
+        brand: ws.products?.brand,
+        unit: ws.products?.unit,
+        current_stock: ws.current_stock,
+      })).filter((p: any) => p.id).sort((a: any, b: any) => a.name?.localeCompare(b.name));
+    },
+    enabled: !!addingGroup?.fromWarehouseId,
+  });
+
+  // Add product to pending transfer mutation
+  const addProductMutation = useMutation({
+    mutationFn: async ({ group, productId, quantity }: { group: GroupedTransfer; productId: string; quantity: number }) => {
+      const { error } = await supabase.from("warehouse_transfers").insert({
+        from_warehouse_id: group.fromWarehouseId,
+        to_warehouse_id: group.toWarehouseId,
+        product_id: productId,
+        quantity,
+        transfer_type: "manual",
+        status: "pendiente",
+        transfer_group_id: group.groupId,
+        notes: group.notes,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["warehouse_transfers_history"] });
+      setNewProductId("");
+      setNewQuantity(1);
+      setAddingToGroup(null);
+      toast({ title: "Producto agregado a la transferencia" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error al agregar", description: error.message, variant: "destructive" });
+    },
+  });
 
   // Approve mutation - applies stock changes
   const approveMutation = useMutation({
@@ -370,8 +425,8 @@ export function WarehouseTransferHistory() {
               const isExpanded = expandedGroup === group.key;
 
               return (
-                <>
-                  <TableRow key={group.key} className={isPending ? "bg-yellow-50/50" : ""}>
+                <React.Fragment key={group.key}>
+                  <TableRow className={isPending ? "bg-yellow-50/50" : ""}>
                     <TableCell className="text-xs">
                       {format(new Date(group.date), "dd/MM/yyyy HH:mm", { locale: es })}
                     </TableCell>
@@ -522,7 +577,76 @@ export function WarehouseTransferHistory() {
                       </TableRow>
                     );
                   })}
-                </>
+
+                  {/* Add product row for pending transfers */}
+                  {isExpanded && isPending && addingToGroup === group.key && (
+                    <TableRow className="bg-muted/20">
+                      <TableCell />
+                      <TableCell colSpan={5} className="text-xs">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Plus className="h-3 w-3 text-muted-foreground" />
+                          <Select value={newProductId} onValueChange={setNewProductId}>
+                            <SelectTrigger className="h-7 w-[220px] text-xs">
+                              <SelectValue placeholder="Seleccionar producto..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableProducts.map((p: any) => (
+                                <SelectItem key={p.id} value={p.id} className="text-xs">
+                                  {p.name} {p.brand ? `(${p.brand})` : ""} — Stock: {p.current_stock}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={newQuantity}
+                            onChange={(e) => setNewQuantity(parseInt(e.target.value) || 1)}
+                            className="h-7 w-16 text-xs"
+                            placeholder="Cant."
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-green-600"
+                            disabled={!newProductId || newQuantity < 1 || addProductMutation.isPending}
+                            onClick={() => addProductMutation.mutate({ group, productId: newProductId, quantity: newQuantity })}
+                            title="Confirmar"
+                          >
+                            <Check className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => { setAddingToGroup(null); setNewProductId(""); setNewQuantity(1); }}
+                            title="Cancelar"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell colSpan={2} />
+                    </TableRow>
+                  )}
+
+                  {/* Add product button */}
+                  {isExpanded && isPending && addingToGroup !== group.key && (
+                    <TableRow className="bg-muted/10">
+                      <TableCell />
+                      <TableCell colSpan={7}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1"
+                          onClick={() => { setAddingToGroup(group.key); setExpandedGroup(group.key); }}
+                        >
+                          <Plus className="h-3 w-3" /> Agregar producto
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               );
             })}
           </TableBody>
