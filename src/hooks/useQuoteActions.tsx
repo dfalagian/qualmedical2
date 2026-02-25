@@ -249,7 +249,7 @@ export const useQuoteActions = () => {
           importe: item.importe,
           tipo_precio: item.tipo_precio || "1",
           is_sub_product: true,
-          parent_item_id: item.parent_item_id ? (parentIdMap.get(item.parent_item_id) || item.parent_item_id) : null,
+          parent_item_id: item.parent_item_id ? (parentIdMap.get(item.parent_item_id) || null) : null,
         }));
 
         const { error: subError } = await supabase
