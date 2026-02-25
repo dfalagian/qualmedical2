@@ -1,0 +1,1 @@
+UPDATE warehouse_transfers SET status = 'pendiente', approved_at = NULL, approved_by = NULL WHERE status = 'aprobada';
