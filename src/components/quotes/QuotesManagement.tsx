@@ -300,18 +300,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     }
   }, [quoteToEdit, products]);
 
-  // Generate folio on mount (only for new quotes)
-  useEffect(() => {
-    if (!isEditMode) {
-      const generateFolio = async () => {
-        const { data, error } = await supabase.rpc("generate_quote_folio");
-        if (!error && data) {
-          setFolio(data);
-        }
-      };
-      generateFolio();
-    }
-  }, [isEditMode]);
+  // Folio is generated at save time if not manually set
 
   // Filter clients
   const filteredClients = useMemo(() => {
@@ -661,10 +650,18 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
         });
         onEditComplete?.();
       } else {
+        // Generate folio at save time if user didn't set one manually
+        let finalFolio = folio;
+        if (!finalFolio || finalFolio.trim() === "") {
+          const { data: generatedFolio, error: folioError } = await supabase.rpc("generate_quote_folio");
+          if (folioError) throw folioError;
+          finalFolio = generatedFolio || `COT-${Date.now()}`;
+          setFolio(finalFolio);
+        }
         // Create new quote
         const quote = await saveQuote({
           clientId: selectedClient.id,
-          folio,
+          folio: finalFolio,
           concepto,
           fechaCotizacion,
           fechaEntrega,
@@ -726,14 +723,8 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     setSelectedPriceType("1");
     setProductPrecio("");
     setIsManualPrice(false);
-    // Generate new folio
-    const generateNewFolio = async () => {
-      const { data, error } = await supabase.rpc("generate_quote_folio");
-      if (!error && data) {
-        setFolio(data);
-      }
-    };
-    generateNewFolio();
+    // Folio will be generated at save time
+    setFolio("");
   };
 
   return (
@@ -841,7 +832,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
 
             <div className="space-y-2">
               <Label>Folio Cotización</Label>
-              <Input value={folio} onChange={(e) => setFolio(e.target.value)} placeholder="Ej. COT-QUAL-2025-001" />
+              <Input value={folio} onChange={(e) => setFolio(e.target.value)} placeholder="Automático al guardar (o escriba uno manual)" />
             </div>
 
             <div className="space-y-2">
