@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Printer, ArrowRightLeft, Package, Tag as TagIcon, Check, X, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
@@ -64,6 +65,7 @@ export function WarehouseTransferHistory() {
   const queryClient = useQueryClient();
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: "approve" | "cancel" | "deleteItem"; group?: GroupedTransfer; itemId?: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ id: string; quantity: number } | null>(null);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ["warehouse_transfers_history"],
@@ -248,6 +250,31 @@ export function WarehouseTransferHistory() {
     },
   });
 
+  // Update quantity mutation for pending items
+  const updateQuantityMutation = useMutation({
+    mutationFn: async ({ itemId, quantity }: { itemId: string; quantity: number }) => {
+      const { error } = await supabase
+        .from("warehouse_transfers")
+        .update({ quantity })
+        .eq("id", itemId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["warehouse_transfers_history"] });
+      setEditingItem(null);
+      toast({ title: "Cantidad actualizada" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error al actualizar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSaveQuantity = useCallback(() => {
+    if (editingItem && editingItem.quantity > 0) {
+      updateQuantityMutation.mutate({ itemId: editingItem.id, quantity: editingItem.quantity });
+    }
+  }, [editingItem, updateQuantityMutation]);
+
   const handlePrint = (group: GroupedTransfer) => {
     const printItems: TransferPrintItem[] = group.items.map((item, idx) => {
       if (item.transfer_type === "rfid" && item.rfid_tags) {
@@ -428,6 +455,7 @@ export function WarehouseTransferHistory() {
                       ? (item.rfid_tags as any)?.product_batches?.batch_number
                       : (item.product_batches as any)?.batch_number;
                     const qty = item.quantity || 1;
+                    const isEditingThis = editingItem?.id === item.id;
 
                     return (
                       <TableRow key={item.id} className="bg-muted/30">
@@ -437,22 +465,58 @@ export function WarehouseTransferHistory() {
                             {isRfid ? <TagIcon className="h-3 w-3" /> : <Package className="h-3 w-3" />}
                             <span className="font-medium">{prodName}</span>
                             {batchNum && <span className="text-muted-foreground">Lote: {batchNum}</span>}
-                            <Badge variant="secondary" className="text-xs">{qty} ud{qty !== 1 ? "s" : ""}</Badge>
+                            {isEditingThis ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={editingItem.quantity}
+                                  onChange={(e) => setEditingItem({ ...editingItem, quantity: parseInt(e.target.value) || 1 })}
+                                  className="h-6 w-16 text-xs"
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleSaveQuantity();
+                                    if (e.key === "Escape") setEditingItem(null);
+                                  }}
+                                  autoFocus
+                                />
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600" onClick={handleSaveQuantity} disabled={updateQuantityMutation.isPending}>
+                                  <Check className="h-3 w-3" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditingItem(null)}>
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">{qty} ud{qty !== 1 ? "s" : ""}</Badge>
+                            )}
                             {isRfid && <span className="font-mono text-xs text-muted-foreground">{(item.rfid_tags as any)?.epc}</span>}
                           </div>
                         </TableCell>
                         <TableCell colSpan={3} />
                         <TableCell>
                           {isPending && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-red-500 hover:text-red-600"
-                              onClick={() => setConfirmAction({ type: "deleteItem", itemId: item.id })}
-                              title="Quitar de la transferencia"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                            <div className="flex gap-0.5">
+                              {!isRfid && !isEditingThis && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                  onClick={() => setEditingItem({ id: item.id, quantity: qty })}
+                                  title="Editar cantidad"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive hover:text-destructive"
+                                onClick={() => setConfirmAction({ type: "deleteItem", itemId: item.id })}
+                                title="Quitar de la transferencia"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
                           )}
                         </TableCell>
                       </TableRow>
