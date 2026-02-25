@@ -301,26 +301,14 @@ export function WarehouseTransferDialog({
     setManualItems(prev => prev.filter(i => !(i.productId === productId && (i.batchId || undefined) === batchId)));
   };
 
-  // Transfer mutation
+  // Transfer mutation - now saves as "pendiente" without moving stock
   const transferMutation = useMutation({
     mutationFn: async () => {
       const results = { rfidCount: 0, manualCount: 0 };
+      const groupId = crypto.randomUUID();
 
-      // Transfer RFID tags
+      // Save RFID tags as pending transfers (NO stock movement)
       if (scannedTags.length > 0) {
-        const tagIds = scannedTags.map(t => t.id);
-        
-        const { error: tagError } = await supabase
-          .from("rfid_tags")
-          .update({ 
-            warehouse_id: toWarehouseId,
-            last_location: warehouses.find(w => w.id === toWarehouseId)?.name || null,
-            last_read_at: new Date().toISOString()
-          })
-          .in("id", tagIds);
-
-        if (tagError) throw tagError;
-
         const transfers = scannedTags.map(tag => ({
           from_warehouse_id: fromWarehouseId,
           to_warehouse_id: toWarehouseId,
@@ -328,6 +316,8 @@ export function WarehouseTransferDialog({
           transfer_type: "rfid",
           notes: notes || null,
           created_at: transferDate.toISOString(),
+          status: "pendiente",
+          transfer_group_id: groupId,
         }));
 
         const { error: transferError } = await supabase
@@ -338,62 +328,8 @@ export function WarehouseTransferDialog({
         results.rfidCount = scannedTags.length;
       }
 
-      // Transfer manual items - usando warehouse_stock (stock por almacén independiente)
+      // Save manual items as pending transfers (NO stock movement)
       for (const item of manualItems) {
-        // 1. Verificar stock disponible en almacén origen
-        const { data: sourceStock, error: sourceError } = await supabase
-          .from("warehouse_stock")
-          .select("current_stock")
-          .eq("product_id", item.productId)
-          .eq("warehouse_id", fromWarehouseId)
-          .maybeSingle();
-
-        if (sourceError || !sourceStock || sourceStock.current_stock < item.quantity) {
-          throw new Error(`Stock insuficiente para ${item.productName} en almacén origen`);
-        }
-
-        // 2. Decrementar stock en almacén ORIGEN
-        const { error: decrementError } = await supabase
-          .from("warehouse_stock")
-          .update({ current_stock: sourceStock.current_stock - item.quantity })
-          .eq("product_id", item.productId)
-          .eq("warehouse_id", fromWarehouseId);
-
-        if (decrementError) throw decrementError;
-
-        // 3. Incrementar (o crear) stock en almacén DESTINO
-        const { data: destStock } = await supabase
-          .from("warehouse_stock")
-          .select("current_stock")
-          .eq("product_id", item.productId)
-          .eq("warehouse_id", toWarehouseId)
-          .maybeSingle();
-
-        if (destStock) {
-          // Ya existe el registro en destino, incrementar
-          const { error: incrementError } = await supabase
-            .from("warehouse_stock")
-            .update({ current_stock: destStock.current_stock + item.quantity })
-            .eq("product_id", item.productId)
-            .eq("warehouse_id", toWarehouseId);
-          if (incrementError) throw incrementError;
-        } else {
-          // Crear nuevo registro de stock en almacén destino
-          const { error: insertError } = await supabase
-            .from("warehouse_stock")
-            .insert({
-              product_id: item.productId,
-              warehouse_id: toWarehouseId,
-              current_stock: item.quantity,
-            });
-          if (insertError) throw insertError;
-        }
-
-        // NOTA: products.current_stock NO se modifica en traspasos.
-        // El stock global solo cambia al aprobar una cotización (venta).
-        // Un traspaso es un movimiento interno: resta en origen, suma en destino. El total no varía.
-
-        // 4. Registrar la transferencia en el historial
         await supabase
           .from("warehouse_transfers")
           .insert({
@@ -405,6 +341,8 @@ export function WarehouseTransferDialog({
             transfer_type: "manual",
             notes: notes || null,
             created_at: transferDate.toISOString(),
+            status: "pendiente",
+            transfer_group_id: groupId,
           });
 
         results.manualCount += item.quantity;
@@ -413,8 +351,6 @@ export function WarehouseTransferDialog({
       return results;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["rfid_tags"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse_transfers"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse_transfers_history"] });
       
@@ -428,53 +364,13 @@ export function WarehouseTransferDialog({
         section: "inventario",
         action: "transferencia",
         entityType: "Transferencia Almacén",
-        entityName: `${fromName} → ${toName}`,
+        entityName: `${fromName} → ${toName} (pendiente)`,
         details: { items_count: data.rfidCount + data.manualCount, note: notes || undefined },
       });
-
-      // Generate PDF report
-      const printItems: TransferPrintItem[] = [];
-      
-      for (const tag of scannedTags) {
-        printItems.push({
-          index: printItems.length + 1,
-          productName: tag.productName,
-          brand: tag.brand || "",
-          batchNumber: tag.batchNumber || "",
-          expirationDate: tag.expirationDate ? format(new Date(tag.expirationDate + "T00:00:00"), "dd/MM/yyyy") : "",
-          quantity: 1,
-          unit: tag.unit || "pieza",
-          epc: tag.epc,
-          type: "rfid",
-        });
-      }
-      
-      for (const item of manualItems) {
-        printItems.push({
-          index: printItems.length + 1,
-          productName: item.productName,
-          brand: item.brand,
-          batchNumber: item.batchNumber,
-          expirationDate: item.expirationDate,
-          quantity: item.quantity,
-          unit: item.unit,
-          type: "manual",
-        });
-      }
-
-      const printData: TransferPrintData = {
-        transferDate: transferDate,
-        fromWarehouse: fromName,
-        toWarehouse: toName,
-        items: printItems,
-        notes: notes || undefined,
-      };
-
-      openWarehouseTransferPrint(printData);
       
       toast({
-        title: "Transferencia completada",
-        description: `${parts.join(" y ")} transferido(s) exitosamente.`,
+        title: "Transferencia creada como pendiente",
+        description: `${parts.join(" y ")} listos para aprobar. El stock no se moverá hasta que se apruebe.`,
       });
       resetForm();
       onOpenChange(false);
@@ -806,8 +702,8 @@ export function WarehouseTransferDialog({
             disabled={!canTransfer || transferMutation.isPending}
           >
             {transferMutation.isPending 
-              ? "Transfiriendo..." 
-              : `Transferir ${totalItems > 0 ? `(${totalItems})` : ""}`
+              ? "Guardando..." 
+              : `Crear Pendiente ${totalItems > 0 ? `(${totalItems})` : ""}`
             }
           </Button>
         </DialogFooter>

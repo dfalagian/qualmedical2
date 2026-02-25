@@ -2154,6 +2154,8 @@ export type Database = {
       }
       warehouse_transfers: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           batch_id: string | null
           created_at: string
           created_by: string | null
@@ -2163,10 +2165,14 @@ export type Database = {
           product_id: string | null
           quantity: number | null
           rfid_tag_id: string | null
+          status: string
           to_warehouse_id: string
+          transfer_group_id: string | null
           transfer_type: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           batch_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -2176,10 +2182,14 @@ export type Database = {
           product_id?: string | null
           quantity?: number | null
           rfid_tag_id?: string | null
+          status?: string
           to_warehouse_id: string
+          transfer_group_id?: string | null
           transfer_type: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           batch_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -2189,7 +2199,9 @@ export type Database = {
           product_id?: string | null
           quantity?: number | null
           rfid_tag_id?: string | null
+          status?: string
           to_warehouse_id?: string
+          transfer_group_id?: string | null
           transfer_type?: string
         }
         Relationships: [
