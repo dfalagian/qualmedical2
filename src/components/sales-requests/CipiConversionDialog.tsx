@@ -196,7 +196,7 @@ export function CipiConversionDialog({
             )}
 
             {/* Item list */}
-            <ScrollArea className="max-h-[240px]">
+            <ScrollArea className="max-h-[400px]">
               <div className="space-y-1">
                 {items.map((item) => (
                   <div
