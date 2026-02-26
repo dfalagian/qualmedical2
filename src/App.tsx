@@ -31,6 +31,7 @@ import SalesRequests from "./pages/SalesRequests";
 import PublicSalesRequest from "./pages/PublicSalesRequest";
 import GeneralSuppliers from "./pages/GeneralSuppliers";
 import PointOfSale from "./pages/PointOfSale";
+import WhatsAppChat from "./pages/WhatsAppChat";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -226,6 +227,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <PointOfSale />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/whatsapp"
+              element={
+                <ProtectedRoute>
+                  <WhatsAppChat />
                 </ProtectedRoute>
               }
             />
