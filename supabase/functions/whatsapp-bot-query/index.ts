@@ -16,50 +16,46 @@ async function getContextData(supabase: any, question: string) {
   const q = question.toLowerCase();
   const context: string[] = [];
 
-  // Always fetch products summary for inventory questions
-  if (q.includes("stock") || q.includes("inventario") || q.includes("medicamento") || 
-      q.includes("producto") || q.includes("cantidad") || q.includes("cuant") ||
-      q.includes("disponible") || q.includes("existencia") || q.includes("almacen") ||
-      q.includes("almacén") || q.includes("citio") || q.includes("principal")) {
-    // Fetch products
-    const { data: products } = await supabase
+  // ALWAYS fetch products - they are the core business data and users may search by any name
+  const [productsRes, warehousesRes, warehouseStockRes] = await Promise.all([
+    supabase
       .from("products")
-      .select("id, name, sku, current_stock, category, brand, price_with_tax, unit")
+      .select("id, name, sku, current_stock, category, brand, price_with_tax, unit, description")
       .eq("is_active", true)
       .order("name")
-      .limit(200);
-
-    // Fetch warehouses
-    const { data: warehouses } = await supabase
+      .limit(500),
+    supabase
       .from("warehouses")
       .select("id, name, code")
-      .eq("is_active", true);
-
-    // Fetch warehouse_stock
-    const { data: warehouseStock } = await supabase
+      .eq("is_active", true),
+    supabase
       .from("warehouse_stock")
       .select("product_id, warehouse_id, current_stock")
-      .gt("current_stock", 0);
+      .gt("current_stock", 0),
+  ]);
 
-    if (products?.length) {
-      const whMap: Record<string, string> = {};
-      (warehouses || []).forEach((w: any) => { whMap[w.id] = w.name; });
+  const products = productsRes.data || [];
+  const warehouses = warehousesRes.data || [];
+  const warehouseStock = warehouseStockRes.data || [];
 
-      const wsMap: Record<string, Record<string, number>> = {};
-      (warehouseStock || []).forEach((ws: any) => {
-        if (!wsMap[ws.product_id]) wsMap[ws.product_id] = {};
-        wsMap[ws.product_id][whMap[ws.warehouse_id] || ws.warehouse_id] = ws.current_stock;
-      });
+  if (products.length) {
+    const whMap: Record<string, string> = {};
+    warehouses.forEach((w: any) => { whMap[w.id] = w.name; });
 
-      context.push(`INVENTARIO DE PRODUCTOS (${products.length} productos activos):\nAlmacenes disponibles: ${(warehouses || []).map((w: any) => w.name).join(", ")}\n` +
-        products.map((p: any) => {
-          const perWh = wsMap[p.id];
-          const whDetail = perWh
-            ? Object.entries(perWh).map(([wh, qty]) => `${wh}: ${qty}`).join(", ")
-            : "Sin stock por almacén";
-          return `- ${p.name} | SKU: ${p.sku} | Stock Global: ${p.current_stock ?? 0} ${p.unit || 'pza'} | Por almacén: [${whDetail}] | Categoría: ${p.category || 'N/A'} | Marca: ${p.brand || 'N/A'} | Precio: $${p.price_with_tax || 0}`;
-        }).join("\n"));
-    }
+    const wsMap: Record<string, Record<string, number>> = {};
+    warehouseStock.forEach((ws: any) => {
+      if (!wsMap[ws.product_id]) wsMap[ws.product_id] = {};
+      wsMap[ws.product_id][whMap[ws.warehouse_id] || ws.warehouse_id] = ws.current_stock;
+    });
+
+    context.push(`INVENTARIO DE PRODUCTOS (${products.length} productos activos):\nAlmacenes disponibles: ${warehouses.map((w: any) => w.name).join(", ")}\n` +
+      products.map((p: any) => {
+        const perWh = wsMap[p.id];
+        const whDetail = perWh
+          ? Object.entries(perWh).map(([wh, qty]) => `${wh}: ${qty}`).join(", ")
+          : "Sin stock por almacén";
+        return `- ${p.name} | SKU: ${p.sku} | Stock Global: ${p.current_stock ?? 0} ${p.unit || 'pza'} | Por almacén: [${whDetail}] | Categoría: ${p.category || 'N/A'} | Marca: ${p.brand || 'N/A'} | Precio: $${p.price_with_tax || 0}${p.description ? ` | Desc: ${p.description}` : ''}`;
+      }).join("\n"));
   }
 
   // Quotes/cotizaciones
@@ -94,7 +90,6 @@ async function getContextData(supabase: any, question: string) {
       .limit(200);
     
     if (quoteItems?.length) {
-      // Aggregate by product
       const productSales: Record<string, { qty: number; total: number; count: number }> = {};
       quoteItems.filter((i: any) => i.quotes?.status === "aprobada").forEach((i: any) => {
         const name = i.nombre_producto;
@@ -165,18 +160,6 @@ async function getContextData(supabase: any, question: string) {
     }
   }
 
-  // If no specific context matched, provide a general overview
-  if (context.length === 0) {
-    const [productsRes, quotesRes, ordersRes, requestsRes] = await Promise.all([
-      supabase.from("products").select("id", { count: "exact", head: true }).eq("is_active", true),
-      supabase.from("quotes").select("id", { count: "exact", head: true }),
-      supabase.from("purchase_orders").select("id", { count: "exact", head: true }),
-      supabase.from("cipi_requests").select("id", { count: "exact", head: true }),
-    ]);
-    
-    context.push(`RESUMEN GENERAL DEL SISTEMA:\n- Productos activos: ${productsRes.count || 0}\n- Cotizaciones: ${quotesRes.count || 0}\n- Órdenes de compra: ${ordersRes.count || 0}\n- Solicitudes de venta: ${requestsRes.count || 0}`);
-  }
-
   return context.join("\n\n---\n\n");
 }
 
@@ -245,9 +228,16 @@ REGLAS:
 - Sé conciso y directo, adaptado para lectura en WhatsApp
 - Usa emojis moderadamente para mejor legibilidad
 - Formatea números con separadores de miles y 2 decimales
-- Si no encuentras la información específica, indícalo claramente
 - No inventes datos, solo usa la información proporcionada
 - Si la pregunta no está relacionada con el negocio, indica amablemente que solo puedes responder consultas del sistema
+
+BÚSQUEDA DE PRODUCTOS:
+- Cuando el usuario pregunte por un producto, busca en TODA la lista usando coincidencias parciales y sinónimos comunes
+- Por ejemplo: "aguja" puede coincidir con "Aguja hipodérmica", "Aguja para insulina", etc.
+- "bata" puede coincidir con "Bata quirúrgica estéril", "Bata desechable", etc.
+- Si encuentras varios productos que coinciden, muestra TODOS los resultados relevantes
+- Si no encuentras coincidencia exacta, busca por palabras similares o relacionadas
+- NUNCA digas que no existe un producto sin antes revisar toda la lista cuidadosamente
 
 DATOS ACTUALES DEL SISTEMA:
 ${contextData}`
