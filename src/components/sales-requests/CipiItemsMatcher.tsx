@@ -26,6 +26,7 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
   const queryClient = useQueryClient();
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["cipi-request-items", requestId],
@@ -186,7 +187,10 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
                 <TableCell>
                   <Popover
                     open={openPopoverId === item.id}
-                    onOpenChange={(open) => setOpenPopoverId(open ? item.id : null)}
+                    onOpenChange={(open) => {
+                      setOpenPopoverId(open ? item.id : null);
+                      if (!open) setSearchTerm("");
+                    }}
                   >
                     <PopoverTrigger asChild>
                       <Button
@@ -206,8 +210,13 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[350px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Buscar producto..." className="text-xs" />
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Buscar producto..."
+                          className="text-xs"
+                          value={searchTerm}
+                          onValueChange={setSearchTerm}
+                        />
                         <CommandList>
                           <CommandEmpty>No encontrado.</CommandEmpty>
                           <CommandGroup className="max-h-[200px] overflow-auto">
@@ -219,29 +228,40 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
                                 ✕ Quitar vinculación
                               </CommandItem>
                             )}
-                            {products.map((product: any) => (
-                              <CommandItem
-                                key={product.id}
-                                value={`${product.name} ${product.sku} ${product.brand || ''} ${product.grupo_sat || ''}`}
-                                onSelect={() => handleProductMatch(item.id, product.id, product.name)}
-                                className="text-xs"
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-1 h-3 w-3",
-                                    item.product_id === product.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="truncate font-medium">{product.name}</div>
-                                  <div className="text-[10px] text-muted-foreground">
-                                    SKU: {product.sku}
-                                    {product.brand && ` | ${product.brand}`}
-                                    {product.current_stock != null && ` | Stock: ${product.current_stock}`}
+                            {(() => {
+                              const term = searchTerm.toLowerCase().trim();
+                              const filtered = term
+                                ? products.filter((p: any) =>
+                                    p.name.toLowerCase().includes(term) ||
+                                    p.sku.toLowerCase().includes(term) ||
+                                    (p.brand && p.brand.toLowerCase().includes(term)) ||
+                                    (p.grupo_sat && p.grupo_sat.toLowerCase().includes(term))
+                                  )
+                                : products.slice(0, 50);
+                              return filtered.slice(0, 50).map((product: any) => (
+                                <CommandItem
+                                  key={product.id}
+                                  value={product.id}
+                                  onSelect={() => handleProductMatch(item.id, product.id, product.name)}
+                                  className="text-xs"
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-1 h-3 w-3",
+                                      item.product_id === product.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="truncate font-medium">{product.name}</div>
+                                    <div className="text-[10px] text-muted-foreground">
+                                      SKU: {product.sku}
+                                      {product.brand && ` | ${product.brand}`}
+                                      {product.current_stock != null && ` | Stock: ${product.current_stock}`}
+                                    </div>
                                   </div>
-                                </div>
-                              </CommandItem>
-                            ))}
+                                </CommandItem>
+                              ));
+                            })()}
                           </CommandGroup>
                         </CommandList>
                       </Command>
