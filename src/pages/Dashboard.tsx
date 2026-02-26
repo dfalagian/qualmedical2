@@ -91,7 +91,7 @@ const Dashboard = () => {
         {isAdmin && <EmailServerStatus />}
 
         {/* Banner de contacto WhatsApp para proveedores */}
-        {isSupplier && (
+        {!isAdmin && (
           <a
             href="https://wa.me/525647599227"
             target="_blank"
