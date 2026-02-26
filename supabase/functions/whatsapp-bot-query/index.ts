@@ -19,19 +19,46 @@ async function getContextData(supabase: any, question: string) {
   // Always fetch products summary for inventory questions
   if (q.includes("stock") || q.includes("inventario") || q.includes("medicamento") || 
       q.includes("producto") || q.includes("cantidad") || q.includes("cuant") ||
-      q.includes("disponible") || q.includes("existencia")) {
+      q.includes("disponible") || q.includes("existencia") || q.includes("almacen") ||
+      q.includes("almacén") || q.includes("citio") || q.includes("principal")) {
+    // Fetch products
     const { data: products } = await supabase
       .from("products")
-      .select("name, sku, current_stock, category, brand, price_with_tax, unit")
+      .select("id, name, sku, current_stock, category, brand, price_with_tax, unit")
       .eq("is_active", true)
       .order("name")
       .limit(200);
-    
+
+    // Fetch warehouses
+    const { data: warehouses } = await supabase
+      .from("warehouses")
+      .select("id, name, code")
+      .eq("is_active", true);
+
+    // Fetch warehouse_stock
+    const { data: warehouseStock } = await supabase
+      .from("warehouse_stock")
+      .select("product_id, warehouse_id, current_stock")
+      .gt("current_stock", 0);
+
     if (products?.length) {
-      context.push(`INVENTARIO DE PRODUCTOS (${products.length} productos activos):\n` +
-        products.map((p: any) => 
-          `- ${p.name} | SKU: ${p.sku} | Stock: ${p.current_stock ?? 0} ${p.unit || 'pza'} | Categoría: ${p.category || 'N/A'} | Marca: ${p.brand || 'N/A'} | Precio: $${p.price_with_tax || 0}`
-        ).join("\n"));
+      const whMap: Record<string, string> = {};
+      (warehouses || []).forEach((w: any) => { whMap[w.id] = w.name; });
+
+      const wsMap: Record<string, Record<string, number>> = {};
+      (warehouseStock || []).forEach((ws: any) => {
+        if (!wsMap[ws.product_id]) wsMap[ws.product_id] = {};
+        wsMap[ws.product_id][whMap[ws.warehouse_id] || ws.warehouse_id] = ws.current_stock;
+      });
+
+      context.push(`INVENTARIO DE PRODUCTOS (${products.length} productos activos):\nAlmacenes disponibles: ${(warehouses || []).map((w: any) => w.name).join(", ")}\n` +
+        products.map((p: any) => {
+          const perWh = wsMap[p.id];
+          const whDetail = perWh
+            ? Object.entries(perWh).map(([wh, qty]) => `${wh}: ${qty}`).join(", ")
+            : "Sin stock por almacén";
+          return `- ${p.name} | SKU: ${p.sku} | Stock Global: ${p.current_stock ?? 0} ${p.unit || 'pza'} | Por almacén: [${whDetail}] | Categoría: ${p.category || 'N/A'} | Marca: ${p.brand || 'N/A'} | Precio: $${p.price_with_tax || 0}`;
+        }).join("\n"));
     }
   }
 
