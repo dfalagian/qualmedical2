@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Send, 
   Search, 
@@ -14,12 +15,14 @@ import {
   CheckCheck, 
   Clock,
   Phone,
-  ArrowLeft
+  ArrowLeft,
+  Bot
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { WhatsAppBotUsersManager } from "@/components/whatsapp/WhatsAppBotUsersManager";
 
 interface WhatsAppMessage {
   id: string;
@@ -178,212 +181,229 @@ const WhatsAppChat = () => {
 
   return (
     <DashboardLayout>
-      <div className="h-[calc(100vh-140px)] flex rounded-xl overflow-hidden border bg-card shadow-lg">
-        {/* Sidebar - Conversations List */}
-        <div
-          className={cn(
-            "w-full md:w-[340px] md:min-w-[340px] border-r flex flex-col bg-card",
-            selectedPhone ? "hidden md:flex" : "flex"
-          )}
-        >
-          {/* Header */}
-          <div className="p-3 border-b bg-primary/5">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <MessageCircle className="h-5 w-5 text-primary" />
-                WhatsApp
-              </h2>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowNewChat(!showNewChat)}
-              >
-                {showNewChat ? "Cancelar" : "Nuevo"}
-              </Button>
-            </div>
+      <Tabs defaultValue="chat" className="h-[calc(100vh-140px)]">
+        <TabsList className="mb-2">
+          <TabsTrigger value="chat" className="gap-1.5">
+            <MessageCircle className="h-4 w-4" /> Chat
+          </TabsTrigger>
+          <TabsTrigger value="bot" className="gap-1.5">
+            <Bot className="h-4 w-4" /> Bot IA
+          </TabsTrigger>
+        </TabsList>
 
-            {showNewChat ? (
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Número (ej: 5512345678)"
-                  value={newChatPhone}
-                  onChange={(e) => setNewChatPhone(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleNewChat()}
-                  className="text-sm"
-                />
-                <Button size="sm" onClick={handleNewChat}>
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar conversación..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 text-sm"
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Conversations */}
-          <ScrollArea className="flex-1">
-            {filteredConversations.length === 0 ? (
-              <div className="p-6 text-center text-muted-foreground text-sm">
-                No hay conversaciones
-              </div>
-            ) : (
-              filteredConversations.map((conv) => (
-                <button
-                  key={conv.phone}
-                  onClick={() => setSelectedPhone(conv.phone)}
-                  className={cn(
-                    "w-full p-3 flex items-start gap-3 hover:bg-accent/10 transition-colors border-b text-left",
-                    selectedPhone === conv.phone && "bg-primary/10"
-                  )}
-                >
-                  <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                    <Phone className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-sm truncate">
-                        {conv.contact_name}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
-                        {formatTime(conv.last_timestamp)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <p className="text-xs text-muted-foreground truncate pr-2">
-                        {conv.last_message}
-                      </p>
-                      {conv.unread_count > 0 && (
-                        <Badge className="h-5 min-w-5 flex items-center justify-center rounded-full text-[10px] bg-primary text-primary-foreground shrink-0">
-                          {conv.unread_count}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              ))
-            )}
-          </ScrollArea>
-        </div>
-
-        {/* Chat Area */}
-        <div
-          className={cn(
-            "flex-1 flex flex-col",
-            !selectedPhone ? "hidden md:flex" : "flex"
-          )}
-        >
-          {selectedPhone ? (
-            <>
-              {/* Chat Header */}
-              <div className="p-3 border-b bg-primary/5 flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="md:hidden shrink-0"
-                  onClick={() => setSelectedPhone(null)}
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <div className="h-9 w-9 rounded-full bg-primary/20 flex items-center justify-center">
-                  <Phone className="h-4 w-4 text-primary" />
+        <TabsContent value="chat" className="mt-0 h-[calc(100%-48px)]">
+          <div className="h-full flex rounded-xl overflow-hidden border bg-card shadow-lg">
+            {/* Sidebar - Conversations List */}
+            <div
+              className={cn(
+                "w-full md:w-[340px] md:min-w-[340px] border-r flex flex-col bg-card",
+                selectedPhone ? "hidden md:flex" : "flex"
+              )}
+            >
+              {/* Header */}
+              <div className="p-3 border-b bg-primary/5">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-bold flex items-center gap-2">
+                    <MessageCircle className="h-5 w-5 text-primary" />
+                    WhatsApp
+                  </h2>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowNewChat(!showNewChat)}
+                  >
+                    {showNewChat ? "Cancelar" : "Nuevo"}
+                  </Button>
                 </div>
-                <div>
-                  <p className="font-semibold text-sm">
-                    {selectedConversation?.contact_name || selectedPhone}
-                  </p>
-                  <p className="text-xs text-muted-foreground">+{selectedPhone}</p>
-                </div>
+
+                {showNewChat ? (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Número (ej: 5512345678)"
+                      value={newChatPhone}
+                      onChange={(e) => setNewChatPhone(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleNewChat()}
+                      className="text-sm"
+                    />
+                    <Button size="sm" onClick={handleNewChat}>
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar conversación..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 text-sm"
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* Messages */}
-              <ScrollArea className="flex-1 p-4">
-                <div className="space-y-2 max-w-3xl mx-auto">
-                  {conversationMessages.map((msg) => (
-                    <div
-                      key={msg.id}
+              {/* Conversations */}
+              <ScrollArea className="flex-1">
+                {filteredConversations.length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground text-sm">
+                    No hay conversaciones
+                  </div>
+                ) : (
+                  filteredConversations.map((conv) => (
+                    <button
+                      key={conv.phone}
+                      onClick={() => setSelectedPhone(conv.phone)}
                       className={cn(
-                        "flex",
-                        msg.direction === "outgoing" ? "justify-end" : "justify-start"
+                        "w-full p-3 flex items-start gap-3 hover:bg-accent/10 transition-colors border-b text-left",
+                        selectedPhone === conv.phone && "bg-primary/10"
                       )}
                     >
-                      <div
-                        className={cn(
-                          "max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm",
-                          msg.direction === "outgoing"
-                            ? "bg-primary text-primary-foreground rounded-br-md"
-                            : "bg-secondary text-secondary-foreground rounded-bl-md"
-                        )}
-                      >
-                        <p className="whitespace-pre-wrap break-words">{msg.message}</p>
-                        <div
-                          className={cn(
-                            "flex items-center justify-end gap-1 mt-1",
-                            msg.direction === "outgoing"
-                              ? "text-primary-foreground/70"
-                              : "text-muted-foreground"
-                          )}
-                        >
-                          <span className="text-[10px]">
-                            {formatTime(msg.timestamp)}
+                      <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                        <Phone className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm truncate">
+                            {conv.contact_name}
                           </span>
-                          {msg.direction === "outgoing" && (
-                            <CheckCheck className="h-3 w-3" />
+                          <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
+                            {formatTime(conv.last_timestamp)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <p className="text-xs text-muted-foreground truncate pr-2">
+                            {conv.last_message}
+                          </p>
+                          {conv.unread_count > 0 && (
+                            <Badge className="h-5 min-w-5 flex items-center justify-center rounded-full text-[10px] bg-primary text-primary-foreground shrink-0">
+                              {conv.unread_count}
+                            </Badge>
                           )}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                  <div ref={messagesEndRef} />
-                </div>
+                    </button>
+                  ))
+                )}
               </ScrollArea>
-
-              {/* Message Input */}
-              <div className="p-3 border-t bg-card">
-                <div className="flex gap-2 max-w-3xl mx-auto">
-                  <Input
-                    placeholder="Escribe un mensaje..."
-                    value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                    disabled={sendMessage.isPending}
-                    className="flex-1"
-                  />
-                  <Button
-                    onClick={handleSend}
-                    disabled={!messageText.trim() || sendMessage.isPending}
-                    size="icon"
-                    className="shrink-0"
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-center p-8">
-              <div>
-                <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <MessageCircle className="h-10 w-10 text-primary/50" />
-                </div>
-                <h3 className="text-lg font-semibold text-muted-foreground">
-                  WhatsApp Business
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Selecciona una conversación o inicia una nueva
-                </p>
-              </div>
             </div>
-          )}
-        </div>
-      </div>
+
+            {/* Chat Area */}
+            <div
+              className={cn(
+                "flex-1 flex flex-col",
+                !selectedPhone ? "hidden md:flex" : "flex"
+              )}
+            >
+              {selectedPhone ? (
+                <>
+                  {/* Chat Header */}
+                  <div className="p-3 border-b bg-primary/5 flex items-center gap-3">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="md:hidden shrink-0"
+                      onClick={() => setSelectedPhone(null)}
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                    <div className="h-9 w-9 rounded-full bg-primary/20 flex items-center justify-center">
+                      <Phone className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">
+                        {selectedConversation?.contact_name || selectedPhone}
+                      </p>
+                      <p className="text-xs text-muted-foreground">+{selectedPhone}</p>
+                    </div>
+                  </div>
+
+                  {/* Messages */}
+                  <ScrollArea className="flex-1 p-4">
+                    <div className="space-y-2 max-w-3xl mx-auto">
+                      {conversationMessages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={cn(
+                            "flex",
+                            msg.direction === "outgoing" ? "justify-end" : "justify-start"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm",
+                              msg.direction === "outgoing"
+                                ? "bg-primary text-primary-foreground rounded-br-md"
+                                : "bg-secondary text-secondary-foreground rounded-bl-md"
+                            )}
+                          >
+                            <p className="whitespace-pre-wrap break-words">{msg.message}</p>
+                            <div
+                              className={cn(
+                                "flex items-center justify-end gap-1 mt-1",
+                                msg.direction === "outgoing"
+                                  ? "text-primary-foreground/70"
+                                  : "text-muted-foreground"
+                              )}
+                            >
+                              <span className="text-[10px]">
+                                {formatTime(msg.timestamp)}
+                              </span>
+                              {msg.direction === "outgoing" && (
+                                <CheckCheck className="h-3 w-3" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  </ScrollArea>
+
+                  {/* Message Input */}
+                  <div className="p-3 border-t bg-card">
+                    <div className="flex gap-2 max-w-3xl mx-auto">
+                      <Input
+                        placeholder="Escribe un mensaje..."
+                        value={messageText}
+                        onChange={(e) => setMessageText(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+                        disabled={sendMessage.isPending}
+                        className="flex-1"
+                      />
+                      <Button
+                        onClick={handleSend}
+                        disabled={!messageText.trim() || sendMessage.isPending}
+                        size="icon"
+                        className="shrink-0"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-center p-8">
+                  <div>
+                    <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                      <MessageCircle className="h-10 w-10 text-primary/50" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-muted-foreground">
+                      WhatsApp Business
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Selecciona una conversación o inicia una nueva
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="bot" className="mt-0">
+          <WhatsAppBotUsersManager />
+        </TabsContent>
+      </Tabs>
     </DashboardLayout>
   );
 };

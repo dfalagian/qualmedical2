@@ -2279,6 +2279,36 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_bot_users: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string
+        }
+        Relationships: []
+      }
       whatsapp_messages: {
         Row: {
           contact_name: string | null

@@ -71,3 +71,6 @@ verify_jwt = false
 
 [functions.whatsapp-webhook]
 verify_jwt = false
+
+[functions.whatsapp-bot-query]
+verify_jwt = false

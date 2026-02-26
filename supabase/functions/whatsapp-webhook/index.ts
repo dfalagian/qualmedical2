@@ -6,6 +6,30 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+async function sendWhatsAppReply(to: string, body: string) {
+  const phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID")!;
+  const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN")!;
+  const url = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "text",
+      text: { preview_url: false, body },
+    }),
+  });
+
+  const result = await response.json();
+  return { ok: response.ok, result };
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -64,6 +88,58 @@ Deno.serve(async (req) => {
         });
 
         console.log("Incoming message stored successfully");
+
+        // Check if sender is an authorized bot user
+        const { data: botUser } = await supabase
+          .from("whatsapp_bot_users")
+          .select("*")
+          .eq("phone", from)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (botUser) {
+          // Route to AI bot
+          console.log(`Bot user detected: ${botUser.name} (${from}). Querying AI...`);
+          
+          try {
+            const botResponse = await fetch(`${supabaseUrl}/functions/v1/whatsapp-bot-query`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${supabaseServiceKey}`,
+              },
+              body: JSON.stringify({
+                phone: from,
+                question: msgBody,
+                contact_name: contactName,
+              }),
+            });
+
+            const botData = await botResponse.json();
+            const reply = botData.reply || "No pude procesar tu consulta.";
+
+            // Send AI reply via WhatsApp
+            const sendResult = await sendWhatsAppReply(from, reply);
+            console.log("Bot reply sent:", sendResult.ok);
+
+            // Store outgoing bot reply
+            await supabase.from("whatsapp_messages").insert({
+              from_phone: from,
+              contact_name: contactName,
+              message: reply,
+              direction: "outgoing",
+              is_read: true,
+              timestamp: new Date().toISOString(),
+            });
+          } catch (botError: any) {
+            console.error("Bot query error:", botError);
+            await sendWhatsAppReply(from, "⚠️ Error al procesar tu consulta. Intenta de nuevo en un momento.");
+          }
+        } else {
+          // Not a bot user - check if message looks like a sales request
+          console.log(`Regular message from ${from}. Stored for manual review.`);
+          // Future: auto-create sales request from supplier messages
+        }
       }
 
       // Check for status updates (sent, delivered, read)
