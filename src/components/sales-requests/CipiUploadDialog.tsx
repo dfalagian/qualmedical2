@@ -416,7 +416,7 @@ export function CipiUploadDialog({ open, onOpenChange, type, onSuccess }: CipiUp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Nueva solicitud {type === "cipi" ? "CIPI" : "CIPI Pro"}</DialogTitle>
+          <DialogTitle>Nueva solicitud {type === "cipi" ? "CIPI" : type === "cemi" ? "CEMI" : "CIPI Pro"}</DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="excel" className="w-full">
