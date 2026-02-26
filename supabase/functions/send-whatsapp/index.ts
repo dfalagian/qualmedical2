@@ -9,7 +9,6 @@ interface MessageRequest {
   message?: string;
   template_type?: string;
   data?: Record<string, string>;
-  channel?: "whatsapp" | "sms" | "both";
 }
 
 const TEMPLATES: Record<string, (d: Record<string, string>) => string> = {
@@ -37,40 +36,48 @@ const TEMPLATES: Record<string, (d: Record<string, string>) => string> = {
     `🛒 *QualMedical - Nueva Venta POS*\n\n📋 Folio: ${d.folio || "N/A"}\n👤 Vendedor: ${d.vendedor || "N/A"}\n🏢 Cliente: ${d.cliente || "Mostrador"}\n📦 Productos: ${d.productos || "N/A"}\n💰 Total: $${d.total || "0"} MXN\n\n📝 Detalle:\n${d.detalle || "Sin detalle"}`,
 };
 
-function formatPhoneNumber(phone: string, channel: "whatsapp" | "sms"): string {
+function formatPhoneNumber(phone: string): string {
   let digits = phone.replace(/\D/g, "");
 
+  // Already has country code for Mexico
   if (digits.startsWith("52") && digits.length === 12) {
-    return channel === "whatsapp" ? `whatsapp:+${digits}` : `+${digits}`;
+    return digits;
   }
 
+  // 10-digit Mexican number
   if (digits.length === 10) {
-    return channel === "whatsapp" ? `whatsapp:+52${digits}` : `+52${digits}`;
+    return `52${digits}`;
   }
 
+  // Already has + prefix
   if (phone.startsWith("+")) {
-    return channel === "whatsapp" ? `whatsapp:${phone}` : phone;
+    return digits;
   }
 
-  return channel === "whatsapp" ? `whatsapp:+${digits}` : `+${digits}`;
+  return digits;
 }
 
-async function sendViaTwilio(
-  accountSid: string,
-  authToken: string,
-  from: string,
+async function sendWhatsAppMessage(
+  phoneNumberId: string,
+  accessToken: string,
   to: string,
   body: string
 ): Promise<{ ok: boolean; result: any }> {
-  const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+  const url = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
 
-  const response = await fetch(twilioUrl, {
+  const response = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
-      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
-    body: new URLSearchParams({ From: from, To: to, Body: body }),
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "text",
+      text: { preview_url: false, body },
+    }),
   });
 
   const result = await response.json();
@@ -83,7 +90,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { to, message, template_type, data, channel = "whatsapp" }: MessageRequest = await req.json();
+    const { to, message, template_type, data }: MessageRequest = await req.json();
 
     if (!to) {
       return new Response(
@@ -105,46 +112,26 @@ Deno.serve(async (req) => {
       );
     }
 
-    const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID")!;
-    const authToken = Deno.env.get("TWILIO_AUTH_TOKEN")!;
-    const whatsappFrom = Deno.env.get("TWILIO_WHATSAPP_FROM") || "whatsapp:+14155238886";
-    const smsFrom = Deno.env.get("TWILIO_SMS_FROM") || "";
+    const phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID")!;
+    const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN")!;
 
-    const results: Record<string, any> = {};
+    const formattedPhone = formatPhoneNumber(to);
+    console.log(`Sending WhatsApp to: ${formattedPhone}, template: ${template_type || "custom"}`);
 
-    // Send WhatsApp
-    if (channel === "whatsapp" || channel === "both") {
-      const toFormatted = formatPhoneNumber(to, "whatsapp");
-      console.log(`Sending WhatsApp to: ${toFormatted}, template: ${template_type || "custom"}`);
-      const wa = await sendViaTwilio(accountSid, authToken, whatsappFrom, toFormatted, body);
-      results.whatsapp = wa;
-      if (!wa.ok) console.error("WhatsApp error:", wa.result);
-      else console.log("WhatsApp sent, SID:", wa.result.sid);
+    const result = await sendWhatsAppMessage(phoneNumberId, accessToken, formattedPhone, body);
+
+    if (!result.ok) {
+      console.error("WhatsApp API error:", JSON.stringify(result.result));
+    } else {
+      console.log("WhatsApp sent, message ID:", result.result?.messages?.[0]?.id);
     }
-
-    // Send SMS
-    if ((channel === "sms" || channel === "both") && smsFrom) {
-      const toFormatted = formatPhoneNumber(to, "sms");
-      // Strip markdown-style formatting for SMS
-      const smsBody = body.replace(/\*/g, "");
-      console.log(`Sending SMS to: ${toFormatted}`);
-      const sms = await sendViaTwilio(accountSid, authToken, smsFrom, toFormatted, smsBody);
-      results.sms = sms;
-      if (!sms.ok) console.error("SMS error:", sms.result);
-      else console.log("SMS sent, SID:", sms.result.sid);
-    } else if ((channel === "sms" || channel === "both") && !smsFrom) {
-      console.warn("SMS requested but TWILIO_SMS_FROM not configured, skipping SMS");
-      results.sms = { ok: false, result: { message: "TWILIO_SMS_FROM not configured" } };
-    }
-
-    const anySuccess = Object.values(results).some((r: any) => r.ok);
 
     return new Response(
-      JSON.stringify({ success: anySuccess, results }),
-      { status: anySuccess ? 200 : 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      JSON.stringify({ success: result.ok, result: result.result }),
+      { status: result.ok ? 200 : 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: any) {
-    console.error("Error sending message:", error);
+    console.error("Error sending WhatsApp message:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
