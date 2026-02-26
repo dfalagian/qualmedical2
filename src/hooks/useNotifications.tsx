@@ -26,7 +26,6 @@ type AdminNotificationType =
   | 'new_message'
   | 'payment_proof_uploaded';
 
-// Map notification types to WhatsApp template types
 const WHATSAPP_TEMPLATE_MAP: Partial<Record<NotificationType, string>> = {
   account_approved: 'account_approved',
   account_rejected: 'account_rejected',
@@ -41,8 +40,7 @@ const WHATSAPP_TEMPLATE_MAP: Partial<Record<NotificationType, string>> = {
 };
 
 export const useNotifications = () => {
-  // WhatsApp/SMS desactivado temporalmente - código listo para cuando se active Twilio
-  const WHATSAPP_ENABLED = false;
+  const WHATSAPP_ENABLED = true;
 
   const sendWhatsApp = async (
     phone: string,
@@ -95,7 +93,6 @@ export const useNotifications = () => {
             await sendWhatsApp(profile.phone, templateType, data);
           }
         } catch (whatsappError) {
-          // Don't fail the main notification if WhatsApp fails
           console.error("WhatsApp notification failed (non-blocking):", whatsappError);
         }
       }
@@ -156,7 +153,6 @@ export const useNotifications = () => {
               to: recipient.phone,
               template_type: templateType,
               data,
-              channel: recipient.channel || "both",
             },
           });
           console.log(`Notification sent to ${recipient.name} (${recipient.phone})`);
