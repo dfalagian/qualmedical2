@@ -1,7 +1,7 @@
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Receipt, MessageSquare, ShoppingCart } from "lucide-react";
+import { FileText, Receipt, MessageSquare, ShoppingCart, MessageCircle } from "lucide-react";
 import { EmailServerStatus } from "@/components/dashboard/EmailServerStatus";
 import { Navigate } from "react-router-dom";
 import { ManageContador } from "@/components/supplier/ManageContador";
@@ -89,6 +89,22 @@ const Dashboard = () => {
         </div>
 
         {isAdmin && <EmailServerStatus />}
+
+        {/* Banner de contacto WhatsApp para proveedores */}
+        {isSupplier && (
+          <a
+            href="https://wa.me/525647599227"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-4 rounded-lg bg-[#25D366]/10 border border-[#25D366]/30 hover:bg-[#25D366]/20 transition-colors"
+          >
+            <MessageCircle className="h-6 w-6 text-[#25D366] shrink-0" />
+            <div>
+              <p className="text-sm font-medium">Si tienes dudas sobre tus facturas, contáctanos</p>
+              <p className="text-xs text-muted-foreground">+52 56 4759 9227</p>
+            </div>
+          </a>
+        )}
 
         {/* Sección para que proveedores gestionen su contador */}
         {isSupplier && (
