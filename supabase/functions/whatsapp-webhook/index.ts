@@ -27,6 +27,9 @@ async function sendWhatsAppReply(to: string, body: string) {
   });
 
   const result = await response.json();
+  if (!response.ok) {
+    console.error("WhatsApp API error:", JSON.stringify(result));
+  }
   return { ok: response.ok, result };
 }
 
