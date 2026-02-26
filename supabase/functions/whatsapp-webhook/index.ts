@@ -6,31 +6,63 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const WHATSAPP_MAX_LENGTH = 4096;
+
 async function sendWhatsAppReply(to: string, body: string) {
   const phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID")!;
   const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN")!;
   const url = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to,
-      type: "text",
-      text: { preview_url: false, body },
-    }),
-  });
-
-  const result = await response.json();
-  if (!response.ok) {
-    console.error("WhatsApp API error:", JSON.stringify(result));
+  // Split long messages into chunks respecting WhatsApp's 4096 char limit
+  const chunks: string[] = [];
+  if (body.length <= WHATSAPP_MAX_LENGTH) {
+    chunks.push(body);
+  } else {
+    let remaining = body;
+    while (remaining.length > 0) {
+      if (remaining.length <= WHATSAPP_MAX_LENGTH) {
+        chunks.push(remaining);
+        break;
+      }
+      let breakAt = remaining.lastIndexOf("\n", WHATSAPP_MAX_LENGTH);
+      if (breakAt < WHATSAPP_MAX_LENGTH * 0.5) {
+        breakAt = remaining.lastIndexOf(" ", WHATSAPP_MAX_LENGTH);
+      }
+      if (breakAt < WHATSAPP_MAX_LENGTH * 0.5) {
+        breakAt = WHATSAPP_MAX_LENGTH;
+      }
+      chunks.push(remaining.substring(0, breakAt));
+      remaining = remaining.substring(breakAt).trimStart();
+    }
   }
-  return { ok: response.ok, result };
+
+  let lastResult: any = null;
+  let allOk = true;
+  for (const chunk of chunks) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "text",
+        text: { preview_url: false, body: chunk },
+      }),
+    });
+
+    lastResult = await response.json();
+    if (!response.ok) {
+      console.error("WhatsApp API error:", JSON.stringify(lastResult));
+      allOk = false;
+      break;
+    }
+  }
+
+  return { ok: allOk, result: lastResult };
 }
 
 Deno.serve(async (req) => {
