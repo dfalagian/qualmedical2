@@ -1,0 +1,2 @@
+ALTER TABLE public.cipi_requests DROP CONSTRAINT cipi_requests_type_check;
+ALTER TABLE public.cipi_requests ADD CONSTRAINT cipi_requests_type_check CHECK (type = ANY (ARRAY['cipi'::text, 'cipi_pro'::text, 'cemi'::text]));
