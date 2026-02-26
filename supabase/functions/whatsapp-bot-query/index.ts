@@ -58,12 +58,21 @@ async function getContextData(supabase: any, question: string) {
       }).join("\n"));
   }
 
-  // Quotes/cotizaciones
-  if (q.includes("cotizac") || q.includes("venta") || q.includes("vendido") || 
-      q.includes("folio") || q.includes("cliente") || q.includes("presupuesto")) {
+  // Detect folio patterns like COT-QUAL-2026-057, COT-XXX, PRESU_XXX
+  const folioMatch = question.match(/COT[-\s]?QUAL[-\s]?\d{4}[-\s]?\d+/i) || 
+                     question.match(/COT[-\s]\d+/i) ||
+                     question.match(/PRESU[_\s]?\d+/i);
+  const hasFolioRef = !!folioMatch;
+
+  // Quotes/cotizaciones - trigger on keywords OR folio references
+  const needsQuotes = q.includes("cotizac") || q.includes("venta") || q.includes("vendido") || 
+      q.includes("folio") || q.includes("cliente") || q.includes("presupuesto") ||
+      q.includes("cot-") || q.includes("presu") || hasFolioRef;
+
+  if (needsQuotes) {
     const { data: quotes } = await supabase
       .from("quotes")
-      .select("folio, status, total, fecha_cotizacion, concepto, clients(nombre_cliente)")
+      .select("id, folio, status, total, fecha_cotizacion, concepto, clients(nombre_cliente)")
       .order("created_at", { ascending: false })
       .limit(50);
     
@@ -79,6 +88,33 @@ async function getContextData(supabase: any, question: string) {
         quotes.slice(0, 20).map((q: any) => 
           `- ${q.folio} | ${q.status} | $${q.total} | ${q.fecha_cotizacion} | Cliente: ${q.clients?.nombre_cliente || 'N/A'} | ${q.concepto || ''}`
         ).join("\n"));
+
+      // If a specific folio is referenced, fetch its items
+      if (hasFolioRef) {
+        const folioStr = folioMatch![0].toUpperCase().replace(/\s/g, '-');
+        const matchedQuote = quotes.find((q: any) => q.folio && q.folio.toUpperCase().includes(folioStr.replace(/[-]/g, '').replace('COTQUAL', 'COT-QUAL-')));
+        // Try flexible match
+        const targetQuote = matchedQuote || quotes.find((q: any) => {
+          if (!q.folio) return false;
+          const cleanFolio = q.folio.replace(/[-_\s]/g, '').toUpperCase();
+          const cleanSearch = folioStr.replace(/[-_\s]/g, '').toUpperCase();
+          return cleanFolio.includes(cleanSearch) || cleanSearch.includes(cleanFolio);
+        });
+
+        if (targetQuote) {
+          const { data: quoteItems } = await supabase
+            .from("quote_items")
+            .select("nombre_producto, cantidad, precio_unitario, importe, marca, lote, fecha_caducidad")
+            .eq("quote_id", targetQuote.id);
+          
+          if (quoteItems?.length) {
+            context.push(`DETALLE DE PRODUCTOS DE COTIZACIÓN ${targetQuote.folio}:\nCliente: ${targetQuote.clients?.nombre_cliente || 'N/A'} | Total: $${targetQuote.total} | Estado: ${targetQuote.status}\n` +
+              quoteItems.map((i: any) => 
+                `- ${i.nombre_producto} | Cant: ${i.cantidad} | P.Unit: $${i.precio_unitario} | Importe: $${i.importe}${i.marca ? ` | Marca: ${i.marca}` : ''}${i.lote ? ` | Lote: ${i.lote}` : ''}${i.fecha_caducidad ? ` | Cad: ${i.fecha_caducidad}` : ''}`
+              ).join("\n"));
+          }
+        }
+      }
     }
   }
 
