@@ -95,7 +95,7 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
 
       // Find or use a default client
       let clientId: string;
-      const clientName = request.empresa || request.razon_social || (type === 'cipi' ? 'CIPI' : 'CIPI PRO');
+      const clientName = request.empresa || request.razon_social || type.toUpperCase();
       
       const { data: existingClient } = await supabase
         .from("clients")

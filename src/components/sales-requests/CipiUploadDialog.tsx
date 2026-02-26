@@ -59,7 +59,7 @@ export function CipiUploadDialog({ open, onOpenChange, type, onSuccess }: CipiUp
             return cell ? (cell.v !== undefined ? cell.v : '') : '';
           };
 
-          // Extract header fields based on the known CIPI format
+          // Extract header fields based on the known CIPI/CEMI format
           header.empresa = getCellValue("B3") || '';
           header.razon_social = getCellValue("B4") || '';
           header.rfc = getCellValue("B5") || '';
@@ -71,6 +71,48 @@ export function CipiUploadDialog({ open, onOpenChange, type, onSuccess }: CipiUp
           header.fecha_ultima_factura = getCellValue("G6") || '';
           header.monto_ultima_factura = getCellValue("G7") || '';
           header.fecha_entrega = getCellValue("B8") || '';
+
+          // Smart field correction: detect misaligned fields by pattern
+          const rfcPattern = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
+          const allHeaderValues = [
+            { key: 'empresa', val: String(header.empresa).trim() },
+            { key: 'razon_social', val: String(header.razon_social).trim() },
+            { key: 'rfc', val: String(header.rfc).trim() },
+            { key: 'cfdi', val: String(header.cfdi).trim() },
+            { key: 'concepto', val: String(header.concepto).trim() },
+          ];
+
+          // If rfc field doesn't look like an RFC, try to find the real RFC in other fields
+          if (header.rfc && !rfcPattern.test(String(header.rfc).trim())) {
+            const rfcField = allHeaderValues.find(f => f.key !== 'rfc' && rfcPattern.test(f.val));
+            if (rfcField) {
+              // Move the misplaced value: the field that has the RFC gets cleared, and rfc gets the correct value
+              const wrongRfcValue = String(header.rfc).trim();
+              header.rfc = rfcField.val;
+              // If the RFC was in cfdi, clear cfdi and try to use the wrong rfc value if it looks like a company name
+              if (rfcField.key === 'cfdi') {
+                header.cfdi = '';
+              }
+              // If empresa is empty and rfc had a company-like name, assign it
+              if (!header.empresa && wrongRfcValue.length > 5 && !rfcPattern.test(wrongRfcValue)) {
+                header.empresa = wrongRfcValue;
+              }
+            }
+          }
+
+          // Also scan header rows broadly for RFC if still not found
+          if (!header.rfc || !rfcPattern.test(String(header.rfc).trim())) {
+            for (let r = 0; r <= Math.min(range.e.r, 15); r++) {
+              for (let c = 0; c <= range.e.c; c++) {
+                const cell = sheet[XLSX.utils.encode_cell({ r, c })];
+                if (cell && typeof cell.v === 'string' && rfcPattern.test(cell.v.trim())) {
+                  header.rfc = cell.v.trim();
+                  break;
+                }
+              }
+              if (header.rfc && rfcPattern.test(String(header.rfc).trim())) break;
+            }
+          }
 
           // Find the data header row (DESCRIPCION, MARCA, LOTE, etc.)
           let headerRow = -1;
