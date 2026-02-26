@@ -25,6 +25,7 @@ import {
 import { Search, AlertCircle, ShoppingCart, ChevronDown, ChevronUp, FileText, User, Package, ArrowRightCircle, Loader2, Trash2, Plus, Link2, Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CitioConversionDialog } from "./CitioConversionDialog";
 
 interface ExternalOrderItem {
   id: string;
@@ -152,6 +153,7 @@ export function SalesRequestsCitioOrders() {
   // Add product popover state
   const [addingToOrderId, setAddingToOrderId] = useState<string | null>(null);
   const [addProductSearch, setAddProductSearch] = useState("");
+  const [conversionDialogOrder, setConversionDialogOrder] = useState<ExternalOrder | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -862,10 +864,10 @@ export function SalesRequestsCitioOrders() {
                             </Button>
                           )}
                           <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleConvertToQuote(order);
-                            }}
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               setConversionDialogOrder(order);
+                             }}
                             disabled={convertingId === order.id}
                             className="gap-2"
                           >
@@ -886,6 +888,21 @@ export function SalesRequestsCitioOrders() {
           </div>
         )}
       </CardContent>
+
+      {conversionDialogOrder && (
+        <CitioConversionDialog
+          open={!!conversionDialogOrder}
+          onOpenChange={(open) => { if (!open) setConversionDialogOrder(null); }}
+          orderNumber={conversionDialogOrder.order_number}
+          items={getOrderItems(conversionDialogOrder)}
+          localProducts={localProducts}
+          onConfirm={() => {
+            handleConvertToQuote(conversionDialogOrder);
+            setConversionDialogOrder(null);
+          }}
+          converting={convertingId === conversionDialogOrder.id}
+        />
+      )}
     </Card>
   );
 }
