@@ -105,6 +105,15 @@ function getExtensionFromMime(mimeType: string): string {
   return map[mimeType] || "bin";
 }
 
+function normalizePhone(phone: string): string {
+  let digits = phone.replace(/\D/g, "");
+  // Mexican numbers: WhatsApp sends 521XXXXXXXXXX, normalize to 52XXXXXXXXXX
+  if (digits.startsWith("521") && digits.length === 13) {
+    digits = "52" + digits.substring(3);
+  }
+  return digits;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -146,6 +155,7 @@ Deno.serve(async (req) => {
 
         console.log(`Message from ${contactName} (${from}): type=${message.type} body=${msgBody}`);
 
+        const normalizedFrom = normalizePhone(from);
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -162,11 +172,11 @@ Deno.serve(async (req) => {
 
         console.log("Incoming message stored successfully");
 
-        // Check if sender is an authorized bot user
+        // Check if sender is an authorized bot user (try both original and normalized phone)
         const { data: botUser } = await supabase
           .from("whatsapp_bot_users")
           .select("*")
-          .eq("phone", from)
+          .or(`phone.eq.${from},phone.eq.${normalizedFrom}`)
           .eq("is_active", true)
           .maybeSingle();
 
@@ -211,7 +221,7 @@ Deno.serve(async (req) => {
           const { data: requester } = await supabase
             .from("whatsapp_sales_requesters")
             .select("*")
-            .eq("phone", from)
+            .or(`phone.eq.${from},phone.eq.${normalizedFrom}`)
             .eq("is_active", true)
             .maybeSingle();
 
