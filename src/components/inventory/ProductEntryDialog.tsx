@@ -677,7 +677,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-end">
             <div className="space-y-1">
               <Label className="text-xs">Orden de Compra</Label>
-              <Popover>
+              <Popover modal={true}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -698,7 +698,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
                     <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[340px] p-0" align="start">
+                <PopoverContent className="w-[340px] p-0 z-[9999]" align="start">
                   <Command>
                     <CommandInput placeholder="Buscar OC..." />
                     <CommandList>
