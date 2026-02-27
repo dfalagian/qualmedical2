@@ -11,27 +11,54 @@ export function ExportInventoryButton() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      // Fetch products
-      const { data: products, error: pErr } = await supabase
-        .from("products")
-        .select("id, name, sku, brand, category, current_stock, minimum_stock, unit, barcode, price_with_tax, price_without_tax, unit_price, tax_rate, is_active, created_at, updated_at")
-        .order("category")
-        .order("name");
-      if (pErr) throw pErr;
+      // Fetch all products (paginated to avoid 1000 row limit)
+      let allProducts: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from("products")
+          .select("id, name, sku, brand, category, current_stock, minimum_stock, unit, barcode, price_with_tax, price_without_tax, unit_price, tax_rate, is_active, created_at, updated_at")
+          .order("category")
+          .order("name")
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        allProducts = allProducts.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+      }
+      const products = allProducts;
 
-      // Fetch batches
-      const { data: batches, error: bErr } = await supabase
-        .from("product_batches")
-        .select("product_id, batch_number, barcode, expiration_date, current_quantity, initial_quantity, is_active, received_at")
-        .eq("is_active", true);
-      if (bErr) throw bErr;
+      // Fetch ALL batches (paginated)
+      let allBatches: any[] = [];
+      from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("product_batches")
+          .select("product_id, batch_number, barcode, expiration_date, current_quantity, initial_quantity, is_active, received_at")
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        allBatches = allBatches.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+      }
+      const batches = allBatches;
 
-      // Fetch warehouse stock
-      const { data: whStock, error: wErr } = await supabase
-        .from("warehouse_stock")
-        .select("product_id, warehouse_id, current_stock, warehouses:warehouse_id(name, code)")
-        .gt("current_stock", 0);
-      if (wErr) throw wErr;
+      // Fetch warehouse stock (paginated)
+      let allWhStock: any[] = [];
+      from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("warehouse_stock")
+          .select("product_id, warehouse_id, current_stock, warehouses:warehouse_id(name, code)")
+          .gt("current_stock", 0)
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        allWhStock = allWhStock.concat(data || []);
+        if (!data || data.length < pageSize) break;
+        from += pageSize;
+      }
+      const whStock = allWhStock;
 
       // Build batches map
       const batchMap: Record<string, typeof batches> = {};
@@ -85,6 +112,7 @@ export function ExportInventoryButton() {
             "Cantidad Inicial": b.initial_quantity,
             "Cantidad Actual": b.current_quantity,
             "Fecha Recepción": b.received_at ? new Date(b.received_at).toLocaleDateString("es-MX") : "",
+            Activo: b.is_active ? "Sí" : "No",
           });
         }
       }
