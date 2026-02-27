@@ -677,26 +677,60 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-end">
             <div className="space-y-1">
               <Label className="text-xs">Orden de Compra</Label>
-              <Select
-                value={formData.ordenCompraId}
-                onValueChange={(value) => setFormData({ ...formData, ordenCompraId: value })}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Seleccionar OC..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sin_orden">Sin orden</SelectItem>
-                  {ordenesCompra.map((oc: any) => {
-                    const supplierName = oc.profiles?.company_name || oc.profiles?.full_name || "";
-                    const statusLabel = oc.status === "pendiente" ? "🟡 Pendiente" : oc.status === "en_proceso" ? "🔵 En proceso" : oc.status;
-                    return (
-                      <SelectItem key={oc.id} value={oc.id}>
-                        {oc.order_number}{supplierName ? ` — ${supplierName}` : ""} [{statusLabel}]
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="h-9 w-full justify-between text-xs font-normal"
+                  >
+                    <span className="truncate">
+                      {formData.ordenCompraId === "sin_orden"
+                        ? "Sin orden"
+                        : (() => {
+                            const selected = ordenesCompra.find((oc: any) => oc.id === formData.ordenCompraId);
+                            if (!selected) return "Seleccionar OC...";
+                            const name = selected.profiles?.company_name || selected.profiles?.full_name || "";
+                            const st = selected.status === "pendiente" ? "🟡" : selected.status === "en_proceso" ? "🔵" : "";
+                            return `${selected.order_number}${name ? ` — ${name}` : ""} ${st}`;
+                          })()}
+                    </span>
+                    <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[340px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar OC..." />
+                    <CommandList>
+                      <CommandEmpty>No se encontró ninguna OC.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="sin_orden"
+                          onSelect={() => setFormData({ ...formData, ordenCompraId: "sin_orden" })}
+                        >
+                          <Check className={cn("mr-2 h-3 w-3", formData.ordenCompraId === "sin_orden" ? "opacity-100" : "opacity-0")} />
+                          Sin orden
+                        </CommandItem>
+                        {ordenesCompra.map((oc: any) => {
+                          const supplierName = oc.profiles?.company_name || oc.profiles?.full_name || "";
+                          const statusLabel = oc.status === "pendiente" ? "🟡 Pendiente" : oc.status === "en_proceso" ? "🔵 En proceso" : oc.status;
+                          const label = `${oc.order_number}${supplierName ? ` — ${supplierName}` : ""} [${statusLabel}]`;
+                          return (
+                            <CommandItem
+                              key={oc.id}
+                              value={label}
+                              onSelect={() => setFormData({ ...formData, ordenCompraId: oc.id })}
+                            >
+                              <Check className={cn("mr-2 h-3 w-3", formData.ordenCompraId === oc.id ? "opacity-100" : "opacity-0")} />
+                              <span className="text-xs">{label}</span>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Nº Factura</Label>
