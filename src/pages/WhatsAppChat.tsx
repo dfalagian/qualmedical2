@@ -16,13 +16,15 @@ import {
   Clock,
   Phone,
   ArrowLeft,
-  Bot
+  Bot,
+  ShoppingCart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { WhatsAppBotUsersManager } from "@/components/whatsapp/WhatsAppBotUsersManager";
+import { WhatsAppSalesRequestersManager } from "@/components/whatsapp/WhatsAppSalesRequestersManager";
 
 interface WhatsAppMessage {
   id: string;
@@ -188,6 +190,9 @@ const WhatsAppChat = () => {
           </TabsTrigger>
           <TabsTrigger value="bot" className="gap-1.5">
             <Bot className="h-4 w-4" /> Bot IA
+          </TabsTrigger>
+          <TabsTrigger value="requesters" className="gap-1.5">
+            <ShoppingCart className="h-4 w-4" /> Solicitantes
           </TabsTrigger>
         </TabsList>
 
@@ -402,6 +407,10 @@ const WhatsAppChat = () => {
 
         <TabsContent value="bot" className="mt-0">
           <WhatsAppBotUsersManager />
+        </TabsContent>
+
+        <TabsContent value="requesters" className="mt-0">
+          <WhatsAppSalesRequestersManager />
         </TabsContent>
       </Tabs>
     </DashboardLayout>

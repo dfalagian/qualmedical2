@@ -1977,6 +1977,7 @@ export type Database = {
       }
       sales_requests: {
         Row: {
+          contact_name: string | null
           created_at: string
           extracted_data: Json | null
           extraction_status: string | null
@@ -1986,10 +1987,12 @@ export type Database = {
           id: string
           notes: string | null
           raw_text: string | null
+          source_phone: string | null
           status: string | null
           updated_at: string
         }
         Insert: {
+          contact_name?: string | null
           created_at?: string
           extracted_data?: Json | null
           extraction_status?: string | null
@@ -1999,10 +2002,12 @@ export type Database = {
           id?: string
           notes?: string | null
           raw_text?: string | null
+          source_phone?: string | null
           status?: string | null
           updated_at?: string
         }
         Update: {
+          contact_name?: string | null
           created_at?: string
           extracted_data?: Json | null
           extraction_status?: string | null
@@ -2012,6 +2017,7 @@ export type Database = {
           id?: string
           notes?: string | null
           raw_text?: string | null
+          source_phone?: string | null
           status?: string | null
           updated_at?: string
         }
@@ -2342,6 +2348,36 @@ export type Database = {
           message?: string
           timestamp?: string
           whatsapp_message_id?: string | null
+        }
+        Relationships: []
+      }
+      whatsapp_sales_requesters: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string
         }
         Relationships: []
       }
