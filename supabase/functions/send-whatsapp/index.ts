@@ -39,6 +39,11 @@ const TEMPLATES: Record<string, (d: Record<string, string>) => string> = {
 function formatPhoneNumber(phone: string): string {
   let digits = phone.replace(/\D/g, "");
 
+  // Mexican numbers: remove extra '1' after '52' (521XXXXXXXXXX -> 52XXXXXXXXXX)
+  if (digits.startsWith("521") && digits.length === 13) {
+    digits = "52" + digits.substring(3);
+  }
+
   // Already has country code for Mexico
   if (digits.startsWith("52") && digits.length === 12) {
     return digits;

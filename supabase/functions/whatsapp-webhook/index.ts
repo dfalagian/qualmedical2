@@ -9,6 +9,11 @@ const corsHeaders = {
 const WHATSAPP_MAX_LENGTH = 4096;
 
 async function sendWhatsAppReply(to: string, body: string) {
+  // Normalize Mexican numbers: remove the extra '1' after '52'
+  let normalizedTo = to.replace(/\D/g, "");
+  if (normalizedTo.startsWith("521") && normalizedTo.length === 13) {
+    normalizedTo = "52" + normalizedTo.substring(3);
+  }
   const phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID")!;
   const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN")!;
   const url = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
@@ -47,7 +52,7 @@ async function sendWhatsAppReply(to: string, body: string) {
       body: JSON.stringify({
         messaging_product: "whatsapp",
         recipient_type: "individual",
-        to,
+        to: normalizedTo,
         type: "text",
         text: { preview_url: false, body: chunk },
       }),
@@ -112,6 +117,10 @@ function normalizePhone(phone: string): string {
     digits = "52" + digits.substring(3);
   }
   return digits;
+}
+
+function normalizePhoneForSending(phone: string): string {
+  return normalizePhone(phone);
 }
 
 Deno.serve(async (req) => {
