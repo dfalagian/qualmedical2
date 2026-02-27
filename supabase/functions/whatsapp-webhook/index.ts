@@ -13,7 +13,6 @@ async function sendWhatsAppReply(to: string, body: string) {
   const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN")!;
   const url = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
 
-  // Split long messages into chunks respecting WhatsApp's 4096 char limit
   const chunks: string[] = [];
   if (body.length <= WHATSAPP_MAX_LENGTH) {
     chunks.push(body);
@@ -65,8 +64,48 @@ async function sendWhatsAppReply(to: string, body: string) {
   return { ok: allOk, result: lastResult };
 }
 
+async function downloadWhatsAppMedia(mediaId: string): Promise<{ buffer: ArrayBuffer; mimeType: string } | null> {
+  const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN")!;
+  
+  // Step 1: Get media URL
+  const metaRes = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!metaRes.ok) {
+    console.error("Failed to get media URL:", await metaRes.text());
+    return null;
+  }
+  const metaData = await metaRes.json();
+  const mediaUrl = metaData.url;
+  const mimeType = metaData.mime_type || "application/octet-stream";
+
+  // Step 2: Download the actual file
+  const fileRes = await fetch(mediaUrl, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!fileRes.ok) {
+    console.error("Failed to download media:", await fileRes.text());
+    return null;
+  }
+  const buffer = await fileRes.arrayBuffer();
+  return { buffer, mimeType };
+}
+
+function getExtensionFromMime(mimeType: string): string {
+  const map: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "application/pdf": "pdf",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.ms-excel": "xls",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/msword": "doc",
+  };
+  return map[mimeType] || "bin";
+}
+
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -77,14 +116,12 @@ Deno.serve(async (req) => {
     const mode = url.searchParams.get("hub.mode");
     const token = url.searchParams.get("hub.verify_token");
     const challenge = url.searchParams.get("hub.challenge");
-
     const verifyToken = Deno.env.get("WHATSAPP_VERIFY_TOKEN");
 
     if (mode === "subscribe" && token === verifyToken) {
       console.log("Webhook verified successfully");
       return new Response(challenge, { status: 200, headers: corsHeaders });
     }
-
     return new Response("Forbidden", { status: 403, headers: corsHeaders });
   }
 
@@ -98,25 +135,26 @@ Deno.serve(async (req) => {
       const changes = entry?.changes?.[0];
       const value = changes?.value;
 
-      // Check if it's a message (not a status update)
       if (value?.messages && value.messages.length > 0) {
         const message = value.messages[0];
-        const from = message.from; // sender phone number
-        const msgBody = message.text?.body || "";
+        const from = message.from;
         const timestamp = message.timestamp;
         const contactName = value.contacts?.[0]?.profile?.name || "Desconocido";
 
-        console.log(`Message from ${contactName} (${from}): ${msgBody}`);
+        // Extract text body from different message types
+        const msgBody = message.text?.body || message.caption || "";
 
-        // Store incoming message in database
+        console.log(`Message from ${contactName} (${from}): type=${message.type} body=${msgBody}`);
+
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+        // Store incoming message
         await supabase.from("whatsapp_messages").insert({
           from_phone: from,
           contact_name: contactName,
-          message: msgBody,
+          message: msgBody || `[${message.type}]`,
           direction: "incoming",
           whatsapp_message_id: message.id,
           timestamp: new Date(parseInt(timestamp) * 1000).toISOString(),
@@ -135,7 +173,6 @@ Deno.serve(async (req) => {
         if (botUser) {
           // Route to AI bot
           console.log(`Bot user detected: ${botUser.name} (${from}). Querying AI...`);
-          
           try {
             const botResponse = await fetch(`${supabaseUrl}/functions/v1/whatsapp-bot-query`, {
               method: "POST",
@@ -153,11 +190,9 @@ Deno.serve(async (req) => {
             const botData = await botResponse.json();
             const reply = botData.reply || "No pude procesar tu consulta.";
 
-            // Send AI reply via WhatsApp
             const sendResult = await sendWhatsAppReply(from, reply);
             console.log("Bot reply sent:", sendResult.ok);
 
-            // Store outgoing bot reply
             await supabase.from("whatsapp_messages").insert({
               from_phone: from,
               contact_name: contactName,
@@ -170,14 +205,108 @@ Deno.serve(async (req) => {
             console.error("Bot query error:", botError);
             await sendWhatsAppReply(from, "⚠️ Error al procesar tu consulta. Intenta de nuevo en un momento.");
           }
+          // Return early - bot users don't create sales requests
         } else {
-          // Not a bot user - check if message looks like a sales request
-          console.log(`Regular message from ${from}. Stored for manual review.`);
-          // Future: auto-create sales request from supplier messages
+          // Check if sender is an authorized sales requester
+          const { data: requester } = await supabase
+            .from("whatsapp_sales_requesters")
+            .select("*")
+            .eq("phone", from)
+            .eq("is_active", true)
+            .maybeSingle();
+
+          if (requester) {
+            console.log(`Sales requester detected: ${requester.name} (${from}). Processing request...`);
+
+            let fileUrl: string | null = null;
+            let fileName: string | null = null;
+            let fileType: string | null = null;
+
+            // Handle media messages (image, document)
+            const mediaId = message.image?.id || message.document?.id;
+            if (mediaId) {
+              try {
+                const media = await downloadWhatsAppMedia(mediaId);
+                if (media) {
+                  const ext = getExtensionFromMime(media.mimeType);
+                  const originalName = message.document?.filename || `whatsapp-${Date.now()}.${ext}`;
+                  const storagePath = `${crypto.randomUUID()}.${ext}`;
+
+                  const { error: uploadError } = await supabase.storage
+                    .from("sales-requests")
+                    .upload(storagePath, media.buffer, {
+                      contentType: media.mimeType,
+                      upsert: false,
+                    });
+
+                  if (uploadError) {
+                    console.error("Storage upload error:", uploadError);
+                  } else {
+                    const { data: urlData } = supabase.storage
+                      .from("sales-requests")
+                      .getPublicUrl(storagePath);
+                    fileUrl = urlData.publicUrl;
+                    fileName = originalName;
+                    fileType = media.mimeType;
+                    console.log("Media uploaded:", fileUrl);
+                  }
+                }
+              } catch (mediaErr) {
+                console.error("Media download/upload error:", mediaErr);
+              }
+            }
+
+            // Create sales request
+            const rawText = msgBody || null;
+
+            // Only create if there's content
+            if (fileUrl || rawText) {
+              const { data: inserted, error: insertError } = await supabase
+                .from("sales_requests")
+                .insert({
+                  file_url: fileUrl,
+                  file_name: fileName,
+                  file_type: fileType,
+                  raw_text: rawText,
+                  extraction_status: "pending",
+                  status: "nueva",
+                  source_phone: from,
+                  contact_name: contactName,
+                })
+                .select("id")
+                .single();
+
+              if (insertError) {
+                console.error("Sales request insert error:", insertError);
+                await sendWhatsAppReply(from, "⚠️ Error al registrar tu solicitud. Intenta de nuevo.");
+              } else {
+                console.log("Sales request created:", inserted.id);
+
+                // Trigger extraction if there's a file
+                if (inserted?.id && fileUrl) {
+                  supabase.functions.invoke("extract-sales-request", {
+                    body: { requestId: inserted.id },
+                  }).catch((err: any) => console.error("Extraction trigger error:", err));
+                }
+
+                await sendWhatsAppReply(
+                  from,
+                  `✅ ¡Solicitud recibida, ${requester.name}! Tu pedido ha sido registrado y será procesado. Te contactaremos pronto.`
+                );
+              }
+            } else {
+              await sendWhatsAppReply(
+                from,
+                "Hola, para registrar tu solicitud envía un texto con los productos, una imagen o un documento (PDF/Excel)."
+              );
+            }
+          } else {
+            console.log(`Regular message from ${from}. Stored for manual review.`);
+          }
         }
       }
 
-      // Check for status updates (sent, delivered, read)
+      // Status updates
       if (value?.statuses && value.statuses.length > 0) {
         const status = value.statuses[0];
         console.log(`Status update: ${status.status} for message ${status.id}`);
