@@ -68,6 +68,7 @@ import { WarehouseTransferHistory } from "@/components/inventory/WarehouseTransf
 
 import { WarehouseFilter } from "@/components/inventory/WarehouseFilter";
 import { StockByWarehouseModal } from "@/components/dashboard/StockByWarehouseModal";
+import { ExportInventoryButton } from "@/components/inventory/ExportInventoryButton";
 import { PriceTypesEditor } from "@/components/inventory/PriceTypesEditor";
 
 // Ubicaciones de las antenas RFID
@@ -1309,8 +1310,9 @@ export default function Inventory() {
 
         {/* Botón Stock por Almacén - Solo para admin */}
         {isAdmin && (
-          <div className="flex justify-start">
+          <div className="flex justify-start gap-2">
             <StockByWarehouseModal />
+            <ExportInventoryButton />
           </div>
         )}
 
