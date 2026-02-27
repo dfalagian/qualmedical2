@@ -277,9 +277,10 @@ Deno.serve(async (req) => {
 
             // Create sales request
             const rawText = msgBody || null;
+            // Only create a request if there's an attached file or meaningful text (>20 chars)
+            const hasMeaningfulContent = fileUrl || (rawText && rawText.trim().length > 20);
 
-            // Only create if there's content
-            if (fileUrl || rawText) {
+            if (hasMeaningfulContent) {
               const { data: inserted, error: insertError } = await supabase
                 .from("sales_requests")
                 .insert({
