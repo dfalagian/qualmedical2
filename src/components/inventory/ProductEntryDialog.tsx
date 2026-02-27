@@ -133,31 +133,11 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       
       if (error) throw error;
 
-      // Fetch ALL OC ids that have been used in inventory movements
-      const { data: usedMovements } = await supabase
-        .from("inventory_movements")
-        .select("reference_id")
-        .eq("reference_type", "purchase_order")
-        .not("reference_id", "is", null);
-
-      const usedOcIds = new Set((usedMovements || []).map((m: any) => m.reference_id));
-
-      // Also fetch OC ids linked to medicine_counts (conteo de medicamentos)
-      const { data: usedInCounts } = await supabase
-        .from("medicine_counts")
-        .select("purchase_order_id")
-        .not("purchase_order_id", "is", null);
-
-      const usedInCountIds = new Set((usedInCounts || []).map((m: any) => m.purchase_order_id));
-
-      // Filter out purchase orders already used in inventory movements OR medicine counts
-      const availableOrders = data.filter((o: any) => 
-        !usedOcIds.has(o.id) && !usedInCountIds.has(o.id)
-      );
+      // No filtering - show all pending/in-process purchase orders
 
       // Fetch supplier names for each order
-      const registeredIds = availableOrders.filter((o: any) => o.supplier_type !== "general").map((o: any) => o.supplier_id);
-      const generalIds = availableOrders.filter((o: any) => o.supplier_type === "general").map((o: any) => o.supplier_id);
+      const registeredIds = data.filter((o: any) => o.supplier_type !== "general").map((o: any) => o.supplier_id);
+      const generalIds = data.filter((o: any) => o.supplier_type === "general").map((o: any) => o.supplier_id);
 
       let profilesMap: Record<string, any> = {};
       let generalMap: Record<string, any> = {};
@@ -177,7 +157,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
         for (const g of gs || []) generalMap[g.id] = g;
       }
 
-      return availableOrders.map((o: any) => {
+      return data.map((o: any) => {
         const isGeneral = o.supplier_type === "general";
         const supplier = isGeneral ? generalMap[o.supplier_id] : profilesMap[o.supplier_id];
         return {
