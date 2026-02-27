@@ -688,9 +688,10 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
                   <SelectItem value="sin_orden">Sin orden</SelectItem>
                   {ordenesCompra.map((oc: any) => {
                     const supplierName = oc.profiles?.company_name || oc.profiles?.full_name || "";
+                    const statusLabel = oc.status === "pendiente" ? "🟡 Pendiente" : oc.status === "en_proceso" ? "🔵 En proceso" : oc.status;
                     return (
                       <SelectItem key={oc.id} value={oc.id}>
-                        {oc.order_number}{supplierName ? ` — ${supplierName}` : ""}
+                        {oc.order_number}{supplierName ? ` — ${supplierName}` : ""} [{statusLabel}]
                       </SelectItem>
                     );
                   })}
