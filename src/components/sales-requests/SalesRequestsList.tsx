@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Inbox, FileText, MessageSquareText, ExternalLink, RefreshCw, Loader2, Package, Receipt, FileSearch } from "lucide-react";
+import { Inbox, FileText, MessageSquareText, RefreshCw, Loader2, Package, Receipt, FileSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useState } from "react";
+import { ImageViewer } from "@/components/admin/ImageViewer";
 
 const statusColors: Record<string, string> = {
   nueva: "bg-blue-100 text-blue-800",
@@ -198,14 +199,17 @@ export function SalesRequestsList() {
                     <p className="text-sm text-muted-foreground line-clamp-2">{req.raw_text}</p>
                   )}
 
-                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                     {req.file_url && (
-                      <Button variant="ghost" size="sm" asChild className="gap-1 h-7 text-xs">
-                        <a href={req.file_url} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-3 w-3" />
-                          Ver archivo
-                        </a>
-                      </Button>
+                      <ImageViewer
+                        fileUrl={req.file_url}
+                        fileName={req.file_name || "Archivo"}
+                        triggerText="Ver archivo"
+                        triggerSize="sm"
+                        triggerVariant="ghost"
+                        bucket="sales-requests"
+                        showDownload={true}
+                      />
                     )}
                     {(req.extraction_status === 'pending' || req.extraction_status === 'failed') && (
                       <Button
