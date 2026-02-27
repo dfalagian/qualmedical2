@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText, KeyRound, ClipboardList, Bell } from "lucide-react";
+import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText, KeyRound, ClipboardList, Bell, BarChart3 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
@@ -21,6 +21,7 @@ import { ImageViewer } from "@/components/admin/ImageViewer";
 import { ActivityLog } from "@/components/admin/ActivityLog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NotificationRecipientsManager } from "@/components/admin/NotificationRecipientsManager";
+import { ExportInventoryButton } from "@/components/inventory/ExportInventoryButton";
 
 
 const userFormSchema = z.object({
@@ -344,6 +345,10 @@ const Admin = () => {
             <TabsTrigger value="notifications" className="gap-1.5">
               <Bell className="h-3.5 w-3.5" />
               Notificaciones
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="gap-1.5">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Reportes
             </TabsTrigger>
           </TabsList>
 
@@ -789,6 +794,25 @@ const Admin = () => {
 
           <TabsContent value="notifications" className="mt-4">
             <NotificationRecipientsManager />
+          </TabsContent>
+
+          <TabsContent value="reports" className="mt-4">
+            <Card className="shadow-md">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Reportes
+                </CardTitle>
+                <CardDescription>
+                  Exporta información del sistema en diferentes formatos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-3">
+                  <ExportInventoryButton />
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
