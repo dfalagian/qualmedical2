@@ -310,13 +310,13 @@ Deno.serve(async (req) => {
 
                 await sendWhatsAppReply(
                   from,
-                  `✅ ¡Solicitud recibida, ${requester.name}! Tu pedido ha sido registrado y será procesado. Te contactaremos pronto.`
+                  `✅ ¡Solicitud recibida, ${requester.name}! Tu pedido ha sido registrado y será procesado.\n\nTendrás una respuesta ni bien sea procesada por un responsable.\n\nMuchas gracias. 🙏`
                 );
               }
             } else {
               await sendWhatsAppReply(
                 from,
-                "Hola, para registrar tu solicitud envía un texto con los productos, una imagen o un documento (PDF/Excel)."
+                `¡Hola ${requester.name}! 👋\n\nPuedes subir una imagen, PDF, Excel o texto libre y yo interpretaré tu solicitud.\n\nTendrás una respuesta ni bien sea procesada por un responsable.\n\nMuchas gracias. 🙏`
               );
             }
           } else {
