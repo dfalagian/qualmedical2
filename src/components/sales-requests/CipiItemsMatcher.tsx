@@ -27,6 +27,8 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  // Local overrides to show selected product name immediately (before refetch completes)
+  const [localSelections, setLocalSelections] = useState<Record<string, { productId: string; productName: string } | null>>({});
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["cipi-request-items", requestId],
@@ -56,14 +58,30 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
 
   const handleProductMatch = async (itemId: string, productId: string, productName: string) => {
     try {
+      // Update local state immediately so the UI reflects the selection
+      setLocalSelections(prev => ({ ...prev, [itemId]: { productId, productName } }));
+      setOpenPopoverId(null);
+      setSearchTerm("");
+      
       const { error } = await supabase
         .from("cipi_request_items")
         .update({ product_id: productId, matched_product_name: productName })
         .eq("id", itemId);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["cipi-request-items", requestId] });
-      setOpenPopoverId(null);
+      // Clear local override after refetch
+      setLocalSelections(prev => {
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
+      });
     } catch (err: any) {
+      // Revert local state on error
+      setLocalSelections(prev => {
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
+      });
       toast.error(err.message || "Error al vincular producto");
     }
   };
@@ -198,13 +216,15 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
                         size="sm"
                         className={cn(
                           "w-full justify-between text-xs h-7",
-                          item.product_id && "border-green-300 bg-green-50"
+                          (item.product_id || localSelections[item.id]) && "border-green-300 bg-green-50"
                         )}
                       >
                         <span className="truncate">
-                          {item.product_id
-                            ? (item.products?.name || item.matched_product_name || "Vinculado")
-                            : "Seleccionar..."}
+                          {localSelections[item.id]
+                            ? localSelections[item.id]!.productName
+                            : item.product_id
+                              ? (item.products?.name || item.matched_product_name || "Vinculado")
+                              : "Seleccionar..."}
                         </span>
                         <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
                       </Button>
@@ -248,7 +268,7 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
                                   <Check
                                     className={cn(
                                       "mr-1 h-3 w-3",
-                                      item.product_id === product.id ? "opacity-100" : "opacity-0"
+                                      (item.product_id === product.id || localSelections[item.id]?.productId === product.id) ? "opacity-100" : "opacity-0"
                                     )}
                                   />
                                   <div className="flex-1 min-w-0">
