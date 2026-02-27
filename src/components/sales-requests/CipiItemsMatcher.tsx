@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -29,6 +29,8 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
   const [searchTerm, setSearchTerm] = useState("");
   // Local overrides to show selected product name immediately (before refetch completes)
   const [localSelections, setLocalSelections] = useState<Record<string, { productId: string; productName: string } | null>>({});
+  // Maintain stable order: store the first-seen order of item IDs
+  const stableOrderRef = useRef<string[]>([]);
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["cipi-request-items", requestId],
@@ -42,6 +44,25 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
       return data;
     },
   });
+
+  // Keep items in their original order even after refetch
+  const sortedItems = useMemo(() => {
+    if (!items.length) return items;
+    const currentIds = items.map((i: any) => i.id);
+    // Update stable order only when items are added/removed (not on product match updates)
+    const storedIds = stableOrderRef.current;
+    const sameSet = storedIds.length === currentIds.length && 
+      currentIds.every((id: string) => storedIds.includes(id));
+    if (!sameSet) {
+      stableOrderRef.current = currentIds;
+      return items;
+    }
+    // Sort by the original captured order
+    const orderMap = new Map(storedIds.map((id, idx) => [id, idx] as const));
+    return [...items].sort((a: any, b: any) => 
+      (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999)
+    );
+  }, [items]);
 
   const { data: products = [] } = useQuery({
     queryKey: ["all-products-for-matching"],
@@ -160,7 +181,7 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.map((item: any) => (
+            {sortedItems.map((item: any) => (
               <TableRow key={item.id}>
                 <TableCell>
                   {item.categoria && (
