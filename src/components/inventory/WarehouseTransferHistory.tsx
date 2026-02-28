@@ -203,75 +203,93 @@ export function WarehouseTransferHistory() {
   // Approve mutation - applies stock changes
   const approveMutation = useMutation({
     mutationFn: async (group: GroupedTransfer) => {
-      for (const item of group.items) {
-        if (item.transfer_type === "rfid" && item.rfid_tag_id) {
-          // Move RFID tag to destination warehouse
-          const { error: tagError } = await supabase
-            .from("rfid_tags")
-            .update({
-              warehouse_id: group.toWarehouseId,
-              last_location: group.toWarehouse,
-              last_read_at: new Date().toISOString(),
-            })
-            .eq("id", item.rfid_tag_id);
-          if (tagError) throw tagError;
-        } else if (item.transfer_type === "manual" && item.product_id && item.quantity) {
-          // Decrement source warehouse stock
-          const { data: sourceStock } = await supabase
-            .from("warehouse_stock")
-            .select("current_stock")
-            .eq("product_id", item.product_id)
-            .eq("warehouse_id", group.fromWarehouseId)
-            .maybeSingle();
-
-          if (!sourceStock || sourceStock.current_stock < item.quantity) {
-            const prodName = (item.products as any)?.name || "Producto";
-            throw new Error(`Stock insuficiente para ${prodName} en almacén origen`);
-          }
-
-          await supabase
-            .from("warehouse_stock")
-            .update({ current_stock: sourceStock.current_stock - item.quantity })
-            .eq("product_id", item.product_id)
-            .eq("warehouse_id", group.fromWarehouseId);
-
-          // Increment (or create) destination warehouse stock
-          const { data: destStock } = await supabase
-            .from("warehouse_stock")
-            .select("current_stock")
-            .eq("product_id", item.product_id)
-            .eq("warehouse_id", group.toWarehouseId)
-            .maybeSingle();
-
-          if (destStock) {
-            await supabase
-              .from("warehouse_stock")
-              .update({ current_stock: destStock.current_stock + item.quantity })
-              .eq("product_id", item.product_id)
-              .eq("warehouse_id", group.toWarehouseId);
-          } else {
-            await supabase
-              .from("warehouse_stock")
-              .insert({
-                product_id: item.product_id,
-                warehouse_id: group.toWarehouseId,
-                current_stock: item.quantity,
-              });
-          }
-        }
-      }
-
-      // Mark all items as approved
       const itemIds = group.items.map(i => i.id);
       const { data: { user } } = await supabase.auth.getUser();
-      await supabase
+
+      // FIRST: Atomically mark as approved to prevent double-click
+      // Only update rows that are still "pendiente"
+      const { data: updatedRows, error: statusError } = await supabase
         .from("warehouse_transfers")
         .update({
           status: "aprobada",
           approved_at: new Date().toISOString(),
           approved_by: user?.id || null,
         })
-        .in("id", itemIds);
+        .in("id", itemIds)
+        .eq("status", "pendiente")
+        .select("id");
+
+      if (statusError) throw statusError;
+
+      // If no rows were updated, the transfer was already processed
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error("Esta transferencia ya fue procesada anteriormente.");
+      }
+
+      // THEN: Apply stock changes
+      try {
+        for (const item of group.items) {
+          if (item.transfer_type === "rfid" && item.rfid_tag_id) {
+            const { error: tagError } = await supabase
+              .from("rfid_tags")
+              .update({
+                warehouse_id: group.toWarehouseId,
+                last_location: group.toWarehouse,
+                last_read_at: new Date().toISOString(),
+              })
+              .eq("id", item.rfid_tag_id);
+            if (tagError) throw tagError;
+          } else if (item.transfer_type === "manual" && item.product_id && item.quantity) {
+            const { data: sourceStock } = await supabase
+              .from("warehouse_stock")
+              .select("current_stock")
+              .eq("product_id", item.product_id)
+              .eq("warehouse_id", group.fromWarehouseId)
+              .maybeSingle();
+
+            if (!sourceStock || sourceStock.current_stock < item.quantity) {
+              const prodName = (item.products as any)?.name || "Producto";
+              throw new Error(`Stock insuficiente para ${prodName} en almacén origen`);
+            }
+
+            await supabase
+              .from("warehouse_stock")
+              .update({ current_stock: sourceStock.current_stock - item.quantity })
+              .eq("product_id", item.product_id)
+              .eq("warehouse_id", group.fromWarehouseId);
+
+            const { data: destStock } = await supabase
+              .from("warehouse_stock")
+              .select("current_stock")
+              .eq("product_id", item.product_id)
+              .eq("warehouse_id", group.toWarehouseId)
+              .maybeSingle();
+
+            if (destStock) {
+              await supabase
+                .from("warehouse_stock")
+                .update({ current_stock: destStock.current_stock + item.quantity })
+                .eq("product_id", item.product_id)
+                .eq("warehouse_id", group.toWarehouseId);
+            } else {
+              await supabase
+                .from("warehouse_stock")
+                .insert({
+                  product_id: item.product_id,
+                  warehouse_id: group.toWarehouseId,
+                  current_stock: item.quantity,
+                });
+            }
+          }
+        }
+      } catch (stockError) {
+        // Revert status back to pendiente if stock changes fail
+        await supabase
+          .from("warehouse_transfers")
+          .update({ status: "pendiente", approved_at: null, approved_by: null })
+          .in("id", itemIds);
+        throw stockError;
+      }
     },
     onSuccess: (_, group) => {
       queryClient.invalidateQueries({ queryKey: ["warehouse_transfers_history"] });
