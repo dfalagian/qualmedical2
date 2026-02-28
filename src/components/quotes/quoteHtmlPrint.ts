@@ -226,6 +226,7 @@ export const printQuoteHtml = (data: QuotePrintData) => {
       </style>
     </head>
     <body>
+      ${data.isRemision ? `<div style="background: #f97316; color: white; text-align: center; font-weight: bold; font-size: 14px; padding: 4px 0; letter-spacing: 2px;">RE</div>` : ''}
       
       <div class="header">
         <div class="logo-section">
@@ -246,7 +247,7 @@ export const printQuoteHtml = (data: QuotePrintData) => {
         <div class="info-item"><span class="info-label">FECHA ULTIMA FACTURA:</span> ${formatDate(data.fechaFacturaAnterior)}</div>
         <div class="info-item"><span class="info-label">CONCEPTO:</span> ${data.concepto || "S/D"}</div>
         <div class="info-item"><span class="info-label">MONTO ULTIMA FACTURA:</span> ${data.montoFacturaAnterior ? formatCurrency(data.montoFacturaAnterior) : "S/D"}</div>
-        ${data.isRemision ? `<div class="info-item"><span style="color: #f97316; font-weight: bold; font-size: 11px;">RE</span></div>` : ''}
+        ${data.isRemision ? `<div class="info-item"><span style="color: #f97316; font-weight: bold; font-size: 11px;">RE</span></div>` : `<div class="info-item"></div>`}
         <div class="info-item"><span class="info-label">FECHA DE ENTREGA:</span> ${formatDateLong(data.fechaEntrega)}</div>
         <div class="info-item"></div>
       </div>
