@@ -128,7 +128,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       const { data, error } = await supabase
         .from("purchase_orders")
         .select("id, order_number, status, supplier_id, supplier_type")
-        .eq("status", "en_proceso")
+        .neq("status", "pendiente")
         .order("created_at", { ascending: false });
       
       if (error) throw error;
