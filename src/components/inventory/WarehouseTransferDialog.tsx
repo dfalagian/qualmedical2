@@ -25,8 +25,12 @@ import {
   Tag as TagIcon,
   Warehouse,
   Plus,
-  CalendarIcon
+  CalendarIcon,
+  Search,
+  ChevronsUpDown,
+  Check
 } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -85,6 +89,7 @@ export function WarehouseTransferDialog({
   const [manualQuantity, setManualQuantity] = useState<number>(1);
   const [notes, setNotes] = useState("");
   const [transferDate, setTransferDate] = useState<Date>(new Date());
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
 
   // Fetch warehouses
   const { data: warehouses = [] } = useQuery({
@@ -537,25 +542,50 @@ export function WarehouseTransferDialog({
             
             <div className="space-y-2">
               <div className="flex gap-2">
-                <Select value={selectedProductId} onValueChange={(v) => {
-                  setSelectedProductId(v);
-                  setSelectedBatchId("");
-                }}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Seleccionar producto..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        <div className="flex items-center justify-between gap-2 w-full">
-                          <span className="truncate">{p.name}</span>
-                          {p.brand && <span className="text-xs text-muted-foreground shrink-0">{p.brand}</span>}
-                          <Badge variant="secondary" className="ml-2">{p.current_stock}</Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover modal={true} open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={productSearchOpen}
+                      className="flex-1 justify-between font-normal"
+                    >
+                      {selectedProductId
+                        ? (() => {
+                            const p = products.find(p => p.id === selectedProductId);
+                            return p ? `${p.name}${p.brand ? ` (${p.brand})` : ''} — ${p.current_stock}` : "Seleccionar producto...";
+                          })()
+                        : "Seleccionar producto..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[450px] p-0 z-[9999]" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar producto..." />
+                      <CommandList>
+                        <CommandEmpty>No se encontró producto.</CommandEmpty>
+                        <CommandGroup>
+                          {products.map(p => (
+                            <CommandItem
+                              key={p.id}
+                              value={`${p.name} ${p.brand || ''} ${p.sku || ''}`}
+                              onSelect={() => {
+                                setSelectedProductId(p.id);
+                                setSelectedBatchId("");
+                                setProductSearchOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", selectedProductId === p.id ? "opacity-100" : "opacity-0")} />
+                              <span className="truncate flex-1">{p.name}</span>
+                              {p.brand && <span className="text-xs text-muted-foreground mx-1">{p.brand}</span>}
+                              <Badge variant="secondary" className="ml-2 shrink-0">{p.current_stock}</Badge>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {selectedProductId && (
