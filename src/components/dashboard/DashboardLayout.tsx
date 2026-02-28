@@ -178,7 +178,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     <div className="min-h-screen bg-background overflow-x-hidden">
       <DashboardHeader />
 
-      <div className="container mx-auto px-3 md:px-4 overflow-x-hidden">
+      <div className="max-w-screen-2xl mx-auto px-3 md:px-4 overflow-x-hidden">
         <div className="flex gap-4 md:gap-6 py-3 md:py-6 overflow-x-hidden">
           {/* Desktop Sidebar */}
           <aside className="hidden lg:block w-64 shrink-0">
