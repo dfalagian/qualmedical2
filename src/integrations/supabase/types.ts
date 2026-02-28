@@ -2163,6 +2163,8 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           batch_id: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
           created_at: string
           created_by: string | null
           from_warehouse_id: string
@@ -2180,6 +2182,8 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           batch_id?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string
           created_by?: string | null
           from_warehouse_id: string
@@ -2197,6 +2201,8 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           batch_id?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string
           created_by?: string | null
           from_warehouse_id?: string
