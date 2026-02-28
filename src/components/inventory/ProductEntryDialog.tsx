@@ -128,16 +128,23 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       const { data, error } = await supabase
         .from("purchase_orders")
         .select("id, order_number, status, supplier_id, supplier_type")
-        .neq("status", "pendiente")
         .order("created_at", { ascending: false });
       
       if (error) throw error;
 
-      // No filtering - show all pending/in-process purchase orders
+      // Filter out orders that already have inventory movements linked
+      const { data: movementsData } = await supabase
+        .from("inventory_movements")
+        .select("reference_id")
+        .eq("reference_type", "purchase_order")
+        .not("reference_id", "is", null);
+      
+      const usedOrderIds = new Set((movementsData || []).map((m: any) => m.reference_id));
+      const filtered = data.filter((o: any) => !usedOrderIds.has(o.id));
 
       // Fetch supplier names for each order
-      const registeredIds = data.filter((o: any) => o.supplier_type !== "general").map((o: any) => o.supplier_id);
-      const generalIds = data.filter((o: any) => o.supplier_type === "general").map((o: any) => o.supplier_id);
+      const registeredIds = filtered.filter((o: any) => o.supplier_type !== "general").map((o: any) => o.supplier_id);
+      const generalIds = filtered.filter((o: any) => o.supplier_type === "general").map((o: any) => o.supplier_id);
 
       let profilesMap: Record<string, any> = {};
       let generalMap: Record<string, any> = {};
@@ -157,7 +164,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
         for (const g of gs || []) generalMap[g.id] = g;
       }
 
-      return data.map((o: any) => {
+      return filtered.map((o: any) => {
         const isGeneral = o.supplier_type === "general";
         const supplier = isGeneral ? generalMap[o.supplier_id] : profilesMap[o.supplier_id];
         return {
