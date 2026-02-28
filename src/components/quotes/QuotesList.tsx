@@ -26,6 +26,7 @@ import {
   Radio,
   AlertTriangle,
   Trash2,
+  PackageCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -475,6 +476,23 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
     }
   };
 
+  // Mark inventory exit as complete manually (without RFID)
+  const handleManualExitComplete = async (quote: Quote) => {
+    if (!confirm(`¿Marcar la salida de inventario de ${quote.folio} como completada sin escaneo RFID?`)) return;
+    
+    try {
+      await supabase
+        .from("quotes")
+        .update({ inventory_exit_status: "completed" })
+        .eq("id", quote.id);
+      
+      toast.success(`Salida de ${quote.folio} marcada como completada`);
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    } catch (error: any) {
+      toast.error("Error: " + error.message);
+    }
+  };
+
   // Start cancel process
   const handleStartCancel = (quote: Quote) => {
     setQuoteToCancel(quote);
@@ -629,12 +647,12 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                                 Remisión
                               </Badge>
                             )}
-                            {/* Alert for pending inventory exit */}
+                            {/* Informative badge for pending inventory exit */}
                             {quote.status === "aprobada" && quote.inventory_exit_status !== "completed" && (
                               <Badge 
                                 variant="outline" 
-                                className="text-amber-600 border-amber-400 bg-amber-50 animate-pulse"
-                                title="Salida de inventario pendiente"
+                                className="text-amber-600 border-amber-400 bg-amber-50"
+                                title="Salida de inventario pendiente - puede completarse con RFID o manualmente"
                               >
                                 <AlertTriangle className="h-3 w-3 mr-1" />
                                 Salida pendiente
@@ -683,15 +701,26 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                               </Button>
                             )}
                             {quote.status === "aprobada" && quote.inventory_exit_status !== "completed" && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleStartExitScan(quote)}
-                                title="Registrar salida de inventario"
-                                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                              >
-                                <Radio className="h-4 w-4" />
-                              </Button>
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleStartExitScan(quote)}
+                                  title="Escanear RFID para salida"
+                                  className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                >
+                                  <Radio className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleManualExitComplete(quote)}
+                                  title="Marcar salida completa (sin RFID)"
+                                  className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                >
+                                  <PackageCheck className="h-4 w-4" />
+                                </Button>
+                              </>
                             )}
                             {quote.status === "aprobada" && (
                               <Button
