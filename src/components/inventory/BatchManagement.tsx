@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { OldBatchesWarningModal } from "./OldBatchesWarningModal";
 import { BatchTraceabilityModal } from "./BatchTraceabilityModal";
@@ -24,8 +25,11 @@ import {
   Boxes,
   AlertTriangle,
   Tag,
-  Search
+  Search,
+  ChevronsUpDown,
+  Check
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -74,6 +78,7 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<ProductBatch | null>(null);
   const [localSearchTerm, setLocalSearchTerm] = useState("");
+  const [productComboOpen, setProductComboOpen] = useState(false);
   const [selectedBatchForTags, setSelectedBatchForTags] = useState<{
     id: string;
     batchNumber: string;
@@ -356,29 +361,61 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Producto *</Label>
-                  <Select
-                    value={batchForm.product_id}
-                    onValueChange={(value) => {
-                      const selectedProduct = products.find(p => p.id === value);
-                      setBatchForm({ 
-                        ...batchForm, 
-                        product_id: value,
-                        // Usar el barcode del producto, o el SKU como fallback si barcode es null
-                        barcode: selectedProduct?.barcode || selectedProduct?.sku || batchForm.barcode
-                      });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar producto..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.sku} - {product.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={productComboOpen} onOpenChange={setProductComboOpen} modal={true}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={productComboOpen}
+                        className="w-full justify-between font-normal"
+                      >
+                        {batchForm.product_id
+                          ? (() => {
+                              const p = products.find(p => p.id === batchForm.product_id);
+                              return p ? `${p.sku} - ${p.name}` : "Seleccionar producto...";
+                            })()
+                          : "Seleccionar producto..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[380px] p-0 z-[9999]" align="start">
+                      <Command shouldFilter={true}>
+                        <CommandInput placeholder="Buscar por nombre, SKU o código..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontraron productos</CommandEmpty>
+                          <CommandGroup className="max-h-[200px] overflow-auto">
+                            {products.map((product) => (
+                              <CommandItem
+                                key={product.id}
+                                value={`${product.sku} ${product.name} ${product.barcode || ""}`}
+                                onSelect={() => {
+                                  setBatchForm({
+                                    ...batchForm,
+                                    product_id: product.id,
+                                    barcode: product.barcode || product.sku || batchForm.barcode
+                                  });
+                                  setProductComboOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    batchForm.product_id === product.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium">{product.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {product.sku}{product.category ? ` • ${product.category}` : ""}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
