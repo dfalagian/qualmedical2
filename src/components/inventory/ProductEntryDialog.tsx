@@ -128,7 +128,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       const { data, error } = await supabase
         .from("purchase_orders")
         .select("id, order_number, status, supplier_id, supplier_type")
-        .in("status", ["pendiente", "en_proceso"])
+        .eq("status", "en_proceso")
         .order("created_at", { ascending: false });
       
       if (error) throw error;
@@ -690,9 +690,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
                         : (() => {
                             const selected = ordenesCompra.find((oc: any) => oc.id === formData.ordenCompraId);
                             if (!selected) return "Seleccionar OC...";
-                            const name = selected.profiles?.company_name || selected.profiles?.full_name || "";
-                            const st = selected.status === "pendiente" ? "🟡" : selected.status === "en_proceso" ? "🔵" : "";
-                            return `${selected.order_number}${name ? ` — ${name}` : ""} ${st}`;
+                            return selected.order_number;
                           })()}
                     </span>
                     <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
@@ -711,21 +709,16 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
                           <Check className={cn("mr-2 h-3 w-3", formData.ordenCompraId === "sin_orden" ? "opacity-100" : "opacity-0")} />
                           Sin orden
                         </CommandItem>
-                        {ordenesCompra.map((oc: any) => {
-                          const supplierName = oc.profiles?.company_name || oc.profiles?.full_name || "";
-                          const statusLabel = oc.status === "pendiente" ? "🟡 Pendiente" : oc.status === "en_proceso" ? "🔵 En proceso" : oc.status;
-                          const label = `${oc.order_number}${supplierName ? ` — ${supplierName}` : ""} [${statusLabel}]`;
-                          return (
+                        {ordenesCompra.map((oc: any) => (
                             <CommandItem
                               key={oc.id}
-                              value={label}
+                              value={oc.order_number}
                               onSelect={() => setFormData({ ...formData, ordenCompraId: oc.id })}
                             >
                               <Check className={cn("mr-2 h-3 w-3", formData.ordenCompraId === oc.id ? "opacity-100" : "opacity-0")} />
-                              <span className="text-xs">{label}</span>
+                              <span className="text-xs">{oc.order_number}</span>
                             </CommandItem>
-                          );
-                        })}
+                        ))}
                       </CommandGroup>
                     </CommandList>
                   </Command>
