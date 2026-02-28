@@ -1,7 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format, parse, isValid } from "date-fns";
-import { es } from "date-fns/locale";
-import { CalendarIcon, ChevronsUpDown, Check, Search } from "lucide-react";
+import { CalendarIcon, ChevronsUpDown, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,9 +32,13 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
   const [selectedProductId, setSelectedProductId] = useState<string | undefined>(productId);
   const [selectedProductName, setSelectedProductName] = useState<string>(productName || "");
 
-  const showProductSearch = !productName;
+  // Sync pre-selected product when props change
+  useEffect(() => {
+    if (productId) setSelectedProductId(productId);
+    if (productName) setSelectedProductName(productName);
+  }, [productId, productName]);
 
-  // Fetch products only when search is needed
+  // Fetch products
   const { data: productos = [] } = useQuery({
     queryKey: ["products-list-batch-modal"],
     queryFn: async () => {
@@ -47,7 +50,7 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
       if (error) throw error;
       return data;
     },
-    enabled: open && showProductSearch
+    enabled: open
   });
 
   const filteredProducts = useMemo(() => {
@@ -72,11 +75,10 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
   };
 
   const handleConfirm = () => {
-    const finalProductName = showProductSearch ? selectedProductName : productName;
-    if (!batchNumber.trim() || !expirationDate || (showProductSearch && !selectedProductId)) return;
+    if (!batchNumber.trim() || !expirationDate || !selectedProductId) return;
 
     const formattedDate = format(expirationDate, "yyyy-MM-dd");
-    onConfirm(batchNumber.toUpperCase().trim(), formattedDate, selectedProductId, finalProductName);
+    onConfirm(batchNumber.toUpperCase().trim(), formattedDate, selectedProductId, selectedProductName);
 
     resetForm();
     onOpenChange(false);
@@ -91,10 +93,8 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
     setBatchNumber("");
     setExpirationDate(undefined);
     setDateInputValue("");
-    if (showProductSearch) {
-      setSelectedProductId(undefined);
-      setSelectedProductName("");
-    }
+    setSelectedProductId(productId);
+    setSelectedProductName(productName || "");
   };
 
   const handleDateInputChange = (value: string) => {
@@ -122,7 +122,7 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
     setCalendarOpen(false);
   };
 
-  const isConfirmDisabled = !batchNumber.trim() || !expirationDate || (showProductSearch && !selectedProductId);
+  const isConfirmDisabled = !batchNumber.trim() || !expirationDate || !selectedProductId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -132,60 +132,55 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Product: show search or static name */}
           <div className="space-y-2">
             <Label>Producto</Label>
-            {showProductSearch ? (
-              <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen} modal={true}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={productSearchOpen}
-                    className="w-full justify-between font-normal"
-                  >
-                    {selectedProductName || "Buscar producto..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[380px] p-0 z-[9999]" align="start">
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder="Buscar por nombre, SKU o marca..."
-                      value={productSearch}
-                      onValueChange={setProductSearch}
-                    />
-                    <CommandList>
-                      <CommandEmpty>No se encontraron productos</CommandEmpty>
-                      <CommandGroup className="max-h-[200px] overflow-auto">
-                        {filteredProducts.map(product => (
-                          <CommandItem
-                            key={product.id}
-                            value={product.id}
-                            onSelect={handleSelectProduct}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selectedProductId === product.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">{product.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {product.sku}{product.brand ? ` • ${product.brand}` : ""}
-                              </span>
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            ) : (
-              <p className="font-medium">{productName}</p>
-            )}
+            <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen} modal={true}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={productSearchOpen}
+                  className="w-full justify-between font-normal"
+                >
+                  {selectedProductName || "Buscar producto..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[380px] p-0 z-[9999]" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="Buscar por nombre, SKU o marca..."
+                    value={productSearch}
+                    onValueChange={setProductSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No se encontraron productos</CommandEmpty>
+                    <CommandGroup className="max-h-[200px] overflow-auto">
+                      {filteredProducts.map(product => (
+                        <CommandItem
+                          key={product.id}
+                          value={product.id}
+                          onSelect={handleSelectProduct}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedProductId === product.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{product.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {product.sku}{product.brand ? ` • ${product.brand}` : ""}
+                            </span>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="space-y-2">
@@ -195,7 +190,6 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
               value={batchNumber}
               onChange={(e) => setBatchNumber(e.target.value.toUpperCase())}
               placeholder="Ej: LOT-2024-001"
-              autoFocus={!showProductSearch}
             />
           </div>
 
