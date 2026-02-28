@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Printer, ArrowRightLeft, Package, Tag as TagIcon, Check, X, Pencil, Trash2, ChevronDown, ChevronUp, Plus, Search, Eye, Truck, PackageCheck } from "lucide-react";
+import { TransferReceptionScanDialog } from "./TransferReceptionScanDialog";
 import { openWarehouseTransferPrint, TransferPrintItem, TransferPrintData } from "./warehouseTransferPrint";
 import { useToast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLogger";
@@ -45,6 +46,7 @@ interface TransferRecord {
   product_batches?: { batch_number: string; expiration_date: string } | null;
   rfid_tags?: {
     epc: string;
+    product_id?: string | null;
     products?: { name: string; brand: string | null; unit: string | null } | null;
     product_batches?: { batch_number: string; expiration_date: string } | null;
   } | null;
@@ -74,6 +76,7 @@ export function WarehouseTransferHistory() {
   const [newBatchId, setNewBatchId] = useState<string>("");
   const [newQuantity, setNewQuantity] = useState<number>(1);
   const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [receptionDialogGroup, setReceptionDialogGroup] = useState<GroupedTransfer | null>(null);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ["warehouse_transfers_history"],
@@ -88,6 +91,7 @@ export function WarehouseTransferHistory() {
           product_batches:batch_id(batch_number, expiration_date),
           rfid_tags:rfid_tag_id(
             epc,
+            product_id,
             products:product_id(name, brand, unit),
             product_batches:batch_id(batch_number, expiration_date)
           )
@@ -595,7 +599,7 @@ export function WarehouseTransferHistory() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
-                            onClick={() => setConfirmAction({ type: "confirm", group })}
+                            onClick={() => setReceptionDialogGroup(group)}
                             title="Confirmar recepción"
                             disabled={confirmMutation.isPending}
                           >
@@ -817,6 +821,22 @@ export function WarehouseTransferHistory() {
           </TableBody>
         </Table>
       </ScrollArea>
+
+      {/* Reception scan dialog */}
+      {receptionDialogGroup && (
+        <TransferReceptionScanDialog
+          open={!!receptionDialogGroup}
+          onOpenChange={(open) => { if (!open) setReceptionDialogGroup(null); }}
+          groupId={receptionDialogGroup.groupId}
+          transferItems={receptionDialogGroup.items}
+          fromWarehouse={receptionDialogGroup.fromWarehouse}
+          toWarehouse={receptionDialogGroup.toWarehouse}
+          onComplete={() => {
+            confirmMutation.mutate(receptionDialogGroup);
+            setReceptionDialogGroup(null);
+          }}
+        />
+      )}
 
       {/* Confirmation dialogs */}
       <AlertDialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
