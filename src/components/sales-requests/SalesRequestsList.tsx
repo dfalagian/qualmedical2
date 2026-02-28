@@ -4,11 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Inbox, FileText, MessageSquareText, RefreshCw, Loader2, Package, Receipt, FileSearch } from "lucide-react";
+import { Inbox, FileText, MessageSquareText, RefreshCw, Loader2, Package, Receipt, FileSearch, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useState } from "react";
 import { ImageViewer } from "@/components/admin/ImageViewer";
+import { WhatsAppProductMatcher } from "./WhatsAppProductMatcher";
 
 const statusColors: Record<string, string> = {
   nueva: "bg-blue-100 text-blue-800",
@@ -41,6 +42,7 @@ const extractionStatusColors: Record<string, string> = {
 export function SalesRequestsList() {
   const queryClient = useQueryClient();
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["sales-requests"],
@@ -211,6 +213,21 @@ export function SalesRequestsList() {
                         showDownload={true}
                       />
                     )}
+                    {req.extracted_data?.productos?.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 h-7 text-xs"
+                        onClick={() => setExpandedId(expandedId === req.id ? null : req.id)}
+                      >
+                        {expandedId === req.id ? (
+                          <ChevronUp className="h-3 w-3" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3" />
+                        )}
+                        {req.extracted_data.productos.length} producto(s)
+                      </Button>
+                    )}
                     {(req.extraction_status === 'pending' || req.extraction_status === 'failed') && (
                       <Button
                         variant="ghost"
@@ -229,7 +246,16 @@ export function SalesRequestsList() {
                     )}
                   </div>
 
-                  {renderExtractedData(req.extracted_data)}
+                  {expandedId === req.id && req.extracted_data?.productos?.length > 0 && (
+                    <div className="border-t pt-3 mt-2">
+                      <WhatsAppProductMatcher
+                        request={req}
+                        onConverted={() => queryClient.invalidateQueries({ queryKey: ["sales-requests"] })}
+                      />
+                    </div>
+                  )}
+
+                  {expandedId !== req.id && renderExtractedData(req.extracted_data)}
                 </div>
               ))}
             </div>
