@@ -20,7 +20,8 @@ export type ActivityAction =
   | "cancelar"
   | "ingreso"
   | "salida"
-  | "transferencia";
+  | "transferencia"
+  | "confirmar_recepcion";
 
 interface LogActivityParams {
   section: ActivitySection;

@@ -11,7 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Printer, ArrowRightLeft, Package, Tag as TagIcon, Check, X, Pencil, Trash2, ChevronDown, ChevronUp, Plus, Search, Eye } from "lucide-react";
+import { Printer, ArrowRightLeft, Package, Tag as TagIcon, Check, X, Pencil, Trash2, ChevronDown, ChevronUp, Plus, Search, Eye, Truck, PackageCheck } from "lucide-react";
 import { openWarehouseTransferPrint, TransferPrintItem, TransferPrintData } from "./warehouseTransferPrint";
 import { useToast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLogger";
@@ -67,7 +67,7 @@ export function WarehouseTransferHistory() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<{ type: "approve" | "cancel" | "deleteItem"; group?: GroupedTransfer; itemId?: string } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: "approve" | "confirm" | "cancel" | "deleteItem"; group?: GroupedTransfer; itemId?: string } | null>(null);
   const [editingItem, setEditingItem] = useState<{ id: string; quantity: number } | null>(null);
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
   const [newProductId, setNewProductId] = useState<string>("");
@@ -200,18 +200,16 @@ export function WarehouseTransferHistory() {
     },
   });
 
-  // Approve mutation - applies stock changes
+  // Approve mutation - marks as "en_curso" (NO stock movement)
   const approveMutation = useMutation({
     mutationFn: async (group: GroupedTransfer) => {
       const itemIds = group.items.map(i => i.id);
       const { data: { user } } = await supabase.auth.getUser();
 
-      // FIRST: Atomically mark as approved to prevent double-click
-      // Only update rows that are still "pendiente"
       const { data: updatedRows, error: statusError } = await supabase
         .from("warehouse_transfers")
         .update({
-          status: "aprobada",
+          status: "en_curso",
           approved_at: new Date().toISOString(),
           approved_by: user?.id || null,
         })
@@ -220,10 +218,49 @@ export function WarehouseTransferHistory() {
         .select("id");
 
       if (statusError) throw statusError;
-
-      // If no rows were updated, the transfer was already processed
       if (!updatedRows || updatedRows.length === 0) {
         throw new Error("Esta transferencia ya fue procesada anteriormente.");
+      }
+    },
+    onSuccess: (_, group) => {
+      queryClient.invalidateQueries({ queryKey: ["warehouse_transfers_history"] });
+
+      logActivity({
+        section: "inventario",
+        action: "aprobar",
+        entityType: "Transferencia Almacén",
+        entityName: `${group.fromWarehouse} → ${group.toWarehouse} (en curso)`,
+        details: { items_count: group.items.length },
+      });
+
+      toast({ title: "Traslado en curso", description: "La transferencia ha sido aprobada. Confirme la recepción cuando llegue al destino." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error al aprobar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Confirm mutation - applies stock changes (from "en_curso" to "completada")
+  const confirmMutation = useMutation({
+    mutationFn: async (group: GroupedTransfer) => {
+      const itemIds = group.items.map(i => i.id);
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Atomically mark as completada to prevent double-click
+      const { data: updatedRows, error: statusError } = await supabase
+        .from("warehouse_transfers")
+        .update({
+          status: "completada",
+          confirmed_at: new Date().toISOString(),
+          confirmed_by: user?.id || null,
+        })
+        .in("id", itemIds)
+        .eq("status", "en_curso")
+        .select("id");
+
+      if (statusError) throw statusError;
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error("Esta transferencia ya fue procesada o no está en curso.");
       }
 
       // THEN: Apply stock changes
@@ -283,10 +320,10 @@ export function WarehouseTransferHistory() {
           }
         }
       } catch (stockError) {
-        // Revert status back to pendiente if stock changes fail
+        // Revert status back to en_curso if stock changes fail
         await supabase
           .from("warehouse_transfers")
-          .update({ status: "pendiente", approved_at: null, approved_by: null })
+          .update({ status: "en_curso", confirmed_at: null, confirmed_by: null })
           .in("id", itemIds);
         throw stockError;
       }
@@ -300,19 +337,18 @@ export function WarehouseTransferHistory() {
 
       logActivity({
         section: "inventario",
-        action: "aprobar",
+        action: "confirmar_recepcion",
         entityType: "Transferencia Almacén",
         entityName: `${group.fromWarehouse} → ${group.toWarehouse}`,
         details: { items_count: group.items.length },
       });
 
-      // Generate PDF
       handlePrint(group);
 
-      toast({ title: "Transferencia aprobada", description: "El stock se ha movido correctamente." });
+      toast({ title: "Transferencia completada", description: "El stock se ha movido correctamente al almacén destino." });
     },
     onError: (error: Error) => {
-      toast({ title: "Error al aprobar", description: error.message, variant: "destructive" });
+      toast({ title: "Error al confirmar", description: error.message, variant: "destructive" });
     },
   });
 
@@ -419,8 +455,12 @@ export function WarehouseTransferHistory() {
     switch (status) {
       case "pendiente":
         return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">Pendiente</Badge>;
+      case "en_curso":
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 gap-1"><Truck className="h-3 w-3" />Traslado en curso</Badge>;
+      case "completada":
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">Completada</Badge>;
       case "aprobada":
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">Aprobada</Badge>;
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">Completada</Badge>;
       case "cancelada":
         return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">Cancelada</Badge>;
       default:
@@ -463,11 +503,13 @@ export function WarehouseTransferHistory() {
               const hasRfid = group.items.some((i) => i.transfer_type === "rfid");
               const hasManual = group.items.some((i) => i.transfer_type === "manual");
               const isPending = group.status === "pendiente";
+              const isEnCurso = group.status === "en_curso";
+              const canEdit = isPending;
               const isExpanded = expandedGroup === group.key;
 
               return (
                 <React.Fragment key={group.key}>
-                  <TableRow className={isPending ? "bg-yellow-50/50" : ""}>
+                  <TableRow className={isPending ? "bg-yellow-50/50" : isEnCurso ? "bg-blue-50/50" : ""}>
                     <TableCell className="text-xs">
                       {format(new Date(group.date), "dd/MM/yyyy HH:mm", { locale: es })}
                     </TableCell>
@@ -513,7 +555,7 @@ export function WarehouseTransferHistory() {
                           <Eye className="h-4 w-4" />
                         </Button>
                         {/* Editar (solo pendientes) */}
-                        {isPending && (
+                        {canEdit && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -534,27 +576,40 @@ export function WarehouseTransferHistory() {
                         >
                           <Printer className="h-4 w-4" />
                         </Button>
-                        {/* Confirmar (solo pendientes) */}
+                        {/* Aprobar traslado (pendiente → en_curso) */}
                         {isPending && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                             onClick={() => setConfirmAction({ type: "approve", group })}
-                            title="Confirmar transferencia"
+                            title="Aprobar traslado"
                             disabled={approveMutation.isPending}
                           >
-                            <Check className="h-4 w-4" />
+                            <Truck className="h-4 w-4" />
                           </Button>
                         )}
-                        {/* Eliminar / Cancelar (solo pendientes) */}
-                        {isPending && (
+                        {/* Confirmar recepción (en_curso → completada) */}
+                        {isEnCurso && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={() => setConfirmAction({ type: "confirm", group })}
+                            title="Confirmar recepción"
+                            disabled={confirmMutation.isPending}
+                          >
+                            <PackageCheck className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {/* Eliminar / Cancelar (solo pendientes o en_curso) */}
+                        {(isPending || isEnCurso) && (
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-destructive hover:text-destructive"
                             onClick={() => setConfirmAction({ type: "cancel", group })}
-                            title="Eliminar transferencia"
+                            title="Cancelar transferencia"
                             disabled={cancelMutation.isPending}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -613,7 +668,7 @@ export function WarehouseTransferHistory() {
                         </TableCell>
                         <TableCell colSpan={3} />
                         <TableCell>
-                          {isPending && (
+                          {canEdit && (
                             <div className="flex gap-0.5">
                               {!isRfid && !isEditingThis && (
                                 <Button
@@ -642,7 +697,7 @@ export function WarehouseTransferHistory() {
                     );
                   })}
 
-                  {/* Add product row for pending transfers */}
+                  {/* Add product row for pending transfers (only when canEdit) */}
                   {isExpanded && isPending && addingToGroup === group.key && (
                     <TableRow className="bg-muted/20">
                       <TableCell />
@@ -768,12 +823,14 @@ export function WarehouseTransferHistory() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmAction?.type === "approve" && "¿Aprobar transferencia?"}
+              {confirmAction?.type === "approve" && "¿Aprobar traslado?"}
+              {confirmAction?.type === "confirm" && "¿Confirmar recepción?"}
               {confirmAction?.type === "cancel" && "¿Cancelar transferencia?"}
               {confirmAction?.type === "deleteItem" && "¿Eliminar producto?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmAction?.type === "approve" && "Se moverá el stock del almacén origen al destino. Esta acción no se puede deshacer."}
+              {confirmAction?.type === "approve" && "El traslado pasará a estado \"en curso\". El stock NO se moverá hasta que se confirme la recepción en destino."}
+              {confirmAction?.type === "confirm" && "Se moverá el stock del almacén origen al destino. Esta acción no se puede deshacer."}
               {confirmAction?.type === "cancel" && "La transferencia se marcará como cancelada. No se moverá stock."}
               {confirmAction?.type === "deleteItem" && "Se eliminará este producto de la transferencia pendiente."}
             </AlertDialogDescription>
@@ -783,6 +840,8 @@ export function WarehouseTransferHistory() {
             <AlertDialogAction onClick={() => {
               if (confirmAction?.type === "approve" && confirmAction.group) {
                 approveMutation.mutate(confirmAction.group);
+              } else if (confirmAction?.type === "confirm" && confirmAction.group) {
+                confirmMutation.mutate(confirmAction.group);
               } else if (confirmAction?.type === "cancel" && confirmAction.group) {
                 cancelMutation.mutate(confirmAction.group);
               } else if (confirmAction?.type === "deleteItem" && confirmAction.itemId) {
