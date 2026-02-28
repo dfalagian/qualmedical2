@@ -394,16 +394,24 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     const importe = precio * cantidad;
 
     // Check if this product already exists in the quote
+    // Allow same product with different batch (lot), block only if no batch or same batch
     const existingProduct = quoteItems.find(
       item => item.product_id === product.id
     );
     
     if (existingProduct) {
-      toast.warning(
-        `"${product.name}" ya está en la cotización. Puede modificar la cantidad directamente en la grilla.`,
-        { duration: 4000 }
-      );
-      return;
+      const newBatchId = batchInfo?.batchId || null;
+      const existingBatchId = existingProduct.batch_id || null;
+      
+      // Block if neither has a batch, or if they share the same batch
+      if (!newBatchId || !existingBatchId || newBatchId === existingBatchId) {
+        toast.warning(
+          `"${product.name}" ya está en la cotización con el mismo lote. Puede modificar la cantidad directamente en la grilla.`,
+          { duration: 4000 }
+        );
+        return;
+      }
+      // Different batches → allow adding as separate line item
     }
 
     const newItem: QuoteItem = {
