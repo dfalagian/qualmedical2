@@ -23,9 +23,14 @@ export function WarehouseFilter({
         .from("warehouses")
         .select("id, code, name")
         .eq("is_active", true)
-        .order("name");
+      .order("name");
       if (error) throw error;
-      return data;
+      // Sort: "Almacén Principal" first, then alphabetically
+      return (data || []).sort((a, b) => {
+        if (a.name === "Almacén Principal") return -1;
+        if (b.name === "Almacén Principal") return 1;
+        return a.name.localeCompare(b.name);
+      });
     },
   });
 
