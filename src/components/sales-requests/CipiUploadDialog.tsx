@@ -293,6 +293,37 @@ export function CipiUploadDialog({ open, onOpenChange, type, onSuccess }: CipiUp
           if (d) return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
         }
         if (typeof val === 'string') {
+          // Handle Spanish month-year format: "ene-27", "mar-27", "dic-28", etc.
+          const spanishMonths: Record<string, string> = {
+            'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04',
+            'may': '05', 'jun': '06', 'jul': '07', 'ago': '08',
+            'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12'
+          };
+          const monthYearMatch = val.trim().toLowerCase().match(/^([a-záéíóú]+)[.\-/\s]+(\d{2,4})$/);
+          if (monthYearMatch) {
+            const monthStr = monthYearMatch[1].substring(0, 3);
+            const monthNum = spanishMonths[monthStr];
+            if (monthNum) {
+              let year = parseInt(monthYearMatch[2]);
+              if (year < 100) year += 2000; // 27 → 2027
+              return `${year}-${monthNum}-01`;
+            }
+          }
+          // Also handle English month-year: "Jan-27", "Mar-27"
+          const englishMonths: Record<string, string> = {
+            'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
+            'may': '05', 'jun': '06', 'jul': '07', 'aug': '08',
+            'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+          };
+          if (monthYearMatch) {
+            const monthStr = monthYearMatch[1].substring(0, 3);
+            const monthNum = englishMonths[monthStr];
+            if (monthNum) {
+              let year = parseInt(monthYearMatch[2]);
+              if (year < 100) year += 2000;
+              return `${year}-${monthNum}-01`;
+            }
+          }
           const d = new Date(val);
           if (!isNaN(d.getTime())) return toLocalDateStr(d);
         }
