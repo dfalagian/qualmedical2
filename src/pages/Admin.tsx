@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText, KeyRound, ClipboardList, Bell, BarChart3 } from "lucide-react";
+import { Settings, Users, ShieldCheck, Pencil, Trash2, UserPlus, FileText, KeyRound, ClipboardList, Bell, BarChart3, ClipboardCheck } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
@@ -22,6 +22,7 @@ import { ActivityLog } from "@/components/admin/ActivityLog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NotificationRecipientsManager } from "@/components/admin/NotificationRecipientsManager";
 import { ExportInventoryButton } from "@/components/inventory/ExportInventoryButton";
+import { PhysicalInventoryCount } from "@/components/admin/PhysicalInventoryCount";
 
 
 const userFormSchema = z.object({
@@ -349,6 +350,10 @@ const Admin = () => {
             <TabsTrigger value="reports" className="gap-1.5">
               <BarChart3 className="h-3.5 w-3.5" />
               Reportes
+            </TabsTrigger>
+            <TabsTrigger value="physical-inventory" className="gap-1.5">
+              <ClipboardCheck className="h-3.5 w-3.5" />
+              Inventario Físico
             </TabsTrigger>
           </TabsList>
 
@@ -813,6 +818,10 @@ const Admin = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="physical-inventory" className="mt-4">
+            <PhysicalInventoryCount />
           </TabsContent>
         </Tabs>
 

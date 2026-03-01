@@ -1226,6 +1226,70 @@ export type Database = {
           },
         ]
       }
+      physical_inventory_counts: {
+        Row: {
+          batch_id: string | null
+          counted_at: string
+          counted_by: string
+          counted_quantity: number
+          created_at: string
+          difference: number | null
+          id: string
+          notes: string | null
+          product_id: string
+          system_quantity: number
+          warehouse_id: string
+        }
+        Insert: {
+          batch_id?: string | null
+          counted_at?: string
+          counted_by: string
+          counted_quantity: number
+          created_at?: string
+          difference?: number | null
+          id?: string
+          notes?: string | null
+          product_id: string
+          system_quantity?: number
+          warehouse_id: string
+        }
+        Update: {
+          batch_id?: string | null
+          counted_at?: string
+          counted_by?: string
+          counted_quantity?: number
+          created_at?: string
+          difference?: number | null
+          id?: string
+          notes?: string | null
+          product_id?: string
+          system_quantity?: number
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "physical_inventory_counts_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physical_inventory_counts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physical_inventory_counts_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_batches: {
         Row: {
           barcode: string
