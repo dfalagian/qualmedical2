@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -154,6 +154,7 @@ export function StockByWarehouseModal() {
                   products={wh.products}
                   searchTerm={searchTerm}
                   getStockBadge={getStockBadge}
+                  allWarehouseStock={searchTerm ? warehouseStock : undefined}
                 />
               </TabsContent>
             ))}
@@ -174,10 +175,12 @@ function WarehouseTabContent({
   products,
   searchTerm,
   getStockBadge,
+  allWarehouseStock,
 }: {
   products: WarehouseProduct[];
   searchTerm: string;
   getStockBadge: (current: number, minimum: number) => React.ReactNode;
+  allWarehouseStock?: WarehouseStock[];
 }) {
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
 
@@ -272,28 +275,56 @@ function WarehouseTabContent({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {categoryProducts.map((product) => (
-                        <TableRow key={product.id}>
-                          <TableCell className="font-medium">
-                            {product.name}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {product.brand || "—"}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {product.sku}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {product.current_stock}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-muted-foreground">
-                            {product.minimum_stock}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {getStockBadge(product.current_stock, product.minimum_stock)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {categoryProducts.map((product) => {
+                        // Build per-warehouse breakdown when searching
+                        const warehouseBreakdown = searchTerm && allWarehouseStock
+                          ? allWarehouseStock
+                              .map((wh) => {
+                                const found = wh.products.find((p) => p.id === product.id);
+                                return found ? { name: wh.name, code: wh.code, stock: found.current_stock } : null;
+                              })
+                              .filter(Boolean) as { name: string; code: string; stock: number }[]
+                          : null;
+
+                        return (
+                          <Fragment key={product.id}>
+                            <TableRow>
+                              <TableCell className="font-medium">
+                                {product.name}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground text-sm">
+                                {product.brand || "—"}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {product.sku}
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                {product.current_stock}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-muted-foreground">
+                                {product.minimum_stock}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {getStockBadge(product.current_stock, product.minimum_stock)}
+                              </TableCell>
+                            </TableRow>
+                            {warehouseBreakdown && warehouseBreakdown.length > 1 && (
+                              <TableRow className="bg-muted/20">
+                                <TableCell colSpan={6} className="py-1 px-6">
+                                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                    {warehouseBreakdown.map((wb) => (
+                                      <span key={wb.code} className="inline-flex items-center gap-1">
+                                        <Warehouse className="h-3 w-3" />
+                                        {wb.name}: <span className="font-mono font-medium text-foreground">{wb.stock}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
