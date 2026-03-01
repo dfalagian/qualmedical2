@@ -43,6 +43,7 @@ interface ApproveQuoteParams {
   quoteId: string;
   warehouseId: string;
   items: Array<{
+    item_id: string;
     product_id: string;
     batch_id: string;
     cantidad: number;
@@ -376,6 +377,7 @@ export const useQuoteActions = () => {
         if (movementError) throw movementError;
 
         // Actualizar quote_item con batch_id, lote y fecha_caducidad seleccionados
+        // Usar item_id para precisión en caso de multi-lote (mismo producto, distintos lotes)
         await supabase
           .from("quote_items")
           .update({
@@ -383,8 +385,7 @@ export const useQuoteActions = () => {
             lote: batch.batch_number,
             fecha_caducidad: batch.expiration_date,
           })
-          .eq("quote_id", params.quoteId)
-          .eq("product_id", item.product_id);
+          .eq("id", item.item_id);
       }
 
       // Actualizar estado de la cotización
