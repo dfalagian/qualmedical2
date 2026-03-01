@@ -385,6 +385,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
         .map(sel => {
           const originalItem = quoteItems.find(i => i.id === sel.itemId);
           return {
+            item_id: sel.itemId,
             product_id: sel.productId,
             batch_id: sel.batchId!,
             cantidad: sel.requestedQuantity,
