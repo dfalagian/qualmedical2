@@ -160,6 +160,88 @@ export const BatchSelectionDialog = ({
     enabled: open && productIds.length > 0,
   });
 
+  // Fetch completed transfers to calculate batch stock per warehouse
+  const { data: batchWarehouseStock = {} } = useQuery({
+    queryKey: ["batch-warehouse-stock-approval", productIds, warehouses],
+    queryFn: async () => {
+      if (productIds.length === 0 || warehouses.length === 0) return {};
+
+      // Get all batch IDs from batchesByProduct
+      const allBatchIds = Object.values(batchesByProduct).flat().map(b => b.id);
+      if (allBatchIds.length === 0) return {};
+
+      const { data: transfers, error } = await supabase
+        .from("warehouse_transfers")
+        .select("batch_id, from_warehouse_id, to_warehouse_id, quantity")
+        .eq("status", "completada")
+        .in("batch_id", allBatchIds);
+      if (error) throw error;
+
+      const principalWh = warehouses.find(w => w.code === "PRINCIPAL");
+      if (!principalWh) return {};
+
+      // Build transfer net per batch per warehouse
+      const transferNet: Record<string, Record<string, number>> = {};
+      for (const t of transfers || []) {
+        if (!t.batch_id) continue;
+        if (!transferNet[t.batch_id]) transferNet[t.batch_id] = {};
+        const m = transferNet[t.batch_id];
+        m[t.from_warehouse_id] = (m[t.from_warehouse_id] || 0) - t.quantity;
+        m[t.to_warehouse_id] = (m[t.to_warehouse_id] || 0) + t.quantity;
+      }
+
+      // Calculate stock per batch per warehouse
+      // All batches originate in Principal by default
+      const result: Record<string, Record<string, number>> = {};
+      for (const batches of Object.values(batchesByProduct)) {
+        for (const batch of batches) {
+          const nets = transferNet[batch.id] || {};
+          const perWh: Record<string, number> = {};
+          
+          for (const wh of warehouses) {
+            const netTransfer = nets[wh.id] || 0;
+            if (wh.id === principalWh.id) {
+              // Principal = total - what was sent out + what came back
+              perWh[wh.id] = batch.current_quantity + netTransfer;
+            } else {
+              // Other warehouses = only what was transferred in (net)
+              if (netTransfer > 0) {
+                perWh[wh.id] = netTransfer;
+              }
+            }
+          }
+          result[batch.id] = perWh;
+        }
+      }
+      return result;
+    },
+    enabled: open && productIds.length > 0 && warehouses.length > 0 && Object.keys(batchesByProduct).length > 0,
+  });
+
+  // Helper: get batch stock in a specific warehouse
+  const getBatchStockInWarehouse = (batchId: string, warehouseId: string): number => {
+    return batchWarehouseStock[batchId]?.[warehouseId] ?? 0;
+  };
+
+  // Filter batches to only show those with stock in the selected warehouse
+  const getFilteredBatches = (productId: string): (Batch & { warehouseQty: number })[] => {
+    const allBatches = batchesByProduct[productId] || [];
+    if (!selectedWarehouseId) return allBatches.map(b => ({ ...b, warehouseQty: b.current_quantity }));
+    
+    const hasBatchWarehouseData = Object.keys(batchWarehouseStock).length > 0;
+    if (!hasBatchWarehouseData) {
+      // If no transfer data loaded yet, show all batches
+      return allBatches.map(b => ({ ...b, warehouseQty: b.current_quantity }));
+    }
+    
+    return allBatches
+      .map(b => {
+        const whQty = getBatchStockInWarehouse(b.id, selectedWarehouseId);
+        return { ...b, warehouseQty: whQty };
+      })
+      .filter(b => b.warehouseQty > 0);
+  };
+
   // Initialize selections when dialog opens or items change
   // IMPORTANT: If the user already selected a batch during quote creation, respect that choice
   useEffect(() => {
@@ -167,23 +249,23 @@ export const BatchSelectionDialog = ({
       const initialSelections: BatchSelection[] = quoteItems
         .filter(item => item.product_id)
         .map(item => {
-          const productBatches = batchesByProduct[item.product_id!] || [];
+          const filteredBatches = getFilteredBatches(item.product_id!);
           
           // Priority 1: match by batch_id (UUID) if available
           let userSelectedBatch = item.batch_id 
-            ? productBatches.find(b => b.id === item.batch_id) 
+            ? filteredBatches.find(b => b.id === item.batch_id) 
             : null;
           
           // Priority 2: if no batch_id but lote (batch number) exists, match by name
           if (!userSelectedBatch && item.lote) {
-            userSelectedBatch = productBatches.find(b => b.batch_number === item.lote) || null;
+            userSelectedBatch = filteredBatches.find(b => b.batch_number === item.lote) || null;
           }
           
-          // Priority 3: auto-select only if user didn't choose any batch
+          // Priority 3: auto-select only if user didn't choose any batch - use warehouse qty
           let selectedBatch = userSelectedBatch;
           if (!selectedBatch) {
-            const autoSelectedBatch = productBatches.find(b => b.current_quantity >= item.cantidad);
-            selectedBatch = autoSelectedBatch || productBatches[0] || null;
+            const autoSelectedBatch = filteredBatches.find(b => b.warehouseQty >= item.cantidad);
+            selectedBatch = autoSelectedBatch || filteredBatches[0] || null;
           }
           
           return {
@@ -192,26 +274,26 @@ export const BatchSelectionDialog = ({
             batchId: selectedBatch?.id || null,
             batchNumber: selectedBatch?.batch_number || null,
             expirationDate: selectedBatch?.expiration_date || null,
-            availableQuantity: selectedBatch?.current_quantity || 0,
+            availableQuantity: selectedBatch?.warehouseQty ?? selectedBatch?.current_quantity ?? 0,
             requestedQuantity: item.cantidad,
           };
         });
       setSelections(initialSelections);
     }
-  }, [open, quoteItems, batchesByProduct]);
+  }, [open, quoteItems, batchesByProduct, selectedWarehouseId, batchWarehouseStock]);
 
   // Handle batch selection change
   const handleBatchChange = (itemId: string, batchId: string) => {
     setSelections(prev => prev.map(sel => {
       if (sel.itemId === itemId) {
-        const productBatches = batchesByProduct[sel.productId] || [];
-        const selectedBatch = productBatches.find(b => b.id === batchId);
+        const filteredBatches = getFilteredBatches(sel.productId);
+        const selectedBatch = filteredBatches.find(b => b.id === batchId);
         return {
           ...sel,
           batchId: selectedBatch?.id || null,
           batchNumber: selectedBatch?.batch_number || null,
           expirationDate: selectedBatch?.expiration_date || null,
-          availableQuantity: selectedBatch?.current_quantity || 0,
+          availableQuantity: selectedBatch?.warehouseQty ?? selectedBatch?.current_quantity ?? 0,
         };
       }
       return sel;
@@ -233,11 +315,11 @@ export const BatchSelectionDialog = ({
     sel.batchId && sel.availableQuantity < sel.requestedQuantity
   );
 
-  // Check for items without available batches (no stock at all) - only for items WITH product_id
+  // Check for items without available batches in the selected warehouse
   const itemsWithoutBatches = quoteItems.filter(item => {
     if (!item.product_id) return false;
-    const productBatches = batchesByProduct[item.product_id] || [];
-    return productBatches.length === 0;
+    const filteredBatches = getFilteredBatches(item.product_id);
+    return filteredBatches.length === 0;
   });
 
   // Combine all products without sufficient stock for the error message
@@ -372,10 +454,10 @@ export const BatchSelectionDialog = ({
                 <TableBody>
                   {quoteItems.map(item => {
                     const hasProductId = !!item.product_id;
-                    const productBatches = hasProductId ? (batchesByProduct[item.product_id!] || []) : [];
+                    const filteredBatches = hasProductId ? getFilteredBatches(item.product_id!) : [];
                     const selection = selections.find(s => s.itemId === item.id);
                     const hasEnoughStock = selection && selection.availableQuantity >= item.cantidad;
-                    const noBatches = hasProductId && productBatches.length === 0;
+                    const noBatches = hasProductId && filteredBatches.length === 0;
                     const warehouseStock = hasProductId ? (warehouseStockMap[item.product_id!] ?? null) : null;
 
                     return (
@@ -401,23 +483,27 @@ export const BatchSelectionDialog = ({
                           {!hasProductId ? (
                             <span className="text-sm text-muted-foreground italic">Sin control de inventario</span>
                           ) : noBatches ? (
-                            <span className="text-sm text-destructive">Sin lotes disponibles</span>
+                            <span className="text-sm text-destructive">
+                              {selectedWarehouseId 
+                                ? "Sin lotes en este almacén" 
+                                : "Sin lotes disponibles"}
+                            </span>
                           ) : (
                             <Select
                               value={selection?.batchId || ""}
                               onValueChange={(value) => handleBatchChange(item.id, value)}
                             >
-                              <SelectTrigger className="w-[280px]">
+                              <SelectTrigger className="w-[300px]">
                                 <SelectValue placeholder="Seleccionar lote..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {productBatches.map(batch => (
+                                {filteredBatches.map(batch => (
                                   <SelectItem key={batch.id} value={batch.id}>
                                     <div className="flex items-center justify-between gap-4">
                                       <span className="font-medium">{batch.batch_number}</span>
                                       <span className="text-muted-foreground text-xs">
                                         Cad: {format(new Date(batch.expiration_date), "dd/MM/yyyy")} · 
-                                        Stock: {batch.current_quantity}
+                                        Disp: {batch.warehouseQty}
                                       </span>
                                     </div>
                                   </SelectItem>
