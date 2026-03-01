@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { WarehouseFilter } from "@/components/inventory/WarehouseFilter";
-import { Search, ClipboardCheck, Package, Save, Trash2, AlertTriangle, CheckCircle2, MinusCircle } from "lucide-react";
+import { Search, ClipboardCheck, Package, Save, Trash2, AlertTriangle, CheckCircle2, MinusCircle, Warehouse } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 interface CountEntry {
@@ -318,8 +318,28 @@ export function PhysicalInventoryCount() {
                             </SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell className="text-center font-mono text-sm">
-                          {entry.system_quantity}
+                        <TableCell className="text-center">
+                          <div className="space-y-0.5">
+                            <span className="font-mono text-sm font-semibold">{entry.system_quantity}</span>
+                            {(() => {
+                              const whStock = warehouseStockMap[entry.product_id];
+                              if (!whStock) return null;
+                              const breakdown = warehouses
+                                .filter((w) => whStock[w.id] && whStock[w.id] > 0)
+                                .map((w) => ({ name: w.name, stock: whStock[w.id] }));
+                              if (breakdown.length <= 1) return null;
+                              return (
+                                <div className="flex flex-col gap-0.5">
+                                  {breakdown.map((wb) => (
+                                    <span key={wb.name} className="text-[10px] text-muted-foreground flex items-center gap-0.5 justify-center">
+                                      <Warehouse className="h-2.5 w-2.5" />
+                                      {wb.name}: <span className="font-mono font-medium text-foreground">{wb.stock}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Input
