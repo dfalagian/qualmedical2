@@ -169,12 +169,17 @@ export const BatchSelectionDialog = ({
         .map(item => {
           const productBatches = batchesByProduct[item.product_id!] || [];
           
-          // First priority: use the batch the user already selected in the quote
-          const userSelectedBatch = item.batch_id 
+          // Priority 1: match by batch_id (UUID) if available
+          let userSelectedBatch = item.batch_id 
             ? productBatches.find(b => b.id === item.batch_id) 
             : null;
           
-          // Only auto-select if user didn't choose a batch
+          // Priority 2: if no batch_id but lote (batch number) exists, match by name
+          if (!userSelectedBatch && item.lote) {
+            userSelectedBatch = productBatches.find(b => b.batch_number === item.lote) || null;
+          }
+          
+          // Priority 3: auto-select only if user didn't choose any batch
           let selectedBatch = userSelectedBatch;
           if (!selectedBatch) {
             const autoSelectedBatch = productBatches.find(b => b.current_quantity >= item.cantidad);
