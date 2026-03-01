@@ -302,14 +302,13 @@ export function PhysicalInventoryCount() {
                         </TableCell>
                         <TableCell>
                           <Select
-                            value={entry.batch_id || "none"}
-                            onValueChange={(v) => updateEntry(idx, "batch_id", v === "none" ? null : v)}
+                            value={entry.batch_id || ""}
+                            onValueChange={(v) => updateEntry(idx, "batch_id", v)}
                           >
                             <SelectTrigger className="w-[140px] h-8 text-xs">
-                              <SelectValue placeholder="Sin lote" />
+                              <SelectValue placeholder="Seleccionar lote" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="none">Sin lote</SelectItem>
                               {batches.map((b) => (
                                 <SelectItem key={b.id} value={b.id}>
                                   {b.batch_number} ({b.current_quantity})
