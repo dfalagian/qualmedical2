@@ -747,16 +747,18 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
                       {(() => {
                         const batchTransfers = batchWarehouseMap[batch.id];
                         const principalWh = warehouses.find(w => w.code === "PRINCIPAL");
+                        if (!principalWh || batch.current_quantity <= 0) return null;
+                        
                         // Calculate batch distribution per warehouse
                         const batchDistribution: { name: string; qty: number }[] = [];
-                        if (batchTransfers && principalWh) {
-                          // Principal = current_quantity + net transfer (net is negative for outgoing)
+                        
+                        if (batchTransfers) {
+                          // Has transfers: calculate from net movements
                           const principalNet = batchTransfers.find(t => t.warehouseId === principalWh.id)?.quantity || 0;
                           const principalQty = batch.current_quantity + principalNet;
                           if (principalQty > 0) {
                             batchDistribution.push({ name: principalWh.name, qty: principalQty });
                           }
-                          // Other warehouses
                           for (const t of batchTransfers) {
                             if (t.warehouseId === principalWh.id) continue;
                             if (t.quantity > 0) {
@@ -764,32 +766,23 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
                               batchDistribution.push({ name: wh?.name || t.warehouseId, qty: t.quantity });
                             }
                           }
+                        } else if (whBreakdown.length > 1) {
+                          // No transfers but product is in multiple warehouses: batch is entirely in Principal
+                          batchDistribution.push({ name: principalWh.name, qty: batch.current_quantity });
                         }
                         
-                        const showBatchBreakdown = batchDistribution.length > 0;
-                        const showProductBreakdown = !showBatchBreakdown && whBreakdown.length > 1;
-                        
-                        if (!showBatchBreakdown && !showProductBreakdown) return null;
+                        if (batchDistribution.length === 0) return null;
                         
                         return (
                           <TableRow className="bg-muted/20">
                             <TableCell colSpan={canEdit ? 7 : 6} className="py-1 px-6">
                               <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                {showBatchBreakdown ? (
-                                  batchDistribution.map((bd) => (
-                                    <span key={bd.name} className="inline-flex items-center gap-1">
-                                      <Warehouse className="h-3 w-3" />
-                                      {bd.name}: <span className="font-mono font-medium text-foreground">{bd.qty}</span>
-                                    </span>
-                                  ))
-                                ) : (
-                                  whBreakdown.map((wb) => (
-                                    <span key={wb.code} className="inline-flex items-center gap-1">
-                                      <Warehouse className="h-3 w-3" />
-                                      {wb.name}: <span className="font-mono font-medium text-foreground">{wb.stock}</span>
-                                    </span>
-                                  ))
-                                )}
+                                {batchDistribution.map((bd) => (
+                                  <span key={bd.name} className="inline-flex items-center gap-1">
+                                    <Warehouse className="h-3 w-3" />
+                                    {bd.name}: <span className="font-mono font-medium text-foreground">{bd.qty}</span>
+                                  </span>
+                                ))}
                               </div>
                             </TableCell>
                           </TableRow>
