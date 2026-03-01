@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +27,8 @@ import {
   Tag,
   Search,
   ChevronsUpDown,
-  Check
+  Check,
+  Warehouse
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, differenceInDays, parseISO } from "date-fns";
@@ -132,6 +133,33 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
         }
       });
       return counts;
+    }
+  });
+
+  // Fetch warehouse stock breakdown per product
+  const { data: warehouseStockMap = {} } = useQuery({
+    queryKey: ["warehouse_stock_by_product"],
+    queryFn: async () => {
+      const { data: warehouses, error: whErr } = await supabase
+        .from("warehouses")
+        .select("id, name, code")
+        .eq("is_active", true);
+      if (whErr) throw whErr;
+
+      const { data: wsData, error: wsErr } = await supabase
+        .from("warehouse_stock")
+        .select("product_id, warehouse_id, current_stock")
+        .gt("current_stock", 0);
+      if (wsErr) throw wsErr;
+
+      const map: Record<string, { name: string; code: string; stock: number }[]> = {};
+      for (const ws of wsData || []) {
+        const wh = warehouses?.find(w => w.id === ws.warehouse_id);
+        if (!wh) continue;
+        if (!map[ws.product_id]) map[ws.product_id] = [];
+        map[ws.product_id].push({ name: wh.name, code: wh.code, stock: ws.current_stock });
+      }
+      return map;
     }
   });
 
@@ -590,79 +618,95 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
                 filteredBatches.map((batch) => {
                   const expStatus = getExpirationStatus(batch.expiration_date);
                   const tagCount = tagsPerBatch[batch.id] || 0;
+                  const whBreakdown = warehouseStockMap[batch.product_id] || [];
                   
                   return (
-                    <TableRow 
-                      key={batch.id}
-                      className={expStatus.status === "expired" ? "bg-destructive/5" : ""}
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Barcode className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-mono text-sm">{batch.barcode}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{batch.products?.name}</span>
-                          <span className="text-xs text-muted-foreground font-mono">
-                            {batch.products?.sku}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono">{batch.batch_number}</TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="text-sm">
-                            {format(parseISO(batch.expiration_date), "dd MMM yyyy", { locale: es })}
-                          </span>
-                          <Badge variant={expStatus.variant}>
-                            {expStatus.label}
+                    <Fragment key={batch.id}>
+                      <TableRow 
+                        className={expStatus.status === "expired" ? "bg-destructive/5" : ""}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Barcode className="h-3 w-3 text-muted-foreground" />
+                            <span className="font-mono text-sm">{batch.barcode}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{batch.products?.name}</span>
+                            <span className="text-xs text-muted-foreground font-mono">
+                              {batch.products?.sku}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono">{batch.batch_number}</TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-sm">
+                              {format(parseISO(batch.expiration_date), "dd MMM yyyy", { locale: es })}
+                            </span>
+                            <Badge variant={expStatus.variant}>
+                              {expStatus.label}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={batch.current_quantity === 0 ? "destructive" : "default"}>
+                            {batch.current_quantity} / {batch.initial_quantity}
                           </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={batch.current_quantity === 0 ? "destructive" : "default"}>
-                          {batch.current_quantity} / {batch.initial_quantity}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge 
-                          variant="secondary" 
-                          className="cursor-pointer hover:bg-secondary/80 transition-colors"
-                          onClick={() => setSelectedBatchForTags({
-                            id: batch.id,
-                            batchNumber: batch.batch_number,
-                            productName: batch.products?.name || "Producto"
-                          })}
-                        >
-                          <Tag className="h-3 w-3 mr-1" />
-                          {tagCount}
-                        </Badge>
-                      </TableCell>
-                      {canEdit && (
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => handleEdit(batch)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            {isAdmin && (
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge 
+                            variant="secondary" 
+                            className="cursor-pointer hover:bg-secondary/80 transition-colors"
+                            onClick={() => setSelectedBatchForTags({
+                              id: batch.id,
+                              batchNumber: batch.batch_number,
+                              productName: batch.products?.name || "Producto"
+                            })}
+                          >
+                            <Tag className="h-3 w-3 mr-1" />
+                            {tagCount}
+                          </Badge>
+                        </TableCell>
+                        {canEdit && (
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
                               <Button 
                                 variant="ghost" 
                                 size="icon"
-                                onClick={() => deleteBatchMutation.mutate(batch.id)}
+                                onClick={() => handleEdit(batch)}
                               >
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                                <Edit className="h-4 w-4" />
                               </Button>
-                            )}
-                          </div>
-                        </TableCell>
+                              {isAdmin && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => deleteBatchMutation.mutate(batch.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                      {whBreakdown.length > 1 && (
+                        <TableRow className="bg-muted/20">
+                          <TableCell colSpan={canEdit ? 7 : 6} className="py-1 px-6">
+                            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                              {whBreakdown.map((wb) => (
+                                <span key={wb.code} className="inline-flex items-center gap-1">
+                                  <Warehouse className="h-3 w-3" />
+                                  {wb.name}: <span className="font-mono font-medium text-foreground">{wb.stock}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </TableRow>
+                    </Fragment>
                   );
                 })
               )}
