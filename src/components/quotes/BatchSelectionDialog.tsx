@@ -161,16 +161,25 @@ export const BatchSelectionDialog = ({
   });
 
   // Initialize selections when dialog opens or items change
+  // IMPORTANT: If the user already selected a batch during quote creation, respect that choice
   useEffect(() => {
     if (open && quoteItems.length > 0) {
       const initialSelections: BatchSelection[] = quoteItems
         .filter(item => item.product_id)
         .map(item => {
           const productBatches = batchesByProduct[item.product_id!] || [];
-          // Auto-select first available batch with enough stock
-          const autoSelectedBatch = productBatches.find(b => b.current_quantity >= item.cantidad);
-          const fallbackBatch = productBatches[0]; // Or first batch if none has enough
-          const selectedBatch = autoSelectedBatch || fallbackBatch;
+          
+          // First priority: use the batch the user already selected in the quote
+          const userSelectedBatch = item.batch_id 
+            ? productBatches.find(b => b.id === item.batch_id) 
+            : null;
+          
+          // Only auto-select if user didn't choose a batch
+          let selectedBatch = userSelectedBatch;
+          if (!selectedBatch) {
+            const autoSelectedBatch = productBatches.find(b => b.current_quantity >= item.cantidad);
+            selectedBatch = autoSelectedBatch || productBatches[0] || null;
+          }
           
           return {
             itemId: item.id,
