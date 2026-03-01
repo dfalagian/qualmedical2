@@ -63,16 +63,21 @@ export function PhysicalInventoryCount() {
     },
   });
 
-  // Fetch batches for selected products
+  // Collect all product IDs from both search results and entries
+  const allProductIds = Array.from(new Set([
+    ...products.map((p) => p.id),
+    ...entries.map((e) => e.product_id),
+  ]));
+
+  // Fetch batches for selected products and entries
   const { data: batchesMap = {} } = useQuery({
-    queryKey: ["physical-inv-batches", products.map((p) => p.id)],
-    enabled: products.length > 0,
+    queryKey: ["physical-inv-batches", allProductIds],
+    enabled: allProductIds.length > 0,
     queryFn: async () => {
-      const productIds = products.map((p) => p.id);
       const { data, error } = await supabase
         .from("product_batches")
         .select("id, product_id, batch_number, current_quantity, expiration_date")
-        .in("product_id", productIds)
+        .in("product_id", allProductIds)
         .eq("is_active", true)
         .order("expiration_date");
       if (error) throw error;
@@ -87,14 +92,13 @@ export function PhysicalInventoryCount() {
 
   // Fetch warehouse stock for products
   const { data: warehouseStockMap = {} } = useQuery({
-    queryKey: ["physical-inv-wh-stock", products.map((p) => p.id)],
-    enabled: products.length > 0,
+    queryKey: ["physical-inv-wh-stock", allProductIds],
+    enabled: allProductIds.length > 0,
     queryFn: async () => {
-      const productIds = products.map((p) => p.id);
       const { data, error } = await supabase
         .from("warehouse_stock")
         .select("product_id, warehouse_id, current_stock")
-        .in("product_id", productIds);
+        .in("product_id", allProductIds);
       if (error) throw error;
       const map: Record<string, Record<string, number>> = {};
       data.forEach((ws) => {
