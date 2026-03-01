@@ -136,16 +136,23 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
     }
   });
 
+  // Fetch warehouses
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ["warehouses"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouses")
+        .select("id, name, code")
+        .eq("is_active", true);
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
   // Fetch warehouse stock breakdown per product
   const { data: warehouseStockMap = {} } = useQuery({
     queryKey: ["warehouse_stock_by_product"],
     queryFn: async () => {
-      const { data: warehouses, error: whErr } = await supabase
-        .from("warehouses")
-        .select("id, name, code")
-        .eq("is_active", true);
-      if (whErr) throw whErr;
-
       const { data: wsData, error: wsErr } = await supabase
         .from("warehouse_stock")
         .select("product_id, warehouse_id, current_stock")
@@ -160,7 +167,52 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
         map[ws.product_id].push({ name: wh.name, code: wh.code, stock: ws.current_stock });
       }
       return map;
-    }
+    },
+    enabled: warehouses.length > 0,
+  });
+
+  // Fetch completed transfers with batch_id to calculate batch-per-warehouse distribution
+  const { data: batchWarehouseMap = {} } = useQuery({
+    queryKey: ["batch_warehouse_distribution", warehouses],
+    queryFn: async () => {
+      const { data: transfers, error } = await supabase
+        .from("warehouse_transfers")
+        .select("batch_id, from_warehouse_id, to_warehouse_id, quantity")
+        .eq("status", "completada")
+        .not("batch_id", "is", null);
+      if (error) throw error;
+
+      // Principal warehouse is assumed as the default origin
+      const principalWh = warehouses.find(w => w.code === "PRINCIPAL");
+      if (!principalWh) return {};
+
+      // Build a map: batchId -> { warehouseId -> net_transferred_quantity }
+      const transferMap: Record<string, Record<string, number>> = {};
+      for (const t of transfers || []) {
+        if (!t.batch_id) continue;
+        if (!transferMap[t.batch_id]) transferMap[t.batch_id] = {};
+        const m = transferMap[t.batch_id];
+        // Subtract from source
+        m[t.from_warehouse_id] = (m[t.from_warehouse_id] || 0) - t.quantity;
+        // Add to destination
+        m[t.to_warehouse_id] = (m[t.to_warehouse_id] || 0) + t.quantity;
+      }
+
+      // Convert to final format: batchId -> [{ warehouseId, warehouseName, quantity }]
+      const result: Record<string, { warehouseId: string; warehouseName: string; quantity: number }[]> = {};
+      for (const [batchId, movements] of Object.entries(transferMap)) {
+        const entries: { warehouseId: string; warehouseName: string; quantity: number }[] = [];
+        for (const wh of warehouses) {
+          const netTransfer = movements[wh.id] || 0;
+          if (netTransfer !== 0) {
+            entries.push({ warehouseId: wh.id, warehouseName: wh.name, quantity: netTransfer });
+          }
+        }
+        if (entries.length > 0) result[batchId] = entries;
+      }
+      return result;
+    },
+    enabled: warehouses.length > 0,
   });
 
   // Create/Update batch
@@ -692,20 +744,57 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
                           </TableCell>
                         )}
                       </TableRow>
-                      {whBreakdown.length > 1 && (
-                        <TableRow className="bg-muted/20">
-                          <TableCell colSpan={canEdit ? 7 : 6} className="py-1 px-6">
-                            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                              {whBreakdown.map((wb) => (
-                                <span key={wb.code} className="inline-flex items-center gap-1">
-                                  <Warehouse className="h-3 w-3" />
-                                  {wb.name}: <span className="font-mono font-medium text-foreground">{wb.stock}</span>
-                                </span>
-                              ))}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
+                      {(() => {
+                        const batchTransfers = batchWarehouseMap[batch.id];
+                        const principalWh = warehouses.find(w => w.code === "PRINCIPAL");
+                        // Calculate batch distribution per warehouse
+                        const batchDistribution: { name: string; qty: number }[] = [];
+                        if (batchTransfers && principalWh) {
+                          // Principal = current_quantity + net transfer (net is negative for outgoing)
+                          const principalNet = batchTransfers.find(t => t.warehouseId === principalWh.id)?.quantity || 0;
+                          const principalQty = batch.current_quantity + principalNet;
+                          if (principalQty > 0) {
+                            batchDistribution.push({ name: principalWh.name, qty: principalQty });
+                          }
+                          // Other warehouses
+                          for (const t of batchTransfers) {
+                            if (t.warehouseId === principalWh.id) continue;
+                            if (t.quantity > 0) {
+                              const wh = warehouses.find(w => w.id === t.warehouseId);
+                              batchDistribution.push({ name: wh?.name || t.warehouseId, qty: t.quantity });
+                            }
+                          }
+                        }
+                        
+                        const showBatchBreakdown = batchDistribution.length > 0;
+                        const showProductBreakdown = !showBatchBreakdown && whBreakdown.length > 1;
+                        
+                        if (!showBatchBreakdown && !showProductBreakdown) return null;
+                        
+                        return (
+                          <TableRow className="bg-muted/20">
+                            <TableCell colSpan={canEdit ? 7 : 6} className="py-1 px-6">
+                              <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                {showBatchBreakdown ? (
+                                  batchDistribution.map((bd) => (
+                                    <span key={bd.name} className="inline-flex items-center gap-1">
+                                      <Warehouse className="h-3 w-3" />
+                                      {bd.name}: <span className="font-mono font-medium text-foreground">{bd.qty}</span>
+                                    </span>
+                                  ))
+                                ) : (
+                                  whBreakdown.map((wb) => (
+                                    <span key={wb.code} className="inline-flex items-center gap-1">
+                                      <Warehouse className="h-3 w-3" />
+                                      {wb.name}: <span className="font-mono font-medium text-foreground">{wb.stock}</span>
+                                    </span>
+                                  ))
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })()}
                     </Fragment>
                   );
                 })
