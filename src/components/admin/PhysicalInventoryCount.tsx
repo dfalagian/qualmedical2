@@ -175,29 +175,34 @@ export function PhysicalInventoryCount() {
       return;
     }
     const wh = warehouses.find((w) => w.id === whId);
-    const systemQty = warehouseStockMap[product.id]?.[whId] ?? 0;
 
     // Check if already added
-    const exists = entries.find((e) => e.product_id === product.id && e.warehouse_id === whId && !e.batch_id);
+    const exists = entries.find((e) => e.product_id === product.id && e.warehouse_id === whId);
     if (exists) {
       toast.info("Este producto ya está en la lista");
       return;
     }
 
-    setEntries((prev) => [
-      ...prev,
-      {
-        product_id: product.id,
-        product_name: product.name,
-        batch_id: null,
-        batch_number: null,
-        warehouse_id: whId,
-        warehouse_name: wh?.name || "",
-        counted_quantity: 0,
-        system_quantity: systemQty,
-        notes: "",
-      },
-    ]);
+    const batches = batchesMap[product.id] || [];
+    if (batches.length === 0) {
+      toast.warning("Este producto no tiene lotes activos");
+      return;
+    }
+
+    // Add one entry per batch
+    const newEntries: CountEntry[] = batches.map((b) => ({
+      product_id: product.id,
+      product_name: product.name,
+      batch_id: b.id,
+      batch_number: b.batch_number,
+      warehouse_id: whId,
+      warehouse_name: wh?.name || "",
+      counted_quantity: 0,
+      system_quantity: b.current_quantity,
+      notes: "",
+    }));
+
+    setEntries((prev) => [...prev, ...newEntries]);
     setSearch("");
   };
 
@@ -341,69 +346,97 @@ export function PhysicalInventoryCount() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {entries.map((entry, idx) => {
-                    const diff = entry.counted_quantity - entry.system_quantity;
-                    const batches = batchesMap[entry.product_id] || [];
-                    return (
-                      <TableRow key={idx}>
-                        <TableCell className="font-medium text-sm">{entry.product_name}</TableCell>
-                        <TableCell>
-                          <Select
-                            value={entry.batch_id || ""}
-                            onValueChange={(v) => updateEntry(idx, "batch_id", v)}
-                          >
-                            <SelectTrigger className="w-[140px] h-8 text-xs">
-                              <SelectValue placeholder="Seleccionar lote" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {batches.map((b) => (
-                                <SelectItem key={b.id} value={b.id}>
-                                  {b.batch_number} ({b.current_quantity})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="font-mono text-sm font-semibold">{entry.system_quantity}</span>
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={entry.counted_quantity}
-                            onChange={(e) => updateEntry(idx, "counted_quantity", parseInt(e.target.value) || 0)}
-                            className="w-20 h-8 text-center text-sm mx-auto"
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            variant={diff === 0 ? "secondary" : "destructive"}
-                            className={diff === 0 ? "bg-green-100 text-green-800" : ""}
-                          >
-                            {diff === 0 ? (
-                              <><CheckCircle2 className="h-3 w-3 mr-1" />OK</>
-                            ) : (
-                              <>{diff > 0 ? "+" : ""}{diff}</>
-                            )}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            placeholder="Nota..."
-                            value={entry.notes}
-                            onChange={(e) => updateEntry(idx, "notes", e.target.value)}
-                            className="h-8 text-xs w-[120px]"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Button size="icon" variant="ghost" onClick={() => removeEntry(idx)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {(() => {
+                    // Group entries by product_id to show totals
+                    const productIds = [...new Set(entries.map((e) => e.product_id))];
+                    const rows: React.ReactNode[] = [];
+
+                    productIds.forEach((pid) => {
+                      const productEntries = entries.filter((e) => e.product_id === pid);
+                      const productName = productEntries[0]?.product_name || "";
+
+                      productEntries.forEach((entry) => {
+                        const idx = entries.indexOf(entry);
+                        const diff = entry.counted_quantity - entry.system_quantity;
+                        rows.push(
+                          <TableRow key={`entry-${idx}`}>
+                            <TableCell className="font-medium text-sm">
+                              {productEntries.indexOf(entry) === 0 ? productName : ""}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              <Badge variant="outline" className="font-mono text-xs">
+                                {entry.batch_number}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="font-mono text-sm font-semibold">{entry.system_quantity}</span>
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={entry.counted_quantity}
+                                onChange={(e) => updateEntry(idx, "counted_quantity", parseInt(e.target.value) || 0)}
+                                className="w-20 h-8 text-center text-sm mx-auto"
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge
+                                variant={diff === 0 ? "secondary" : "destructive"}
+                                className={diff === 0 ? "bg-green-100 text-green-800" : ""}
+                              >
+                                {diff === 0 ? (
+                                  <><CheckCircle2 className="h-3 w-3 mr-1" />OK</>
+                                ) : (
+                                  <>{diff > 0 ? "+" : ""}{diff}</>
+                                )}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                placeholder="Nota..."
+                                value={entry.notes}
+                                onChange={(e) => updateEntry(idx, "notes", e.target.value)}
+                                className="h-8 text-xs w-[120px]"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Button size="icon" variant="ghost" onClick={() => removeEntry(idx)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
+
+                      // Total row for this product
+                      if (productEntries.length > 1) {
+                        const totalSystem = productEntries.reduce((s, e) => s + e.system_quantity, 0);
+                        const totalCounted = productEntries.reduce((s, e) => s + e.counted_quantity, 0);
+                        const totalDiff = totalCounted - totalSystem;
+                        rows.push(
+                          <TableRow key={`total-${pid}`} className="bg-muted/50 border-b-2">
+                            <TableCell className="text-sm font-semibold text-right" colSpan={2}>
+                              Total {productName}:
+                            </TableCell>
+                            <TableCell className="text-center font-mono text-sm font-bold">{totalSystem}</TableCell>
+                            <TableCell className="text-center font-mono text-sm font-bold">{totalCounted}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge
+                                variant={totalDiff === 0 ? "secondary" : "destructive"}
+                                className={totalDiff === 0 ? "bg-green-100 text-green-800 font-bold" : "font-bold"}
+                              >
+                                {totalDiff === 0 ? "OK" : `${totalDiff > 0 ? "+" : ""}${totalDiff}`}
+                              </Badge>
+                            </TableCell>
+                            <TableCell colSpan={2}></TableCell>
+                          </TableRow>
+                        );
+                      }
+                    });
+
+                    return rows;
+                  })()}
                 </TableBody>
               </Table>
 
