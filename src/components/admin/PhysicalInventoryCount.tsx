@@ -419,7 +419,7 @@ export function PhysicalInventoryCount() {
                       rows.push(
                         <TableRow
                           key={`entry-${idx}`}
-                          className={`border-l-4 ${colorClass} ${isEven ? "bg-accent/40" : ""} ${isFirst && productIndex > 0 ? "border-t-2 border-t-border" : ""}`}
+                          className={`border-l-4 ${colorClass} ${isEven ? "bg-accent/40" : ""} ${isFirst && productIndex > 0 ? "border-t-2 border-t-border" : ""} ${!isFirst && productEntries.length > 1 ? "bg-muted/40" : ""}`}
                         >
                           <TableCell className={`font-medium text-sm ${isFirst ? "pt-3" : ""}`}>
                             {isFirst ? (
