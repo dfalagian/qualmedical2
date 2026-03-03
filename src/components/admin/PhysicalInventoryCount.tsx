@@ -399,14 +399,15 @@ export function PhysicalInventoryCount() {
                 {(() => {
                   const productIds = [...new Set(entries.map((e) => e.product_id))];
                   const rows: React.ReactNode[] = [];
-                  productIds.forEach((pid) => {
+                  productIds.forEach((pid, productIndex) => {
                     const productEntries = entries.filter((e) => e.product_id === pid);
                     const productName = productEntries[0]?.product_name || "";
+                    const isEvenProduct = productIndex % 2 === 0;
                     productEntries.forEach((entry) => {
                       const idx = entries.indexOf(entry);
                       const diff = entry.counted_quantity - entry.system_quantity;
                       rows.push(
-                        <TableRow key={`entry-${idx}`}>
+                        <TableRow key={`entry-${idx}`} className={isEvenProduct ? "bg-muted/30" : ""}>
                           <TableCell className="font-medium text-sm">
                             {productEntries.indexOf(entry) === 0 ? productName : ""}
                           </TableCell>
