@@ -399,17 +399,34 @@ export function PhysicalInventoryCount() {
                 {(() => {
                   const productIds = [...new Set(entries.map((e) => e.product_id))];
                   const rows: React.ReactNode[] = [];
+                  const groupColors = [
+                    "border-l-primary",
+                    "border-l-chart-2",
+                    "border-l-chart-3",
+                    "border-l-chart-4",
+                    "border-l-chart-5",
+                  ];
                   productIds.forEach((pid, productIndex) => {
                     const productEntries = entries.filter((e) => e.product_id === pid);
                     const productName = productEntries[0]?.product_name || "";
-                    const isEvenProduct = productIndex % 2 === 0;
-                    productEntries.forEach((entry) => {
+                    const colorClass = groupColors[productIndex % groupColors.length];
+                    const isEven = productIndex % 2 === 0;
+
+                    productEntries.forEach((entry, batchIndex) => {
                       const idx = entries.indexOf(entry);
                       const diff = entry.counted_quantity - entry.system_quantity;
+                      const isFirst = batchIndex === 0;
                       rows.push(
-                        <TableRow key={`entry-${idx}`} className={isEvenProduct ? "bg-accent/50" : "bg-background"}>
-                          <TableCell className="font-medium text-sm">
-                            {productEntries.indexOf(entry) === 0 ? productName : ""}
+                        <TableRow
+                          key={`entry-${idx}`}
+                          className={`border-l-4 ${colorClass} ${isEven ? "bg-accent/40" : ""} ${isFirst && productIndex > 0 ? "border-t-2 border-t-border" : ""}`}
+                        >
+                          <TableCell className={`font-medium text-sm ${isFirst ? "pt-3" : ""}`}>
+                            {isFirst ? (
+                              <span className="font-semibold">{productName}</span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs pl-4">↳</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className="font-mono text-xs">{entry.batch_number}</Badge>
@@ -454,7 +471,7 @@ export function PhysicalInventoryCount() {
                       const totalCounted = productEntries.reduce((s, e) => s + e.counted_quantity, 0);
                       const totalDiff = totalCounted - totalSystem;
                       rows.push(
-                        <TableRow key={`total-${pid}`} className="bg-muted/50 border-b-2">
+                        <TableRow key={`total-${pid}`} className={`border-l-4 ${colorClass} bg-muted/60 border-b-2 border-b-border`}>
                           <TableCell className="text-sm font-semibold text-right" colSpan={2}>Total {productName}:</TableCell>
                           <TableCell className="text-center font-mono text-sm font-bold">{totalSystem}</TableCell>
                           <TableCell className="text-center font-mono text-sm font-bold">{totalCounted}</TableCell>
