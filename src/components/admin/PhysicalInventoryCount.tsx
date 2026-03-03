@@ -407,7 +407,7 @@ export function PhysicalInventoryCount() {
                       const idx = entries.indexOf(entry);
                       const diff = entry.counted_quantity - entry.system_quantity;
                       rows.push(
-                        <TableRow key={`entry-${idx}`} className={isEvenProduct ? "bg-muted/30" : ""}>
+                        <TableRow key={`entry-${idx}`} className={isEvenProduct ? "bg-accent/50" : "bg-background"}>
                           <TableCell className="font-medium text-sm">
                             {productEntries.indexOf(entry) === 0 ? productName : ""}
                           </TableCell>
