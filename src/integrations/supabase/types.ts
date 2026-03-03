@@ -1237,6 +1237,8 @@ export type Database = {
           id: string
           notes: string | null
           product_id: string
+          session_id: string | null
+          session_warehouse_name: string | null
           system_quantity: number
           warehouse_id: string
         }
@@ -1250,6 +1252,8 @@ export type Database = {
           id?: string
           notes?: string | null
           product_id: string
+          session_id?: string | null
+          session_warehouse_name?: string | null
           system_quantity?: number
           warehouse_id: string
         }
@@ -1263,6 +1267,8 @@ export type Database = {
           id?: string
           notes?: string | null
           product_id?: string
+          session_id?: string | null
+          session_warehouse_name?: string | null
           system_quantity?: number
           warehouse_id?: string
         }

@@ -7,11 +7,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { WarehouseFilter } from "@/components/inventory/WarehouseFilter";
-import { Search, ClipboardCheck, Package, Save, Trash2, AlertTriangle, CheckCircle2, MinusCircle, Warehouse } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
+import { Search, ClipboardCheck, Package, Save, Trash2, CheckCircle2, Warehouse, Eye, Pencil, List } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PhysicalCountSessionView } from "./PhysicalCountSessionView";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface CountEntry {
   product_id: string;
@@ -33,6 +43,12 @@ export function PhysicalInventoryCount() {
   const [entries, setEntries] = useState<CountEntry[]>([]);
   const [inventoryStarted, setInventoryStarted] = useState(false);
   const [activeWarehouseId, setActiveWarehouseId] = useState<string | null>(null);
+
+  // History view/edit state
+  const [viewSessionId, setViewSessionId] = useState<string | null>(null);
+  const [editSessionId, setEditSessionId] = useState<string | null>(null);
+  const [editEntries, setEditEntries] = useState<any[]>([]);
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
 
   // Fetch products
   const { data: products = [] } = useQuery({
@@ -65,13 +81,12 @@ export function PhysicalInventoryCount() {
     },
   });
 
-  // Collect all product IDs from both search results and entries
   const allProductIds = Array.from(new Set([
     ...products.map((p) => p.id),
     ...entries.map((e) => e.product_id),
   ]));
 
-  // Fetch batches for selected products and entries
+  // Fetch batches
   const { data: batchesMap = {} } = useQuery({
     queryKey: ["physical-inv-batches", allProductIds],
     enabled: allProductIds.length > 0,
@@ -92,49 +107,52 @@ export function PhysicalInventoryCount() {
     },
   });
 
-  // Fetch warehouse stock for products
-  const { data: warehouseStockMap = {} } = useQuery({
-    queryKey: ["physical-inv-wh-stock", allProductIds],
-    enabled: allProductIds.length > 0,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("warehouse_stock")
-        .select("product_id, warehouse_id, current_stock")
-        .in("product_id", allProductIds);
-      if (error) throw error;
-      const map: Record<string, Record<string, number>> = {};
-      data.forEach((ws) => {
-        if (!map[ws.product_id]) map[ws.product_id] = {};
-        map[ws.product_id][ws.warehouse_id] = ws.current_stock;
-      });
-      return map;
-    },
-  });
-
-  // Fetch saved counts
-  const { data: savedCounts = [] } = useQuery({
-    queryKey: ["physical-inv-counts"],
+  // Fetch saved counts grouped by session
+  const { data: savedSessions = [] } = useQuery({
+    queryKey: ["physical-inv-sessions"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("physical_inventory_counts")
         .select("*, products(name, sku), product_batches(batch_number), warehouses(name)")
         .order("counted_at", { ascending: false })
-        .limit(50);
+        .limit(500);
       if (error) throw error;
-      return data;
+
+      // Group by session_id
+      const sessionMap: Record<string, any[]> = {};
+      (data || []).forEach((row: any) => {
+        const sid = row.session_id || row.id;
+        if (!sessionMap[sid]) sessionMap[sid] = [];
+        sessionMap[sid].push(row);
+      });
+
+      return Object.entries(sessionMap).map(([sessionId, counts]) => ({
+        sessionId,
+        counts,
+        warehouseName: counts[0]?.session_warehouse_name || counts[0]?.warehouses?.name || "—",
+        countedAt: counts[0]?.counted_at,
+        totalProducts: new Set(counts.map((c: any) => c.product_id)).size,
+        totalEntries: counts.length,
+        withDifference: counts.filter((c: any) => (c.counted_quantity - c.system_quantity) !== 0).length,
+      }));
     },
   });
 
   const saveMutation = useMutation({
     mutationFn: async (entriesToSave: CountEntry[]) => {
+      const sessionId = crypto.randomUUID();
+      const whName = warehouses.find((w) => w.id === activeWarehouseId)?.name || "";
       const rows = entriesToSave.map((e) => ({
         product_id: e.product_id,
         batch_id: e.batch_id,
         warehouse_id: e.warehouse_id,
         counted_quantity: e.counted_quantity,
         system_quantity: e.system_quantity,
+        difference: e.counted_quantity - e.system_quantity,
         notes: e.notes || null,
         counted_by: user?.id,
+        session_id: sessionId,
+        session_warehouse_name: whName,
       }));
       const { error } = await supabase.from("physical_inventory_counts").insert(rows);
       if (error) throw error;
@@ -145,9 +163,48 @@ export function PhysicalInventoryCount() {
       setInventoryStarted(false);
       setActiveWarehouseId(null);
       setSelectedWarehouse("all");
-      queryClient.invalidateQueries({ queryKey: ["physical-inv-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["physical-inv-sessions"] });
     },
     onError: (err: any) => toast.error(err.message || "Error al guardar"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (rows: any[]) => {
+      for (const row of rows) {
+        const { error } = await supabase
+          .from("physical_inventory_counts")
+          .update({
+            counted_quantity: row.counted_quantity,
+            difference: row.counted_quantity - row.system_quantity,
+            notes: row.notes,
+          })
+          .eq("id", row.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success("Conteo actualizado correctamente");
+      setEditSessionId(null);
+      setEditEntries([]);
+      queryClient.invalidateQueries({ queryKey: ["physical-inv-sessions"] });
+    },
+    onError: (err: any) => toast.error(err.message || "Error al actualizar"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { error } = await supabase
+        .from("physical_inventory_counts")
+        .delete()
+        .eq("session_id", sessionId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Conteo eliminado");
+      setDeleteSessionId(null);
+      queryClient.invalidateQueries({ queryKey: ["physical-inv-sessions"] });
+    },
+    onError: (err: any) => toast.error(err.message || "Error al eliminar"),
   });
 
   const handleStartInventory = () => {
@@ -170,26 +227,14 @@ export function PhysicalInventoryCount() {
 
   const addProduct = (product: typeof products[0]) => {
     const whId = activeWarehouseId;
-    if (!whId) {
-      toast.error("Selecciona un almacén");
-      return;
-    }
+    if (!whId) return;
     const wh = warehouses.find((w) => w.id === whId);
-
-    // Check if already added
     const exists = entries.find((e) => e.product_id === product.id && e.warehouse_id === whId);
-    if (exists) {
-      toast.info("Este producto ya está en la lista");
-      return;
-    }
+    if (exists) { toast.info("Este producto ya está en la lista"); return; }
 
     const batches = batchesMap[product.id] || [];
-    if (batches.length === 0) {
-      toast.warning("Este producto no tiene lotes activos");
-      return;
-    }
+    if (batches.length === 0) { toast.warning("Este producto no tiene lotes activos"); return; }
 
-    // Add one entry per batch
     const newEntries: CountEntry[] = batches.map((b) => ({
       product_id: product.id,
       product_name: product.name,
@@ -210,24 +255,6 @@ export function PhysicalInventoryCount() {
     setEntries((prev) => {
       const updated = [...prev];
       (updated[index] as any)[field] = value;
-
-      // If warehouse changes, update system quantity
-      if (field === "warehouse_id") {
-        const wh = warehouses.find((w) => w.id === value);
-        updated[index].warehouse_name = wh?.name || "";
-        updated[index].system_quantity = warehouseStockMap[updated[index].product_id]?.[value] ?? 0;
-      }
-
-      // If batch changes, update batch info
-      if (field === "batch_id") {
-        const batches = batchesMap[updated[index].product_id] || [];
-        const batch = batches.find((b) => b.id === value);
-        updated[index].batch_number = batch?.batch_number || null;
-        if (batch) {
-          updated[index].system_quantity = batch.current_quantity;
-        }
-      }
-
       return updated;
     });
   };
@@ -236,8 +263,25 @@ export function PhysicalInventoryCount() {
     setEntries((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleEditSession = (session: typeof savedSessions[0]) => {
+    setEditSessionId(session.sessionId);
+    setEditEntries(session.counts.map((c: any) => ({ ...c })));
+  };
+
+  const updateEditEntry = (index: number, field: string, value: any) => {
+    setEditEntries((prev) => {
+      const updated = [...prev];
+      (updated[index] as any)[field] = value;
+      return updated;
+    });
+  };
+
+  // View dialog data
+  const viewSession = savedSessions.find((s) => s.sessionId === viewSessionId);
+
   return (
     <div className="space-y-6">
+      {/* Phase 1: Start */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -249,34 +293,30 @@ export function PhysicalInventoryCount() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Phase 1: Start inventory */}
           {!inventoryStarted && (
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-                <div className="space-y-1 flex-1">
-                  <label className="text-sm font-medium">Selecciona el almacén a inventariar</label>
-                  <WarehouseFilter
-                    value={selectedWarehouse}
-                    onChange={setSelectedWarehouse}
-                    showAllOption={false}
-                    className="w-full sm:w-[280px]"
-                  />
-                </div>
-                <Button onClick={handleStartInventory} size="lg" className="gap-2">
-                  <ClipboardCheck className="h-5 w-5" />
-                  Iniciar Inventario Físico
-                </Button>
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+              <div className="space-y-1 flex-1">
+                <label className="text-sm font-medium">Selecciona el almacén a inventariar</label>
+                <WarehouseFilter
+                  value={selectedWarehouse}
+                  onChange={setSelectedWarehouse}
+                  showAllOption={false}
+                  className="w-full sm:w-[280px]"
+                />
               </div>
+              <Button onClick={handleStartInventory} size="lg" className="gap-2">
+                <ClipboardCheck className="h-5 w-5" />
+                Iniciar Inventario Físico
+              </Button>
             </div>
           )}
 
-          {/* Phase 2: Active inventory */}
           {inventoryStarted && activeWarehouseId && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Badge variant="outline" className="text-sm px-3 py-1 gap-1.5">
                   <Warehouse className="h-4 w-4" />
-                  Inventariando: {warehouses.find(w => w.id === activeWarehouseId)?.name}
+                  Inventariando: {warehouses.find((w) => w.id === activeWarehouseId)?.name}
                 </Badge>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-primary">
@@ -303,7 +343,7 @@ export function PhysicalInventoryCount() {
                 />
               </div>
 
-              {/* Search results with Add button */}
+              {/* Search results */}
               {search.length >= 2 && products.length > 0 && (
                 <div className="border rounded-md max-h-48 overflow-y-auto">
                   {products.map((p) => (
@@ -314,9 +354,7 @@ export function PhysicalInventoryCount() {
                       <div>
                         <span className="font-medium">{p.name}</span>
                         <span className="ml-2 text-muted-foreground text-xs">{p.sku}</span>
-                        {p.category && (
-                          <Badge variant="outline" className="ml-2 text-xs">{p.category}</Badge>
-                        )}
+                        {p.category && <Badge variant="outline" className="ml-2 text-xs">{p.category}</Badge>}
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-muted-foreground">Stock: {p.current_stock ?? 0}</span>
@@ -329,135 +367,133 @@ export function PhysicalInventoryCount() {
                   ))}
                 </div>
               )}
-
-          {/* Entries table */}
-          {entries.length > 0 && (
-            <div className="space-y-3">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Producto</TableHead>
-                    <TableHead>Lote</TableHead>
-                    <TableHead className="text-center">Qty Sistema</TableHead>
-                    <TableHead className="text-center">Qty Contada</TableHead>
-                    <TableHead className="text-center">Diferencia</TableHead>
-                    <TableHead>Notas</TableHead>
-                    <TableHead className="w-10"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(() => {
-                    // Group entries by product_id to show totals
-                    const productIds = [...new Set(entries.map((e) => e.product_id))];
-                    const rows: React.ReactNode[] = [];
-
-                    productIds.forEach((pid) => {
-                      const productEntries = entries.filter((e) => e.product_id === pid);
-                      const productName = productEntries[0]?.product_name || "";
-
-                      productEntries.forEach((entry) => {
-                        const idx = entries.indexOf(entry);
-                        const diff = entry.counted_quantity - entry.system_quantity;
-                        rows.push(
-                          <TableRow key={`entry-${idx}`}>
-                            <TableCell className="font-medium text-sm">
-                              {productEntries.indexOf(entry) === 0 ? productName : ""}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              <Badge variant="outline" className="font-mono text-xs">
-                                {entry.batch_number}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <span className="font-mono text-sm font-semibold">{entry.system_quantity}</span>
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                min={0}
-                                value={entry.counted_quantity}
-                                onChange={(e) => updateEntry(idx, "counted_quantity", parseInt(e.target.value) || 0)}
-                                className="w-20 h-8 text-center text-sm mx-auto"
-                              />
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge
-                                variant={diff === 0 ? "secondary" : "destructive"}
-                                className={diff === 0 ? "bg-green-100 text-green-800" : ""}
-                              >
-                                {diff === 0 ? (
-                                  <><CheckCircle2 className="h-3 w-3 mr-1" />OK</>
-                                ) : (
-                                  <>{diff > 0 ? "+" : ""}{diff}</>
-                                )}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                placeholder="Nota..."
-                                value={entry.notes}
-                                onChange={(e) => updateEntry(idx, "notes", e.target.value)}
-                                className="h-8 text-xs w-[120px]"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Button size="icon" variant="ghost" onClick={() => removeEntry(idx)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      });
-
-                      // Total row for this product
-                      if (productEntries.length > 1) {
-                        const totalSystem = productEntries.reduce((s, e) => s + e.system_quantity, 0);
-                        const totalCounted = productEntries.reduce((s, e) => s + e.counted_quantity, 0);
-                        const totalDiff = totalCounted - totalSystem;
-                        rows.push(
-                          <TableRow key={`total-${pid}`} className="bg-muted/50 border-b-2">
-                            <TableCell className="text-sm font-semibold text-right" colSpan={2}>
-                              Total {productName}:
-                            </TableCell>
-                            <TableCell className="text-center font-mono text-sm font-bold">{totalSystem}</TableCell>
-                            <TableCell className="text-center font-mono text-sm font-bold">{totalCounted}</TableCell>
-                            <TableCell className="text-center">
-                              <Badge
-                                variant={totalDiff === 0 ? "secondary" : "destructive"}
-                                className={totalDiff === 0 ? "bg-green-100 text-green-800 font-bold" : "font-bold"}
-                              >
-                                {totalDiff === 0 ? "OK" : `${totalDiff > 0 ? "+" : ""}${totalDiff}`}
-                              </Badge>
-                            </TableCell>
-                            <TableCell colSpan={2}></TableCell>
-                          </TableRow>
-                        );
-                      }
-                    });
-
-                    return rows;
-                  })()}
-                </TableBody>
-              </Table>
-
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  {entries.length} producto(s) • {entries.filter((e) => e.counted_quantity - e.system_quantity !== 0).length} con diferencia
-                </p>
-                <Button
-                  onClick={() => saveMutation.mutate(entries)}
-                  disabled={saveMutation.isPending || entries.length === 0}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {saveMutation.isPending ? "Guardando..." : "Guardar Conteo"}
-                </Button>
-              </div>
-            </div>
-          )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Intermediate List */}
+      {entries.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <List className="h-5 w-5" />
+              Listado de Conteo en Curso
+            </CardTitle>
+            <CardDescription>
+              Revisa las cantidades contadas antes de guardar. Puedes seguir agregando productos arriba.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Producto</TableHead>
+                  <TableHead>Lote</TableHead>
+                  <TableHead className="text-center">Qty Sistema</TableHead>
+                  <TableHead className="text-center">Qty Contada</TableHead>
+                  <TableHead className="text-center">Diferencia</TableHead>
+                  <TableHead>Notas</TableHead>
+                  <TableHead className="w-10"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(() => {
+                  const productIds = [...new Set(entries.map((e) => e.product_id))];
+                  const rows: React.ReactNode[] = [];
+                  productIds.forEach((pid) => {
+                    const productEntries = entries.filter((e) => e.product_id === pid);
+                    const productName = productEntries[0]?.product_name || "";
+                    productEntries.forEach((entry) => {
+                      const idx = entries.indexOf(entry);
+                      const diff = entry.counted_quantity - entry.system_quantity;
+                      rows.push(
+                        <TableRow key={`entry-${idx}`}>
+                          <TableCell className="font-medium text-sm">
+                            {productEntries.indexOf(entry) === 0 ? productName : ""}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="font-mono text-xs">{entry.batch_number}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center font-mono text-sm font-semibold">{entry.system_quantity}</TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={entry.counted_quantity}
+                              onChange={(e) => updateEntry(idx, "counted_quantity", parseInt(e.target.value) || 0)}
+                              className="w-20 h-8 text-center text-sm mx-auto"
+                            />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge
+                              variant={diff === 0 ? "secondary" : "destructive"}
+                              className={diff === 0 ? "bg-green-100 text-green-800" : ""}
+                            >
+                              {diff === 0 ? <><CheckCircle2 className="h-3 w-3 mr-1" />OK</> : `${diff > 0 ? "+" : ""}${diff}`}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              placeholder="Nota..."
+                              value={entry.notes}
+                              onChange={(e) => updateEntry(idx, "notes", e.target.value)}
+                              className="h-8 text-xs w-[120px]"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button size="icon" variant="ghost" onClick={() => removeEntry(idx)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
+
+                    if (productEntries.length > 1) {
+                      const totalSystem = productEntries.reduce((s, e) => s + e.system_quantity, 0);
+                      const totalCounted = productEntries.reduce((s, e) => s + e.counted_quantity, 0);
+                      const totalDiff = totalCounted - totalSystem;
+                      rows.push(
+                        <TableRow key={`total-${pid}`} className="bg-muted/50 border-b-2">
+                          <TableCell className="text-sm font-semibold text-right" colSpan={2}>Total {productName}:</TableCell>
+                          <TableCell className="text-center font-mono text-sm font-bold">{totalSystem}</TableCell>
+                          <TableCell className="text-center font-mono text-sm font-bold">{totalCounted}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge
+                              variant={totalDiff === 0 ? "secondary" : "destructive"}
+                              className={totalDiff === 0 ? "bg-green-100 text-green-800 font-bold" : "font-bold"}
+                            >
+                              {totalDiff === 0 ? "OK" : `${totalDiff > 0 ? "+" : ""}${totalDiff}`}
+                            </Badge>
+                          </TableCell>
+                          <TableCell colSpan={2}></TableCell>
+                        </TableRow>
+                      );
+                    }
+                  });
+                  return rows;
+                })()}
+              </TableBody>
+            </Table>
+
+            <div className="flex items-center justify-between pt-2 border-t">
+              <p className="text-sm text-muted-foreground">
+                {entries.length} registro(s) • {entries.filter((e) => e.counted_quantity - e.system_quantity !== 0).length} con diferencia
+              </p>
+              <Button
+                onClick={() => saveMutation.mutate(entries)}
+                disabled={saveMutation.isPending || entries.length === 0}
+                size="lg"
+                className="gap-2"
+              >
+                <Save className="h-4 w-4" />
+                {saveMutation.isPending ? "Guardando..." : "Guardar Conteo"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* History */}
       <Card>
@@ -465,57 +501,182 @@ export function PhysicalInventoryCount() {
           <CardTitle className="text-lg">Historial de Conteos</CardTitle>
         </CardHeader>
         <CardContent>
-          {savedCounts.length === 0 ? (
+          {savedSessions.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No hay conteos registrados aún</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Fecha</TableHead>
-                  <TableHead>Producto</TableHead>
                   <TableHead>Almacén</TableHead>
-                  <TableHead>Lote</TableHead>
-                  <TableHead className="text-center">Sistema</TableHead>
-                  <TableHead className="text-center">Conteo</TableHead>
-                  <TableHead className="text-center">Diferencia</TableHead>
-                  <TableHead>Notas</TableHead>
+                  <TableHead className="text-center">Productos</TableHead>
+                  <TableHead className="text-center">Registros</TableHead>
+                  <TableHead className="text-center">Con Diferencia</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {savedCounts.map((c: any) => {
-                  const diff = c.difference ?? (c.counted_quantity - c.system_quantity);
-                  return (
-                    <TableRow key={c.id}>
-                      <TableCell className="text-xs">
-                        {new Date(c.counted_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      </TableCell>
-                      <TableCell className="font-medium text-sm">
-                        {c.products?.name || "—"}
-                        <span className="text-xs text-muted-foreground ml-1">{c.products?.sku}</span>
-                      </TableCell>
-                      <TableCell className="text-sm">{c.warehouses?.name || "—"}</TableCell>
-                      <TableCell className="text-sm">{c.product_batches?.batch_number || "—"}</TableCell>
-                      <TableCell className="text-center font-mono text-sm">{c.system_quantity}</TableCell>
-                      <TableCell className="text-center font-mono text-sm">{c.counted_quantity}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge
-                          variant={diff === 0 ? "secondary" : "destructive"}
-                          className={diff === 0 ? "bg-green-100 text-green-800" : ""}
-                        >
-                          {diff === 0 ? "OK" : `${diff > 0 ? "+" : ""}${diff}`}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">
-                        {c.notes || "—"}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {savedSessions.map((session) => (
+                  <TableRow key={session.sessionId}>
+                    <TableCell className="text-sm">
+                      {new Date(session.countedAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </TableCell>
+                    <TableCell className="font-medium text-sm">{session.warehouseName}</TableCell>
+                    <TableCell className="text-center">{session.totalProducts}</TableCell>
+                    <TableCell className="text-center">{session.totalEntries}</TableCell>
+                    <TableCell className="text-center">
+                      {session.withDifference > 0 ? (
+                        <Badge variant="destructive">{session.withDifference}</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">0</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => setViewSessionId(session.sessionId)} className="gap-1">
+                          <Eye className="h-3.5 w-3.5" /> Ver
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleEditSession(session)} className="gap-1">
+                          <Pencil className="h-3.5 w-3.5" /> Editar
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setDeleteSessionId(session.sessionId)} className="gap-1 text-destructive hover:text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
+
+      {/* View Dialog */}
+      {viewSession && (
+        <PhysicalCountSessionView
+          open={!!viewSessionId}
+          onOpenChange={(open) => !open && setViewSessionId(null)}
+          counts={viewSession.counts}
+          warehouseName={viewSession.warehouseName}
+          sessionDate={viewSession.countedAt}
+        />
+      )}
+
+      {/* Edit Dialog */}
+      {editSessionId && editEntries.length > 0 && (
+        <PhysicalCountEditDialog
+          open={!!editSessionId}
+          onOpenChange={(open) => { if (!open) { setEditSessionId(null); setEditEntries([]); } }}
+          entries={editEntries}
+          onUpdateEntry={updateEditEntry}
+          onSave={() => updateMutation.mutate(editEntries)}
+          saving={updateMutation.isPending}
+        />
+      )}
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteSessionId} onOpenChange={(open) => !open && setDeleteSessionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este conteo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará todos los registros de esta sesión de conteo. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteSessionId && deleteMutation.mutate(deleteSessionId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
+// Edit dialog inline component
+function PhysicalCountEditDialog({
+  open, onOpenChange, entries, onUpdateEntry, onSave, saving,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  entries: any[];
+  onUpdateEntry: (index: number, field: string, value: any) => void;
+  onSave: () => void;
+  saving: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Editar Conteo Físico</DialogTitle>
+        </DialogHeader>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Producto</TableHead>
+              <TableHead>Lote</TableHead>
+              <TableHead className="text-center">Qty Sistema</TableHead>
+              <TableHead className="text-center">Qty Contada</TableHead>
+              <TableHead className="text-center">Diferencia</TableHead>
+              <TableHead>Notas</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {entries.map((c: any, idx: number) => {
+              const diff = c.counted_quantity - c.system_quantity;
+              return (
+                <TableRow key={c.id}>
+                  <TableCell className="font-medium text-sm">{c.products?.name || "—"}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {c.product_batches?.batch_number || "—"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center font-mono">{c.system_quantity}</TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={c.counted_quantity}
+                      onChange={(e) => onUpdateEntry(idx, "counted_quantity", parseInt(e.target.value) || 0)}
+                      className="w-20 h-8 text-center text-sm mx-auto"
+                    />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge
+                      variant={diff === 0 ? "secondary" : "destructive"}
+                      className={diff === 0 ? "bg-green-100 text-green-800" : ""}
+                    >
+                      {diff === 0 ? <><CheckCircle2 className="h-3 w-3 mr-1" />OK</> : `${diff > 0 ? "+" : ""}${diff}`}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      placeholder="Nota..."
+                      value={c.notes || ""}
+                      onChange={(e) => onUpdateEntry(idx, "notes", e.target.value)}
+                      className="h-8 text-xs w-[120px]"
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+        <div className="flex justify-end pt-2">
+          <Button onClick={onSave} disabled={saving} className="gap-2">
+            <Save className="h-4 w-4" />
+            {saving ? "Guardando..." : "Guardar Cambios"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
