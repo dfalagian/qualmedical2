@@ -31,6 +31,8 @@ export function PhysicalInventoryCount() {
   const [search, setSearch] = useState("");
   const [selectedWarehouse, setSelectedWarehouse] = useState("all");
   const [entries, setEntries] = useState<CountEntry[]>([]);
+  const [inventoryStarted, setInventoryStarted] = useState(false);
+  const [activeWarehouseId, setActiveWarehouseId] = useState<string | null>(null);
 
   // Fetch products
   const { data: products = [] } = useQuery({
@@ -140,13 +142,34 @@ export function PhysicalInventoryCount() {
     onSuccess: () => {
       toast.success("Conteo físico guardado correctamente");
       setEntries([]);
+      setInventoryStarted(false);
+      setActiveWarehouseId(null);
+      setSelectedWarehouse("all");
       queryClient.invalidateQueries({ queryKey: ["physical-inv-counts"] });
     },
     onError: (err: any) => toast.error(err.message || "Error al guardar"),
   });
 
+  const handleStartInventory = () => {
+    if (selectedWarehouse === "all") {
+      toast.error("Selecciona un almacén para iniciar el inventario");
+      return;
+    }
+    setActiveWarehouseId(selectedWarehouse);
+    setInventoryStarted(true);
+    setEntries([]);
+    toast.success("Inventario físico iniciado");
+  };
+
+  const handleCancelInventory = () => {
+    setInventoryStarted(false);
+    setActiveWarehouseId(null);
+    setEntries([]);
+    setSearch("");
+  };
+
   const addProduct = (product: typeof products[0]) => {
-    const whId = selectedWarehouse !== "all" ? selectedWarehouse : warehouses[0]?.id;
+    const whId = activeWarehouseId;
     if (!whId) {
       toast.error("Selecciona un almacén");
       return;
@@ -221,46 +244,77 @@ export function PhysicalInventoryCount() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Search and warehouse filter */}
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar producto por nombre o SKU..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <WarehouseFilter
-              value={selectedWarehouse}
-              onChange={setSelectedWarehouse}
-              showAllOption={false}
-              className="w-[220px]"
-            />
-          </div>
-
-          {/* Search results */}
-          {search.length >= 2 && products.length > 0 && (
-            <div className="border rounded-md max-h-48 overflow-y-auto">
-              {products.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => addProduct(p)}
-                  className="w-full flex items-center justify-between px-4 py-2 hover:bg-muted/50 text-left text-sm border-b last:border-b-0"
-                >
-                  <div>
-                    <span className="font-medium">{p.name}</span>
-                    <span className="ml-2 text-muted-foreground text-xs">{p.sku}</span>
-                    {p.category && (
-                      <Badge variant="outline" className="ml-2 text-xs">{p.category}</Badge>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground">Stock: {p.current_stock ?? 0}</span>
-                </button>
-              ))}
+          {/* Phase 1: Start inventory */}
+          {!inventoryStarted && (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+                <div className="space-y-1 flex-1">
+                  <label className="text-sm font-medium">Selecciona el almacén a inventariar</label>
+                  <WarehouseFilter
+                    value={selectedWarehouse}
+                    onChange={setSelectedWarehouse}
+                    showAllOption={false}
+                    className="w-full sm:w-[280px]"
+                  />
+                </div>
+                <Button onClick={handleStartInventory} size="lg" className="gap-2">
+                  <ClipboardCheck className="h-5 w-5" />
+                  Iniciar Inventario Físico
+                </Button>
+              </div>
             </div>
           )}
+
+          {/* Phase 2: Active inventory */}
+          {inventoryStarted && activeWarehouseId && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Badge variant="outline" className="text-sm px-3 py-1 gap-1.5">
+                  <Warehouse className="h-4 w-4" />
+                  Inventariando: {warehouses.find(w => w.id === activeWarehouseId)?.name}
+                </Badge>
+                <Button variant="ghost" size="sm" onClick={handleCancelInventory} className="text-destructive">
+                  Cancelar Inventario
+                </Button>
+              </div>
+
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar producto por nombre o SKU para agregar..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              {/* Search results with Add button */}
+              {search.length >= 2 && products.length > 0 && (
+                <div className="border rounded-md max-h-48 overflow-y-auto">
+                  {products.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between px-4 py-2 hover:bg-muted/50 text-sm border-b last:border-b-0"
+                    >
+                      <div>
+                        <span className="font-medium">{p.name}</span>
+                        <span className="ml-2 text-muted-foreground text-xs">{p.sku}</span>
+                        {p.category && (
+                          <Badge variant="outline" className="ml-2 text-xs">{p.category}</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground">Stock: {p.current_stock ?? 0}</span>
+                        <Button size="sm" variant="secondary" onClick={() => addProduct(p)} className="gap-1">
+                          <Package className="h-3.5 w-3.5" />
+                          Agregar
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
           {/* Entries table */}
           {entries.length > 0 && (
@@ -269,7 +323,6 @@ export function PhysicalInventoryCount() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Producto</TableHead>
-                    <TableHead>Almacén</TableHead>
                     <TableHead>Lote</TableHead>
                     <TableHead className="text-center">Qty Sistema</TableHead>
                     <TableHead className="text-center">Qty Contada</TableHead>
@@ -285,21 +338,6 @@ export function PhysicalInventoryCount() {
                     return (
                       <TableRow key={idx}>
                         <TableCell className="font-medium text-sm">{entry.product_name}</TableCell>
-                        <TableCell>
-                          <Select
-                            value={entry.warehouse_id}
-                            onValueChange={(v) => updateEntry(idx, "warehouse_id", v)}
-                          >
-                            <SelectTrigger className="w-[160px] h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {warehouses.map((w) => (
-                                <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
                         <TableCell>
                           <Select
                             value={entry.batch_id || ""}
@@ -318,27 +356,7 @@ export function PhysicalInventoryCount() {
                           </Select>
                         </TableCell>
                         <TableCell className="text-center">
-                          <div className="space-y-0.5">
-                            <span className="font-mono text-sm font-semibold">{entry.system_quantity}</span>
-                            {(() => {
-                              const whStock = warehouseStockMap[entry.product_id];
-                              if (!whStock) return null;
-                              const breakdown = warehouses
-                                .filter((w) => whStock[w.id] && whStock[w.id] > 0)
-                                .map((w) => ({ name: w.name, stock: whStock[w.id] }));
-                              if (breakdown.length <= 1) return null;
-                              return (
-                                <div className="flex flex-col gap-0.5">
-                                  {breakdown.map((wb) => (
-                                    <span key={wb.name} className="text-[10px] text-muted-foreground flex items-center gap-0.5 justify-center">
-                                      <Warehouse className="h-2.5 w-2.5" />
-                                      {wb.name}: <span className="font-mono font-medium text-foreground">{wb.stock}</span>
-                                    </span>
-                                  ))}
-                                </div>
-                              );
-                            })()}
-                          </div>
+                          <span className="font-mono text-sm font-semibold">{entry.system_quantity}</span>
                         </TableCell>
                         <TableCell>
                           <Input
@@ -392,6 +410,8 @@ export function PhysicalInventoryCount() {
                   {saveMutation.isPending ? "Guardando..." : "Guardar Conteo"}
                 </Button>
               </div>
+            </div>
+          )}
             </div>
           )}
         </CardContent>
