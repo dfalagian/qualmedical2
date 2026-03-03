@@ -148,7 +148,6 @@ export function PhysicalInventoryCount() {
         warehouse_id: e.warehouse_id,
         counted_quantity: e.counted_quantity,
         system_quantity: e.system_quantity,
-        difference: e.counted_quantity - e.system_quantity,
         notes: e.notes || null,
         counted_by: user?.id,
         session_id: sessionId,
@@ -175,7 +174,6 @@ export function PhysicalInventoryCount() {
           .from("physical_inventory_counts")
           .update({
             counted_quantity: row.counted_quantity,
-            difference: row.counted_quantity - row.system_quantity,
             notes: row.notes,
           })
           .eq("id", row.id);
