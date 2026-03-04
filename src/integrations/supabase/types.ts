@@ -583,6 +583,7 @@ export type Database = {
       }
       inventory_movements: {
         Row: {
+          batch_id: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -598,6 +599,7 @@ export type Database = {
           rfid_tag_id: string | null
         }
         Insert: {
+          batch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -613,6 +615,7 @@ export type Database = {
           rfid_tag_id?: string | null
         }
         Update: {
+          batch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -628,6 +631,13 @@ export type Database = {
           rfid_tag_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "inventory_movements_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "inventory_movements_created_by_fkey"
             columns: ["created_by"]

@@ -114,9 +114,9 @@ export function BatchTraceabilityModal() {
         .from("inventory_movements")
         .select("id", { count: "exact", head: true });
 
-      // When batch is selected, filter by its product_id (movements are product-level)
-      if (selectedBatch && batchProductId) {
-        query = query.eq("product_id", batchProductId);
+      // Filter by batch_id directly if batch is selected
+      if (selectedBatch) {
+        query = query.eq("batch_id", selectedBatch);
       } else if (selectedProduct) {
         query = query.eq("product_id", selectedProduct);
       }
@@ -149,15 +149,16 @@ export function BatchTraceabilityModal() {
         .select(`
           *,
           products:product_id (name, sku),
+          batch:batch_id (batch_number),
           rfid_tags:rfid_tag_id (epc, batch_id, product_batches:batch_id (batch_number)),
           profiles:created_by (full_name)
         `)
         .order("created_at", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-      // When batch is selected, filter by its product_id (movements are product-level)
-      if (selectedBatch && batchProductId) {
-        query = query.eq("product_id", batchProductId);
+      // Filter by batch_id directly if batch is selected
+      if (selectedBatch) {
+        query = query.eq("batch_id", selectedBatch);
       } else if (selectedProduct) {
         query = query.eq("product_id", selectedProduct);
       }
@@ -480,8 +481,8 @@ export function BatchTraceabilityModal() {
 
           {/* Info when filtering by batch */}
           {selectedBatch && (
-            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-1.5">
-              ⚠ Los movimientos de inventario se registran a nivel de producto, no de lote. Al filtrar por lote se muestran todos los movimientos del producto asociado. Las transferencias sí se filtran por lote específico.
+            <p className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded px-3 py-1.5">
+              ℹ Mostrando movimientos vinculados directamente al lote seleccionado. Los movimientos históricos anteriores a esta mejora pueden no tener lote asociado.
             </p>
           )}
 
@@ -586,7 +587,11 @@ export function BatchTraceabilityModal() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            {mov.rfid_tags?.product_batches?.batch_number ? (
+                            {mov.batch?.batch_number ? (
+                              <Badge variant="outline" className="font-mono text-xs">
+                                {mov.batch.batch_number}
+                              </Badge>
+                            ) : mov.rfid_tags?.product_batches?.batch_number ? (
                               <Badge variant="outline" className="font-mono text-xs">
                                 {mov.rfid_tags.product_batches.batch_number}
                               </Badge>
