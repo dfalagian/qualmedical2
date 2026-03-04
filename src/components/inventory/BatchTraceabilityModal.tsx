@@ -88,27 +88,24 @@ export function BatchTraceabilityModal() {
     enabled: open,
   });
 
+  // Helper: resolve batch to product_id
+  const batchProductId = selectedBatch
+    ? batches.find((b) => b.id === selectedBatch)?.product_id
+    : undefined;
+
   // Count total movements for pagination
   const { data: totalCount = 0 } = useQuery({
-    queryKey: ["inventory_movements_count", selectedBatch, selectedProduct, searchEpc],
+    queryKey: ["inventory_movements_count", selectedBatch, selectedProduct, searchEpc, batchProductId],
     queryFn: async () => {
       let query = supabase
         .from("inventory_movements")
         .select("id", { count: "exact", head: true });
 
-      if (selectedProduct) query = query.eq("product_id", selectedProduct);
-
-      if (selectedBatch) {
-        // Get tag ids for this batch
-        const { data: tags } = await supabase
-          .from("rfid_tags")
-          .select("id")
-          .eq("batch_id", selectedBatch);
-        if (tags && tags.length > 0) {
-          query = query.in("rfid_tag_id", tags.map((t) => t.id));
-        } else {
-          return 0;
-        }
+      // When batch is selected, filter by its product_id (movements are product-level)
+      if (selectedBatch && batchProductId) {
+        query = query.eq("product_id", batchProductId);
+      } else if (selectedProduct) {
+        query = query.eq("product_id", selectedProduct);
       }
 
       if (searchEpc) {
@@ -132,7 +129,7 @@ export function BatchTraceabilityModal() {
 
   // Fetch movements with server-side pagination and filters
   const { data: movements = [], isLoading } = useQuery({
-    queryKey: ["inventory_movements_trace", selectedBatch, selectedProduct, searchEpc, page],
+    queryKey: ["inventory_movements_trace", selectedBatch, selectedProduct, searchEpc, page, batchProductId],
     queryFn: async () => {
       let query = supabase
         .from("inventory_movements")
@@ -145,18 +142,11 @@ export function BatchTraceabilityModal() {
         .order("created_at", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-      if (selectedProduct) query = query.eq("product_id", selectedProduct);
-
-      if (selectedBatch) {
-        const { data: tags } = await supabase
-          .from("rfid_tags")
-          .select("id")
-          .eq("batch_id", selectedBatch);
-        if (tags && tags.length > 0) {
-          query = query.in("rfid_tag_id", tags.map((t) => t.id));
-        } else {
-          return [];
-        }
+      // When batch is selected, filter by its product_id (movements are product-level)
+      if (selectedBatch && batchProductId) {
+        query = query.eq("product_id", batchProductId);
+      } else if (selectedProduct) {
+        query = query.eq("product_id", selectedProduct);
       }
 
       if (searchEpc) {
@@ -401,6 +391,13 @@ export function BatchTraceabilityModal() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Info when filtering by batch */}
+          {selectedBatch && (
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-1.5">
+              ⚠ Los movimientos de inventario se registran a nivel de producto, no de lote. Al filtrar por lote se muestran todos los movimientos del producto asociado. Las transferencias sí se filtran por lote específico.
+            </p>
+          )}
 
           {/* Tabs: Movimientos + Transferencias */}
           <Tabs defaultValue="movements">
