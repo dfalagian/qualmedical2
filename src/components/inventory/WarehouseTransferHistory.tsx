@@ -523,17 +523,34 @@ export function WarehouseTransferHistory() {
           className="pl-9 h-9 text-sm"
         />
       </div>
-      {transferSearch.trim() && filteredGrouped.length > 0 && (
-        <div className="mb-3 p-3 bg-muted/50 rounded-lg border">
-          <p className="text-sm font-medium">
-            Total transferido:{" "}
-            <span className="text-primary font-bold">
-              {filteredGrouped.reduce((sum, g) => sum + g.items.reduce((s, i) => s + (i.quantity || 1), 0), 0)} unidades
-            </span>
-            {" "}en {filteredGrouped.length} transferencia(s)
-          </p>
-        </div>
-      )}
+      {transferSearch.trim() && filteredGrouped.length > 0 && (() => {
+        const term = transferSearch.toLowerCase();
+        const completedGroups = filteredGrouped.filter(g => g.status === "completada");
+        const matchedItemsTotal = completedGroups.reduce((sum, g) => {
+          return sum + g.items.filter((item) => {
+            const isRfid = item.transfer_type === "rfid";
+            const prodName = isRfid ? (item.rfid_tags as any)?.products?.name : (item.products as any)?.name;
+            const prodSku = isRfid ? null : (item.products as any)?.sku;
+            const batchNum = isRfid ? (item.rfid_tags as any)?.product_batches?.batch_number : (item.product_batches as any)?.batch_number;
+            return (
+              (prodName && prodName.toLowerCase().includes(term)) ||
+              (prodSku && prodSku.toLowerCase().includes(term)) ||
+              (batchNum && batchNum.toLowerCase().includes(term))
+            );
+          }).reduce((s, i) => s + (i.quantity || 1), 0);
+        }, 0);
+        return (
+          <div className="mb-3 p-3 bg-muted/50 rounded-lg border">
+            <p className="text-sm font-medium">
+              Total transferido del producto buscado (completadas):{" "}
+              <span className="text-primary font-bold">
+                {matchedItemsTotal} unidades
+              </span>
+              {" "}en {completedGroups.length} transferencia(s) completada(s) de {filteredGrouped.length} encontrada(s)
+            </p>
+          </div>
+        );
+      })()}
       <ScrollArea className="h-[500px]">
         <Table>
           <TableHeader>
