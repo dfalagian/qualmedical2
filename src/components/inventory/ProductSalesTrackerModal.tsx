@@ -251,6 +251,7 @@ export function ProductSalesTrackerModal() {
           </DialogTitle>
         </DialogHeader>
 
+        <ScrollArea className="max-h-[calc(90vh-100px)] pr-4">
         <div className="space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -619,6 +620,7 @@ export function ProductSalesTrackerModal() {
             </>
           )}
         </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
