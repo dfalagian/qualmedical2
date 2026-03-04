@@ -523,6 +523,17 @@ export function WarehouseTransferHistory() {
           className="pl-9 h-9 text-sm"
         />
       </div>
+      {transferSearch.trim() && filteredGrouped.length > 0 && (
+        <div className="mb-3 p-3 bg-muted/50 rounded-lg border">
+          <p className="text-sm font-medium">
+            Total transferido:{" "}
+            <span className="text-primary font-bold">
+              {filteredGrouped.reduce((sum, g) => sum + g.items.reduce((s, i) => s + (i.quantity || 1), 0), 0)} unidades
+            </span>
+            {" "}en {filteredGrouped.length} transferencia(s)
+          </p>
+        </div>
+      )}
       <ScrollArea className="h-[500px]">
         <Table>
           <TableHeader>
