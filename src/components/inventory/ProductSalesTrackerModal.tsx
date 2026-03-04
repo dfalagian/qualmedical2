@@ -125,8 +125,17 @@ export function ProductSalesTrackerModal() {
         .in("product_id", allProductIds)
         .order("created_at", { ascending: false });
       if (error) throw error;
+      // Include any order where product was actually received, regardless of order status
       return (data || []).filter(
-        (item: any) => ["aprobada", "recibida", "completada", "parcial"].includes(item.purchase_orders?.status)
+        (item: any) => {
+          const status = item.purchase_orders?.status;
+          // Exclude cancelled orders
+          if (status === "cancelada") return false;
+          // Include if quantity_received > 0 (product was actually received)
+          if ((item.quantity_received || 0) > 0) return true;
+          // Also include approved/completed orders even if quantity_received is not set
+          return ["aprobada", "recibida", "completada", "parcial"].includes(status);
+        }
       );
     },
     enabled: open && allProductIds.length > 0,
