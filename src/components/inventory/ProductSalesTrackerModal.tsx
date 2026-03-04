@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, ShoppingCart, Package, ArrowRightLeft } from "lucide-react";
+import { Search, ShoppingCart, Package, ArrowRightLeft, TruckIcon } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -105,6 +105,33 @@ export function ProductSalesTrackerModal() {
     enabled: open && allProductIds.length > 0,
   });
 
+  // Fetch purchases (purchase_order_items from approved orders)
+  const { data: purchasesData = [], isLoading: loadingPurchases } = useQuery({
+    queryKey: ["sales_tracker_purchases", allProductIds],
+    queryFn: async () => {
+      if (allProductIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("purchase_order_items")
+        .select(`
+          id, quantity_ordered, quantity_received, unit_price,
+          purchase_order_id,
+          products:product_id(name, sku),
+          purchase_orders:purchase_order_id (
+            id, order_number, status, created_at, delivery_date, received_date,
+            supplier_id,
+            profiles:supplier_id(full_name, company_name)
+          )
+        `)
+        .in("product_id", allProductIds)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data || []).filter(
+        (item: any) => ["aprobada", "recibida", "completada", "parcial"].includes(item.purchase_orders?.status)
+      );
+    },
+    enabled: open && allProductIds.length > 0,
+  });
+
   // Fetch transfers for these products
   const { data: transfersData = [], isLoading: loadingTransfers } = useQuery({
     queryKey: ["sales_tracker_transfers", allProductIds],
@@ -129,7 +156,7 @@ export function ProductSalesTrackerModal() {
     enabled: open && allProductIds.length > 0,
   });
 
-  const isLoading = loadingSales || loadingTransfers;
+  const isLoading = loadingSales || loadingPurchases || loadingTransfers;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -190,7 +217,17 @@ export function ProductSalesTrackerModal() {
               {/* Totals summary */}
               <Card className="border-primary/30 bg-primary/5">
                 <CardContent className="pt-4 pb-3">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex items-center gap-3">
+                      <TruckIcon className="h-5 w-5 text-orange-600" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Total Comprado</p>
+                        <p className="text-lg font-bold text-orange-700">
+                          {purchasesData.reduce((sum: number, item: any) => sum + (item.quantity_ordered || 0), 0)} unidades
+                        </p>
+                        <p className="text-xs text-muted-foreground">{purchasesData.length} compra(s)</p>
+                      </div>
+                    </div>
                     <div className="flex items-center gap-3">
                       <ShoppingCart className="h-5 w-5 text-green-600" />
                       <div>
@@ -212,6 +249,68 @@ export function ProductSalesTrackerModal() {
                       </div>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Purchases section */}
+              <Card>
+                <CardContent className="pt-4">
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <TruckIcon className="h-4 w-4 text-orange-600" />
+                    Compras ({purchasesData.length}) — {purchasesData.reduce((sum: number, item: any) => sum + (item.quantity_ordered || 0), 0)} uds.
+                  </h3>
+                  {purchasesData.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-4">
+                      No se encontraron compras para este producto
+                    </p>
+                  ) : (
+                    <ScrollArea className="h-[200px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Fecha</TableHead>
+                            <TableHead className="text-xs">Orden</TableHead>
+                            <TableHead className="text-xs">Proveedor</TableHead>
+                            <TableHead className="text-xs">Producto</TableHead>
+                            <TableHead className="text-xs text-right">Pedido</TableHead>
+                            <TableHead className="text-xs text-right">Recibido</TableHead>
+                            <TableHead className="text-xs">Estado</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {purchasesData.map((item: any) => (
+                            <TableRow key={item.id}>
+                              <TableCell className="text-xs">
+                                {item.purchase_orders?.created_at
+                                  ? format(new Date(item.purchase_orders.created_at), "dd/MM/yyyy", { locale: es })
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className="text-xs font-mono">
+                                {item.purchase_orders?.order_number || "—"}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {(item.purchase_orders?.profiles as any)?.company_name || (item.purchase_orders?.profiles as any)?.full_name || "—"}
+                              </TableCell>
+                              <TableCell className="text-xs font-medium">
+                                {(item.products as any)?.name || "—"}
+                              </TableCell>
+                              <TableCell className="text-xs text-right font-mono">
+                                {item.quantity_ordered}
+                              </TableCell>
+                              <TableCell className="text-xs text-right font-mono">
+                                {item.quantity_received ?? "—"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-xs">
+                                  {item.purchase_orders?.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  )}
                 </CardContent>
               </Card>
 
