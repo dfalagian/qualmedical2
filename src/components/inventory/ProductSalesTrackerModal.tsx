@@ -118,25 +118,67 @@ export function ProductSalesTrackerModal() {
           products:product_id(name, sku),
           purchase_orders:purchase_order_id (
             id, order_number, status, created_at, delivery_date, received_date,
-            supplier_id,
-            profiles:supplier_id(full_name, company_name)
+            supplier_id, supplier_type
           )
         `)
         .in("product_id", allProductIds)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      // Include any order where product was actually received, regardless of order status
-      return (data || []).filter(
+      
+      const filtered = (data || []).filter(
         (item: any) => {
           const status = item.purchase_orders?.status;
-          // Exclude cancelled orders
           if (status === "cancelada") return false;
-          // Include if quantity_received > 0 (product was actually received)
           if ((item.quantity_received || 0) > 0) return true;
-          // Also include approved/completed orders even if quantity_received is not set
           return ["aprobada", "recibida", "completada", "parcial"].includes(status);
         }
       );
+
+      // Fetch supplier names for general suppliers
+      const generalSupplierIds = [...new Set(
+        filtered
+          .filter((item: any) => item.purchase_orders?.supplier_type === 'general')
+          .map((item: any) => item.purchase_orders?.supplier_id)
+          .filter(Boolean)
+      )] as string[];
+      
+      let generalSuppliersMap: Record<string, any> = {};
+      if (generalSupplierIds.length > 0) {
+        const { data: gs } = await supabase
+          .from("general_suppliers")
+          .select("id, razon_social, nombre_comercial")
+          .in("id", generalSupplierIds);
+        if (gs) gs.forEach((s: any) => { generalSuppliersMap[s.id] = s; });
+      }
+
+      // Fetch supplier names for registered suppliers
+      const registeredSupplierIds = [...new Set(
+        filtered
+          .filter((item: any) => item.purchase_orders?.supplier_type !== 'general')
+          .map((item: any) => item.purchase_orders?.supplier_id)
+          .filter(Boolean)
+      )] as string[];
+      
+      let registeredSuppliersMap: Record<string, any> = {};
+      if (registeredSupplierIds.length > 0) {
+        const { data: rs } = await supabase
+          .from("profiles")
+          .select("id, full_name, company_name")
+          .in("id", registeredSupplierIds);
+        if (rs) rs.forEach((s: any) => { registeredSuppliersMap[s.id] = s; });
+      }
+
+      return filtered.map((item: any) => {
+        const suppId = item.purchase_orders?.supplier_id;
+        const isGeneral = item.purchase_orders?.supplier_type === 'general';
+        const supplier = isGeneral ? generalSuppliersMap[suppId] : registeredSuppliersMap[suppId];
+        return {
+          ...item,
+          _supplier_name: isGeneral
+            ? (supplier?.nombre_comercial || supplier?.razon_social || "—")
+            : (supplier?.company_name || supplier?.full_name || "—")
+        };
+      });
     },
     enabled: open && allProductIds.length > 0,
   });
@@ -298,7 +340,7 @@ export function ProductSalesTrackerModal() {
                                 {item.purchase_orders?.order_number || "—"}
                               </TableCell>
                               <TableCell className="text-xs">
-                                {(item.purchase_orders?.profiles as any)?.company_name || (item.purchase_orders?.profiles as any)?.full_name || "—"}
+                                {item._supplier_name || "—"}
                               </TableCell>
                               <TableCell className="text-xs font-medium">
                                 {(item.products as any)?.name || "—"}
