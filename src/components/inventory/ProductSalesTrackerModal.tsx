@@ -187,12 +187,40 @@ export function ProductSalesTrackerModal() {
                 ))}
               </div>
 
+              {/* Totals summary */}
+              <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="pt-4 pb-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-3">
+                      <ShoppingCart className="h-5 w-5 text-green-600" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Total Vendido</p>
+                        <p className="text-lg font-bold text-green-700">
+                          {salesData.reduce((sum: number, item: any) => sum + (item.cantidad || 0), 0)} unidades
+                        </p>
+                        <p className="text-xs text-muted-foreground">{salesData.length} venta(s)</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <ArrowRightLeft className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Total Transferido</p>
+                        <p className="text-lg font-bold text-blue-700">
+                          {transfersData.reduce((sum: number, t: any) => sum + (t.quantity || 1), 0)} unidades
+                        </p>
+                        <p className="text-xs text-muted-foreground">{transfersData.length} transferencia(s)</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Sales section */}
               <Card>
                 <CardContent className="pt-4">
                   <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
                     <ShoppingCart className="h-4 w-4 text-green-600" />
-                    Ventas ({salesData.length})
+                    Ventas ({salesData.length}) — {salesData.reduce((sum: number, item: any) => sum + (item.cantidad || 0), 0)} uds.
                   </h3>
                   {salesData.length === 0 ? (
                     <p className="text-xs text-muted-foreground text-center py-4">
@@ -254,7 +282,7 @@ export function ProductSalesTrackerModal() {
                 <CardContent className="pt-4">
                   <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
                     <ArrowRightLeft className="h-4 w-4 text-blue-600" />
-                    Transferencias ({transfersData.length})
+                    Transferencias ({transfersData.length}) — {transfersData.reduce((sum: number, t: any) => sum + (t.quantity || 1), 0)} uds.
                   </h3>
                   {transfersData.length === 0 ? (
                     <p className="text-xs text-muted-foreground text-center py-4">
