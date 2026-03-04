@@ -8,6 +8,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +26,7 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, ShoppingCart, Package, ArrowRightLeft, TruckIcon, LogIn } from "lucide-react";
+import { Search, ShoppingCart, Package, ArrowRightLeft, TruckIcon, LogIn, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -335,246 +340,282 @@ export function ProductSalesTrackerModal() {
               </Card>
 
               {/* Entries section */}
-              <Card>
-                <CardContent className="pt-4">
-                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                    <LogIn className="h-4 w-4 text-purple-600" />
-                    Entradas de Inventario ({entriesData.length}) — {entriesData.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)} uds.
-                  </h3>
-                  {entriesData.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4">
-                      No se encontraron entradas para este producto
-                    </p>
-                  ) : (
-                    <ScrollArea className="h-[200px]">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">Fecha</TableHead>
-                            <TableHead className="text-xs">Producto</TableHead>
-                            <TableHead className="text-xs text-right">Cantidad</TableHead>
-                            <TableHead className="text-xs">Ubicación</TableHead>
-                            <TableHead className="text-xs">Referencia</TableHead>
-                            <TableHead className="text-xs">Registró</TableHead>
-                            <TableHead className="text-xs">Notas</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {entriesData.map((item: any) => (
-                            <TableRow key={item.id}>
-                              <TableCell className="text-xs">
-                                {format(new Date(item.created_at), "dd/MM/yyyy", { locale: es })}
-                              </TableCell>
-                              <TableCell className="text-xs font-medium">
-                                {(item.products as any)?.name || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs text-right font-mono">
-                                {item.quantity}
-                              </TableCell>
-                              <TableCell className="text-xs">
-                                {item.location || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs">
-                                {item.reference_type || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs">
-                                {(item.profiles as any)?.full_name || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs max-w-[150px] truncate">
-                                {item.notes || "—"}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
+              <Collapsible>
+                <Card>
+                  <CollapsibleTrigger asChild>
+                    <CardContent className="pt-4 pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <LogIn className="h-4 w-4 text-purple-600" />
+                        Entradas de Inventario ({entriesData.length}) — {entriesData.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)} uds.
+                        <ChevronDown className="h-4 w-4 ml-auto text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                      </h3>
+                    </CardContent>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="pt-0">
+                      {entriesData.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-4">
+                          No se encontraron entradas para este producto
+                        </p>
+                      ) : (
+                        <ScrollArea className="h-[200px]">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs">Fecha</TableHead>
+                                <TableHead className="text-xs">Producto</TableHead>
+                                <TableHead className="text-xs text-right">Cantidad</TableHead>
+                                <TableHead className="text-xs">Ubicación</TableHead>
+                                <TableHead className="text-xs">Referencia</TableHead>
+                                <TableHead className="text-xs">Registró</TableHead>
+                                <TableHead className="text-xs">Notas</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {entriesData.map((item: any) => (
+                                <TableRow key={item.id}>
+                                  <TableCell className="text-xs">
+                                    {format(new Date(item.created_at), "dd/MM/yyyy", { locale: es })}
+                                  </TableCell>
+                                  <TableCell className="text-xs font-medium">
+                                    {(item.products as any)?.name || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-right font-mono">
+                                    {item.quantity}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {item.location || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {item.reference_type || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {(item.profiles as any)?.full_name || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs max-w-[150px] truncate">
+                                    {item.notes || "—"}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
 
               {/* Purchases section */}
-              <Card>
-                <CardContent className="pt-4">
-                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                    <TruckIcon className="h-4 w-4 text-orange-600" />
-                    Compras ({purchasesData.length}) — {purchasesData.reduce((sum: number, item: any) => sum + (item.quantity_ordered || 0), 0)} uds.
-                  </h3>
-                  {purchasesData.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4">
-                      No se encontraron compras para este producto
-                    </p>
-                  ) : (
-                    <ScrollArea className="h-[200px]">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">Fecha</TableHead>
-                            <TableHead className="text-xs">Orden</TableHead>
-                            <TableHead className="text-xs">Proveedor</TableHead>
-                            <TableHead className="text-xs">Producto</TableHead>
-                            <TableHead className="text-xs text-right">Pedido</TableHead>
-                            <TableHead className="text-xs text-right">Recibido</TableHead>
-                            <TableHead className="text-xs">Estado</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {purchasesData.map((item: any) => (
-                            <TableRow key={item.id}>
-                              <TableCell className="text-xs">
-                                {item.purchase_orders?.created_at
-                                  ? format(new Date(item.purchase_orders.created_at), "dd/MM/yyyy", { locale: es })
-                                  : "—"}
-                              </TableCell>
-                              <TableCell className="text-xs font-mono">
-                                {item.purchase_orders?.order_number || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs">
-                                {item._supplier_name || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs font-medium">
-                                {(item.products as any)?.name || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs text-right font-mono">
-                                {item.quantity_ordered}
-                              </TableCell>
-                              <TableCell className="text-xs text-right font-mono">
-                                {item.quantity_received ?? "—"}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="text-xs">
-                                  {item.purchase_orders?.status}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
+              <Collapsible>
+                <Card>
+                  <CollapsibleTrigger asChild>
+                    <CardContent className="pt-4 pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <TruckIcon className="h-4 w-4 text-orange-600" />
+                        Compras ({purchasesData.length}) — {purchasesData.reduce((sum: number, item: any) => sum + (item.quantity_ordered || 0), 0)} uds.
+                        <ChevronDown className="h-4 w-4 ml-auto text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                      </h3>
+                    </CardContent>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="pt-0">
+                      {purchasesData.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-4">
+                          No se encontraron compras para este producto
+                        </p>
+                      ) : (
+                        <ScrollArea className="h-[200px]">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs">Fecha</TableHead>
+                                <TableHead className="text-xs">Orden</TableHead>
+                                <TableHead className="text-xs">Proveedor</TableHead>
+                                <TableHead className="text-xs">Producto</TableHead>
+                                <TableHead className="text-xs text-right">Pedido</TableHead>
+                                <TableHead className="text-xs text-right">Recibido</TableHead>
+                                <TableHead className="text-xs">Estado</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {purchasesData.map((item: any) => (
+                                <TableRow key={item.id}>
+                                  <TableCell className="text-xs">
+                                    {item.purchase_orders?.created_at
+                                      ? format(new Date(item.purchase_orders.created_at), "dd/MM/yyyy", { locale: es })
+                                      : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs font-mono">
+                                    {item.purchase_orders?.order_number || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {item._supplier_name || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs font-medium">
+                                    {(item.products as any)?.name || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-right font-mono">
+                                    {item.quantity_ordered}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-right font-mono">
+                                    {item.quantity_received ?? "—"}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-xs">
+                                      {item.purchase_orders?.status}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
 
               {/* Sales section */}
-              <Card>
-                <CardContent className="pt-4">
-                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                    <ShoppingCart className="h-4 w-4 text-green-600" />
-                    Ventas ({salesData.length}) — {salesData.reduce((sum: number, item: any) => sum + (item.cantidad || 0), 0)} uds.
-                  </h3>
-                  {salesData.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4">
-                      No se encontraron ventas para este producto
-                    </p>
-                  ) : (
-                    <ScrollArea className="h-[200px]">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">Fecha Venta</TableHead>
-                            <TableHead className="text-xs">Folio</TableHead>
-                            <TableHead className="text-xs">Cliente</TableHead>
-                            <TableHead className="text-xs">Producto</TableHead>
-                            <TableHead className="text-xs">Lote</TableHead>
-                            <TableHead className="text-xs text-right">Cantidad</TableHead>
-                            <TableHead className="text-xs text-right">Importe</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {salesData.map((item: any) => (
-                            <TableRow key={item.id}>
-                              <TableCell className="text-xs">
-                                {item.quotes?.approved_at
-                                  ? format(new Date(item.quotes.approved_at), "dd/MM/yyyy", { locale: es })
-                                  : item.quotes?.fecha_cotizacion
-                                    ? format(new Date(item.quotes.fecha_cotizacion + "T00:00:00"), "dd/MM/yyyy", { locale: es })
-                                    : "—"}
-                              </TableCell>
-                              <TableCell className="text-xs font-mono">
-                                {item.quotes?.folio || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs">
-                                {(item.quotes?.clients as any)?.nombre_cliente || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs font-medium">
-                                {item.nombre_producto}
-                              </TableCell>
-                              <TableCell className="text-xs">
-                                {item.lote || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs text-right font-mono">
-                                {item.cantidad}
-                              </TableCell>
-                              <TableCell className="text-xs text-right font-mono">
-                                ${item.importe?.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
+              <Collapsible>
+                <Card>
+                  <CollapsibleTrigger asChild>
+                    <CardContent className="pt-4 pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <ShoppingCart className="h-4 w-4 text-green-600" />
+                        Ventas ({salesData.length}) — {salesData.reduce((sum: number, item: any) => sum + (item.cantidad || 0), 0)} uds.
+                        <ChevronDown className="h-4 w-4 ml-auto text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                      </h3>
+                    </CardContent>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="pt-0">
+                      {salesData.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-4">
+                          No se encontraron ventas para este producto
+                        </p>
+                      ) : (
+                        <ScrollArea className="h-[200px]">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs">Fecha Venta</TableHead>
+                                <TableHead className="text-xs">Folio</TableHead>
+                                <TableHead className="text-xs">Cliente</TableHead>
+                                <TableHead className="text-xs">Producto</TableHead>
+                                <TableHead className="text-xs">Lote</TableHead>
+                                <TableHead className="text-xs text-right">Cantidad</TableHead>
+                                <TableHead className="text-xs text-right">Importe</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {salesData.map((item: any) => (
+                                <TableRow key={item.id}>
+                                  <TableCell className="text-xs">
+                                    {item.quotes?.approved_at
+                                      ? format(new Date(item.quotes.approved_at), "dd/MM/yyyy", { locale: es })
+                                      : item.quotes?.fecha_cotizacion
+                                        ? format(new Date(item.quotes.fecha_cotizacion + "T00:00:00"), "dd/MM/yyyy", { locale: es })
+                                        : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs font-mono">
+                                    {item.quotes?.folio || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {(item.quotes?.clients as any)?.nombre_cliente || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs font-medium">
+                                    {item.nombre_producto}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {item.lote || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-right font-mono">
+                                    {item.cantidad}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-right font-mono">
+                                    ${item.importe?.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
 
               {/* Transfers section */}
-              <Card>
-                <CardContent className="pt-4">
-                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                    <ArrowRightLeft className="h-4 w-4 text-blue-600" />
-                    Transferencias ({transfersData.length}) — {transfersData.reduce((sum: number, t: any) => sum + (t.quantity || 1), 0)} uds.
-                  </h3>
-                  {transfersData.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4">
-                      No se encontraron transferencias para este producto
-                    </p>
-                  ) : (
-                    <ScrollArea className="h-[200px]">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">Fecha</TableHead>
-                            <TableHead className="text-xs">Origen</TableHead>
-                            <TableHead className="text-xs">Destino</TableHead>
-                            <TableHead className="text-xs">Producto</TableHead>
-                            <TableHead className="text-xs">Lote</TableHead>
-                            <TableHead className="text-xs text-right">Cantidad</TableHead>
-                            <TableHead className="text-xs">Estado</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {transfersData.map((t: any) => (
-                            <TableRow key={t.id}>
-                              <TableCell className="text-xs">
-                                {format(new Date(t.created_at), "dd/MM/yyyy", { locale: es })}
-                              </TableCell>
-                              <TableCell className="text-xs">
-                                {t.from_warehouse?.name || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs">
-                                {t.to_warehouse?.name || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs font-medium">
-                                {t.products?.name || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs">
-                                {t.product_batches?.batch_number || "—"}
-                              </TableCell>
-                              <TableCell className="text-xs text-right font-mono">
-                                {t.quantity || 1}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="text-xs">
-                                  {t.status}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
+              <Collapsible>
+                <Card>
+                  <CollapsibleTrigger asChild>
+                    <CardContent className="pt-4 pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <ArrowRightLeft className="h-4 w-4 text-blue-600" />
+                        Transferencias ({transfersData.length}) — {transfersData.reduce((sum: number, t: any) => sum + (t.quantity || 1), 0)} uds.
+                        <ChevronDown className="h-4 w-4 ml-auto text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                      </h3>
+                    </CardContent>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="pt-0">
+                      {transfersData.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-4">
+                          No se encontraron transferencias para este producto
+                        </p>
+                      ) : (
+                        <ScrollArea className="h-[200px]">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs">Fecha</TableHead>
+                                <TableHead className="text-xs">Origen</TableHead>
+                                <TableHead className="text-xs">Destino</TableHead>
+                                <TableHead className="text-xs">Producto</TableHead>
+                                <TableHead className="text-xs">Lote</TableHead>
+                                <TableHead className="text-xs text-right">Cantidad</TableHead>
+                                <TableHead className="text-xs">Estado</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {transfersData.map((t: any) => (
+                                <TableRow key={t.id}>
+                                  <TableCell className="text-xs">
+                                    {format(new Date(t.created_at), "dd/MM/yyyy", { locale: es })}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {t.from_warehouse?.name || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {t.to_warehouse?.name || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs font-medium">
+                                    {t.products?.name || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {t.product_batches?.batch_number || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-right font-mono">
+                                    {t.quantity || 1}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-xs">
+                                      {t.status}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
             </>
           )}
         </div>
