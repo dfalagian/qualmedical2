@@ -72,6 +72,19 @@ export function BatchTraceabilityModal() {
     enabled: open,
   });
 
+  // Fetch warehouses for resolving location UUIDs
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ["warehouses_for_traceability"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouses")
+        .select("id, name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
   // Fetch batches, optionally filtered by product
   const { data: batches = [] } = useQuery({
     queryKey: ["batches_for_traceability", selectedProduct],
@@ -163,7 +176,49 @@ export function BatchTraceabilityModal() {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as any[];
+      const movs = data as any[];
+
+      // Resolve quote folios for reference_ids
+      const quoteIds = movs
+        .filter((m) => m.reference_id && (m.reference_type === 'venta' || m.reference_type === 'cancelacion_venta' || !m.reference_type))
+        .map((m) => m.reference_id)
+        .filter((v, i, a) => a.indexOf(v) === i);
+
+      let quoteFolioMap: Record<string, string> = {};
+      if (quoteIds.length > 0) {
+        const { data: quotes } = await supabase
+          .from("quotes")
+          .select("id, folio")
+          .in("id", quoteIds);
+        if (quotes) {
+          quoteFolioMap = Object.fromEntries(quotes.map((q) => [q.id, q.folio]));
+        }
+      }
+
+      // Resolve purchase order numbers
+      const poIds = movs
+        .filter((m) => m.reference_type === 'purchase_order' && m.reference_id)
+        .map((m) => m.reference_id)
+        .filter((v, i, a) => a.indexOf(v) === i);
+
+      let poNumberMap: Record<string, string> = {};
+      if (poIds.length > 0) {
+        const { data: pos } = await supabase
+          .from("purchase_orders")
+          .select("id, order_number")
+          .in("id", poIds);
+        if (pos) {
+          poNumberMap = Object.fromEntries(pos.map((p) => [p.id, p.order_number]));
+        }
+      }
+
+      // Attach resolved data
+      return movs.map((m) => ({
+        ...m,
+        _resolved_reference: m.reference_id
+          ? (quoteFolioMap[m.reference_id] || poNumberMap[m.reference_id] || null)
+          : null,
+      }));
     },
     enabled: open,
   });
@@ -229,6 +284,37 @@ export function BatchTraceabilityModal() {
       case "ajuste": return <Badge variant="secondary">Ajuste</Badge>;
       default: return <Badge variant="outline">{type}</Badge>;
     }
+  };
+
+  // Resolve location UUID to warehouse name
+  const resolveLocation = (location: string | null) => {
+    if (!location) return null;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(location)) {
+      const warehouse = warehouses.find((w) => w.id === location);
+      return warehouse?.name || location.slice(0, 8) + "...";
+    }
+    return location;
+  };
+
+  // Format notes removing UUIDs and showing resolved reference
+  const formatReference = (mov: any) => {
+    if (mov._resolved_reference) {
+      if (mov.reference_type === 'cancelacion_venta' || mov.notes?.includes("Cancelación")) {
+        return "Cancelación → " + mov._resolved_reference;
+      }
+      if (mov.reference_type === 'venta' || mov.notes?.includes("Venta")) {
+        return "Venta → " + mov._resolved_reference;
+      }
+      if (mov.reference_type === 'purchase_order') {
+        return "OC " + mov._resolved_reference;
+      }
+      return mov._resolved_reference;
+    }
+    if (mov.notes) {
+      return mov.notes.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "").trim().replace(/\s+/g, " ").replace(/[-–]\s*$/, "").trim();
+    }
+    return null;
   };
 
   // Stats from current page (approximate for display)
@@ -472,10 +558,10 @@ export function BatchTraceabilityModal() {
                         <TableHead>Fecha/Hora</TableHead>
                         <TableHead>Producto</TableHead>
                         <TableHead>Lote</TableHead>
-                        <TableHead>Tag EPC</TableHead>
                         <TableHead className="text-center">Cantidad</TableHead>
                         <TableHead className="text-center">Stock</TableHead>
                         <TableHead>Ubicación</TableHead>
+                        <TableHead>Referencia</TableHead>
                         <TableHead>Usuario</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -508,16 +594,6 @@ export function BatchTraceabilityModal() {
                               <span className="text-muted-foreground text-xs">-</span>
                             )}
                           </TableCell>
-                          <TableCell>
-                            {mov.rfid_tags ? (
-                              <div className="flex items-center gap-1">
-                                <Tag className="h-3 w-3 text-muted-foreground" />
-                                <span className="font-mono text-xs">{mov.rfid_tags.epc.slice(-8)}</span>
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">-</span>
-                            )}
-                          </TableCell>
                           <TableCell className="text-center">
                             {getMovementBadge(mov.movement_type)}
                             <span className="ml-1 font-mono text-sm">
@@ -533,11 +609,21 @@ export function BatchTraceabilityModal() {
                             {mov.location ? (
                               <div className="flex items-center gap-1">
                                 <MapPin className="h-3 w-3 text-muted-foreground" />
-                                <span className="text-xs">{mov.location}</span>
+                                <span className="text-xs">{resolveLocation(mov.location)}</span>
                               </div>
                             ) : (
                               <span className="text-muted-foreground text-xs">-</span>
                             )}
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const ref = formatReference(mov);
+                              return ref ? (
+                                <span className="text-xs">{ref}</span>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">-</span>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>
                             {mov.profiles ? (
