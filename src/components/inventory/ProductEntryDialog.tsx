@@ -357,7 +357,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
             .eq("id", item.batchId);
         } else {
           // Crear nuevo lote
-          const { error: batchError } = await supabase
+          const { data: newBatch, error: batchError } = await supabase
             .from("product_batches")
             .insert({
               product_id: item.productId,
@@ -367,9 +367,13 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
               initial_quantity: item.cantidad,
               current_quantity: item.cantidad,
               notes: formData.numeroFactura ? `Factura: ${formData.numeroFactura}` : null
-            });
+            })
+            .select("id")
+            .single();
 
           if (batchError) throw batchError;
+          // Store the new batch ID for the movement record
+          item.batchId = newBatch?.id;
         }
 
         // Actualizar warehouse_id del producto al almacén seleccionado
@@ -409,6 +413,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
           .from("inventory_movements")
           .insert({
             product_id: item.productId,
+            batch_id: item.batchId || null,
             movement_type: "entrada",
             quantity: item.cantidad,
             reference_id: formData.ordenCompraId || null,

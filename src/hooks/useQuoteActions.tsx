@@ -358,11 +358,12 @@ export const useQuoteActions = () => {
             .eq("id", warehouseStockRow.id);
         }
 
-        // Crear movimiento de inventario (salida) con referencia al almacén
+        // Crear movimiento de inventario (salida) con referencia al almacén y lote
         const { error: movementError } = await supabase
           .from("inventory_movements")
           .insert({
             product_id: item.product_id,
+            batch_id: item.batch_id,
             movement_type: "salida",
             quantity: item.cantidad,
             previous_stock: batch.current_quantity,
@@ -486,11 +487,12 @@ export const useQuoteActions = () => {
           }
         }
 
-        // Crear movimiento de inventario (entrada por cancelación)
+        // Crear movimiento de inventario (entrada por cancelación) con lote
         await supabase
           .from("inventory_movements")
           .insert({
             product_id: item.product_id,
+            batch_id: item.batch_id,
             movement_type: "entrada",
             quantity: item.cantidad,
             previous_stock: batch.current_quantity,
