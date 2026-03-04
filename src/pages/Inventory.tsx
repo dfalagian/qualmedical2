@@ -65,6 +65,7 @@ import { ProductsByCategory } from "@/components/inventory/ProductsByCategory";
 
 import { WarehouseTransferDialog } from "@/components/inventory/WarehouseTransferDialog";
 import { WarehouseTransferHistory } from "@/components/inventory/WarehouseTransferHistory";
+import { ProductSalesTrackerModal } from "@/components/inventory/ProductSalesTrackerModal";
 
 import { WarehouseFilter } from "@/components/inventory/WarehouseFilter";
 import { StockByWarehouseModal } from "@/components/dashboard/StockByWarehouseModal";
@@ -1316,7 +1317,7 @@ export default function Inventory() {
 
         {/* Tabs */}
         <Tabs defaultValue="batches" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
+          <TabsList className="grid w-full grid-cols-6 max-w-4xl">
             <TabsTrigger value="batches" className="flex items-center gap-2">
               <Boxes className="h-4 w-4" />
               Lotes
@@ -1332,6 +1333,10 @@ export default function Inventory() {
             <TabsTrigger value="transfers" className="flex items-center gap-2">
               <ArrowRightLeft className="h-4 w-4" />
               Transferencias
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="flex items-center gap-2">
+              <ScanSearch className="h-4 w-4" />
+              Reportes
             </TabsTrigger>
             <TabsTrigger value="alerts" className="flex items-center gap-2 relative">
               <Bell className="h-4 w-4" />
@@ -2090,6 +2095,26 @@ export default function Inventory() {
               </CardHeader>
               <CardContent>
                 <WarehouseTransferHistory />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Reports Tab */}
+          <TabsContent value="reports" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <ScanSearch className="h-5 w-5 text-primary" />
+                    Rastreo de Productos
+                  </CardTitle>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Busca un producto por SKU, nombre o lote para saber si fue vendido o transferido entre almacenes.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <ProductSalesTrackerModal />
               </CardContent>
             </Card>
           </TabsContent>

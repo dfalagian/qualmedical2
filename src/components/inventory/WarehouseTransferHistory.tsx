@@ -42,7 +42,7 @@ interface TransferRecord {
   transfer_group_id: string | null;
   from_warehouse?: { name: string } | null;
   to_warehouse?: { name: string } | null;
-  products?: { name: string; brand: string | null; unit: string | null } | null;
+  products?: { name: string; brand: string | null; unit: string | null; sku?: string } | null;
   product_batches?: { batch_number: string; expiration_date: string } | null;
   rfid_tags?: {
     epc: string;
@@ -66,6 +66,7 @@ interface GroupedTransfer {
 }
 
 export function WarehouseTransferHistory() {
+  const [transferSearch, setTransferSearch] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
@@ -87,7 +88,7 @@ export function WarehouseTransferHistory() {
           *,
           from_warehouse:warehouses!warehouse_transfers_from_warehouse_id_fkey(name),
           to_warehouse:warehouses!warehouse_transfers_to_warehouse_id_fkey(name),
-          products:product_id(name, brand, unit),
+          products:product_id(name, brand, unit, sku),
           product_batches:batch_id(batch_number, expiration_date),
           rfid_tags:rfid_tag_id(
             epc,
@@ -133,6 +134,31 @@ export function WarehouseTransferHistory() {
       });
     }
   }
+
+  // Filter grouped transfers by search term
+  const filteredGrouped = transferSearch.trim()
+    ? grouped.filter((group) => {
+        const term = transferSearch.toLowerCase();
+        return group.items.some((item) => {
+          const isRfid = item.transfer_type === "rfid";
+          const prodName = isRfid
+            ? (item.rfid_tags as any)?.products?.name
+            : (item.products as any)?.name;
+          const batchNum = isRfid
+            ? (item.rfid_tags as any)?.product_batches?.batch_number
+            : (item.product_batches as any)?.batch_number;
+          const prodSku = isRfid
+            ? null
+            : (item.products as any)?.sku;
+          return (
+            (prodName && prodName.toLowerCase().includes(term)) ||
+            (prodSku && prodSku.toLowerCase().includes(term)) ||
+            (batchNum && batchNum.toLowerCase().includes(term)) ||
+            (group.notes && group.notes.toLowerCase().includes(term))
+          );
+        });
+      })
+    : grouped;
 
   // Derive the group being added to (after grouped is built)
   const addingGroup = addingToGroup ? grouped.find(g => g.key === addingToGroup) : null;
@@ -487,6 +513,16 @@ export function WarehouseTransferHistory() {
 
   return (
     <>
+      {/* Search bar */}
+      <div className="mb-3 relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por nombre de producto, lote o notas..."
+          value={transferSearch}
+          onChange={(e) => setTransferSearch(e.target.value)}
+          className="pl-9 h-9 text-sm"
+        />
+      </div>
       <ScrollArea className="h-[500px]">
         <Table>
           <TableHeader>
@@ -502,7 +538,7 @@ export function WarehouseTransferHistory() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {grouped.map((group) => {
+            {filteredGrouped.map((group) => {
               const totalQty = group.items.reduce((s, i) => s + (i.quantity || 1), 0);
               const hasRfid = group.items.some((i) => i.transfer_type === "rfid");
               const hasManual = group.items.some((i) => i.transfer_type === "manual");
