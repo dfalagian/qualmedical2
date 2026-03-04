@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, ShoppingCart, Package, ArrowRightLeft, TruckIcon } from "lucide-react";
+import { Search, ShoppingCart, Package, ArrowRightLeft, TruckIcon, LogIn } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -183,6 +183,27 @@ export function ProductSalesTrackerModal() {
     enabled: open && allProductIds.length > 0,
   });
 
+  // Fetch inventory entry movements (entradas directas)
+  const { data: entriesData = [], isLoading: loadingEntries } = useQuery({
+    queryKey: ["sales_tracker_entries", allProductIds],
+    queryFn: async () => {
+      if (allProductIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("inventory_movements")
+        .select(`
+          id, quantity, movement_type, created_at, notes, reference_type, reference_id, location,
+          products:product_id(name, sku),
+          profiles:created_by(full_name)
+        `)
+        .in("product_id", allProductIds)
+        .eq("movement_type", "entrada")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && allProductIds.length > 0,
+  });
+
   // Fetch transfers for these products
   const { data: transfersData = [], isLoading: loadingTransfers } = useQuery({
     queryKey: ["sales_tracker_transfers", allProductIds],
@@ -207,7 +228,7 @@ export function ProductSalesTrackerModal() {
     enabled: open && allProductIds.length > 0,
   });
 
-  const isLoading = loadingSales || loadingPurchases || loadingTransfers;
+  const isLoading = loadingSales || loadingPurchases || loadingTransfers || loadingEntries;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -268,15 +289,25 @@ export function ProductSalesTrackerModal() {
               {/* Totals summary */}
               <Card className="border-primary/30 bg-primary/5">
                 <CardContent className="pt-4 pb-3">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="flex items-center gap-3">
+                      <LogIn className="h-5 w-5 text-purple-600" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Total Entradas</p>
+                        <p className="text-lg font-bold text-purple-700">
+                          {entriesData.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)} uds
+                        </p>
+                        <p className="text-xs text-muted-foreground">{entriesData.length} movimiento(s)</p>
+                      </div>
+                    </div>
                     <div className="flex items-center gap-3">
                       <TruckIcon className="h-5 w-5 text-orange-600" />
                       <div>
-                        <p className="text-xs text-muted-foreground">Total Comprado</p>
+                        <p className="text-xs text-muted-foreground">Órdenes de Compra</p>
                         <p className="text-lg font-bold text-orange-700">
-                          {purchasesData.reduce((sum: number, item: any) => sum + (item.quantity_ordered || 0), 0)} unidades
+                          {purchasesData.reduce((sum: number, item: any) => sum + (item.quantity_ordered || 0), 0)} uds
                         </p>
-                        <p className="text-xs text-muted-foreground">{purchasesData.length} compra(s)</p>
+                        <p className="text-xs text-muted-foreground">{purchasesData.length} orden(es)</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -284,7 +315,7 @@ export function ProductSalesTrackerModal() {
                       <div>
                         <p className="text-xs text-muted-foreground">Total Vendido</p>
                         <p className="text-lg font-bold text-green-700">
-                          {salesData.reduce((sum: number, item: any) => sum + (item.cantidad || 0), 0)} unidades
+                          {salesData.reduce((sum: number, item: any) => sum + (item.cantidad || 0), 0)} uds
                         </p>
                         <p className="text-xs text-muted-foreground">{salesData.length} venta(s)</p>
                       </div>
@@ -294,12 +325,70 @@ export function ProductSalesTrackerModal() {
                       <div>
                         <p className="text-xs text-muted-foreground">Total Transferido</p>
                         <p className="text-lg font-bold text-blue-700">
-                          {transfersData.reduce((sum: number, t: any) => sum + (t.quantity || 1), 0)} unidades
+                          {transfersData.reduce((sum: number, t: any) => sum + (t.quantity || 1), 0)} uds
                         </p>
                         <p className="text-xs text-muted-foreground">{transfersData.length} transferencia(s)</p>
                       </div>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Entries section */}
+              <Card>
+                <CardContent className="pt-4">
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <LogIn className="h-4 w-4 text-purple-600" />
+                    Entradas de Inventario ({entriesData.length}) — {entriesData.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)} uds.
+                  </h3>
+                  {entriesData.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-4">
+                      No se encontraron entradas para este producto
+                    </p>
+                  ) : (
+                    <ScrollArea className="h-[200px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Fecha</TableHead>
+                            <TableHead className="text-xs">Producto</TableHead>
+                            <TableHead className="text-xs text-right">Cantidad</TableHead>
+                            <TableHead className="text-xs">Ubicación</TableHead>
+                            <TableHead className="text-xs">Referencia</TableHead>
+                            <TableHead className="text-xs">Registró</TableHead>
+                            <TableHead className="text-xs">Notas</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {entriesData.map((item: any) => (
+                            <TableRow key={item.id}>
+                              <TableCell className="text-xs">
+                                {format(new Date(item.created_at), "dd/MM/yyyy", { locale: es })}
+                              </TableCell>
+                              <TableCell className="text-xs font-medium">
+                                {(item.products as any)?.name || "—"}
+                              </TableCell>
+                              <TableCell className="text-xs text-right font-mono">
+                                {item.quantity}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {item.location || "—"}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {item.reference_type || "—"}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {(item.profiles as any)?.full_name || "—"}
+                              </TableCell>
+                              <TableCell className="text-xs max-w-[150px] truncate">
+                                {item.notes || "—"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  )}
                 </CardContent>
               </Card>
 
