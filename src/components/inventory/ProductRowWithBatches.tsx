@@ -196,11 +196,14 @@ export function ProductRowWithBatches({
           )}
         </TableCell>
         <TableCell className="text-center">
-          <Badge
-            variant={product.current_stock <= product.minimum_stock ? "destructive" : "default"}
-          >
-            {product.current_stock} / {product.minimum_stock}
-          </Badge>
+          <div className="flex flex-col items-center gap-0.5">
+            <Badge
+              variant={product.current_stock <= product.minimum_stock ? "destructive" : "default"}
+            >
+              {product.current_stock} / {product.minimum_stock}
+            </Badge>
+            <span className="text-[10px] text-muted-foreground">Actual / Mínimo</span>
+          </div>
         </TableCell>
         <TableCell className="text-right">
           {product.unit_price ? `$${product.unit_price.toFixed(2)}` : "-"}
