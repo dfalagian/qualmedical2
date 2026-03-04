@@ -315,9 +315,9 @@ export function ProductRowWithBatches({
 
                         <div className="flex items-center gap-4">
                           <div className="text-sm">
-                            <span className="text-muted-foreground">Cantidad: </span>
+                            <span className="text-muted-foreground">Restante: </span>
                             <span className="font-medium">{batch.current_quantity}</span>
-                            <span className="text-muted-foreground">/{batch.initial_quantity}</span>
+                            <span className="text-muted-foreground"> de {batch.initial_quantity}</span>
                           </div>
                         </div>
 
