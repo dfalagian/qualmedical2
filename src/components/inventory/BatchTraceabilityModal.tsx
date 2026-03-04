@@ -10,16 +10,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   Table,
   TableBody,
@@ -29,82 +24,38 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   FileSearch, 
   ArrowUpCircle, 
   ArrowDownCircle,
   Package,
-  Calendar,
   Tag,
   MapPin,
   User,
-  History
+  History,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronLeft,
+  ChevronRight,
+  ArrowLeftRight,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
-interface InventoryMovement {
-  id: string;
-  product_id: string;
-  rfid_tag_id: string | null;
-  movement_type: string;
-  quantity: number;
-  previous_stock: number | null;
-  new_stock: number | null;
-  location: string | null;
-  notes: string | null;
-  created_at: string;
-  created_by: string | null;
-  reference_type: string | null;
-  reference_id: string | null;
-  products: {
-    name: string;
-    sku: string;
-  } | null;
-  rfid_tags: {
-    epc: string;
-    batch_id: string | null;
-  } | null;
-  profiles: {
-    full_name: string;
-  } | null;
-}
-
-interface ProductBatch {
-  id: string;
-  batch_number: string;
-  product_id: string;
-  products: {
-    name: string;
-    sku: string;
-  } | null;
-}
+const PAGE_SIZE = 50;
 
 export function BatchTraceabilityModal() {
   const [open, setOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<string>("");
   const [selectedProduct, setSelectedProduct] = useState<string>("");
   const [searchEpc, setSearchEpc] = useState("");
-
-  // Fetch all batches for filter
-  const { data: batches = [] } = useQuery({
-    queryKey: ["batches_for_traceability"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("product_batches")
-        .select(`
-          id,
-          batch_number,
-          product_id,
-          products:product_id (name, sku)
-        `)
-        .order("batch_number", { ascending: false });
-
-      if (error) throw error;
-      return data as ProductBatch[];
-    },
-    enabled: open
-  });
+  const [page, setPage] = useState(0);
+  const [productPopoverOpen, setProductPopoverOpen] = useState(false);
+  const [batchPopoverOpen, setBatchPopoverOpen] = useState(false);
 
   // Fetch products for filter
   const { data: products = [] } = useQuery({
@@ -115,99 +66,198 @@ export function BatchTraceabilityModal() {
         .select("id, name, sku")
         .eq("is_active", true)
         .order("name");
-
       if (error) throw error;
       return data;
     },
-    enabled: open
+    enabled: open,
   });
 
-  // Fetch movements with filters
+  // Fetch batches, optionally filtered by product
+  const { data: batches = [] } = useQuery({
+    queryKey: ["batches_for_traceability", selectedProduct],
+    queryFn: async () => {
+      let query = supabase
+        .from("product_batches")
+        .select(`id, batch_number, product_id, products:product_id (name, sku)`)
+        .order("batch_number", { ascending: false });
+      if (selectedProduct) query = query.eq("product_id", selectedProduct);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as { id: string; batch_number: string; product_id: string; products: { name: string; sku: string } | null }[];
+    },
+    enabled: open,
+  });
+
+  // Count total movements for pagination
+  const { data: totalCount = 0 } = useQuery({
+    queryKey: ["inventory_movements_count", selectedBatch, selectedProduct, searchEpc],
+    queryFn: async () => {
+      let query = supabase
+        .from("inventory_movements")
+        .select("id", { count: "exact", head: true });
+
+      if (selectedProduct) query = query.eq("product_id", selectedProduct);
+
+      if (selectedBatch) {
+        // Get tag ids for this batch
+        const { data: tags } = await supabase
+          .from("rfid_tags")
+          .select("id")
+          .eq("batch_id", selectedBatch);
+        if (tags && tags.length > 0) {
+          query = query.in("rfid_tag_id", tags.map((t) => t.id));
+        } else {
+          return 0;
+        }
+      }
+
+      if (searchEpc) {
+        const { data: tagData } = await supabase
+          .from("rfid_tags")
+          .select("id")
+          .ilike("epc", `%${searchEpc}%`);
+        if (tagData && tagData.length > 0) {
+          query = query.in("rfid_tag_id", tagData.map((t) => t.id));
+        } else {
+          return 0;
+        }
+      }
+
+      const { count, error } = await query;
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: open,
+  });
+
+  // Fetch movements with server-side pagination and filters
   const { data: movements = [], isLoading } = useQuery({
-    queryKey: ["inventory_movements_trace", selectedBatch, selectedProduct, searchEpc],
+    queryKey: ["inventory_movements_trace", selectedBatch, selectedProduct, searchEpc, page],
     queryFn: async () => {
       let query = supabase
         .from("inventory_movements")
         .select(`
           *,
           products:product_id (name, sku),
-          rfid_tags:rfid_tag_id (epc, batch_id),
+          rfid_tags:rfid_tag_id (epc, batch_id, product_batches:batch_id (batch_number)),
           profiles:created_by (full_name)
         `)
         .order("created_at", { ascending: false })
-        .limit(100);
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-      if (selectedProduct) {
-        query = query.eq("product_id", selectedProduct);
+      if (selectedProduct) query = query.eq("product_id", selectedProduct);
+
+      if (selectedBatch) {
+        const { data: tags } = await supabase
+          .from("rfid_tags")
+          .select("id")
+          .eq("batch_id", selectedBatch);
+        if (tags && tags.length > 0) {
+          query = query.in("rfid_tag_id", tags.map((t) => t.id));
+        } else {
+          return [];
+        }
       }
 
       if (searchEpc) {
-        // First get tag id by EPC
         const { data: tagData } = await supabase
           .from("rfid_tags")
           .select("id")
           .ilike("epc", `%${searchEpc}%`);
-        
         if (tagData && tagData.length > 0) {
-          query = query.in("rfid_tag_id", tagData.map(t => t.id));
+          query = query.in("rfid_tag_id", tagData.map((t) => t.id));
+        } else {
+          return [];
         }
       }
 
       const { data, error } = await query;
       if (error) throw error;
-
-      // Filter by batch if selected
-      let result = data as InventoryMovement[];
-      if (selectedBatch) {
-        result = result.filter(m => 
-          m.rfid_tags?.batch_id === selectedBatch ||
-          m.notes?.includes(selectedBatch)
-        );
-      }
-
-      return result;
+      return data as any[];
     },
-    enabled: open
+    enabled: open,
+  });
+
+  // Fetch transfers with pagination
+  const { data: transfersCount = 0 } = useQuery({
+    queryKey: ["transfers_count_trace", selectedProduct, selectedBatch],
+    queryFn: async () => {
+      let query = supabase
+        .from("warehouse_transfers")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "completada");
+      if (selectedProduct) query = query.eq("product_id", selectedProduct);
+      if (selectedBatch) query = query.eq("batch_id", selectedBatch);
+      const { count, error } = await query;
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: open,
+  });
+
+  const [transferPage, setTransferPage] = useState(0);
+
+  const { data: transfers = [], isLoading: transfersLoading } = useQuery({
+    queryKey: ["transfers_trace", selectedProduct, selectedBatch, transferPage],
+    queryFn: async () => {
+      let query = supabase
+        .from("warehouse_transfers")
+        .select(`
+          *,
+          products:product_id (name, sku),
+          product_batches:batch_id (batch_number),
+          from_warehouse:warehouses!warehouse_transfers_from_warehouse_id_fkey (name),
+          to_warehouse:warehouses!warehouse_transfers_to_warehouse_id_fkey (name),
+          profiles:created_by (full_name)
+        `)
+        .eq("status", "completada")
+        .order("confirmed_at", { ascending: false })
+        .range(transferPage * PAGE_SIZE, (transferPage + 1) * PAGE_SIZE - 1);
+
+      if (selectedProduct) query = query.eq("product_id", selectedProduct);
+      if (selectedBatch) query = query.eq("batch_id", selectedBatch);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: open,
   });
 
   const getMovementIcon = (type: string) => {
     switch (type) {
-      case "entrada":
-        return <ArrowDownCircle className="h-4 w-4 text-green-500" />;
-      case "salida":
-        return <ArrowUpCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <History className="h-4 w-4 text-muted-foreground" />;
+      case "entrada": return <ArrowDownCircle className="h-4 w-4 text-green-500" />;
+      case "salida": return <ArrowUpCircle className="h-4 w-4 text-red-500" />;
+      default: return <History className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   const getMovementBadge = (type: string) => {
     switch (type) {
-      case "entrada":
-        return <Badge className="bg-green-100 text-green-700">Entrada</Badge>;
-      case "salida":
-        return <Badge className="bg-red-100 text-red-700">Salida</Badge>;
-      case "ajuste":
-        return <Badge variant="secondary">Ajuste</Badge>;
-      default:
-        return <Badge variant="outline">{type}</Badge>;
+      case "entrada": return <Badge className="bg-green-100 text-green-700">Entrada</Badge>;
+      case "salida": return <Badge className="bg-red-100 text-red-700">Salida</Badge>;
+      case "ajuste": return <Badge variant="secondary">Ajuste</Badge>;
+      default: return <Badge variant="outline">{type}</Badge>;
     }
   };
 
-  // Stats
-  const entradas = movements.filter(m => m.movement_type === "entrada").length;
-  const salidas = movements.filter(m => m.movement_type === "salida").length;
-  const totalQuantity = movements.reduce((acc, m) => {
-    if (m.movement_type === "entrada") return acc + m.quantity;
-    if (m.movement_type === "salida") return acc - m.quantity;
-    return acc;
-  }, 0);
+  // Stats from current page (approximate for display)
+  const entradas = movements.filter((m: any) => m.movement_type === "entrada").length;
+  const salidas = movements.filter((m: any) => m.movement_type === "salida").length;
 
   const clearFilters = () => {
     setSelectedBatch("");
     setSelectedProduct("");
     setSearchEpc("");
+    setPage(0);
+    setTransferPage(0);
   };
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const totalTransferPages = Math.ceil(transfersCount / PAGE_SIZE);
+
+  const selectedProductName = products.find((p) => p.id === selectedProduct);
+  const selectedBatchName = batches.find((b) => b.id === selectedBatch);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -217,7 +267,7 @@ export function BatchTraceabilityModal() {
           Trazabilidad
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-5xl max-h-[90vh]">
+      <DialogContent className="max-w-6xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSearch className="h-5 w-5" />
@@ -230,38 +280,108 @@ export function BatchTraceabilityModal() {
           <Card>
             <CardContent className="pt-4">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {/* Product Combobox */}
                 <div className="space-y-2">
                   <Label className="text-xs">Producto</Label>
-                  <Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val === "all" ? "" : val)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos los productos" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      {products.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.sku} - {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover modal={true} open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                        {selectedProductName
+                          ? <span className="truncate">{selectedProductName.sku} - {selectedProductName.name}</span>
+                          : "Todos los productos"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[350px] p-0 z-[9999]">
+                      <Command>
+                        <CommandInput placeholder="Buscar por nombre o SKU..." />
+                        <CommandList>
+                          <CommandEmpty>Sin resultados</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              onSelect={() => {
+                                setSelectedProduct("");
+                                setSelectedBatch("");
+                                setPage(0);
+                                setTransferPage(0);
+                                setProductPopoverOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", !selectedProduct ? "opacity-100" : "opacity-0")} />
+                              Todos los productos
+                            </CommandItem>
+                            {products.map((p) => (
+                              <CommandItem
+                                key={p.id}
+                                value={`${p.sku} ${p.name}`}
+                                onSelect={() => {
+                                  setSelectedProduct(p.id);
+                                  setSelectedBatch("");
+                                  setPage(0);
+                                  setTransferPage(0);
+                                  setProductPopoverOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", selectedProduct === p.id ? "opacity-100" : "opacity-0")} />
+                                {p.sku} - {p.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
+                {/* Batch Combobox */}
                 <div className="space-y-2">
                   <Label className="text-xs">Lote</Label>
-                  <Select value={selectedBatch} onValueChange={(val) => setSelectedBatch(val === "all" ? "" : val)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos los lotes" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      {batches.map((b) => (
-                        <SelectItem key={b.id} value={b.id}>
-                          {b.batch_number} - {b.products?.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover modal={true} open={batchPopoverOpen} onOpenChange={setBatchPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                        {selectedBatchName
+                          ? <span className="truncate">{selectedBatchName.batch_number}</span>
+                          : "Todos los lotes"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[350px] p-0 z-[9999]">
+                      <Command>
+                        <CommandInput placeholder="Buscar lote..." />
+                        <CommandList>
+                          <CommandEmpty>Sin resultados</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              onSelect={() => {
+                                setSelectedBatch("");
+                                setPage(0);
+                                setTransferPage(0);
+                                setBatchPopoverOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", !selectedBatch ? "opacity-100" : "opacity-0")} />
+                              Todos los lotes
+                            </CommandItem>
+                            {batches.map((b) => (
+                              <CommandItem
+                                key={b.id}
+                                value={`${b.batch_number} ${b.products?.name || ""}`}
+                                onSelect={() => {
+                                  setSelectedBatch(b.id);
+                                  setPage(0);
+                                  setTransferPage(0);
+                                  setBatchPopoverOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", selectedBatch === b.id ? "opacity-100" : "opacity-0")} />
+                                {b.batch_number} - {b.products?.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 <div className="space-y-2">
@@ -269,7 +389,7 @@ export function BatchTraceabilityModal() {
                   <Input
                     placeholder="EPC del tag..."
                     value={searchEpc}
-                    onChange={(e) => setSearchEpc(e.target.value)}
+                    onChange={(e) => { setSearchEpc(e.target.value); setPage(0); }}
                   />
                 </div>
 
@@ -282,151 +402,299 @@ export function BatchTraceabilityModal() {
             </CardContent>
           </Card>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2">
-                  <ArrowDownCircle className="h-5 w-5 text-green-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-green-600">{entradas}</p>
-                    <p className="text-xs text-muted-foreground">Entradas</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2">
-                  <ArrowUpCircle className="h-5 w-5 text-red-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-red-600">{salidas}</p>
-                    <p className="text-xs text-muted-foreground">Salidas</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-primary" />
-                  <div>
-                    <p className={`text-2xl font-bold ${totalQuantity >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {totalQuantity > 0 ? '+' : ''}{totalQuantity}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Balance neto</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Tabs: Movimientos + Transferencias */}
+          <Tabs defaultValue="movements">
+            <TabsList>
+              <TabsTrigger value="movements" className="gap-1">
+                <History className="h-4 w-4" />
+                Movimientos ({totalCount})
+              </TabsTrigger>
+              <TabsTrigger value="transfers" className="gap-1">
+                <ArrowLeftRight className="h-4 w-4" />
+                Transferencias ({transfersCount})
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Movements Table */}
-          <ScrollArea className="h-[400px]">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                <span className="ml-2">Cargando movimientos...</span>
+            {/* Movements Tab */}
+            <TabsContent value="movements" className="space-y-3">
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <ArrowDownCircle className="h-5 w-5 text-green-500" />
+                      <div>
+                        <p className="text-xl font-bold text-green-600">{entradas}</p>
+                        <p className="text-xs text-muted-foreground">Entradas (pág.)</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpCircle className="h-5 w-5 text-red-500" />
+                      <div>
+                        <p className="text-xl font-bold text-red-600">{salidas}</p>
+                        <p className="text-xs text-muted-foreground">Salidas (pág.)</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="text-xl font-bold">{totalCount}</p>
+                        <p className="text-xs text-muted-foreground">Total movimientos</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            ) : movements.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  No hay movimientos registrados con los filtros seleccionados
-                </CardContent>
-              </Card>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]">Tipo</TableHead>
-                    <TableHead>Fecha/Hora</TableHead>
-                    <TableHead>Producto</TableHead>
-                    <TableHead>Tag EPC</TableHead>
-                    <TableHead className="text-center">Cantidad</TableHead>
-                    <TableHead className="text-center">Stock</TableHead>
-                    <TableHead>Ubicación</TableHead>
-                    <TableHead>Usuario</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {movements.map((mov) => (
-                    <TableRow key={mov.id}>
-                      <TableCell>
-                        {getMovementIcon(mov.movement_type)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="text-sm">
-                            {format(parseISO(mov.created_at), "dd MMM yyyy", { locale: es })}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {format(parseISO(mov.created_at), "HH:mm:ss")}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{mov.products?.name}</span>
-                          <span className="text-xs text-muted-foreground font-mono">
-                            {mov.products?.sku}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {mov.rfid_tags ? (
-                          <div className="flex items-center gap-1">
-                            <Tag className="h-3 w-3 text-muted-foreground" />
-                            <span className="font-mono text-xs">
-                              {mov.rfid_tags.epc.slice(-8)}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {getMovementBadge(mov.movement_type)}
-                        <span className="ml-2 font-mono">
-                          {mov.movement_type === "entrada" ? "+" : "-"}{mov.quantity}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="text-muted-foreground">{mov.previous_stock ?? '-'}</span>
-                        <span className="mx-1">→</span>
-                        <span className="font-medium">{mov.new_stock ?? '-'}</span>
-                      </TableCell>
-                      <TableCell>
-                        {mov.location ? (
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs">{mov.location}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {mov.profiles ? (
-                          <div className="flex items-center gap-1">
-                            <User className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs">{mov.profiles.full_name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">Sistema</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </ScrollArea>
 
-          {/* Notes */}
-          <p className="text-xs text-muted-foreground text-center">
-            Mostrando últimos 100 movimientos. Use los filtros para buscar movimientos específicos.
-          </p>
+              <ScrollArea className="h-[350px]">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <span className="ml-2">Cargando movimientos...</span>
+                  </div>
+                ) : movements.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-8 text-center text-muted-foreground">
+                      <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      No hay movimientos registrados con los filtros seleccionados
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">Tipo</TableHead>
+                        <TableHead>Fecha/Hora</TableHead>
+                        <TableHead>Producto</TableHead>
+                        <TableHead>Lote</TableHead>
+                        <TableHead>Tag EPC</TableHead>
+                        <TableHead className="text-center">Cantidad</TableHead>
+                        <TableHead className="text-center">Stock</TableHead>
+                        <TableHead>Ubicación</TableHead>
+                        <TableHead>Usuario</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {movements.map((mov: any) => (
+                        <TableRow key={mov.id}>
+                          <TableCell>{getMovementIcon(mov.movement_type)}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="text-sm">
+                                {format(parseISO(mov.created_at), "dd MMM yyyy", { locale: es })}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {format(parseISO(mov.created_at), "HH:mm:ss")}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-sm">{mov.products?.name}</span>
+                              <span className="text-xs text-muted-foreground font-mono">{mov.products?.sku}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {mov.rfid_tags?.product_batches?.batch_number ? (
+                              <Badge variant="outline" className="font-mono text-xs">
+                                {mov.rfid_tags.product_batches.batch_number}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {mov.rfid_tags ? (
+                              <div className="flex items-center gap-1">
+                                <Tag className="h-3 w-3 text-muted-foreground" />
+                                <span className="font-mono text-xs">{mov.rfid_tags.epc.slice(-8)}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {getMovementBadge(mov.movement_type)}
+                            <span className="ml-1 font-mono text-sm">
+                              {mov.movement_type === "entrada" ? "+" : "-"}{mov.quantity}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-muted-foreground">{mov.previous_stock ?? "-"}</span>
+                            <span className="mx-1">→</span>
+                            <span className="font-medium">{mov.new_stock ?? "-"}</span>
+                          </TableCell>
+                          <TableCell>
+                            {mov.location ? (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-xs">{mov.location}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {mov.profiles ? (
+                              <div className="flex items-center gap-1">
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-xs">{mov.profiles.full_name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">Sistema</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </ScrollArea>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Página {page + 1} de {totalPages} ({totalCount} registros)
+                  </p>
+                  <div className="flex gap-1">
+                    <Button size="icon" variant="ghost" disabled={page === 0} onClick={() => setPage(0)}>
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" disabled={page === 0} onClick={() => setPage(page - 1)}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)}>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" disabled={page >= totalPages - 1} onClick={() => setPage(totalPages - 1)}>
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Transfers Tab */}
+            <TabsContent value="transfers" className="space-y-3">
+              <ScrollArea className="h-[400px]">
+                {transfersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <span className="ml-2">Cargando transferencias...</span>
+                  </div>
+                ) : transfers.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-8 text-center text-muted-foreground">
+                      <ArrowLeftRight className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      No hay transferencias completadas con los filtros seleccionados
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Producto</TableHead>
+                        <TableHead>Lote</TableHead>
+                        <TableHead>Origen</TableHead>
+                        <TableHead>Destino</TableHead>
+                        <TableHead className="text-center">Cantidad</TableHead>
+                        <TableHead>Usuario</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {transfers.map((t: any) => (
+                        <TableRow key={t.id}>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="text-sm">
+                                {t.confirmed_at ? format(parseISO(t.confirmed_at), "dd MMM yyyy", { locale: es }) : "-"}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {t.confirmed_at ? format(parseISO(t.confirmed_at), "HH:mm:ss") : ""}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-sm">{t.products?.name}</span>
+                              <span className="text-xs text-muted-foreground font-mono">{t.products?.sku}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {t.product_batches?.batch_number ? (
+                              <Badge variant="outline" className="font-mono text-xs">
+                                {t.product_batches.batch_number}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-red-400" />
+                              <span className="text-xs">{t.from_warehouse?.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-green-400" />
+                              <span className="text-xs">{t.to_warehouse?.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="font-mono font-medium">{t.quantity}</span>
+                          </TableCell>
+                          <TableCell>
+                            {t.profiles ? (
+                              <div className="flex items-center gap-1">
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-xs">{t.profiles.full_name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </ScrollArea>
+
+              {/* Transfer Pagination */}
+              {totalTransferPages > 1 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Página {transferPage + 1} de {totalTransferPages} ({transfersCount} registros)
+                  </p>
+                  <div className="flex gap-1">
+                    <Button size="icon" variant="ghost" disabled={transferPage === 0} onClick={() => setTransferPage(0)}>
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" disabled={transferPage === 0} onClick={() => setTransferPage(transferPage - 1)}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" disabled={transferPage >= totalTransferPages - 1} onClick={() => setTransferPage(transferPage + 1)}>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" disabled={transferPage >= totalTransferPages - 1} onClick={() => setTransferPage(totalTransferPages - 1)}>
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </DialogContent>
     </Dialog>
