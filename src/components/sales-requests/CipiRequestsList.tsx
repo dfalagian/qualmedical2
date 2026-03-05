@@ -205,8 +205,9 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
             lote: item.lote,
             fecha_caducidad: item.caducidad,
             cantidad: item.cantidad,
-            precio_unitario: item.precio_unitario,
-            importe: item.precio,
+            precio_unitario: item.precio_unitario || 0,
+            importe: (item.precio_unitario || 0) * (item.cantidad || 1),
+            tipo_precio: 'manual',
           };
         });
 
