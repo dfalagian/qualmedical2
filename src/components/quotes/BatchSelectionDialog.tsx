@@ -196,30 +196,60 @@ export const BatchSelectionDialog = ({
       for (const batches of Object.values(batchesByProduct)) {
         for (const batch of batches) {
           const nets = transferNet[batch.id] || {};
+          const hasTransfers = Object.keys(nets).length > 0;
           const perWh: Record<string, number> = {};
-          
-          // First pass: calculate raw values
-          let totalDistributed = 0;
-          for (const wh of warehouses) {
-            const netTransfer = nets[wh.id] || 0;
-            if (wh.id === principalWh.id) {
-              // Principal = total - what was sent out + what came back
-              // Clamp to 0 to handle data inconsistencies (e.g. transfers recorded
-              // that exceed batch quantity due to manual stock corrections)
-              perWh[wh.id] = Math.max(0, batch.current_quantity + netTransfer);
-            } else {
-              // Other warehouses = only what was transferred in (net)
-              if (netTransfer > 0) {
-                perWh[wh.id] = netTransfer;
+
+          if (!hasTransfers) {
+            // No transfers at all — all stock is in Principal
+            perWh[principalWh.id] = batch.current_quantity;
+          } else {
+            // Calculate raw distribution from transfer history
+            for (const wh of warehouses) {
+              const netTransfer = nets[wh.id] || 0;
+              if (wh.id === principalWh.id) {
+                perWh[wh.id] = Math.max(0, batch.current_quantity + netTransfer);
+              } else {
+                if (netTransfer > 0) {
+                  perWh[wh.id] = netTransfer;
+                }
               }
             }
-          }
 
-          // Safety check: if ALL warehouses show 0 but batch has stock,
-          // assign remaining stock to Principal (data inconsistency fallback)
-          totalDistributed = Object.values(perWh).reduce((s, v) => s + v, 0);
-          if (totalDistributed === 0 && batch.current_quantity > 0) {
-            perWh[principalWh.id] = batch.current_quantity;
+            // Normalize: if total distributed exceeds current_quantity,
+            // transfers are inconsistent (e.g. more units transferred than exist
+            // due to sales consuming stock after transfers). Scale down
+            // non-principal warehouses proportionally and assign remainder to Principal.
+            const totalDistributed = Object.values(perWh).reduce((s, v) => s + v, 0);
+            
+            if (totalDistributed === 0 && batch.current_quantity > 0) {
+              // All warehouses show 0 but batch has stock → assign to Principal
+              perWh[principalWh.id] = batch.current_quantity;
+            } else if (totalDistributed > batch.current_quantity) {
+              // Over-allocation: transfers record more units than batch currently has.
+              // This happens when units were consumed (sold) from destination warehouses
+              // after being transferred. Scale down non-principal warehouses to fit,
+              // then give any remainder to Principal.
+              const nonPrincipalTotal = Object.entries(perWh)
+                .filter(([whId]) => whId !== principalWh.id)
+                .reduce((s, [, v]) => s + v, 0);
+
+              if (nonPrincipalTotal > 0) {
+                // Scale factor: how much of the batch can actually be outside Principal
+                const scaleFactor = Math.min(1, batch.current_quantity / nonPrincipalTotal);
+                let usedByOthers = 0;
+                for (const wh of warehouses) {
+                  if (wh.id === principalWh.id) continue;
+                  if (perWh[wh.id] > 0) {
+                    perWh[wh.id] = Math.floor(perWh[wh.id] * scaleFactor);
+                    usedByOthers += perWh[wh.id];
+                  }
+                }
+                // Remainder goes to Principal
+                perWh[principalWh.id] = Math.max(0, batch.current_quantity - usedByOthers);
+              } else {
+                perWh[principalWh.id] = batch.current_quantity;
+              }
+            }
           }
 
           result[batch.id] = perWh;
