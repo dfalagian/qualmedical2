@@ -198,11 +198,15 @@ export const BatchSelectionDialog = ({
           const nets = transferNet[batch.id] || {};
           const perWh: Record<string, number> = {};
           
+          // First pass: calculate raw values
+          let totalDistributed = 0;
           for (const wh of warehouses) {
             const netTransfer = nets[wh.id] || 0;
             if (wh.id === principalWh.id) {
               // Principal = total - what was sent out + what came back
-              perWh[wh.id] = batch.current_quantity + netTransfer;
+              // Clamp to 0 to handle data inconsistencies (e.g. transfers recorded
+              // that exceed batch quantity due to manual stock corrections)
+              perWh[wh.id] = Math.max(0, batch.current_quantity + netTransfer);
             } else {
               // Other warehouses = only what was transferred in (net)
               if (netTransfer > 0) {
@@ -210,6 +214,14 @@ export const BatchSelectionDialog = ({
               }
             }
           }
+
+          // Safety check: if ALL warehouses show 0 but batch has stock,
+          // assign remaining stock to Principal (data inconsistency fallback)
+          totalDistributed = Object.values(perWh).reduce((s, v) => s + v, 0);
+          if (totalDistributed === 0 && batch.current_quantity > 0) {
+            perWh[principalWh.id] = batch.current_quantity;
+          }
+
           result[batch.id] = perWh;
         }
       }
