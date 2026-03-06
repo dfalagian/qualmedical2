@@ -418,10 +418,10 @@ const Invoices = () => {
 
       // Si todo está bien pero requiere complemento de pago
       if (validationData?.requiereComplemento) {
-        return { requiereComplemento: true, mensaje: validationData.mensaje };
+        return { requiereComplemento: true, mensaje: validationData.mensaje, conceptos: validationData.conceptos, amount: parseFloat(amount) };
       }
 
-      return { requiereComplemento: false };
+      return { requiereComplemento: false, conceptos: validationData.conceptos, amount: parseFloat(amount) };
       } finally {
         uploadInProgressRef.current = false;
       }
@@ -437,10 +437,87 @@ const Invoices = () => {
           });
         }, 500);
       }
+
+      // PO-Invoice reconciliation
+      if (selectedPOId && selectedPOItems.length > 0 && data?.conceptos) {
+        const warnings: string[] = [];
+        const invoiceConceptos = data.conceptos || [];
+
+        // Compare total amount
+        const selectedPO = supplierPOs.find((po: any) => po.id === selectedPOId);
+        if (selectedPO && data.amount) {
+          const diff = Math.abs(selectedPO.amount - data.amount);
+          if (diff > 0.01) {
+            warnings.push(
+              `El monto total de la factura ($${data.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}) no coincide con el de la OC ($${selectedPO.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}). Diferencia: $${diff.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+            );
+          }
+        }
+
+        // Compare items: quantities and prices
+        for (const poItem of selectedPOItems) {
+          const productName = (poItem as any).products?.name || '';
+          const poQty = poItem.quantity_ordered;
+          const poPrice = poItem.unit_price || 0;
+
+          // Try to find matching invoice concept by description similarity
+          const matchingConcept = invoiceConceptos.find((c: any) => {
+            const desc = (c.descripcion || '').toLowerCase();
+            const name = productName.toLowerCase();
+            // Simple matching: check if the product name is contained in the description or vice versa
+            return desc.includes(name) || name.includes(desc) || 
+              name.split(' ').filter((w: string) => w.length > 3).some((w: string) => desc.includes(w));
+          });
+
+          if (!matchingConcept) {
+            warnings.push(
+              `Producto "${productName}" de la OC (${poQty} uds) no encontrado en la factura.`
+            );
+          } else {
+            // Compare quantity
+            if (matchingConcept.cantidad !== poQty) {
+              warnings.push(
+                `"${productName}": Cantidad OC: ${poQty}, Factura: ${matchingConcept.cantidad}`
+              );
+            }
+            // Compare unit price
+            if (poPrice > 0 && matchingConcept.valorUnitario) {
+              const priceDiff = Math.abs(poPrice - matchingConcept.valorUnitario);
+              if (priceDiff > 0.01) {
+                warnings.push(
+                  `"${productName}": Precio unitario OC: $${poPrice.toFixed(2)}, Factura: $${matchingConcept.valorUnitario.toFixed(2)}`
+                );
+              }
+            }
+          }
+        }
+
+        // Check if invoice has concepts not in PO
+        for (const concepto of invoiceConceptos) {
+          const desc = (concepto.descripcion || '').toLowerCase();
+          const found = selectedPOItems.some((poItem: any) => {
+            const name = (poItem.products?.name || '').toLowerCase();
+            return desc.includes(name) || name.includes(desc) ||
+              name.split(' ').filter((w: string) => w.length > 3).some((w: string) => desc.includes(w));
+          });
+          if (!found) {
+            warnings.push(
+              `Concepto de factura "${concepto.descripcion}" (${concepto.cantidad} uds, $${concepto.valorUnitario}) no encontrado en la OC.`
+            );
+          }
+        }
+
+        if (warnings.length > 0) {
+          setReconciliationWarnings(warnings);
+          setShowReconciliationDialog(true);
+        }
+      }
       
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-pos-for-invoice"] });
       setPdfFile(null);
       setXmlFile(null);
+      setSelectedPOId(null);
       setIsUploading(false);
     },
     onError: (error: any) => {
