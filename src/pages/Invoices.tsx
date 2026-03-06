@@ -112,7 +112,37 @@ const Invoices = () => {
     },
   });
 
-  const { data: invoices, isLoading } = useQuery({
+  // Supplier's purchase orders for PO selection
+  const { data: supplierPOs = [] } = useQuery({
+    queryKey: ["supplier-pos-for-invoice", user?.id],
+    enabled: !isAdmin && !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_orders")
+        .select("id, order_number, description, amount, currency, status, delivery_date")
+        .eq("supplier_id", user!.id)
+        .in("status", ["pendiente", "en_proceso"])
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Fetch items of the selected PO
+  const { data: selectedPOItems = [] } = useQuery({
+    queryKey: ["po-items-for-reconciliation", selectedPOId],
+    enabled: !!selectedPOId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_order_items")
+        .select("id, quantity_ordered, unit_price, products:product_id(name, sku)")
+        .eq("purchase_order_id", selectedPOId!);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+
     queryKey: ["invoices"],
     queryFn: async () => {
       const { data: invoicesData, error: invoicesError } = await supabase
