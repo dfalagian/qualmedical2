@@ -688,7 +688,48 @@ export function PhysicalInventoryCount() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+
+      {/* Save Confirmation when uncounted products exist */}
+      <AlertDialog open={showSaveConfirm} onOpenChange={setShowSaveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Inventario incompleto
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Hay <strong>{uncountedProducts.length}</strong> producto(s) con stock en este almacén que no han sido inventariados físicamente.
+              </p>
+              <div className="max-h-32 overflow-y-auto border rounded-md mt-2 bg-muted/30">
+                {uncountedProducts.slice(0, 10).map((wp) => (
+                  <div key={wp.product_id} className="px-3 py-1 border-b last:border-b-0 text-xs flex justify-between">
+                    <span>{wp.name}</span>
+                    <span className="text-muted-foreground">Stock: {wp.current_stock}</span>
+                  </div>
+                ))}
+                {uncountedProducts.length > 10 && (
+                  <div className="px-3 py-1 text-xs text-muted-foreground text-center">
+                    ...y {uncountedProducts.length - 10} más
+                  </div>
+                )}
+              </div>
+              <p className="text-xs mt-2">¿Deseas guardar el conteo de todas formas?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowSaveConfirm(false);
+                saveMutation.mutate(entries);
+              }}
+            >
+              Guardar de todas formas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
   );
 }
 
