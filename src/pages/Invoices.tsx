@@ -67,6 +67,11 @@ const Invoices = () => {
   });
   const [paymentHistoryInvoice, setPaymentHistoryInvoice] = useState<any>(null);
   const [complementoToDelete, setComplementoToDelete] = useState<string | null>(null);
+  
+  // PO-Invoice reconciliation state
+  const [selectedPOId, setSelectedPOId] = useState<string | null>(null);
+  const [reconciliationWarnings, setReconciliationWarnings] = useState<string[]>([]);
+  const [showReconciliationDialog, setShowReconciliationDialog] = useState(false);
 
   // Ref para prevenir doble-clic/subidas simultáneas
   const uploadInProgressRef = useRef(false);
