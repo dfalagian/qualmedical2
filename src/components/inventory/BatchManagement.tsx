@@ -171,42 +171,78 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
     enabled: warehouses.length > 0,
   });
 
-  // Fetch completed transfers with batch_id to calculate batch-per-warehouse distribution
+  // Fetch completed transfers AND sales movements to calculate accurate batch-per-warehouse distribution
   const { data: batchWarehouseMap = {} } = useQuery({
     queryKey: ["batch_warehouse_distribution", warehouses],
     queryFn: async () => {
-      const { data: transfers, error } = await supabase
+      const principalWh = warehouses.find(w => w.code === "PRINCIPAL");
+      if (!principalWh) return {};
+
+      // Fetch transfers
+      const { data: transfers, error: tErr } = await supabase
         .from("warehouse_transfers")
         .select("batch_id, from_warehouse_id, to_warehouse_id, quantity")
         .eq("status", "completada")
         .not("batch_id", "is", null);
-      if (error) throw error;
+      if (tErr) throw tErr;
 
-      // Principal warehouse is assumed as the default origin
-      const principalWh = warehouses.find(w => w.code === "PRINCIPAL");
-      if (!principalWh) return {};
+      // Fetch inventory movements with batch_id AND location to know sales per warehouse
+      const { data: movements, error: mErr } = await supabase
+        .from("inventory_movements")
+        .select("batch_id, location, movement_type, quantity")
+        .not("batch_id", "is", null)
+        .not("location", "is", null);
+      if (mErr) throw mErr;
 
-      // Build a map: batchId -> { warehouseId -> net_transferred_quantity }
+      // Build transfer map: batchId -> { warehouseId -> net_transferred }
       const transferMap: Record<string, Record<string, number>> = {};
       for (const t of transfers || []) {
         if (!t.batch_id) continue;
         if (!transferMap[t.batch_id]) transferMap[t.batch_id] = {};
         const m = transferMap[t.batch_id];
-        // Subtract from source
         m[t.from_warehouse_id] = (m[t.from_warehouse_id] || 0) - t.quantity;
-        // Add to destination
         m[t.to_warehouse_id] = (m[t.to_warehouse_id] || 0) + t.quantity;
       }
 
-      // Convert to final format: batchId -> [{ warehouseId, warehouseName, quantity }]
+      // Build sales map: batchId -> { warehouseId -> net_sales (positive = units removed) }
+      const salesMap: Record<string, Record<string, number>> = {};
+      for (const mv of movements || []) {
+        if (!mv.batch_id || !mv.location) continue;
+        if (!salesMap[mv.batch_id]) salesMap[mv.batch_id] = {};
+        const s = salesMap[mv.batch_id];
+        if (mv.movement_type === "salida") {
+          s[mv.location] = (s[mv.location] || 0) + mv.quantity;
+        } else if (mv.movement_type === "entrada") {
+          s[mv.location] = (s[mv.location] || 0) - mv.quantity;
+        }
+      }
+
+      // Combine into result: for each batch, compute per-warehouse qty
+      // Formula: warehouse_qty = initial_in_wh + transfers_in - transfers_out - sales_from_wh
+      // Since all stock starts in Principal: initial_in_principal = current_quantity + total_sales
+      // For other warehouses: initial = 0
+      const allBatchIds = new Set([...Object.keys(transferMap), ...Object.keys(salesMap)]);
+      
       const result: Record<string, { warehouseId: string; warehouseName: string; quantity: number }[]> = {};
-      for (const [batchId, movements] of Object.entries(transferMap)) {
+      for (const batchId of allBatchIds) {
+        const tMap = transferMap[batchId] || {};
+        const sMap = salesMap[batchId] || {};
+        const allWhIds = new Set([...Object.keys(tMap), ...Object.keys(sMap)]);
+        
         const entries: { warehouseId: string; warehouseName: string; quantity: number }[] = [];
         for (const wh of warehouses) {
-          const netTransfer = movements[wh.id] || 0;
-          if (netTransfer !== 0) {
-            entries.push({ warehouseId: wh.id, warehouseName: wh.name, quantity: netTransfer });
-          }
+          if (!allWhIds.has(wh.id)) continue;
+          const netTransfer = tMap[wh.id] || 0;
+          const netSales = sMap[wh.id] || 0; // positive = units sold from this warehouse
+          // For non-principal warehouses: qty = transfers_in - sales
+          // This value is used with the rendering logic which computes principal as remainder
+          entries.push({ 
+            warehouseId: wh.id, 
+            warehouseName: wh.name, 
+            quantity: netTransfer, // net transfer
+            // @ts-ignore - extend type for sales tracking
+            sales: netSales 
+          });
         }
         if (entries.length > 0) result[batchId] = entries;
       }
@@ -745,29 +781,35 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
                         )}
                       </TableRow>
                       {(() => {
-                        const batchTransfers = batchWarehouseMap[batch.id];
+                        const batchData = batchWarehouseMap[batch.id];
                         const principalWh = warehouses.find(w => w.code === "PRINCIPAL");
                         if (!principalWh || batch.current_quantity <= 0) return null;
                         
                         // Calculate batch distribution per warehouse
                         const batchDistribution: { name: string; qty: number }[] = [];
                         
-                        if (batchTransfers) {
-                          // Has transfers: calculate from net movements
-                          const principalNet = batchTransfers.find(t => t.warehouseId === principalWh.id)?.quantity || 0;
-                          const principalQty = batch.current_quantity + principalNet;
-                          if (principalQty > 0) {
-                            batchDistribution.push({ name: principalWh.name, qty: principalQty });
-                          }
-                          for (const t of batchTransfers) {
+                        if (batchData) {
+                          // Calculate qty for non-principal warehouses first
+                          // qty_in_wh = transfers_in - sales_from_wh
+                          let nonPrincipalTotal = 0;
+                          for (const t of batchData) {
                             if (t.warehouseId === principalWh.id) continue;
-                            if (t.quantity > 0) {
+                            const netTransfer = t.quantity; // positive = units transferred IN
+                            const sales = (t as any).sales || 0; // units sold from this warehouse
+                            const whQty = Math.max(0, netTransfer - sales);
+                            if (whQty > 0) {
                               const wh = warehouses.find(w => w.id === t.warehouseId);
-                              batchDistribution.push({ name: wh?.name || t.warehouseId, qty: t.quantity });
+                              batchDistribution.push({ name: wh?.name || t.warehouseId, qty: whQty });
+                              nonPrincipalTotal += whQty;
                             }
                           }
+                          // Principal gets the remainder
+                          const principalQty = batch.current_quantity - nonPrincipalTotal;
+                          if (principalQty > 0) {
+                            batchDistribution.unshift({ name: principalWh.name, qty: principalQty });
+                          }
                         } else if (whBreakdown.length > 1) {
-                          // No transfers but product is in multiple warehouses: batch is entirely in Principal
+                          // No transfers/sales data: batch is entirely in Principal
                           batchDistribution.push({ name: principalWh.name, qty: batch.current_quantity });
                         }
                         
