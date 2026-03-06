@@ -11,7 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye, ArrowRight, Search, X, CalendarIcon, FileText, Link2, Edit2 } from "lucide-react";
+import { ShoppingCart, Plus, DollarSign, Download, Package, Trash2, Eye, ArrowRight, Search, X, CalendarIcon, FileText, Link2, Edit2, Send } from "lucide-react";
+import { useNotifications } from "@/hooks/useNotifications";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PurchaseOrderImportDialog } from "@/components/purchase-orders/PurchaseOrderImportDialog";
@@ -39,6 +40,7 @@ import {
 
 const PurchaseOrders = () => {
   const { user, isAdmin } = useAuth();
+  const { notifySupplier } = useNotifications();
   const queryClient = useQueryClient();
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [createOrderDialogOpen, setCreateOrderDialogOpen] = useState(false);
@@ -468,6 +470,35 @@ const PurchaseOrders = () => {
     },
   });
 
+  const sendToSupplierMutation = useMutation({
+    mutationFn: async (order: any) => {
+      if (order.supplier_type === "general") {
+        throw new Error("Esta orden pertenece a un proveedor oficial externo. No se puede enviar notificación.");
+      }
+      // Notify supplier via email/WhatsApp
+      await notifySupplier(order.supplier_id, "purchase_order_created", {
+        order_number: order.order_number,
+        amount: order.amount?.toLocaleString("es-MX", { minimumFractionDigits: 2 }),
+        delivery_date: order.delivery_date || "Sin fecha definida",
+      });
+      return order;
+    },
+    onSuccess: (order) => {
+      toast.success(`Orden ${order.order_number} enviada al proveedor correctamente`);
+      logActivity({
+        section: "ordenes_compra",
+        action: "enviar_proveedor",
+        entityType: "orden_compra",
+        entityId: order.id,
+        entityName: order.order_number,
+        details: { supplier_id: order.supplier_id },
+      });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al enviar al proveedor");
+    },
+  });
+
   const handleViewDetail = (order: any) => {
     setSelectedOrder(order);
     setDetailDialogOpen(true);
@@ -696,6 +727,21 @@ const PurchaseOrders = () => {
                               title="Editar orden"
                             >
                               <Edit2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {isAdmin && order.supplier_type !== "general" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                sendToSupplierMutation.mutate(order);
+                              }}
+                              disabled={sendToSupplierMutation.isPending}
+                              title="Enviar OC al proveedor"
+                            >
+                              <Send className="h-4 w-4" />
                             </Button>
                           )}
                           <Button
