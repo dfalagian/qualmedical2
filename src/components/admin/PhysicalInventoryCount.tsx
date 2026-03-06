@@ -700,3 +700,30 @@ function PhysicalCountEditDialog({
   );
 }
 
+  // Fetch all products with stock in the active warehouse
+  const { data: warehouseProducts = [] } = useQuery({
+    queryKey: ["physical-inv-warehouse-products", activeWarehouseId],
+    enabled: !!activeWarehouseId && inventoryStarted,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouse_stock")
+        .select("product_id, current_stock, products:product_id(id, name, sku, category)")
+        .eq("warehouse_id", activeWarehouseId!)
+        .gt("current_stock", 0);
+      if (error) throw error;
+      return (data || []).map((ws: any) => ({
+        product_id: ws.product_id,
+        current_stock: ws.current_stock,
+        name: ws.products?.name || "—",
+        sku: ws.products?.sku || "",
+        category: ws.products?.category || "Sin categoría",
+      }));
+    },
+  });
+
+  // Compute uncounted products
+  const countedProductIds = useMemo(() => new Set(entries.map((e) => e.product_id)), [entries]);
+  const uncountedProducts = useMemo(
+    () => warehouseProducts.filter((wp) => !countedProductIds.has(wp.product_id)),
+    [warehouseProducts, countedProductIds]
+  );
