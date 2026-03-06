@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { WarehouseFilter } from "@/components/inventory/WarehouseFilter";
-import { Search, ClipboardCheck, Package, Save, Trash2, CheckCircle2, Warehouse, Eye, Pencil, List } from "lucide-react";
+import { Search, ClipboardCheck, Package, Save, Trash2, CheckCircle2, Warehouse, Eye, Pencil, List, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PhysicalCountSessionView } from "./PhysicalCountSessionView";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +51,8 @@ export function PhysicalInventoryCount() {
   const [editSessionId, setEditSessionId] = useState<string | null>(null);
   const [editEntries, setEditEntries] = useState<any[]>([]);
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [showUncounted, setShowUncounted] = useState(false);
 
   // Fetch products
   const { data: products = [] } = useQuery({
@@ -137,6 +141,34 @@ export function PhysicalInventoryCount() {
       }));
     },
   });
+
+  // Fetch all products with stock in the active warehouse
+  const { data: warehouseProducts = [] } = useQuery({
+    queryKey: ["physical-inv-warehouse-products", activeWarehouseId],
+    enabled: !!activeWarehouseId && inventoryStarted,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouse_stock")
+        .select("product_id, current_stock, products:product_id(id, name, sku, category)")
+        .eq("warehouse_id", activeWarehouseId!)
+        .gt("current_stock", 0);
+      if (error) throw error;
+      return (data || []).map((ws: any) => ({
+        product_id: ws.product_id,
+        current_stock: ws.current_stock,
+        name: ws.products?.name || "—",
+        sku: ws.products?.sku || "",
+        category: ws.products?.category || "Sin categoría",
+      }));
+    },
+  });
+
+  // Compute uncounted products
+  const countedProductIds = useMemo(() => new Set(entries.map((e) => e.product_id)), [entries]);
+  const uncountedProducts = useMemo(
+    () => warehouseProducts.filter((wp) => !countedProductIds.has(wp.product_id)),
+    [warehouseProducts, countedProductIds]
+  );
 
   const saveMutation = useMutation({
     mutationFn: async (entriesToSave: CountEntry[]) => {
@@ -370,6 +402,45 @@ export function PhysicalInventoryCount() {
         </CardContent>
       </Card>
 
+      {/* Uncounted Products Warning */}
+      {inventoryStarted && warehouseProducts.length > 0 && (
+        <Alert variant={uncountedProducts.length > 0 ? "destructive" : "default"} className={uncountedProducts.length === 0 ? "border-green-500 bg-green-50 dark:bg-green-950 text-green-900 dark:text-green-100" : ""}>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>
+            {uncountedProducts.length > 0
+              ? `${uncountedProducts.length} de ${warehouseProducts.length} productos sin inventariar`
+              : `Todos los productos han sido inventariados (${warehouseProducts.length})`}
+          </AlertTitle>
+          <AlertDescription>
+            {uncountedProducts.length > 0 ? (
+              <Collapsible open={showUncounted} onOpenChange={setShowUncounted}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1 mt-1 h-7 px-2 text-xs">
+                    {showUncounted ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    {showUncounted ? "Ocultar lista" : "Ver productos faltantes"}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <div className="max-h-48 overflow-y-auto border rounded-md bg-background">
+                    {uncountedProducts.map((wp) => (
+                      <div key={wp.product_id} className="flex items-center justify-between px-3 py-1.5 border-b last:border-b-0 text-xs">
+                        <div>
+                          <span className="font-medium">{wp.name}</span>
+                          <span className="ml-2 text-muted-foreground">{wp.sku}</span>
+                        </div>
+                        <Badge variant="outline" className="text-xs">Stock: {wp.current_stock}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            ) : (
+              <span className="text-xs">Puedes guardar el conteo con confianza.</span>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Intermediate List */}
       {entries.length > 0 && (
         <Card>
@@ -498,7 +569,13 @@ export function PhysicalInventoryCount() {
                 {entries.length} registro(s) • {entries.filter((e) => e.counted_quantity - e.system_quantity !== 0).length} con diferencia
               </p>
               <Button
-                onClick={() => saveMutation.mutate(entries)}
+                onClick={() => {
+                  if (uncountedProducts.length > 0) {
+                    setShowSaveConfirm(true);
+                  } else {
+                    saveMutation.mutate(entries);
+                  }
+                }}
                 disabled={saveMutation.isPending || entries.length === 0}
                 size="lg"
                 className="gap-2"
@@ -611,6 +688,48 @@ export function PhysicalInventoryCount() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Save Confirmation when uncounted products exist */}
+      <AlertDialog open={showSaveConfirm} onOpenChange={setShowSaveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Inventario incompleto
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Hay <strong>{uncountedProducts.length}</strong> producto(s) con stock en este almacén que no han sido inventariados físicamente.
+              </p>
+              <div className="max-h-32 overflow-y-auto border rounded-md mt-2 bg-muted/30">
+                {uncountedProducts.slice(0, 10).map((wp) => (
+                  <div key={wp.product_id} className="px-3 py-1 border-b last:border-b-0 text-xs flex justify-between">
+                    <span>{wp.name}</span>
+                    <span className="text-muted-foreground">Stock: {wp.current_stock}</span>
+                  </div>
+                ))}
+                {uncountedProducts.length > 10 && (
+                  <div className="px-3 py-1 text-xs text-muted-foreground text-center">
+                    ...y {uncountedProducts.length - 10} más
+                  </div>
+                )}
+              </div>
+              <p className="text-xs mt-2">¿Deseas guardar el conteo de todas formas?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowSaveConfirm(false);
+                saveMutation.mutate(entries);
+              }}
+            >
+              Guardar de todas formas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -695,4 +814,3 @@ function PhysicalCountEditDialog({
     </Dialog>
   );
 }
-
