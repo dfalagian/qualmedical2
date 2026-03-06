@@ -530,7 +530,13 @@ export function PhysicalInventoryCount() {
                 {entries.length} registro(s) • {entries.filter((e) => e.counted_quantity - e.system_quantity !== 0).length} con diferencia
               </p>
               <Button
-                onClick={() => saveMutation.mutate(entries)}
+                onClick={() => {
+                  if (uncountedProducts.length > 0) {
+                    setShowSaveConfirm(true);
+                  } else {
+                    saveMutation.mutate(entries);
+                  }
+                }}
                 disabled={saveMutation.isPending || entries.length === 0}
                 size="lg"
                 className="gap-2"
