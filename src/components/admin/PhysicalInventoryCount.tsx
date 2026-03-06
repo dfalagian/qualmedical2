@@ -730,6 +730,7 @@ export function PhysicalInventoryCount() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
   );
 }
 
