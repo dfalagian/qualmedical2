@@ -6,6 +6,7 @@ import { EmailServerStatus } from "@/components/dashboard/EmailServerStatus";
 import { Navigate } from "react-router-dom";
 import { ManageContador } from "@/components/supplier/ManageContador";
 import { LowStockCard } from "@/components/dashboard/LowStockCard";
+import { SupplierPurchaseOrders } from "@/components/dashboard/SupplierPurchaseOrders";
 
 const Dashboard = () => {
   const { user, isAdmin, isContador, isContadorProveedor, isSupplier } = useAuth();
