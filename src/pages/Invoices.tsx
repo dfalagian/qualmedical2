@@ -40,6 +40,7 @@ import {
 const Invoices = () => {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const [isUploading, setIsUploading] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [xmlFile, setXmlFile] = useState<File | null>(null);
