@@ -45,6 +45,7 @@ const statusLabels: Record<string, { label: string; className: string }> = {
 
 export function SupplierPurchaseOrders() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
 
   const { data: orders = [] } = useQuery({
