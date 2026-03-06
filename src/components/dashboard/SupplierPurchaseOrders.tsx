@@ -271,6 +271,27 @@ export function SupplierPurchaseOrders() {
                     </div>
                   )}
                 </div>
+
+                <Separator />
+
+                {/* Action: go to invoices with this PO preselected */}
+                {selectedOrder.status !== "completada" && selectedOrder.status !== "cancelada" && (
+                  <div className="pt-2">
+                    <Button
+                      className="w-full gap-2"
+                      onClick={() => {
+                        setSelectedOrder(null);
+                        navigate(`/dashboard/invoices?po=${selectedOrder.id}`);
+                      }}
+                    >
+                      <Receipt className="h-4 w-4" />
+                      Subir Factura para esta Orden
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                      Se comparará automáticamente tu factura contra esta OC
+                    </p>
+                  </div>
+                )}
               </div>
             </ScrollArea>
           )}
