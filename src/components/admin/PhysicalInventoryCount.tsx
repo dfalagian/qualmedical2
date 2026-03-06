@@ -170,7 +170,7 @@ export function PhysicalInventoryCount() {
     [warehouseProducts, countedProductIds]
   );
 
-
+  const saveMutation = useMutation({
     mutationFn: async (entriesToSave: CountEntry[]) => {
       const sessionId = crypto.randomUUID();
       const whName = warehouses.find((w) => w.id === activeWarehouseId)?.name || "";
