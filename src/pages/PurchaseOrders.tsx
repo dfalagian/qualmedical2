@@ -729,6 +729,21 @@ const PurchaseOrders = () => {
                               <Edit2 className="h-4 w-4" />
                             </Button>
                           )}
+                          {isAdmin && order.supplier_type !== "general" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                sendToSupplierMutation.mutate(order);
+                              }}
+                              disabled={sendToSupplierMutation.isPending}
+                              title="Enviar OC al proveedor"
+                            >
+                              <Send className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
