@@ -1,6 +1,7 @@
 import { todayLocalStr } from "@/lib/formatters";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
