@@ -40,6 +40,7 @@ import {
 
 const PurchaseOrders = () => {
   const { user, isAdmin } = useAuth();
+  const { notifySupplier } = useNotifications();
   const queryClient = useQueryClient();
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [createOrderDialogOpen, setCreateOrderDialogOpen] = useState(false);
