@@ -21,7 +21,8 @@ export type ActivityAction =
   | "ingreso"
   | "salida"
   | "transferencia"
-  | "confirmar_recepcion";
+  | "confirmar_recepcion"
+  | "enviar_proveedor";
 
 interface LogActivityParams {
   section: ActivitySection;
