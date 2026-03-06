@@ -89,6 +89,9 @@ const Dashboard = () => {
           {isAdmin && <LowStockCard />}
         </div>
 
+        {/* Órdenes de compra para proveedores */}
+        {isSupplier && <SupplierPurchaseOrders />}
+
         {isAdmin && <EmailServerStatus />}
 
         {/* Banner de contacto WhatsApp para proveedores */}
