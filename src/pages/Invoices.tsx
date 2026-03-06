@@ -142,7 +142,7 @@ const Invoices = () => {
     },
   });
 
-
+  const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices"],
     queryFn: async () => {
       const { data: invoicesData, error: invoicesError } = await supabase
