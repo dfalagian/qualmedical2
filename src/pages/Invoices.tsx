@@ -1099,6 +1099,41 @@ const Invoices = () => {
                   }}
                   className="space-y-4"
                 >
+                  {/* PO Selector */}
+                  {supplierPOs.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <ShoppingCart className="h-4 w-4" />
+                        Orden de Compra asociada
+                      </Label>
+                      <Select
+                        value={selectedPOId || "none"}
+                        onValueChange={(val) => {
+                          setSelectedPOId(val === "none" ? null : val);
+                          setReconciliationWarnings([]);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar orden de compra..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin orden de compra</SelectItem>
+                          {supplierPOs.map((po: any) => (
+                            <SelectItem key={po.id} value={po.id}>
+                              {po.order_number} — ${po.amount?.toLocaleString('es-MX', { minimumFractionDigits: 2 })} {po.currency || 'MXN'}
+                              {po.description ? ` (${po.description})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedPOId && (
+                        <p className="text-xs text-muted-foreground">
+                          La factura se comparará automáticamente contra esta OC al subirse.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {!xmlFile && (
                     <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
                       <p className="text-sm text-primary font-medium flex items-center gap-2">
@@ -1127,6 +1162,7 @@ const Invoices = () => {
                         onChange={(e) => {
                           setXmlFile(e.target.files?.[0] || null);
                           setPdfFile(null);
+                          setReconciliationWarnings([]);
                         }}
                         required
                       />
