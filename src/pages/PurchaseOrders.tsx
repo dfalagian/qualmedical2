@@ -470,6 +470,35 @@ const PurchaseOrders = () => {
     },
   });
 
+  const sendToSupplierMutation = useMutation({
+    mutationFn: async (order: any) => {
+      if (order.supplier_type === "general") {
+        throw new Error("Esta orden pertenece a un proveedor oficial externo. No se puede enviar notificación.");
+      }
+      // Notify supplier via email/WhatsApp
+      await notifySupplier(order.supplier_id, "purchase_order_created", {
+        order_number: order.order_number,
+        amount: order.amount?.toLocaleString("es-MX", { minimumFractionDigits: 2 }),
+        delivery_date: order.delivery_date || "Sin fecha definida",
+      });
+      return order;
+    },
+    onSuccess: (order) => {
+      toast.success(`Orden ${order.order_number} enviada al proveedor correctamente`);
+      logActivity({
+        section: "ordenes_compra",
+        action: "enviar_proveedor",
+        entityType: "orden_compra",
+        entityId: order.id,
+        entityName: order.order_number,
+        details: { supplier_id: order.supplier_id },
+      });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al enviar al proveedor");
+    },
+  });
+
   const handleViewDetail = (order: any) => {
     setSelectedOrder(order);
     setDetailDialogOpen(true);
