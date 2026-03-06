@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown, Layers, RotateCcw, History, RefreshCw } from "lucide-react";
+import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown, Layers, RotateCcw, History, RefreshCw, AlertTriangle, ShoppingCart } from "lucide-react";
 import { PaymentProofsHistory } from "@/components/payments/PaymentProofsHistory";
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -67,6 +67,11 @@ const Invoices = () => {
   });
   const [paymentHistoryInvoice, setPaymentHistoryInvoice] = useState<any>(null);
   const [complementoToDelete, setComplementoToDelete] = useState<string | null>(null);
+  
+  // PO-Invoice reconciliation state
+  const [selectedPOId, setSelectedPOId] = useState<string | null>(null);
+  const [reconciliationWarnings, setReconciliationWarnings] = useState<string[]>([]);
+  const [showReconciliationDialog, setShowReconciliationDialog] = useState(false);
 
   // Ref para prevenir doble-clic/subidas simultáneas
   const uploadInProgressRef = useRef(false);
@@ -104,6 +109,36 @@ const Invoices = () => {
 
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Supplier's purchase orders for PO selection
+  const { data: supplierPOs = [] } = useQuery({
+    queryKey: ["supplier-pos-for-invoice", user?.id],
+    enabled: !isAdmin && !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_orders")
+        .select("id, order_number, description, amount, currency, status, delivery_date")
+        .eq("supplier_id", user!.id)
+        .in("status", ["pendiente", "en_proceso"])
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Fetch items of the selected PO
+  const { data: selectedPOItems = [] } = useQuery({
+    queryKey: ["po-items-for-reconciliation", selectedPOId],
+    enabled: !!selectedPOId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_order_items")
+        .select("id, quantity_ordered, unit_price, products:product_id(name, sku)")
+        .eq("purchase_order_id", selectedPOId!);
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -383,10 +418,10 @@ const Invoices = () => {
 
       // Si todo está bien pero requiere complemento de pago
       if (validationData?.requiereComplemento) {
-        return { requiereComplemento: true, mensaje: validationData.mensaje };
+        return { requiereComplemento: true, mensaje: validationData.mensaje, conceptos: validationData.conceptos, amount: parseFloat(amount) };
       }
 
-      return { requiereComplemento: false };
+      return { requiereComplemento: false, conceptos: validationData.conceptos, amount: parseFloat(amount) };
       } finally {
         uploadInProgressRef.current = false;
       }
@@ -402,10 +437,87 @@ const Invoices = () => {
           });
         }, 500);
       }
+
+      // PO-Invoice reconciliation
+      if (selectedPOId && selectedPOItems.length > 0 && data?.conceptos) {
+        const warnings: string[] = [];
+        const invoiceConceptos = data.conceptos || [];
+
+        // Compare total amount
+        const selectedPO = supplierPOs.find((po: any) => po.id === selectedPOId);
+        if (selectedPO && data.amount) {
+          const diff = Math.abs(selectedPO.amount - data.amount);
+          if (diff > 0.01) {
+            warnings.push(
+              `El monto total de la factura ($${data.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}) no coincide con el de la OC ($${selectedPO.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}). Diferencia: $${diff.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+            );
+          }
+        }
+
+        // Compare items: quantities and prices
+        for (const poItem of selectedPOItems) {
+          const productName = (poItem as any).products?.name || '';
+          const poQty = poItem.quantity_ordered;
+          const poPrice = poItem.unit_price || 0;
+
+          // Try to find matching invoice concept by description similarity
+          const matchingConcept = invoiceConceptos.find((c: any) => {
+            const desc = (c.descripcion || '').toLowerCase();
+            const name = productName.toLowerCase();
+            // Simple matching: check if the product name is contained in the description or vice versa
+            return desc.includes(name) || name.includes(desc) || 
+              name.split(' ').filter((w: string) => w.length > 3).some((w: string) => desc.includes(w));
+          });
+
+          if (!matchingConcept) {
+            warnings.push(
+              `Producto "${productName}" de la OC (${poQty} uds) no encontrado en la factura.`
+            );
+          } else {
+            // Compare quantity
+            if (matchingConcept.cantidad !== poQty) {
+              warnings.push(
+                `"${productName}": Cantidad OC: ${poQty}, Factura: ${matchingConcept.cantidad}`
+              );
+            }
+            // Compare unit price
+            if (poPrice > 0 && matchingConcept.valorUnitario) {
+              const priceDiff = Math.abs(poPrice - matchingConcept.valorUnitario);
+              if (priceDiff > 0.01) {
+                warnings.push(
+                  `"${productName}": Precio unitario OC: $${poPrice.toFixed(2)}, Factura: $${matchingConcept.valorUnitario.toFixed(2)}`
+                );
+              }
+            }
+          }
+        }
+
+        // Check if invoice has concepts not in PO
+        for (const concepto of invoiceConceptos) {
+          const desc = (concepto.descripcion || '').toLowerCase();
+          const found = selectedPOItems.some((poItem: any) => {
+            const name = (poItem.products?.name || '').toLowerCase();
+            return desc.includes(name) || name.includes(desc) ||
+              name.split(' ').filter((w: string) => w.length > 3).some((w: string) => desc.includes(w));
+          });
+          if (!found) {
+            warnings.push(
+              `Concepto de factura "${concepto.descripcion}" (${concepto.cantidad} uds, $${concepto.valorUnitario}) no encontrado en la OC.`
+            );
+          }
+        }
+
+        if (warnings.length > 0) {
+          setReconciliationWarnings(warnings);
+          setShowReconciliationDialog(true);
+        }
+      }
       
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-pos-for-invoice"] });
       setPdfFile(null);
       setXmlFile(null);
+      setSelectedPOId(null);
       setIsUploading(false);
     },
     onError: (error: any) => {
@@ -1064,6 +1176,41 @@ const Invoices = () => {
                   }}
                   className="space-y-4"
                 >
+                  {/* PO Selector */}
+                  {supplierPOs.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <ShoppingCart className="h-4 w-4" />
+                        Orden de Compra asociada
+                      </Label>
+                      <Select
+                        value={selectedPOId || "none"}
+                        onValueChange={(val) => {
+                          setSelectedPOId(val === "none" ? null : val);
+                          setReconciliationWarnings([]);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar orden de compra..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin orden de compra</SelectItem>
+                          {supplierPOs.map((po: any) => (
+                            <SelectItem key={po.id} value={po.id}>
+                              {po.order_number} — ${po.amount?.toLocaleString('es-MX', { minimumFractionDigits: 2 })} {po.currency || 'MXN'}
+                              {po.description ? ` (${po.description})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedPOId && (
+                        <p className="text-xs text-muted-foreground">
+                          La factura se comparará automáticamente contra esta OC al subirse.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {!xmlFile && (
                     <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
                       <p className="text-sm text-primary font-medium flex items-center gap-2">
@@ -1092,6 +1239,7 @@ const Invoices = () => {
                         onChange={(e) => {
                           setXmlFile(e.target.files?.[0] || null);
                           setPdfFile(null);
+                          setReconciliationWarnings([]);
                         }}
                         required
                       />
@@ -2052,6 +2200,54 @@ const Invoices = () => {
             >
               {deleteComplementoMutation.isPending ? "Eliminando..." : "Eliminar"}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Diálogo de advertencias de reconciliación OC vs Factura */}
+      <AlertDialog open={showReconciliationDialog} onOpenChange={setShowReconciliationDialog}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Discrepancias entre OC y Factura
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left">
+              <p className="mb-3">
+                Se encontraron las siguientes diferencias entre la Orden de Compra y la factura subida:
+              </p>
+              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {reconciliationWarnings.map((warning, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-2 p-2 rounded bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800"
+                  >
+                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                    <span className="text-sm text-foreground">{warning}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-sm font-medium">
+                Por favor, corrija la factura o póngase en contacto con Administración de QualMedical para resolver las discrepancias.
+              </p>
+              <div
+                onClick={() => window.open("https://wa.me/525647599227", "_blank", "noopener,noreferrer")}
+                role="button"
+                tabIndex={0}
+                className="flex items-center gap-2 mt-3 p-3 rounded-lg bg-[#25D366]/10 border border-[#25D366]/30 hover:bg-[#25D366]/20 transition-colors cursor-pointer"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="#25D366">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+                <div>
+                  <p className="text-sm font-medium">Contactar a QualMedical</p>
+                  <p className="text-xs text-muted-foreground">+52 56 4759 9227</p>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>Entendido</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
