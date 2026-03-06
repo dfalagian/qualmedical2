@@ -71,9 +71,17 @@ const Invoices = () => {
   const [complementoToDelete, setComplementoToDelete] = useState<string | null>(null);
   
   // PO-Invoice reconciliation state
-  const [selectedPOId, setSelectedPOId] = useState<string | null>(null);
+  const poFromUrl = searchParams.get("po");
+  const [selectedPOId, setSelectedPOId] = useState<string | null>(poFromUrl);
   const [reconciliationWarnings, setReconciliationWarnings] = useState<string[]>([]);
   const [showReconciliationDialog, setShowReconciliationDialog] = useState(false);
+
+  // Sync PO from URL param
+  useEffect(() => {
+    if (poFromUrl && poFromUrl !== selectedPOId) {
+      setSelectedPOId(poFromUrl);
+    }
+  }, [poFromUrl]);
 
   // Ref para prevenir doble-clic/subidas simultáneas
   const uploadInProgressRef = useRef(false);
