@@ -51,6 +51,8 @@ export function PhysicalInventoryCount() {
   const [editSessionId, setEditSessionId] = useState<string | null>(null);
   const [editEntries, setEditEntries] = useState<any[]>([]);
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [showUncounted, setShowUncounted] = useState(false);
 
   // Fetch products
   const { data: products = [] } = useQuery({
