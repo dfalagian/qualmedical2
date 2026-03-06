@@ -1,6 +1,7 @@
 import { todayLocalStr } from "@/lib/formatters";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ import {
 const Invoices = () => {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const [isUploading, setIsUploading] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [xmlFile, setXmlFile] = useState<File | null>(null);
@@ -69,9 +71,17 @@ const Invoices = () => {
   const [complementoToDelete, setComplementoToDelete] = useState<string | null>(null);
   
   // PO-Invoice reconciliation state
-  const [selectedPOId, setSelectedPOId] = useState<string | null>(null);
+  const poFromUrl = searchParams.get("po");
+  const [selectedPOId, setSelectedPOId] = useState<string | null>(poFromUrl);
   const [reconciliationWarnings, setReconciliationWarnings] = useState<string[]>([]);
   const [showReconciliationDialog, setShowReconciliationDialog] = useState(false);
+
+  // Sync PO from URL param
+  useEffect(() => {
+    if (poFromUrl && poFromUrl !== selectedPOId) {
+      setSelectedPOId(poFromUrl);
+    }
+  }, [poFromUrl]);
 
   // Ref para prevenir doble-clic/subidas simultáneas
   const uploadInProgressRef = useRef(false);

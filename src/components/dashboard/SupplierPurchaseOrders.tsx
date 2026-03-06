@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingCart, Calendar, DollarSign, Package, ChevronRight } from "lucide-react";
+import { ShoppingCart, Calendar, DollarSign, Package, ChevronRight, Receipt } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -43,6 +45,7 @@ const statusLabels: Record<string, { label: string; className: string }> = {
 
 export function SupplierPurchaseOrders() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
 
   const { data: orders = [] } = useQuery({
@@ -268,6 +271,27 @@ export function SupplierPurchaseOrders() {
                     </div>
                   )}
                 </div>
+
+                <Separator />
+
+                {/* Action: go to invoices with this PO preselected */}
+                {selectedOrder.status !== "completada" && selectedOrder.status !== "cancelada" && (
+                  <div className="pt-2">
+                    <Button
+                      className="w-full gap-2"
+                      onClick={() => {
+                        setSelectedOrder(null);
+                        navigate(`/dashboard/invoices?po=${selectedOrder.id}`);
+                      }}
+                    >
+                      <Receipt className="h-4 w-4" />
+                      Subir Factura para esta Orden
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                      Se comparará automáticamente tu factura contra esta OC
+                    </p>
+                  </div>
+                )}
               </div>
             </ScrollArea>
           )}
