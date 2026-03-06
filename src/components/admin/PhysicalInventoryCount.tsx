@@ -402,6 +402,45 @@ export function PhysicalInventoryCount() {
         </CardContent>
       </Card>
 
+      {/* Uncounted Products Warning */}
+      {inventoryStarted && warehouseProducts.length > 0 && (
+        <Alert variant={uncountedProducts.length > 0 ? "destructive" : "default"} className={uncountedProducts.length === 0 ? "border-green-500 bg-green-50 dark:bg-green-950 text-green-900 dark:text-green-100" : ""}>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>
+            {uncountedProducts.length > 0
+              ? `${uncountedProducts.length} de ${warehouseProducts.length} productos sin inventariar`
+              : `Todos los productos han sido inventariados (${warehouseProducts.length})`}
+          </AlertTitle>
+          <AlertDescription>
+            {uncountedProducts.length > 0 ? (
+              <Collapsible open={showUncounted} onOpenChange={setShowUncounted}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1 mt-1 h-7 px-2 text-xs">
+                    {showUncounted ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    {showUncounted ? "Ocultar lista" : "Ver productos faltantes"}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <div className="max-h-48 overflow-y-auto border rounded-md bg-background">
+                    {uncountedProducts.map((wp) => (
+                      <div key={wp.product_id} className="flex items-center justify-between px-3 py-1.5 border-b last:border-b-0 text-xs">
+                        <div>
+                          <span className="font-medium">{wp.name}</span>
+                          <span className="ml-2 text-muted-foreground">{wp.sku}</span>
+                        </div>
+                        <Badge variant="outline" className="text-xs">Stock: {wp.current_stock}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            ) : (
+              <span className="text-xs">Puedes guardar el conteo con confianza.</span>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Intermediate List */}
       {entries.length > 0 && (
         <Card>
