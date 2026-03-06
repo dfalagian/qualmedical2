@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Warehouse, Package, AlertTriangle, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -129,36 +130,61 @@ export function StockByWarehouseModal() {
             <Skeleton className="h-64 w-full" />
           </div>
         ) : warehouseStock && warehouseStock.length > 0 ? (
-          <Tabs defaultValue={warehouseStock[0]?.id} className="w-full">
-            <TabsList className="w-full justify-start flex-wrap h-auto gap-1 p-1">
-              {warehouseStock.map((wh) => (
-                <TabsTrigger key={wh.id} value={wh.id} className="gap-2">
-                  <Warehouse className="h-4 w-4" />
-                  {wh.name}
-                  <Badge variant="secondary" className="ml-1">
-                    {wh.totalProducts}
-                  </Badge>
-                  {wh.lowStockCount > 0 && (
-                    <Badge variant="destructive" className="ml-1">
-                      <AlertTriangle className="h-3 w-3 mr-1" />
-                      {wh.lowStockCount}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          <TooltipProvider delayDuration={200}>
+            <Tabs defaultValue={warehouseStock[0]?.id} className="w-full">
+              <TabsList className="w-full justify-start flex-wrap h-auto gap-1 p-1">
+                {warehouseStock.map((wh) => {
+                  const lowStockProducts = wh.products.filter(
+                    (p) => p.current_stock <= p.minimum_stock
+                  );
+                  return (
+                    <TabsTrigger key={wh.id} value={wh.id} className="gap-2">
+                      <Warehouse className="h-4 w-4" />
+                      {wh.name}
+                      <Badge variant="secondary" className="ml-1">
+                        {wh.totalProducts}
+                      </Badge>
+                      {lowStockProducts.length > 0 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="destructive" className="ml-1 cursor-help">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              {lowStockProducts.length} stock bajo
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs">
+                            <p className="font-semibold text-xs mb-1">Productos con stock bajo:</p>
+                            <ul className="text-xs space-y-0.5 max-h-40 overflow-y-auto">
+                              {lowStockProducts.slice(0, 15).map((p) => (
+                                <li key={p.id} className="flex justify-between gap-3">
+                                  <span className="truncate">{p.name}</span>
+                                  <span className="font-mono shrink-0">{p.current_stock}/{p.minimum_stock}</span>
+                                </li>
+                              ))}
+                              {lowStockProducts.length > 15 && (
+                                <li className="text-muted-foreground">...y {lowStockProducts.length - 15} más</li>
+                              )}
+                            </ul>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
 
-            {warehouseStock.map((wh) => (
-              <TabsContent key={wh.id} value={wh.id} className="mt-4">
-                <WarehouseTabContent
-                  products={wh.products}
-                  searchTerm={searchTerm}
-                  getStockBadge={getStockBadge}
-                  allWarehouseStock={searchTerm ? warehouseStock : undefined}
-                />
-              </TabsContent>
-            ))}
-          </Tabs>
+              {warehouseStock.map((wh) => (
+                <TabsContent key={wh.id} value={wh.id} className="mt-4">
+                  <WarehouseTabContent
+                    products={wh.products}
+                    searchTerm={searchTerm}
+                    getStockBadge={getStockBadge}
+                    allWarehouseStock={searchTerm ? warehouseStock : undefined}
+                  />
+                </TabsContent>
+              ))}
+            </Tabs>
+          </TooltipProvider>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Warehouse className="h-12 w-12 mb-4" />
