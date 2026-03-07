@@ -71,6 +71,7 @@ const Invoices = () => {
   });
   const [paymentHistoryInvoice, setPaymentHistoryInvoice] = useState<any>(null);
   const [complementoToDelete, setComplementoToDelete] = useState<string | null>(null);
+  const [comparisonInvoice, setComparisonInvoice] = useState<{ id: string; number: string } | null>(null);
   
   // PO-Invoice reconciliation state
   const poFromUrl = searchParams.get("po");
