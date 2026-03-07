@@ -461,7 +461,7 @@ const Invoices = () => {
           const invoiceSubtotal = invoiceConceptos.reduce((sum: number, c: any) => sum + (c.importe || 0), 0);
           const invoiceDescuento = invoiceConceptos.reduce((sum: number, c: any) => sum + (c.descuento || 0), 0);
           // Use the IVA/traslados from validationData if available
-          const invoiceTotalImpuestosTrasladados = validationData?.totalImpuestos || 0;
+          const invoiceTotalImpuestosTrasladados = data?.totalImpuestos || 0;
           const invoiceTotalSinRetenciones = invoiceSubtotal - invoiceDescuento + invoiceTotalImpuestosTrasladados;
           
           const poAmount = selectedPO.amount || 0;
