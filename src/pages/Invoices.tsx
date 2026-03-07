@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { InvoiceDetailsDialog } from "@/components/invoices/InvoiceDetailsDialog";
+import { InvoiceOCComparisonDialog } from "@/components/invoices/InvoiceOCComparisonDialog";
 import { InvoicePaymentProofUpload } from "@/components/invoices/InvoicePaymentProofUpload";
 import { PaymentComplementUpload } from "@/components/invoices/PaymentComplementUpload";
 import { getSignedUrl } from "@/lib/storage";
