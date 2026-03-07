@@ -87,10 +87,10 @@ const Dashboard = () => {
 
           {/* Tarjeta de Stock Bajo - Solo para admin */}
           {isAdmin && <LowStockCard />}
-        </div>
 
-        {/* Órdenes de compra para proveedores */}
-        {isSupplier && <SupplierPurchaseOrders />}
+          {/* Tarjeta de OC Pendientes - Solo para proveedores */}
+          {isSupplier && <SupplierPendingPOCard />}
+        </div>
 
         {isAdmin && <EmailServerStatus />}
 
