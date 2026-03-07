@@ -183,28 +183,47 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
     return nameScore * 0.4 + priceScore * 0.4 + qtyScore * 0.2;
   };
 
-  // Build reconciliation lines using best-score matching
-  const matchedInvoiceIds = new Set<string>();
-  const lines: ReconciliationLine[] = (order.purchase_order_items || []).map((item) => {
-    const productName = item.products?.name || "Producto";
-    const normProduct = normalize(productName);
+  // Build reconciliation lines using global optimal assignment
+  // Step 1: Compute full score matrix (OC items × invoice items)
+  const ocItems = order.purchase_order_items || [];
+  const invItems = invoiceItems as any[];
+  const scoreMatrix: number[][] = ocItems.map((item) => {
+    const normProduct = normalize(item.products?.name || "Producto");
     const orderedPrice = item.unit_price || 0;
     const orderedQty = item.quantity_ordered;
+    return invItems.map((ii) => scoreMatch(normProduct, orderedQty, orderedPrice, ii));
+  });
 
-    // Find ALL candidate matches and pick the best one
-    let bestMatch: any = null;
-    let bestScore = -1;
-    for (const ii of invoiceItems as any[]) {
-      if (matchedInvoiceIds.has(ii.id)) continue;
-      const score = scoreMatch(normProduct, orderedQty, orderedPrice, ii);
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = ii;
+  // Step 2: Greedy global assignment — pick highest score across entire matrix
+  const assignedOC = new Set<number>();
+  const assignedInv = new Set<number>();
+  const ocToInv = new Map<number, number>(); // OC index → invoice index
+
+  // Flatten all (ocIdx, invIdx, score) pairs and sort descending
+  const pairs: { oc: number; inv: number; score: number }[] = [];
+  for (let o = 0; o < ocItems.length; o++) {
+    for (let i = 0; i < invItems.length; i++) {
+      if (scoreMatrix[o][i] >= 0) {
+        pairs.push({ oc: o, inv: i, score: scoreMatrix[o][i] });
       }
     }
+  }
+  pairs.sort((a, b) => b.score - a.score);
 
-    if (bestMatch && bestScore >= 0) matchedInvoiceIds.add(bestMatch.id);
-    const matched = bestScore >= 0 ? bestMatch : null;
+  for (const p of pairs) {
+    if (assignedOC.has(p.oc) || assignedInv.has(p.inv)) continue;
+    assignedOC.add(p.oc);
+    assignedInv.add(p.inv);
+    ocToInv.set(p.oc, p.inv);
+  }
+
+  // Step 3: Build lines from assignment
+  const lines: ReconciliationLine[] = ocItems.map((item, idx) => {
+    const productName = item.products?.name || "Producto";
+    const orderedPrice = item.unit_price || 0;
+    const orderedQty = item.quantity_ordered;
+    const matchedIdx = ocToInv.get(idx);
+    const matched = matchedIdx !== undefined ? invItems[matchedIdx] : null;
 
     return {
       productName,
@@ -220,9 +239,9 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
     };
   });
 
-  // If only 1 order item and 1 invoice item and no match was found, force-match them
-  if (lines.length === 1 && invoiceItems.length === 1 && matchedInvoiceIds.size === 0) {
-    const ii = invoiceItems[0] as any;
+  // Force-match if only 1 item each and no match found
+  if (lines.length === 1 && invItems.length === 1 && ocToInv.size === 0) {
+    const ii = invItems[0];
     lines[0].invoiced = Number(ii.cantidad);
     lines[0].invoicedPrice = Number(ii.valor_unitario);
     lines[0].invoicedSubtotal = Number(ii.importe);
