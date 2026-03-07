@@ -1588,6 +1588,23 @@ const Invoices = () => {
                               variant="outline" 
                               size="icon"
                               className="h-8 w-8"
+                              onClick={() => setComparisonInvoice({ id: invoice.id, number: invoice.invoice_number })}
+                            >
+                              <ShoppingCart className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Comparar OC vs Factura</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={() => {
                                 setSelectedInvoice(invoice);
                                 setShowDetailsDialog(true);
