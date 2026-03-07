@@ -428,10 +428,10 @@ const Invoices = () => {
 
       // Si todo está bien pero requiere complemento de pago
       if (validationData?.requiereComplemento) {
-        return { requiereComplemento: true, mensaje: validationData.mensaje, conceptos: validationData.conceptos, amount: parseFloat(amount) };
+        return { requiereComplemento: true, mensaje: validationData.mensaje, conceptos: validationData.conceptos, amount: parseFloat(amount), totalImpuestos: validationData.totalImpuestos || 0 };
       }
 
-      return { requiereComplemento: false, conceptos: validationData.conceptos, amount: parseFloat(amount) };
+      return { requiereComplemento: false, conceptos: validationData.conceptos, amount: parseFloat(amount), totalImpuestos: validationData.totalImpuestos || 0 };
       } finally {
         uploadInProgressRef.current = false;
       }
@@ -451,18 +451,60 @@ const Invoices = () => {
       // PO-Invoice reconciliation
       if (selectedPOId && selectedPOItems.length > 0 && data?.conceptos) {
         const warnings: string[] = [];
-        const invoiceConceptos = data.conceptos || [];
+        const invoiceConceptos: any[] = data.conceptos || [];
 
-        // Compare total amount
+        // Compare total amount — use subtotal + traslados - descuento (without retentions)
+        // because PO amount represents pre-retention total and XML Total already deducts retentions
         const selectedPO = supplierPOs.find((po: any) => po.id === selectedPOId);
-        if (selectedPO && data.amount) {
-          const diff = Math.abs(selectedPO.amount - data.amount);
-          if (diff > 0.01) {
+        if (selectedPO) {
+          // Calculate invoice total before retentions: sum of all conceptos importe - descuento + traslados
+          const invoiceSubtotal = invoiceConceptos.reduce((sum: number, c: any) => sum + (c.importe || 0), 0);
+          const invoiceDescuento = invoiceConceptos.reduce((sum: number, c: any) => sum + (c.descuento || 0), 0);
+          // Use the IVA/traslados from validationData if available
+          const invoiceTotalImpuestosTrasladados = data?.totalImpuestos || 0;
+          const invoiceTotalSinRetenciones = invoiceSubtotal - invoiceDescuento + invoiceTotalImpuestosTrasladados;
+          
+          const poAmount = selectedPO.amount || 0;
+          const diff = Math.abs(poAmount - invoiceTotalSinRetenciones);
+          if (diff > 1) { // tolerance of $1 for rounding
             warnings.push(
-              `El monto total de la factura ($${data.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}) no coincide con el de la OC ($${selectedPO.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}). Diferencia: $${diff.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+              `El monto total de la factura ($${invoiceTotalSinRetenciones.toLocaleString('es-MX', { minimumFractionDigits: 2 })}) no coincide con el de la OC ($${poAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}). Diferencia: $${diff.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
             );
           }
         }
+
+        // Improved item matching: score-based, tracking already-matched concepts
+        const usedConceptIndices = new Set<number>();
+
+        const findBestMatch = (productName: string): { concept: any; index: number } | null => {
+          const nameWords = productName.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
+          let bestScore = 0;
+          let bestIdx = -1;
+
+          for (let i = 0; i < invoiceConceptos.length; i++) {
+            if (usedConceptIndices.has(i)) continue;
+            const desc = (invoiceConceptos[i].descripcion || '').toLowerCase();
+            
+            // Exact match
+            if (desc === productName.toLowerCase()) {
+              return { concept: invoiceConceptos[i], index: i };
+            }
+            
+            // Score by word overlap
+            const matchedWords = nameWords.filter((w: string) => desc.includes(w));
+            const score = nameWords.length > 0 ? matchedWords.length / nameWords.length : 0;
+            if (score > bestScore) {
+              bestScore = score;
+              bestIdx = i;
+            }
+          }
+
+          // Require at least 40% word overlap
+          if (bestScore >= 0.4 && bestIdx >= 0) {
+            return { concept: invoiceConceptos[bestIdx], index: bestIdx };
+          }
+          return null;
+        };
 
         // Compare items: quantities and prices
         for (const poItem of selectedPOItems) {
@@ -470,47 +512,37 @@ const Invoices = () => {
           const poQty = poItem.quantity_ordered;
           const poPrice = poItem.unit_price || 0;
 
-          // Try to find matching invoice concept by description similarity
-          const matchingConcept = invoiceConceptos.find((c: any) => {
-            const desc = (c.descripcion || '').toLowerCase();
-            const name = productName.toLowerCase();
-            // Simple matching: check if the product name is contained in the description or vice versa
-            return desc.includes(name) || name.includes(desc) || 
-              name.split(' ').filter((w: string) => w.length > 3).some((w: string) => desc.includes(w));
-          });
+          const match = findBestMatch(productName);
 
-          if (!matchingConcept) {
+          if (!match) {
             warnings.push(
               `Producto "${productName}" de la OC (${poQty} uds) no encontrado en la factura.`
             );
           } else {
+            usedConceptIndices.add(match.index);
+            const mc = match.concept;
             // Compare quantity
-            if (matchingConcept.cantidad !== poQty) {
+            if (mc.cantidad !== poQty) {
               warnings.push(
-                `"${productName}": Cantidad OC: ${poQty}, Factura: ${matchingConcept.cantidad}`
+                `"${productName}": Cantidad OC: ${poQty}, Factura: ${mc.cantidad}`
               );
             }
             // Compare unit price
-            if (poPrice > 0 && matchingConcept.valorUnitario) {
-              const priceDiff = Math.abs(poPrice - matchingConcept.valorUnitario);
+            if (poPrice > 0 && mc.valorUnitario) {
+              const priceDiff = Math.abs(poPrice - mc.valorUnitario);
               if (priceDiff > 0.01) {
                 warnings.push(
-                  `"${productName}": Precio unitario OC: $${poPrice.toFixed(2)}, Factura: $${matchingConcept.valorUnitario.toFixed(2)}`
+                  `"${productName}": Precio unitario OC: $${poPrice.toFixed(2)}, Factura: $${mc.valorUnitario.toFixed(2)}`
                 );
               }
             }
           }
         }
 
-        // Check if invoice has concepts not in PO
-        for (const concepto of invoiceConceptos) {
-          const desc = (concepto.descripcion || '').toLowerCase();
-          const found = selectedPOItems.some((poItem: any) => {
-            const name = (poItem.products?.name || '').toLowerCase();
-            return desc.includes(name) || name.includes(desc) ||
-              name.split(' ').filter((w: string) => w.length > 3).some((w: string) => desc.includes(w));
-          });
-          if (!found) {
+        // Check if invoice has concepts not matched to any PO item
+        for (let i = 0; i < invoiceConceptos.length; i++) {
+          if (!usedConceptIndices.has(i)) {
+            const concepto = invoiceConceptos[i];
             warnings.push(
               `Concepto de factura "${concepto.descripcion}" (${concepto.cantidad} uds, $${concepto.valorUnitario}) no encontrado en la OC.`
             );
