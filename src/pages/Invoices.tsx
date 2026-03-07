@@ -2373,6 +2373,16 @@ const Invoices = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Comparativa OC vs Factura */}
+      {comparisonInvoice && (
+        <InvoiceOCComparisonDialog
+          open={!!comparisonInvoice}
+          onOpenChange={(open) => { if (!open) setComparisonInvoice(null); }}
+          invoiceId={comparisonInvoice.id}
+          invoiceNumber={comparisonInvoice.number}
+        />
+      )}
     </DashboardLayout>
   );
 };
