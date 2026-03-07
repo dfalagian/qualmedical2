@@ -429,7 +429,17 @@ const Invoices = () => {
         }
       }
 
-      // Si todo está bien pero requiere complemento de pago
+      // Link PO to this invoice if a PO was selected
+      if (selectedPOId) {
+        const { error: linkError } = await supabase
+          .from("purchase_orders")
+          .update({ invoice_id: invoiceData.id })
+          .eq("id", selectedPOId);
+        if (linkError) {
+          console.error("Error linking PO to invoice:", linkError);
+        }
+      }
+
       if (validationData?.requiereComplemento) {
         return { requiereComplemento: true, mensaje: validationData.mensaje, conceptos: validationData.conceptos, amount: parseFloat(amount), totalImpuestos: validationData.totalImpuestos || 0 };
       }
