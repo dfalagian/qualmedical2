@@ -473,61 +473,95 @@ const Invoices = () => {
           }
         }
 
-        // Improved item matching: score-based, tracking already-matched concepts
-        const usedConceptIndices = new Set<number>();
+        // Global optimal assignment with pharmaceutical stopwords filter
+        const pharmaStopwords = new Set([
+          "sol", "iny", "mg", "ml", "gr", "g", "pieza", "piezas", "h87",
+          "tab", "cap", "amp", "fco", "cja", "env", "sobre", "susp",
+          "100", "200", "300", "400", "500", "50", "10", "20", "25", "30", "45",
+          "04", "06", "4", "1", "2", "3", "5", "6", "8", "16",
+        ]);
 
-        const findBestMatch = (productName: string): { concept: any; index: number } | null => {
-          const nameWords = productName.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
-          let bestScore = 0;
-          let bestIdx = -1;
+        const normalizeStr = (s: string) =>
+          s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
 
-          for (let i = 0; i < invoiceConceptos.length; i++) {
-            if (usedConceptIndices.has(i)) continue;
-            const desc = (invoiceConceptos[i].descripcion || '').toLowerCase();
-            
-            // Exact match
-            if (desc === productName.toLowerCase()) {
-              return { concept: invoiceConceptos[i], index: i };
-            }
-            
-            // Score by word overlap
-            const matchedWords = nameWords.filter((w: string) => desc.includes(w));
-            const score = nameWords.length > 0 ? matchedWords.length / nameWords.length : 0;
-            if (score > bestScore) {
-              bestScore = score;
-              bestIdx = i;
-            }
-          }
-
-          // Require at least 40% word overlap
-          if (bestScore >= 0.4 && bestIdx >= 0) {
-            return { concept: invoiceConceptos[bestIdx], index: bestIdx };
-          }
-          return null;
+        const getMeaningfulTokens = (normalized: string): string[] => {
+          const tokens = normalized.match(/[a-z]+/g) || [];
+          return tokens.filter((t: string) => t.length > 3 && !pharmaStopwords.has(t));
         };
 
-        // Compare items: quantities and prices
-        for (const poItem of selectedPOItems) {
-          const productName = (poItem as any).products?.name || '';
+        const calcNameSimilarity = (normA: string, normB: string): number => {
+          if (normB.includes(normA) || normA.includes(normB)) return 1;
+          const tokensA = getMeaningfulTokens(normA);
+          if (tokensA.length === 0) return 0;
+          const matchCount = tokensA.filter((t: string) => normB.includes(t)).length;
+          return matchCount / tokensA.length;
+        };
+
+        // Build full score matrix (PO items × invoice concepts)
+        const poItemsList = selectedPOItems;
+        const scoreMatrix: number[][] = poItemsList.map((poItem: any) => {
+          const normProduct = normalizeStr(poItem.products?.name || "");
+          const poPrice = poItem.unit_price || 0;
+          const poQty = poItem.quantity_ordered;
+          return invoiceConceptos.map((ic: any) => {
+            const normDesc = normalizeStr(ic.descripcion || "");
+            const nameScore = calcNameSimilarity(normProduct, normDesc);
+            if (nameScore < 0.4) return -1;
+            const icPrice = Number(ic.valorUnitario) || 0;
+            const icQty = Number(ic.cantidad) || 0;
+            let priceScore = 0;
+            if (poPrice > 0 && icPrice > 0) {
+              priceScore = Math.min(poPrice, icPrice) / Math.max(poPrice, icPrice);
+            }
+            let qtyScore = 0;
+            if (poQty > 0 && icQty > 0) {
+              qtyScore = Math.min(poQty, icQty) / Math.max(poQty, icQty);
+            }
+            return nameScore * 0.4 + priceScore * 0.4 + qtyScore * 0.2;
+          });
+        });
+
+        // Greedy global assignment — pick highest score pairs first
+        const allPairs: { po: number; inv: number; score: number }[] = [];
+        for (let p = 0; p < poItemsList.length; p++) {
+          for (let i = 0; i < invoiceConceptos.length; i++) {
+            if (scoreMatrix[p][i] >= 0) {
+              allPairs.push({ po: p, inv: i, score: scoreMatrix[p][i] });
+            }
+          }
+        }
+        allPairs.sort((a, b) => b.score - a.score);
+
+        const assignedPO = new Set<number>();
+        const assignedInv = new Set<number>();
+        const poToInv = new Map<number, number>();
+
+        for (const pair of allPairs) {
+          if (assignedPO.has(pair.po) || assignedInv.has(pair.inv)) continue;
+          assignedPO.add(pair.po);
+          assignedInv.add(pair.inv);
+          poToInv.set(pair.po, pair.inv);
+        }
+
+        // Compare matched items
+        for (let p = 0; p < poItemsList.length; p++) {
+          const poItem = poItemsList[p] as any;
+          const productName = poItem.products?.name || '';
           const poQty = poItem.quantity_ordered;
           const poPrice = poItem.unit_price || 0;
+          const matchedIdx = poToInv.get(p);
 
-          const match = findBestMatch(productName);
-
-          if (!match) {
+          if (matchedIdx === undefined) {
             warnings.push(
               `Producto "${productName}" de la OC (${poQty} uds) no encontrado en la factura.`
             );
           } else {
-            usedConceptIndices.add(match.index);
-            const mc = match.concept;
-            // Compare quantity
+            const mc = invoiceConceptos[matchedIdx];
             if (mc.cantidad !== poQty) {
               warnings.push(
                 `"${productName}": Cantidad OC: ${poQty}, Factura: ${mc.cantidad}`
               );
             }
-            // Compare unit price
             if (poPrice > 0 && mc.valorUnitario) {
               const priceDiff = Math.abs(poPrice - mc.valorUnitario);
               if (priceDiff > 0.01) {
@@ -539,9 +573,9 @@ const Invoices = () => {
           }
         }
 
-        // Check if invoice has concepts not matched to any PO item
+        // Check unmatched invoice concepts
         for (let i = 0; i < invoiceConceptos.length; i++) {
-          if (!usedConceptIndices.has(i)) {
+          if (!assignedInv.has(i)) {
             const concepto = invoiceConceptos[i];
             warnings.push(
               `Concepto de factura "${concepto.descripcion}" (${concepto.cantidad} uds, $${concepto.valorUnitario}) no encontrado en la OC.`
