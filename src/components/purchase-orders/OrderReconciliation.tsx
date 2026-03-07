@@ -168,7 +168,8 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
     normProduct: string,
     orderedQty: number,
     orderedPrice: number,
-    ii: any
+    ii: any,
+    brand?: string | null
   ): number => {
     const normDesc = normalize(ii.descripcion || "");
     const nameScore = nameSimilarity(normProduct, normDesc);
@@ -193,8 +194,17 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
       qtyScore = 1;
     }
 
+    // Brand bonus: if PO brand appears in invoice description, add 10% bonus
+    let brandBonus = 0;
+    if (brand) {
+      const normBrand = normalize(brand);
+      if (normBrand.length > 2 && normDesc.includes(normBrand)) {
+        brandBonus = 0.1;
+      }
+    }
+
     // Weighted: name 40%, price 40%, quantity 20% + brand bonus 10%
-    return Math.min(1, nameScore * 0.4 + priceScore * 0.4 + qtyScore * 0.2);
+    return Math.min(1, nameScore * 0.4 + priceScore * 0.4 + qtyScore * 0.2 + brandBonus);
   };
 
   // Build reconciliation lines using global optimal assignment
