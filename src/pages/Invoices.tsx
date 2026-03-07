@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { InvoiceDetailsDialog } from "@/components/invoices/InvoiceDetailsDialog";
+import { InvoiceOCComparisonDialog } from "@/components/invoices/InvoiceOCComparisonDialog";
 import { InvoicePaymentProofUpload } from "@/components/invoices/InvoicePaymentProofUpload";
 import { PaymentComplementUpload } from "@/components/invoices/PaymentComplementUpload";
 import { getSignedUrl } from "@/lib/storage";
@@ -70,6 +71,7 @@ const Invoices = () => {
   });
   const [paymentHistoryInvoice, setPaymentHistoryInvoice] = useState<any>(null);
   const [complementoToDelete, setComplementoToDelete] = useState<string | null>(null);
+  const [comparisonInvoice, setComparisonInvoice] = useState<{ id: string; number: string } | null>(null);
   
   // PO-Invoice reconciliation state
   const poFromUrl = searchParams.get("po");
@@ -1586,6 +1588,23 @@ const Invoices = () => {
                               variant="outline" 
                               size="icon"
                               className="h-8 w-8"
+                              onClick={() => setComparisonInvoice({ id: invoice.id, number: invoice.invoice_number })}
+                            >
+                              <ShoppingCart className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Comparar OC vs Factura</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={() => {
                                 setSelectedInvoice(invoice);
                                 setShowDetailsDialog(true);
@@ -2354,6 +2373,16 @@ const Invoices = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Comparativa OC vs Factura */}
+      {comparisonInvoice && (
+        <InvoiceOCComparisonDialog
+          open={!!comparisonInvoice}
+          onOpenChange={(open) => { if (!open) setComparisonInvoice(null); }}
+          invoiceId={comparisonInvoice.id}
+          invoiceNumber={comparisonInvoice.number}
+        />
+      )}
     </DashboardLayout>
   );
 };
