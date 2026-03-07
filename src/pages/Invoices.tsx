@@ -1400,6 +1400,7 @@ const Invoices = () => {
               </CardContent>
             </Card>
           )
+          </>
         )}
 
         <Card className="shadow-md">
