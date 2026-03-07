@@ -1399,7 +1399,7 @@ const Invoices = () => {
                 </div>
               </CardContent>
             </Card>
-          )
+          )}
           </>
         )}
 
