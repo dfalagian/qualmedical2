@@ -557,17 +557,28 @@ const Invoices = () => {
             );
           } else {
             const mc = invoiceConceptos[matchedIdx];
-            if (mc.cantidad !== poQty) {
+            const poTotal = poPrice * poQty;
+            const invTotal = (mc.valorUnitario || 0) * (mc.cantidad || 0);
+            const totalMatch = Math.abs(poTotal - invTotal) <= 1;
+
+            if (mc.cantidad !== poQty && totalMatch) {
+              // Same total but different qty/price — likely same product sold as pack vs individual
               warnings.push(
-                `"${productName}": Cantidad OC: ${poQty}, Factura: ${mc.cantidad}`
+                `ℹ️ "${productName}": La OC indica ${poQty} uds a $${poPrice.toFixed(2)} c/u, la factura indica ${mc.cantidad} uds a $${Number(mc.valorUnitario).toFixed(2)} c/u. El importe total es equivalente ($${poTotal.toFixed(2)} vs $${invTotal.toFixed(2)}), posible diferencia de presentación o marca.`
               );
-            }
-            if (poPrice > 0 && mc.valorUnitario) {
-              const priceDiff = Math.abs(poPrice - mc.valorUnitario);
-              if (priceDiff > 0.01) {
+            } else {
+              if (mc.cantidad !== poQty) {
                 warnings.push(
-                  `"${productName}": Precio unitario OC: $${poPrice.toFixed(2)}, Factura: $${mc.valorUnitario.toFixed(2)}`
+                  `⚠️ "${productName}": Cantidad OC: ${poQty}, Factura: ${mc.cantidad}`
                 );
+              }
+              if (poPrice > 0 && mc.valorUnitario) {
+                const priceDiff = Math.abs(poPrice - mc.valorUnitario);
+                if (priceDiff > 0.01) {
+                  warnings.push(
+                    `⚠️ "${productName}": Precio unitario OC: $${poPrice.toFixed(2)}, Factura: $${Number(mc.valorUnitario).toFixed(2)}`
+                  );
+                }
               }
             }
           }
