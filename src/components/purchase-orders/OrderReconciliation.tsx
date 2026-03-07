@@ -27,7 +27,7 @@ interface OrderReconciliationProps {
       quantity_ordered: number;
       quantity_received: number | null;
       unit_price: number | null;
-      products?: { id: string; name: string; sku: string } | null;
+      products?: { id: string; name: string; sku: string; brand?: string | null } | null;
     }>;
   };
 }
