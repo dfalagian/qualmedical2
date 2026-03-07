@@ -237,7 +237,7 @@ export function SupplierPurchaseOrders() {
                       Sin productos registrados
                     </p>
                   ) : (
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
                       {orderItems.map((item) => (
                         <div
                           key={item.id}
