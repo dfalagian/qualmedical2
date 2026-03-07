@@ -1292,7 +1292,7 @@ const Invoices = () => {
                 >
                   {/* PO Selector */}
                   {supplierPOs.length > 0 && (
-                    <div className="space-y-2">
+                    <div className={`space-y-2 p-3 rounded-lg border transition-colors ${selectedPOId ? 'bg-orange-50 border-orange-300 dark:bg-orange-950/30 dark:border-orange-700' : ''}`}>
                       <Label className="flex items-center gap-2">
                         <ShoppingCart className="h-4 w-4" />
                         Orden de Compra asociada
@@ -1304,7 +1304,7 @@ const Invoices = () => {
                           setReconciliationWarnings([]);
                         }}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className={selectedPOId ? 'border-orange-400 dark:border-orange-600' : ''}>
                           <SelectValue placeholder="Seleccionar orden de compra..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -1318,7 +1318,7 @@ const Invoices = () => {
                         </SelectContent>
                       </Select>
                       {selectedPOId && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-orange-700 dark:text-orange-400 font-medium">
                           La factura se comparará automáticamente contra esta OC al subirse.
                         </p>
                       )}
