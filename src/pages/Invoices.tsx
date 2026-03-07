@@ -428,10 +428,10 @@ const Invoices = () => {
 
       // Si todo está bien pero requiere complemento de pago
       if (validationData?.requiereComplemento) {
-        return { requiereComplemento: true, mensaje: validationData.mensaje, conceptos: validationData.conceptos, amount: parseFloat(amount) };
+        return { requiereComplemento: true, mensaje: validationData.mensaje, conceptos: validationData.conceptos, amount: parseFloat(amount), totalImpuestos: validationData.totalImpuestos || 0 };
       }
 
-      return { requiereComplemento: false, conceptos: validationData.conceptos, amount: parseFloat(amount) };
+      return { requiereComplemento: false, conceptos: validationData.conceptos, amount: parseFloat(amount), totalImpuestos: validationData.totalImpuestos || 0 };
       } finally {
         uploadInProgressRef.current = false;
       }
