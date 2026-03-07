@@ -27,7 +27,7 @@ interface OrderReconciliationProps {
       quantity_ordered: number;
       quantity_received: number | null;
       unit_price: number | null;
-      products?: { id: string; name: string; sku: string } | null;
+      products?: { id: string; name: string; sku: string; brand?: string | null } | null;
     }>;
   };
 }
@@ -168,7 +168,8 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
     normProduct: string,
     orderedQty: number,
     orderedPrice: number,
-    ii: any
+    ii: any,
+    brand?: string | null
   ): number => {
     const normDesc = normalize(ii.descripcion || "");
     const nameScore = nameSimilarity(normProduct, normDesc);
@@ -193,8 +194,17 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
       qtyScore = 1;
     }
 
-    // Weighted: name 40%, price 40%, quantity 20%
-    return nameScore * 0.4 + priceScore * 0.4 + qtyScore * 0.2;
+    // Brand bonus: if PO brand appears in invoice description, add 10% bonus
+    let brandBonus = 0;
+    if (brand) {
+      const normBrand = normalize(brand);
+      if (normBrand.length > 2 && normDesc.includes(normBrand)) {
+        brandBonus = 0.1;
+      }
+    }
+
+    // Weighted: name 40%, price 40%, quantity 20% + brand bonus 10%
+    return Math.min(1, nameScore * 0.4 + priceScore * 0.4 + qtyScore * 0.2 + brandBonus);
   };
 
   // Build reconciliation lines using global optimal assignment
@@ -205,7 +215,7 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
     const normProduct = normalize(item.products?.name || "Producto");
     const orderedPrice = item.unit_price || 0;
     const orderedQty = item.quantity_ordered;
-    return invItems.map((ii) => scoreMatch(normProduct, orderedQty, orderedPrice, ii));
+    return invItems.map((ii) => scoreMatch(normProduct, orderedQty, orderedPrice, ii, item.products?.brand));
   });
 
   // Step 2: Greedy global assignment — pick highest score across entire matrix
