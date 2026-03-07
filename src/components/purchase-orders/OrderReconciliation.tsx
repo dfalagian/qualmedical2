@@ -215,7 +215,7 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
     const normProduct = normalize(item.products?.name || "Producto");
     const orderedPrice = item.unit_price || 0;
     const orderedQty = item.quantity_ordered;
-    return invItems.map((ii) => scoreMatch(normProduct, orderedQty, orderedPrice, ii));
+    return invItems.map((ii) => scoreMatch(normProduct, orderedQty, orderedPrice, ii, item.products?.brand));
   });
 
   // Step 2: Greedy global assignment — pick highest score across entire matrix
