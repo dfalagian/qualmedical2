@@ -518,7 +518,16 @@ const Invoices = () => {
             if (poQty > 0 && icQty > 0) {
               qtyScore = Math.min(poQty, icQty) / Math.max(poQty, icQty);
             }
-            return nameScore * 0.4 + priceScore * 0.4 + qtyScore * 0.2;
+            // Brand bonus: if PO brand appears in invoice description, add 10% bonus
+            const poBrand = poItem.products?.brand || "";
+            let brandBonus = 0;
+            if (poBrand) {
+              const normBrand = normalizeStr(poBrand);
+              if (normBrand.length > 2 && normDesc.includes(normBrand)) {
+                brandBonus = 0.1;
+              }
+            }
+            return Math.min(1, nameScore * 0.4 + priceScore * 0.4 + qtyScore * 0.2 + brandBonus);
           });
         });
 

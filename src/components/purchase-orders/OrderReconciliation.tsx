@@ -193,8 +193,8 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
       qtyScore = 1;
     }
 
-    // Weighted: name 40%, price 40%, quantity 20%
-    return nameScore * 0.4 + priceScore * 0.4 + qtyScore * 0.2;
+    // Weighted: name 40%, price 40%, quantity 20% + brand bonus 10%
+    return Math.min(1, nameScore * 0.4 + priceScore * 0.4 + qtyScore * 0.2);
   };
 
   // Build reconciliation lines using global optimal assignment
