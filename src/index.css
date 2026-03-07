@@ -205,3 +205,14 @@ All colors MUST be HSL.
 :root.dark .animate-tag-blink {
   animation: tag-blink-dark 1s ease-in-out infinite !important;
 }
+
+@keyframes pulse-orange {
+  0%, 100% {
+    border-color: hsl(30 90% 70%);
+    box-shadow: 0 0 0 0 hsl(30 90% 60% / 0.2);
+  }
+  50% {
+    border-color: hsl(25 95% 50%);
+    box-shadow: 0 0 16px 2px hsl(25 95% 50% / 0.25);
+  }
+}

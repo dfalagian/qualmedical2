@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Receipt, Upload, FileText, Download, DollarSign, Eye, Trash2, FileImage, Truck, X, Check, ChevronsUpDown, Layers, RotateCcw, History, RefreshCw, AlertTriangle, ShoppingCart } from "lucide-react";
+import { SupplierActiveOCBanner } from "@/components/dashboard/SupplierActiveOCBanner";
 import { PaymentProofsHistory } from "@/components/payments/PaymentProofsHistory";
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -1246,7 +1247,12 @@ const Invoices = () => {
         </div>
 
         {!isAdmin && (
-          (supplierProfile as any)?.approved ? (
+          <>
+            <SupplierActiveOCBanner onSelectPO={(poId) => {
+              setSelectedPOId(poId);
+              setReconciliationWarnings([]);
+            }} />
+            {(supplierProfile as any)?.approved ? (
             <Card className="shadow-md border-accent/20">
               <CardHeader className="bg-gradient-accent/10">
                 <CardTitle className="flex items-center gap-2">
@@ -1393,7 +1399,8 @@ const Invoices = () => {
                 </div>
               </CardContent>
             </Card>
-          )
+          )}
+          </>
         )}
 
         <Card className="shadow-md">
