@@ -138,14 +138,28 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
   const normalize = (s: string) =>
     s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
 
+  // Stopwords: common pharmaceutical terms that appear in almost every product name
+  const stopwords = new Set([
+    "sol", "iny", "mg", "ml", "gr", "g", "pieza", "piezas", "h87",
+    "tab", "cap", "amp", "fco", "cja", "env", "sobre", "susp",
+    "100", "200", "300", "400", "500", "50", "10", "20", "25", "30", "45",
+    "04", "06", "4", "1", "2", "3", "5", "6", "8", "16",
+  ]);
+
+  // Extract meaningful tokens (drug names, not units/quantities)
+  const getMeaningfulTokens = (normalized: string): string[] => {
+    const tokens = normalized.match(/[a-z]+/g) || [];
+    return tokens.filter((t) => t.length > 3 && !stopwords.has(t));
+  };
+
   // Calculate name similarity score (0-1)
   const nameSimilarity = (normProduct: string, normDesc: string): number => {
     // Direct substring match = high score
     if (normDesc.includes(normProduct) || normProduct.includes(normDesc)) return 1;
-    // Token overlap
-    const productTokens = normProduct.match(/[a-z0-9]+/g) || [];
+    // Token overlap using meaningful tokens only
+    const productTokens = getMeaningfulTokens(normProduct);
     if (productTokens.length === 0) return 0;
-    const matchCount = productTokens.filter((t) => t.length > 2 && normDesc.includes(t)).length;
+    const matchCount = productTokens.filter((t) => normDesc.includes(t)).length;
     return matchCount / productTokens.length;
   };
 
