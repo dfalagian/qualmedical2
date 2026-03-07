@@ -146,7 +146,7 @@ const Invoices = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchase_order_items")
-        .select("id, quantity_ordered, unit_price, products:product_id(name, sku)")
+        .select("id, quantity_ordered, unit_price, products:product_id(name, sku, brand)")
         .eq("purchase_order_id", selectedPOId!);
       if (error) throw error;
       return data || [];
