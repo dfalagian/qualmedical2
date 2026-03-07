@@ -138,36 +138,84 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
   const normalize = (s: string) =>
     s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
 
-  // Build reconciliation lines
+  // Calculate name similarity score (0-1)
+  const nameSimilarity = (normProduct: string, normDesc: string): number => {
+    // Direct substring match = high score
+    if (normDesc.includes(normProduct) || normProduct.includes(normDesc)) return 1;
+    // Token overlap
+    const productTokens = normProduct.match(/[a-z0-9]+/g) || [];
+    if (productTokens.length === 0) return 0;
+    const matchCount = productTokens.filter((t) => t.length > 2 && normDesc.includes(t)).length;
+    return matchCount / productTokens.length;
+  };
+
+  // Score an invoice item against an OC item (higher = better match)
+  const scoreMatch = (
+    normProduct: string,
+    orderedQty: number,
+    orderedPrice: number,
+    ii: any
+  ): number => {
+    const normDesc = normalize(ii.descripcion || "");
+    const nameScore = nameSimilarity(normProduct, normDesc);
+    if (nameScore < 0.4) return -1; // below threshold, not a match
+
+    const iiPrice = Number(ii.valor_unitario) || 0;
+    const iiQty = Number(ii.cantidad) || 0;
+
+    // Price proximity: ratio of min/max (1 = identical, 0 = very different)
+    let priceScore = 0;
+    if (orderedPrice > 0 && iiPrice > 0) {
+      priceScore = Math.min(orderedPrice, iiPrice) / Math.max(orderedPrice, iiPrice);
+    } else if (orderedPrice === 0 && iiPrice === 0) {
+      priceScore = 1;
+    }
+
+    // Quantity proximity
+    let qtyScore = 0;
+    if (orderedQty > 0 && iiQty > 0) {
+      qtyScore = Math.min(orderedQty, iiQty) / Math.max(orderedQty, iiQty);
+    } else if (orderedQty === 0 && iiQty === 0) {
+      qtyScore = 1;
+    }
+
+    // Weighted: name 40%, price 40%, quantity 20%
+    return nameScore * 0.4 + priceScore * 0.4 + qtyScore * 0.2;
+  };
+
+  // Build reconciliation lines using best-score matching
   const matchedInvoiceIds = new Set<string>();
   const lines: ReconciliationLine[] = (order.purchase_order_items || []).map((item) => {
     const productName = item.products?.name || "Producto";
     const normProduct = normalize(productName);
+    const orderedPrice = item.unit_price || 0;
+    const orderedQty = item.quantity_ordered;
 
-    // Try to match invoice items: exact includes first, then token overlap
-    const matchedInvoiceItem = invoiceItems.find((ii: any) => {
-      if (matchedInvoiceIds.has(ii.id)) return false;
-      const normDesc = normalize(ii.descripcion || "");
-      // Direct substring match
-      if (normDesc.includes(normProduct) || normProduct.includes(normDesc)) return true;
-      // Token overlap: if >50% of product tokens appear in description
-      const productTokens = normProduct.match(/[a-z0-9]+/g) || [];
-      const matchCount = productTokens.filter((t) => t.length > 2 && normDesc.includes(t)).length;
-      return productTokens.length > 0 && matchCount / productTokens.length > 0.4;
-    });
+    // Find ALL candidate matches and pick the best one
+    let bestMatch: any = null;
+    let bestScore = -1;
+    for (const ii of invoiceItems as any[]) {
+      if (matchedInvoiceIds.has(ii.id)) continue;
+      const score = scoreMatch(normProduct, orderedQty, orderedPrice, ii);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = ii;
+      }
+    }
 
-    if (matchedInvoiceItem) matchedInvoiceIds.add(matchedInvoiceItem.id);
+    if (bestMatch && bestScore >= 0) matchedInvoiceIds.add(bestMatch.id);
+    const matched = bestScore >= 0 ? bestMatch : null;
 
     return {
       productName,
       sku: item.products?.sku || "",
       productId: item.product_id,
-      ordered: item.quantity_ordered,
-      orderedPrice: item.unit_price || 0,
-      orderedSubtotal: (item.unit_price || 0) * item.quantity_ordered,
-      invoiced: matchedInvoiceItem ? Number(matchedInvoiceItem.cantidad) : 0,
-      invoicedPrice: matchedInvoiceItem ? Number(matchedInvoiceItem.valor_unitario) : 0,
-      invoicedSubtotal: matchedInvoiceItem ? Number(matchedInvoiceItem.importe) : 0,
+      ordered: orderedQty,
+      orderedPrice,
+      orderedSubtotal: orderedPrice * orderedQty,
+      invoiced: matched ? Number(matched.cantidad) : 0,
+      invoicedPrice: matched ? Number(matched.valor_unitario) : 0,
+      invoicedSubtotal: matched ? Number(matched.importe) : 0,
       received: receivedByProduct.get(item.product_id) || (item.quantity_received || 0),
     };
   });
