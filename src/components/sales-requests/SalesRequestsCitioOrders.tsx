@@ -516,6 +516,13 @@ export function SalesRequestsCitioOrders() {
             { duration: 8000 }
           );
         }
+
+        if (brandMismatches.length > 0) {
+          toast.warning(
+            `⚠️ ${brandMismatches.length} producto(s) tienen marca diferente entre CITIO y el catálogo local. Verifica que el citio_id esté correctamente asignado:\n${brandMismatches.join('\n')}`,
+            { duration: 15000 }
+          );
+        }
       }
 
       toast.success(`Cotización ${folio} creada exitosamente`);
