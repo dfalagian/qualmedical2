@@ -29,7 +29,7 @@ export function RFIDScannerCard({ onTagRead }: RFIDScannerCardProps) {
   
   const inputRef = useRef<HTMLInputElement>(null);
   const lastProcessedKey = useRef<string | null>(null);
-  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Focus input when mode is selected
   useEffect(() => {
