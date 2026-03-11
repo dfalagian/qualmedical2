@@ -369,6 +369,7 @@ export function CITIOImportDialog({
                     {meds.map((med) => {
                       const imported = isAlreadyImported(med.id);
                       const isSelected = selectedMedications.has(med.id);
+                      const duplicateWarning = !imported ? getDuplicateWarning(med) : null;
                       
                       return (
                         <button
@@ -379,6 +380,10 @@ export function CITIOImportDialog({
                             "w-full text-left px-2 py-1.5 rounded border transition-all text-sm",
                             imported
                               ? "bg-muted/30 opacity-60 cursor-not-allowed"
+                              : duplicateWarning
+                              ? isSelected
+                                ? "bg-destructive/10 border-destructive"
+                                : "border-destructive/50 hover:bg-destructive/5"
                               : isSelected
                               ? "bg-primary/10 border-primary"
                               : "hover:bg-accent hover:border-accent-foreground/20"
@@ -403,6 +408,21 @@ export function CITIOImportDialog({
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1.5 shrink-0">
+                                  {duplicateWarning && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="destructive" className="text-xs px-1.5 py-0">
+                                            <AlertTriangle className="h-3 w-3 mr-0.5" />
+                                            Duplicado
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="left" className="max-w-xs">
+                                          <p>{duplicateWarning}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
                                   {med.price_type_1 != null && med.price_type_1 > 0 && (
                                     <Badge variant="secondary" className="text-xs px-1.5 py-0">
                                       ${med.price_type_1.toFixed(2)}
