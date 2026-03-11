@@ -14,8 +14,9 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Plus, Check, Pill, Package, CheckSquare, Square, Loader2 } from "lucide-react";
+import { Search, Plus, Check, Pill, Package, CheckSquare, Square, Loader2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -62,6 +63,7 @@ export function CITIOImportDialog({
   const [isImporting, setIsImporting] = useState(false);
   const queryClient = useQueryClient();
 
+  // Fetch CITIO medications
   const { data: medications = [], isLoading, error } = useQuery({
     queryKey: ['citio-medications-for-import'],
     queryFn: async () => {
@@ -81,6 +83,47 @@ export function CITIOImportDialog({
     },
     enabled: open,
   });
+
+  // Fetch existing local products to detect name duplicates with different brands
+  const { data: existingProducts = [] } = useQuery({
+    queryKey: ['existing-products-for-citio-check'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('name, brand')
+        .eq('is_active', true);
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Map of lowercase product name -> array of brands already in local catalog
+  const existingProductBrands = useMemo(() => {
+    const map = new Map<string, string[]>();
+    existingProducts.forEach(p => {
+      const key = p.name?.toLowerCase().trim();
+      if (key) {
+        const brands = map.get(key) || [];
+        if (p.brand) brands.push(p.brand);
+        map.set(key, brands);
+      }
+    });
+    return map;
+  }, [existingProducts]);
+
+  // Check if a CITIO med has a name collision with different brand
+  const getDuplicateWarning = (med: CITIOMedication): string | null => {
+    const key = med.name?.toLowerCase().trim();
+    if (!key) return null;
+    const localBrands = existingProductBrands.get(key);
+    if (!localBrands || localBrands.length === 0) return null;
+    const citioBrand = med.brand?.toLowerCase().trim();
+    const hasDifferentBrand = localBrands.some(b => b.toLowerCase().trim() !== citioBrand);
+    if (hasDifferentBrand) {
+      return `Ya existe "${med.name}" con marca: ${localBrands.join(', ')}. Verifica que el citio_id sea correcto.`;
+    }
+    return null;
+  };
 
   const filteredMedications = useMemo(() => {
     if (!searchTerm.trim()) return medications;
@@ -326,6 +369,7 @@ export function CITIOImportDialog({
                     {meds.map((med) => {
                       const imported = isAlreadyImported(med.id);
                       const isSelected = selectedMedications.has(med.id);
+                      const duplicateWarning = !imported ? getDuplicateWarning(med) : null;
                       
                       return (
                         <button
@@ -336,6 +380,10 @@ export function CITIOImportDialog({
                             "w-full text-left px-2 py-1.5 rounded border transition-all text-sm",
                             imported
                               ? "bg-muted/30 opacity-60 cursor-not-allowed"
+                              : duplicateWarning
+                              ? isSelected
+                                ? "bg-destructive/10 border-destructive"
+                                : "border-destructive/50 hover:bg-destructive/5"
                               : isSelected
                               ? "bg-primary/10 border-primary"
                               : "hover:bg-accent hover:border-accent-foreground/20"
@@ -360,6 +408,21 @@ export function CITIOImportDialog({
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1.5 shrink-0">
+                                  {duplicateWarning && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="destructive" className="text-xs px-1.5 py-0">
+                                            <AlertTriangle className="h-3 w-3 mr-0.5" />
+                                            Duplicado
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="left" className="max-w-xs">
+                                          <p>{duplicateWarning}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
                                   {med.price_type_1 != null && med.price_type_1 > 0 && (
                                     <Badge variant="secondary" className="text-xs px-1.5 py-0">
                                       ${med.price_type_1.toFixed(2)}

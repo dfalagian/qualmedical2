@@ -423,9 +423,21 @@ export function SalesRequestsCitioOrders() {
         const subItems = effectiveItems.filter(i => i.is_sub_product);
         let unmatchedCount = 0;
 
+        const brandMismatches: string[] = [];
         const parentQuoteItems = parentItems.map(item => {
           const localProduct = findLocalProduct(item);
           if (!localProduct) unmatchedCount++;
+          
+          // Validar si la marca de CITIO difiere de la marca del producto local
+          const citioBrand = item.medications?.brand;
+          const localBrand = localProduct?.brand;
+          if (localProduct && citioBrand && localBrand && 
+              citioBrand.toLowerCase().trim() !== localBrand.toLowerCase().trim()) {
+            brandMismatches.push(
+              `"${item.medication_name}": CITIO dice "${citioBrand}" pero el producto local es "${localBrand}"`
+            );
+          }
+          
           const precio = localProduct?.price_type_1 || item.unit_price || 0;
           return {
             quote_id: newQuote.id,
@@ -502,6 +514,13 @@ export function SalesRequestsCitioOrders() {
           toast.warning(
             `${unmatchedCount} producto(s) no se encontraron en el inventario local. Vincúlalos manualmente antes de aprobar.`,
             { duration: 8000 }
+          );
+        }
+
+        if (brandMismatches.length > 0) {
+          toast.warning(
+            `⚠️ ${brandMismatches.length} producto(s) tienen marca diferente entre CITIO y el catálogo local. Verifica que el citio_id esté correctamente asignado:\n${brandMismatches.join('\n')}`,
+            { duration: 15000 }
           );
         }
       }
