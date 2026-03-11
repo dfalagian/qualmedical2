@@ -63,6 +63,7 @@ export function CITIOImportDialog({
   const [isImporting, setIsImporting] = useState(false);
   const queryClient = useQueryClient();
 
+  // Fetch CITIO medications
   const { data: medications = [], isLoading, error } = useQuery({
     queryKey: ['citio-medications-for-import'],
     queryFn: async () => {
@@ -82,6 +83,47 @@ export function CITIOImportDialog({
     },
     enabled: open,
   });
+
+  // Fetch existing local products to detect name duplicates with different brands
+  const { data: existingProducts = [] } = useQuery({
+    queryKey: ['existing-products-for-citio-check'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('name, brand')
+        .eq('is_active', true);
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Map of lowercase product name -> array of brands already in local catalog
+  const existingProductBrands = useMemo(() => {
+    const map = new Map<string, string[]>();
+    existingProducts.forEach(p => {
+      const key = p.name?.toLowerCase().trim();
+      if (key) {
+        const brands = map.get(key) || [];
+        if (p.brand) brands.push(p.brand);
+        map.set(key, brands);
+      }
+    });
+    return map;
+  }, [existingProducts]);
+
+  // Check if a CITIO med has a name collision with different brand
+  const getDuplicateWarning = (med: CITIOMedication): string | null => {
+    const key = med.name?.toLowerCase().trim();
+    if (!key) return null;
+    const localBrands = existingProductBrands.get(key);
+    if (!localBrands || localBrands.length === 0) return null;
+    const citioBrand = med.brand?.toLowerCase().trim();
+    const hasDifferentBrand = localBrands.some(b => b.toLowerCase().trim() !== citioBrand);
+    if (hasDifferentBrand) {
+      return `Ya existe "${med.name}" con marca: ${localBrands.join(', ')}. Verifica que el citio_id sea correcto.`;
+    }
+    return null;
+  };
 
   const filteredMedications = useMemo(() => {
     if (!searchTerm.trim()) return medications;
