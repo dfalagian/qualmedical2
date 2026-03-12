@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserRole = useCallback(async (userId: string) => {
     // Si ya tenemos rol para este usuario, no lo vuelvas a pedir
-    if (roleFetchedForUserIdRef.current === userId && userRole) return;
+    if (roleFetchedForUserIdRef.current === userId) return;
 
     setRoleLoading(true);
     try {
@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setRoleLoading(false);
     }
-  }, [userRole]);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
