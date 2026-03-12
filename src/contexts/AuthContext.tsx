@@ -94,8 +94,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(data.session?.user ?? null);
 
         if (data.session?.user) {
-          // Carga inicial: sí bloquea hasta tener rol
-          await fetchUserRole(data.session.user.id);
+          // No bloquear el acceso por una consulta de rol lenta
+          fetchUserRole(data.session.user.id);
         } else {
           setUserRole(null);
           roleFetchedForUserIdRef.current = null;
