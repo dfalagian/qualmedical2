@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.whatsapp-bot-query]
 verify_jwt = false
+
+[functions.get-products-external]
+verify_jwt = false
