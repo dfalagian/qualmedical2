@@ -43,6 +43,7 @@ interface PurchaseOrderItem {
   quantity_received: number | null;
   unit_price: number | null;
   original_price?: number | null;
+  notes?: string | null;
   products?: {
     id: string;
     name: string;
