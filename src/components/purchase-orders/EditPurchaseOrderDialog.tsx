@@ -47,6 +47,7 @@ interface SelectedProduct {
   total: number;
   category: string | null;
   notes: string;
+  unitsPerBox: number | null;
 }
 
 const IVA_RATE = 0.16;
@@ -110,6 +111,7 @@ export const EditPurchaseOrderDialog = ({
           total,
           category: productData?.category || item.products?.category || null,
           notes: item.notes || "Pieza",
+          unitsPerBox: item.units_per_box || null,
         };
       });
 
@@ -150,6 +152,7 @@ export const EditPurchaseOrderDialog = ({
         total,
         category: product.category || null,
         notes: "Pieza",
+        unitsPerBox: null,
       },
     ]);
   };
@@ -187,7 +190,14 @@ export const EditPurchaseOrderDialog = ({
 
   const updateProductNotes = (productId: string, notes: string) => {
     setSelectedProducts(
-      selectedProducts.map((p) => p.id === productId ? { ...p, notes } : p)
+      selectedProducts.map((p) => p.id === productId ? { ...p, notes, unitsPerBox: notes === "Pieza" ? null : p.unitsPerBox } : p)
+    );
+  };
+
+  const updateProductUnitsPerBox = (productId: string, value: string) => {
+    const units = value.trim() === "" ? null : Math.max(1, parseInt(value) || 1);
+    setSelectedProducts(
+      selectedProducts.map((p) => p.id === productId ? { ...p, unitsPerBox: units } : p)
     );
   };
 
@@ -242,6 +252,7 @@ export const EditPurchaseOrderDialog = ({
         unit_price: p.manualPrice ?? p.savedPrice,
         original_price: p.savedPrice,
         notes: p.notes || null,
+        units_per_box: p.notes === "Caja" ? (p.unitsPerBox || null) : null,
         price_updated_at:
           p.manualPrice !== null && p.manualPrice !== p.savedPrice
             ? new Date().toISOString()
@@ -369,15 +380,35 @@ export const EditPurchaseOrderDialog = ({
                           />
                         </TableCell>
                         <TableCell className="text-center">
-                          <Select value={product.notes} onValueChange={(v) => updateProductNotes(product.id, v)}>
-                            <SelectTrigger className="w-24 h-8 mx-auto">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Pieza">Pieza</SelectItem>
-                              <SelectItem value="Caja">Caja</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="flex flex-col items-center gap-1">
+                            <Select value={product.notes} onValueChange={(v) => updateProductNotes(product.id, v)}>
+                              <SelectTrigger className="w-24 h-8 mx-auto">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Pieza">Pieza</SelectItem>
+                                <SelectItem value="Caja">Caja</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {product.notes === "Caja" && (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={product.unitsPerBox ?? ""}
+                                  onChange={(e) => updateProductUnitsPerBox(product.id, e.target.value)}
+                                  placeholder="Pzas"
+                                  className="w-16 h-7 text-xs text-center"
+                                />
+                                <span className="text-xs text-muted-foreground">pzas</span>
+                              </div>
+                            )}
+                            {product.notes === "Caja" && product.unitsPerBox && product.quantity > 0 && (
+                              <span className="text-xs text-primary font-medium">
+                                = {product.quantity * product.unitsPerBox} pzas
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
