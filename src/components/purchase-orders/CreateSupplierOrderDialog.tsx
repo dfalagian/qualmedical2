@@ -50,6 +50,7 @@ interface SelectedProduct {
   manualPrice: number | null;
   total: number;
   category: string | null;
+  notes: string;
 }
 
 const IVA_RATE = 0.16;
