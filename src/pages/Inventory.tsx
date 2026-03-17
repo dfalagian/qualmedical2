@@ -235,6 +235,7 @@ export default function Inventory() {
       const { data, error } = await supabase
         .from("products")
         .select("*")
+        .eq("catalog_only", false)
         .order("created_at", { ascending: false });
 
       if (error) throw error;

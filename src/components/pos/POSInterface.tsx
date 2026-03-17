@@ -45,6 +45,7 @@ export const POSInterface = () => {
         .from("products")
         .select("id, name, sku, brand, category, current_stock, price_type_1, price_type_2, price_type_3, price_type_4, price_type_5, unit_price, grupo_sat, image_url")
         .eq("is_active", true)
+        .eq("catalog_only", false)
         .order("name");
       if (error) throw error;
       return data || [];

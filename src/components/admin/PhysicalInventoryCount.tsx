@@ -63,6 +63,7 @@ export function PhysicalInventoryCount() {
         .from("products")
         .select("id, name, sku, category, current_stock")
         .eq("is_active", true)
+        .eq("catalog_only", false)
         .or(`name.ilike.%${search}%,sku.ilike.%${search}%`)
         .order("name")
         .limit(20);

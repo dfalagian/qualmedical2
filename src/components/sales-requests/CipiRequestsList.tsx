@@ -152,7 +152,8 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
         const { data: prods } = await supabase
           .from("products")
           .select("id, name, brand")
-          .eq("is_active", true);
+          .eq("is_active", true)
+          .eq("catalog_only", false);
         const productsCatalog: Array<{ id: string; name: string; brand: string | null }> = prods || [];
 
         // Build a lookup map for quick access by id

@@ -19,6 +19,7 @@ export function ExportInventoryButton() {
         const { data, error } = await supabase
           .from("products")
           .select("id, name, sku, brand, category, current_stock, minimum_stock, unit, barcode, price_with_tax, price_without_tax, unit_price, tax_rate, is_active, created_at, updated_at")
+          .eq("catalog_only", false)
           .order("category")
           .order("name")
           .range(from, from + pageSize - 1);

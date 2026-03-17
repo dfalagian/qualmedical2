@@ -38,6 +38,7 @@ Deno.serve(async (req) => {
     const brand = url.searchParams.get('brand')
     const productId = url.searchParams.get('id')
     const activeOnly = url.searchParams.get('active') !== 'false' // default true
+    const catalogOnly = url.searchParams.get('catalog_only') // optional filter
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 1000)
     const offset = parseInt(url.searchParams.get('offset') || '0')
 
@@ -73,6 +74,7 @@ Deno.serve(async (req) => {
         codigo_sat,
         image_url,
         is_active,
+        catalog_only,
         created_at,
         updated_at,
         product_batches (
@@ -113,6 +115,9 @@ Deno.serve(async (req) => {
     }
     if (brand) {
       query = query.ilike('brand', `%${brand}%`)
+    }
+    if (catalogOnly !== null) {
+      query = query.eq('catalog_only', catalogOnly === 'true')
     }
 
     query = query.order('name', { ascending: true }).range(offset, offset + limit - 1)
@@ -171,6 +176,7 @@ Deno.serve(async (req) => {
         },
         image_url: p.image_url,
         is_active: p.is_active,
+        catalog_only: p.catalog_only,
         batches: (p.product_batches || [])
           .filter((b: any) => b.is_active)
           .map((b: any) => ({

@@ -149,6 +149,7 @@ export const CreateSupplierOrderDialog = ({
         .from("products")
         .select("id, name, sku, unit_price, current_stock, price_type_1, brand, category")
         .eq("is_active", true)
+        .eq("catalog_only", false)
         .order("name");
       if (error) throw error;
       return data;
