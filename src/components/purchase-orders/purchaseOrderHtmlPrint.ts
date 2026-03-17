@@ -10,6 +10,7 @@ export interface PrintOrderItem {
   unitPrice: number;
   total: number;
   notes?: string;
+  unitsPerBox?: number | null;
 }
 
 export interface PrintOrderData {
