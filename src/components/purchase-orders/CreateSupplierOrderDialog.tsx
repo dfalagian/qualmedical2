@@ -51,6 +51,7 @@ interface SelectedProduct {
   total: number;
   category: string | null;
   notes: string;
+  unitsPerBox: number | null;
 }
 
 const IVA_RATE = 0.16;
