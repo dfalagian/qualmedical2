@@ -50,6 +50,7 @@ interface SelectedProduct {
   manualPrice: number | null;
   total: number;
   category: string | null;
+  notes: string;
 }
 
 const IVA_RATE = 0.16;
@@ -180,6 +181,7 @@ export const CreateSupplierOrderDialog = ({
         manualPrice,
         total,
         category: product.category || null,
+        notes: "Pieza",
       },
     ]);
   };
@@ -212,6 +214,12 @@ export const CreateSupplierOrderDialog = ({
         }
         return p;
       })
+    );
+  };
+
+  const updateProductNotes = (productId: string, notes: string) => {
+    setSelectedProducts(
+      selectedProducts.map((p) => p.id === productId ? { ...p, notes } : p)
     );
   };
 
@@ -296,6 +304,7 @@ export const CreateSupplierOrderDialog = ({
         quantity_ordered: p.quantity,
         unit_price: p.unitPrice,
         original_price: p.savedPrice,
+        notes: p.notes || null,
         price_updated_at:
           p.manualPrice !== null && p.manualPrice !== p.savedPrice
             ? new Date().toISOString()
@@ -518,11 +527,12 @@ export const CreateSupplierOrderDialog = ({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[40%]">Producto</TableHead>
-                        <TableHead className="w-[12%] text-center">Cant.</TableHead>
-                        <TableHead className="w-[15%] text-right">P. Guardado</TableHead>
-                        <TableHead className="w-[15%] text-center">P. Manual</TableHead>
-                        <TableHead className="w-[18%] text-right">Importe</TableHead>
+                        <TableHead className="w-[32%]">Producto</TableHead>
+                        <TableHead className="w-[10%] text-center">Cant.</TableHead>
+                        <TableHead className="w-[12%] text-center">Presentación</TableHead>
+                        <TableHead className="w-[13%] text-right">P. Guardado</TableHead>
+                        <TableHead className="w-[13%] text-center">P. Manual</TableHead>
+                        <TableHead className="w-[15%] text-right">Importe</TableHead>
                         <TableHead className="w-[5%]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -548,6 +558,17 @@ export const CreateSupplierOrderDialog = ({
                               }
                               className="w-16 h-8 text-center mx-auto"
                             />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Select value={product.notes} onValueChange={(v) => updateProductNotes(product.id, v)}>
+                              <SelectTrigger className="w-24 h-8 mx-auto">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Pieza">Pieza</SelectItem>
+                                <SelectItem value="Caja">Caja</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">

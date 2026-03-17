@@ -1,0 +1,1 @@
+ALTER TABLE public.purchase_order_items ADD COLUMN notes TEXT;

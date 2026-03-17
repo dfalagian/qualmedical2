@@ -1604,6 +1604,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          notes: string | null
           original_price: number | null
           price_updated_at: string | null
           price_updated_by: string | null
@@ -1617,6 +1618,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          notes?: string | null
           original_price?: number | null
           price_updated_at?: string | null
           price_updated_by?: string | null
@@ -1630,6 +1632,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          notes?: string | null
           original_price?: number | null
           price_updated_at?: string | null
           price_updated_by?: string | null

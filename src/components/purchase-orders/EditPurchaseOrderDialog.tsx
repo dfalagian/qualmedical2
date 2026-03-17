@@ -14,6 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -39,6 +46,7 @@ interface SelectedProduct {
   manualPrice: number | null;
   total: number;
   category: string | null;
+  notes: string;
 }
 
 const IVA_RATE = 0.16;
@@ -101,6 +109,7 @@ export const EditPurchaseOrderDialog = ({
           manualPrice: isManual ? currentPrice : null,
           total,
           category: productData?.category || item.products?.category || null,
+          notes: item.notes || "Pieza",
         };
       });
 
@@ -140,6 +149,7 @@ export const EditPurchaseOrderDialog = ({
         manualPrice,
         total,
         category: product.category || null,
+        notes: "Pieza",
       },
     ]);
   };
@@ -172,6 +182,12 @@ export const EditPurchaseOrderDialog = ({
         }
         return p;
       })
+    );
+  };
+
+  const updateProductNotes = (productId: string, notes: string) => {
+    setSelectedProducts(
+      selectedProducts.map((p) => p.id === productId ? { ...p, notes } : p)
     );
   };
 
@@ -225,6 +241,7 @@ export const EditPurchaseOrderDialog = ({
         quantity_ordered: p.quantity,
         unit_price: p.manualPrice ?? p.savedPrice,
         original_price: p.savedPrice,
+        notes: p.notes || null,
         price_updated_at:
           p.manualPrice !== null && p.manualPrice !== p.savedPrice
             ? new Date().toISOString()
@@ -319,11 +336,12 @@ export const EditPurchaseOrderDialog = ({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[40%]">Producto</TableHead>
-                      <TableHead className="w-[12%] text-center">Cant.</TableHead>
-                      <TableHead className="w-[15%] text-right">P. Guardado</TableHead>
-                      <TableHead className="w-[15%] text-center">P. Manual</TableHead>
-                      <TableHead className="w-[18%] text-right">Importe</TableHead>
+                      <TableHead className="w-[32%]">Producto</TableHead>
+                      <TableHead className="w-[10%] text-center">Cant.</TableHead>
+                      <TableHead className="w-[12%] text-center">Presentación</TableHead>
+                      <TableHead className="w-[13%] text-right">P. Guardado</TableHead>
+                      <TableHead className="w-[13%] text-center">P. Manual</TableHead>
+                      <TableHead className="w-[15%] text-right">Importe</TableHead>
                       <TableHead className="w-[5%]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -349,6 +367,17 @@ export const EditPurchaseOrderDialog = ({
                             }
                             className="w-16 h-8 text-center mx-auto"
                           />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Select value={product.notes} onValueChange={(v) => updateProductNotes(product.id, v)}>
+                            <SelectTrigger className="w-24 h-8 mx-auto">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Pieza">Pieza</SelectItem>
+                              <SelectItem value="Caja">Caja</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">

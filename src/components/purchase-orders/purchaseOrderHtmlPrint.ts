@@ -9,6 +9,7 @@ export interface PrintOrderItem {
   quantity: number;
   unitPrice: number;
   total: number;
+  notes?: string;
 }
 
 export interface PrintOrderData {
@@ -45,7 +46,7 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
         <td style="border: 1px solid #ccc; padding: 6px;">${item.name}</td>
         <td style="text-align: center; border: 1px solid #ccc; padding: 6px;">-</td>
         <td style="text-align: center; border: 1px solid #ccc; padding: 6px;">${item.quantity}</td>
-        <td style="text-align: center; border: 1px solid #ccc; padding: 6px;">PZAS</td>
+        <td style="text-align: center; border: 1px solid #ccc; padding: 6px;">${item.notes || "PZAS"}</td>
         <td style="text-align: right; border: 1px solid #ccc; padding: 6px;">$${item.unitPrice.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</td>
         <td style="text-align: right; border: 1px solid #ccc; padding: 6px;">$${item.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</td>
       </tr>
