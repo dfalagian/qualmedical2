@@ -181,6 +181,7 @@ export const CreateSupplierOrderDialog = ({
         manualPrice,
         total,
         category: product.category || null,
+        notes: "Pieza",
       },
     ]);
   };

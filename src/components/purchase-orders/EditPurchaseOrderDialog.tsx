@@ -142,6 +142,7 @@ export const EditPurchaseOrderDialog = ({
         manualPrice,
         total,
         category: product.category || null,
+        notes: "Pieza",
       },
     ]);
   };
