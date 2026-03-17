@@ -182,6 +182,13 @@ Deno.serve(async (req) => {
             initial_quantity: b.initial_quantity,
             received_at: b.received_at,
           })),
+        warehouse_stock: (p.warehouse_stock || [])
+          .filter((ws: any) => ws.current_stock > 0)
+          .map((ws: any) => ({
+            warehouse_name: ws.warehouses?.name || null,
+            warehouse_code: ws.warehouses?.code || null,
+            current_stock: ws.current_stock,
+          })),
         created_at: p.created_at,
         updated_at: p.updated_at,
       })),
