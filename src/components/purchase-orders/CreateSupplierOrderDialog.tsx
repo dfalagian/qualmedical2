@@ -527,11 +527,12 @@ export const CreateSupplierOrderDialog = ({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[40%]">Producto</TableHead>
-                        <TableHead className="w-[12%] text-center">Cant.</TableHead>
-                        <TableHead className="w-[15%] text-right">P. Guardado</TableHead>
-                        <TableHead className="w-[15%] text-center">P. Manual</TableHead>
-                        <TableHead className="w-[18%] text-right">Importe</TableHead>
+                        <TableHead className="w-[32%]">Producto</TableHead>
+                        <TableHead className="w-[10%] text-center">Cant.</TableHead>
+                        <TableHead className="w-[12%] text-center">Presentación</TableHead>
+                        <TableHead className="w-[13%] text-right">P. Guardado</TableHead>
+                        <TableHead className="w-[13%] text-center">P. Manual</TableHead>
+                        <TableHead className="w-[15%] text-right">Importe</TableHead>
                         <TableHead className="w-[5%]"></TableHead>
                       </TableRow>
                     </TableHeader>
