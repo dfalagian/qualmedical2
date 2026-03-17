@@ -382,6 +382,11 @@ export function PurchaseOrderDetailDialog({
                                     </p>
                                   )}
                                 </td>
+                                <td className="p-3 text-center">
+                                  <Badge variant="outline" className="text-xs">
+                                    {item.notes || "Pieza"}
+                                  </Badge>
+                                </td>
                                 <td className="p-3 text-right">
                                   {isEditing ? (
                                     <div className="flex items-center justify-end gap-2">

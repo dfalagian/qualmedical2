@@ -9,6 +9,7 @@ export interface PrintOrderItem {
   quantity: number;
   unitPrice: number;
   total: number;
+  notes?: string;
 }
 
 export interface PrintOrderData {
