@@ -569,15 +569,35 @@ export const CreateSupplierOrderDialog = ({
                             />
                           </TableCell>
                           <TableCell className="text-center">
-                            <Select value={product.notes} onValueChange={(v) => updateProductNotes(product.id, v)}>
-                              <SelectTrigger className="w-24 h-8 mx-auto">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Pieza">Pieza</SelectItem>
-                                <SelectItem value="Caja">Caja</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <div className="flex flex-col items-center gap-1">
+                              <Select value={product.notes} onValueChange={(v) => updateProductNotes(product.id, v)}>
+                                <SelectTrigger className="w-24 h-8 mx-auto">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Pieza">Pieza</SelectItem>
+                                  <SelectItem value="Caja">Caja</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {product.notes === "Caja" && (
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    value={product.unitsPerBox ?? ""}
+                                    onChange={(e) => updateProductUnitsPerBox(product.id, e.target.value)}
+                                    placeholder="Pzas"
+                                    className="w-16 h-7 text-xs text-center"
+                                  />
+                                  <span className="text-xs text-muted-foreground">pzas</span>
+                                </div>
+                              )}
+                              {product.notes === "Caja" && product.unitsPerBox && product.quantity > 0 && (
+                                <span className="text-xs text-primary font-medium">
+                                  = {product.quantity * product.unitsPerBox} pzas
+                                </span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
