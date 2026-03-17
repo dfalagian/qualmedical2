@@ -74,6 +74,7 @@ Deno.serve(async (req) => {
         codigo_sat,
         image_url,
         is_active,
+        catalog_only,
         created_at,
         updated_at,
         product_batches (
