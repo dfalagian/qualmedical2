@@ -353,6 +353,7 @@ export function PurchaseOrderDetailDialog({
                         <thead className="bg-muted/50">
                           <tr>
                             <th className="text-left p-3 font-medium">Producto</th>
+                            <th className="text-center p-3 font-medium w-24">Presentación</th>
                             <th className="text-right p-3 font-medium w-44">Precio Unit.</th>
                             <th className="text-center p-3 font-medium w-32">Cantidad</th>
                             <th className="text-right p-3 font-medium w-28">Subtotal</th>
