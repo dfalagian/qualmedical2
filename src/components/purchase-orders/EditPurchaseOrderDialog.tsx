@@ -111,6 +111,7 @@ export const EditPurchaseOrderDialog = ({
           total,
           category: productData?.category || item.products?.category || null,
           notes: item.notes || "Pieza",
+          unitsPerBox: item.units_per_box || null,
         };
       });
 
