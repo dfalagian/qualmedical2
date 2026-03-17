@@ -1431,6 +1431,7 @@ export type Database = {
         Row: {
           barcode: string | null
           brand: string | null
+          catalog_only: boolean
           category: string | null
           citio_id: string | null
           clave_unidad: string | null
@@ -1463,6 +1464,7 @@ export type Database = {
         Insert: {
           barcode?: string | null
           brand?: string | null
+          catalog_only?: boolean
           category?: string | null
           citio_id?: string | null
           clave_unidad?: string | null
@@ -1495,6 +1497,7 @@ export type Database = {
         Update: {
           barcode?: string | null
           brand?: string | null
+          catalog_only?: boolean
           category?: string | null
           citio_id?: string | null
           clave_unidad?: string | null

@@ -1,0 +1,1 @@
+ALTER TABLE public.products ADD COLUMN catalog_only boolean NOT NULL DEFAULT false;
