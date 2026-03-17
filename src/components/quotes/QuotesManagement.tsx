@@ -224,6 +224,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
         .from("products")
         .select("id, name, sku, unit_price, current_stock, brand, category, grupo_sat, price_type_1, price_type_2, price_type_3, price_type_4, price_type_5")
         .eq("is_active", true)
+        .eq("catalog_only", false)
         .order("name");
       if (error) throw error;
       return data as Product[];

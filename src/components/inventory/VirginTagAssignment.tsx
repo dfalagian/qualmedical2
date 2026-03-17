@@ -124,6 +124,7 @@ export function VirginTagAssignment({ open, onOpenChange }: VirginTagAssignmentP
         .from("products")
         .select("id, sku, name, barcode")
         .eq("is_active", true)
+        .eq("catalog_only", false)
         .order("name");
 
       if (error) throw error;
