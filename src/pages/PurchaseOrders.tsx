@@ -83,7 +83,7 @@ const PurchaseOrders = () => {
         .select(`
           *,
           purchase_order_items(
-            id, product_id, quantity_ordered, quantity_received, unit_price, original_price,
+            id, product_id, quantity_ordered, quantity_received, unit_price, original_price, notes, units_per_box,
             products(id, name, sku)
           )
         `)
