@@ -38,6 +38,7 @@ Deno.serve(async (req) => {
     const brand = url.searchParams.get('brand')
     const productId = url.searchParams.get('id')
     const activeOnly = url.searchParams.get('active') !== 'false' // default true
+    const catalogOnly = url.searchParams.get('catalog_only') // optional filter
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 1000)
     const offset = parseInt(url.searchParams.get('offset') || '0')
 
