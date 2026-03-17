@@ -384,9 +384,21 @@ export function PurchaseOrderDetailDialog({
                                   )}
                                 </td>
                                 <td className="p-3 text-center">
-                                  <Badge variant="outline" className="text-xs">
-                                    {item.notes || "Pieza"}
-                                  </Badge>
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <Badge variant="outline" className="text-xs">
+                                      {item.notes || "Pieza"}
+                                    </Badge>
+                                    {item.notes === "Caja" && item.units_per_box && (
+                                      <span className="text-xs text-muted-foreground">
+                                        {item.units_per_box} pzas/caja
+                                      </span>
+                                    )}
+                                    {item.notes === "Caja" && item.units_per_box && item.quantity_ordered > 0 && (
+                                      <span className="text-xs text-primary font-medium">
+                                        = {item.quantity_ordered * item.units_per_box} pzas
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="p-3 text-right">
                                   {isEditing ? (
