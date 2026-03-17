@@ -44,6 +44,7 @@ interface PurchaseOrderItem {
   unit_price: number | null;
   original_price?: number | null;
   notes?: string | null;
+  units_per_box?: number | null;
   products?: {
     id: string;
     name: string;
