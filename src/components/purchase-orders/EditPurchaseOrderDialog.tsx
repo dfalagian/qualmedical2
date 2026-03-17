@@ -361,6 +361,17 @@ export const EditPurchaseOrderDialog = ({
                             className="w-16 h-8 text-center mx-auto"
                           />
                         </TableCell>
+                        <TableCell className="text-center">
+                          <Select value={product.notes} onValueChange={(v) => updateProductNotes(product.id, v)}>
+                            <SelectTrigger className="w-24 h-8 mx-auto">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Pieza">Pieza</SelectItem>
+                              <SelectItem value="Caja">Caja</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             <History className="h-3 w-3 text-muted-foreground" />
