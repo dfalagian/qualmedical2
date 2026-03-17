@@ -183,6 +183,7 @@ export const CreateSupplierOrderDialog = ({
         total,
         category: product.category || null,
         notes: "Pieza",
+        unitsPerBox: null,
       },
     ]);
   };
