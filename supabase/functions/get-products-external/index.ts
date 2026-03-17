@@ -176,6 +176,7 @@ Deno.serve(async (req) => {
         },
         image_url: p.image_url,
         is_active: p.is_active,
+        catalog_only: p.catalog_only,
         batches: (p.product_batches || [])
           .filter((b: any) => b.is_active)
           .map((b: any) => ({
