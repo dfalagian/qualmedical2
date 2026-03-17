@@ -761,6 +761,8 @@ const PurchaseOrders = () => {
                                   quantity,
                                   unitPrice,
                                   total,
+                                  notes: item.notes,
+                                  unitsPerBox: item.units_per_box,
                                 };
                               }) || [];
                               
