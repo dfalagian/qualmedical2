@@ -84,6 +84,14 @@ Deno.serve(async (req) => {
           initial_quantity,
           is_active,
           received_at
+        ),
+        warehouse_stock (
+          current_stock,
+          warehouse_id,
+          warehouses:warehouse_id (
+            name,
+            code
+          )
         )
       `)
 
