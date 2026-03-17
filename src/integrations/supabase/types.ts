@@ -1613,6 +1613,7 @@ export type Database = {
           quantity_ordered: number
           quantity_received: number | null
           unit_price: number | null
+          units_per_box: number | null
           updated_at: string
         }
         Insert: {
@@ -1627,6 +1628,7 @@ export type Database = {
           quantity_ordered: number
           quantity_received?: number | null
           unit_price?: number | null
+          units_per_box?: number | null
           updated_at?: string
         }
         Update: {
@@ -1641,6 +1643,7 @@ export type Database = {
           quantity_ordered?: number
           quantity_received?: number | null
           unit_price?: number | null
+          units_per_box?: number | null
           updated_at?: string
         }
         Relationships: [
