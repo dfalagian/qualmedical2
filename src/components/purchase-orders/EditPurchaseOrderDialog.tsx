@@ -234,6 +234,7 @@ export const EditPurchaseOrderDialog = ({
         quantity_ordered: p.quantity,
         unit_price: p.manualPrice ?? p.savedPrice,
         original_price: p.savedPrice,
+        notes: p.notes || null,
         price_updated_at:
           p.manualPrice !== null && p.manualPrice !== p.savedPrice
             ? new Date().toISOString()
