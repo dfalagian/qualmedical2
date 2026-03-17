@@ -116,6 +116,9 @@ Deno.serve(async (req) => {
     if (brand) {
       query = query.ilike('brand', `%${brand}%`)
     }
+    if (catalogOnly !== null) {
+      query = query.eq('catalog_only', catalogOnly === 'true')
+    }
 
     query = query.order('name', { ascending: true }).range(offset, offset + limit - 1)
 
