@@ -190,7 +190,14 @@ export const EditPurchaseOrderDialog = ({
 
   const updateProductNotes = (productId: string, notes: string) => {
     setSelectedProducts(
-      selectedProducts.map((p) => p.id === productId ? { ...p, notes } : p)
+      selectedProducts.map((p) => p.id === productId ? { ...p, notes, unitsPerBox: notes === "Pieza" ? null : p.unitsPerBox } : p)
+    );
+  };
+
+  const updateProductUnitsPerBox = (productId: string, value: string) => {
+    const units = value.trim() === "" ? null : Math.max(1, parseInt(value) || 1);
+    setSelectedProducts(
+      selectedProducts.map((p) => p.id === productId ? { ...p, unitsPerBox: units } : p)
     );
   };
 
