@@ -178,6 +178,12 @@ export const EditPurchaseOrderDialog = ({
     );
   };
 
+  const updateProductNotes = (productId: string, notes: string) => {
+    setSelectedProducts(
+      selectedProducts.map((p) => p.id === productId ? { ...p, notes } : p)
+    );
+  };
+
   const subtotal = useMemo(() => {
     return selectedProducts.reduce((sum, p) => {
       const effectivePrice = p.manualPrice ?? p.savedPrice;
