@@ -418,16 +418,10 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
           };
         });
 
-      // Check if any have insufficient stock
-      const hasStockWarnings = selections.some(sel => 
-        sel.batchId && sel.availableQuantity < sel.requestedQuantity
-      );
-
       await approveQuote({
         quoteId: quoteToApprove.id,
         items: itemsWithBatches,
         warehouseId,
-        forceApprove: hasStockWarnings,
       });
       
       // Prepare items for exit scan dialog

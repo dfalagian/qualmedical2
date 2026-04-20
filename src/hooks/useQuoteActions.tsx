@@ -50,7 +50,6 @@ interface ApproveQuoteParams {
     cantidad: number;
     nombre_producto: string;
   }>;
-  forceApprove?: boolean; // Permitir aprobar sin stock suficiente (con advertencia)
 }
 
 interface StockValidationResult {
@@ -307,31 +306,53 @@ export const useQuoteActions = () => {
       if (!user) throw new Error("No autenticado");
 
       // 🛡️ BLINDAJE 1: Idempotencia. Si esta cotización ya tiene movimientos
-      // de salida registrados, hubo un intento previo a medias. NO volver a
-      // descontar stock; pedir intervención manual para revertir antes de re-aprobar.
+      // de salida registrados y la cotización ya está aprobada, bloquear re-aprobación.
+      // Si la cotización sigue en borrador, los movimientos son huérfanos de un intento
+      // fallido — se hace rollback automático y se procede con la aprobación limpia.
       const { data: prevMovs, error: prevMovsError } = await supabase
         .from("inventory_movements")
-        .select("id")
+        .select("id, batch_id, quantity, location")
         .eq("reference_id", params.quoteId)
         .eq("reference_type", "venta")
-        .eq("movement_type", "salida")
-        .limit(1);
+        .eq("movement_type", "salida");
       if (prevMovsError) throw prevMovsError;
       if (prevMovs && prevMovs.length > 0) {
-        throw new Error(
-          "Esta cotización ya tiene movimientos de salida registrados de un intento anterior. " +
-          "Contacta al administrador para revertir esos movimientos antes de re-aprobar (evita doble descuento de stock)."
-        );
-      }
+        const { data: quoteCheck } = await supabase
+          .from("quotes")
+          .select("status")
+          .eq("id", params.quoteId)
+          .single();
 
-      // Validar stock - solo bloquear si no se fuerza la aprobación
-      const stockValidation = await validateStock(params.items);
-      if (!stockValidation.isValid && !params.forceApprove) {
-        throw { 
-          type: "STOCK_WARNING", 
-          warnings: stockValidation.warnings,
-          message: `Stock insuficiente:\n${stockValidation.warnings.join("\n")}`
-        };
+        if (quoteCheck?.status === "aprobada") {
+          throw new Error("Esta cotización ya está aprobada.");
+        }
+
+        // Cotización aún en borrador — rollback de movimientos huérfanos
+        for (const mov of prevMovs) {
+          if (mov.batch_id && mov.location) {
+            const { data: bwsRow } = await (supabase as any)
+              .from("batch_warehouse_stock")
+              .select("id, quantity")
+              .eq("batch_id", mov.batch_id)
+              .eq("warehouse_id", mov.location)
+              .maybeSingle();
+            if (bwsRow) {
+              await (supabase as any)
+                .from("batch_warehouse_stock")
+                .update({ quantity: bwsRow.quantity + mov.quantity })
+                .eq("id", bwsRow.id);
+            } else {
+              await (supabase as any)
+                .from("batch_warehouse_stock")
+                .insert({ batch_id: mov.batch_id, warehouse_id: mov.location, quantity: mov.quantity });
+            }
+          }
+          await supabase
+            .from("inventory_movements")
+            .delete()
+            .eq("id", mov.id);
+        }
+        // Movimientos huérfanos limpiados — continuar con aprobación fresca
       }
 
       // 🛡️ BLINDAJE 2: Pre-validación atómica. Verificar stock REAL en
@@ -359,85 +380,115 @@ export const useQuoteActions = () => {
         );
       }
 
-      // Procesar cada item: descontar stock, crear movimiento y guardar batch_id
-      for (const item of params.items) {
-        // Obtener stock actual del lote
-        const { data: batch } = await supabase
-          .from("product_batches")
-          .select("current_quantity, product_id, batch_number, expiration_date")
-          .eq("id", item.batch_id)
-          .single();
+      // Procesar cada item: descontar stock, crear movimiento y guardar batch_id.
+      // Se mantiene un undo stack para revertir automáticamente si un item falla a mitad.
+      const undoStack: Array<() => Promise<void>> = [];
 
-        if (!batch) throw new Error(`Lote no encontrado: ${item.batch_id}`);
+      try {
+        for (const item of params.items) {
+          // Obtener stock actual del lote
+          const { data: batch } = await supabase
+            .from("product_batches")
+            .select("current_quantity, product_id, batch_number, expiration_date")
+            .eq("id", item.batch_id)
+            .single();
 
-        const newBatchQuantity = batch.current_quantity - item.cantidad;
+          if (!batch) throw new Error(`Lote no encontrado: ${item.batch_id}`);
 
-        // Descontar stock del lote en batch_warehouse_stock
-        // El trigger sync_stock_from_batch_warehouse se encarga de actualizar:
-        // - product_batches.current_quantity
-        // - warehouse_stock.current_stock
-        // - products.current_stock
-        const { data: bwsRow } = await (supabase as any)
-          .from("batch_warehouse_stock")
-          .select("id, quantity")
-          .eq("batch_id", item.batch_id)
-          .eq("warehouse_id", params.warehouseId)
-          .maybeSingle();
+          const newBatchQuantity = batch.current_quantity - item.cantidad;
 
-        if (bwsRow && bwsRow.quantity > 0) {
-          const availableBwsQty = bwsRow.quantity;
-          if (availableBwsQty < item.cantidad) {
+          // Descontar stock del lote en batch_warehouse_stock
+          // El trigger sync_stock_from_batch_warehouse se encarga de actualizar:
+          // - product_batches.current_quantity
+          // - warehouse_stock.current_stock
+          // - products.current_stock
+          const { data: bwsRow } = await (supabase as any)
+            .from("batch_warehouse_stock")
+            .select("id, quantity")
+            .eq("batch_id", item.batch_id)
+            .eq("warehouse_id", params.warehouseId)
+            .maybeSingle();
+
+          if (bwsRow && bwsRow.quantity > 0) {
+            const availableBwsQty = bwsRow.quantity;
+            if (availableBwsQty < item.cantidad) {
+              throw new Error(
+                `Stock insuficiente en almacén para ${item.nombre_producto}: disponible ${availableBwsQty}, solicitado ${item.cantidad}`
+              );
+            }
+            const newBwsQty = availableBwsQty - item.cantidad;
+            if (newBwsQty === 0) {
+              await (supabase as any)
+                .from("batch_warehouse_stock")
+                .delete()
+                .eq("id", bwsRow.id);
+              undoStack.push(async () => {
+                await (supabase as any)
+                  .from("batch_warehouse_stock")
+                  .insert({ batch_id: item.batch_id, warehouse_id: params.warehouseId, quantity: item.cantidad });
+              });
+            } else {
+              await (supabase as any)
+                .from("batch_warehouse_stock")
+                .update({ quantity: newBwsQty })
+                .eq("id", bwsRow.id);
+              undoStack.push(async () => {
+                await (supabase as any)
+                  .from("batch_warehouse_stock")
+                  .update({ quantity: availableBwsQty })
+                  .eq("id", bwsRow.id);
+              });
+            }
+          } else {
             throw new Error(
-              `Stock insuficiente en almacén para ${item.nombre_producto}: disponible ${availableBwsQty}, solicitado ${item.cantidad}`
+              `No hay stock del lote en el almacén seleccionado para ${item.nombre_producto}`
             );
           }
-          const newBwsQty = availableBwsQty - item.cantidad;
-          if (newBwsQty === 0) {
-            await (supabase as any)
-              .from("batch_warehouse_stock")
-              .delete()
-              .eq("id", bwsRow.id);
-          } else {
-            await (supabase as any)
-              .from("batch_warehouse_stock")
-              .update({ quantity: newBwsQty })
-              .eq("id", bwsRow.id);
-          }
-        } else {
-          throw new Error(
-            `No hay stock del lote en el almacén seleccionado para ${item.nombre_producto}`
-          );
-        }
 
-        // Crear movimiento de inventario (salida) con referencia al almacén y lote
-        const { error: movementError } = await supabase
-          .from("inventory_movements")
-          .insert({
-            product_id: item.product_id,
-            batch_id: item.batch_id,
-            movement_type: "salida",
-            quantity: item.cantidad,
-            previous_stock: batch.current_quantity,
-            new_stock: newBatchQuantity,
-            reference_type: "venta",
-            reference_id: params.quoteId,
-            location: params.warehouseId,
-            notes: `Venta - Cotización ${params.quoteId}`,
-            created_by: user.id,
+          // Crear movimiento de inventario (salida) con referencia al almacén y lote
+          const { data: insertedMov, error: movementError } = await supabase
+            .from("inventory_movements")
+            .insert({
+              product_id: item.product_id,
+              batch_id: item.batch_id,
+              movement_type: "salida",
+              quantity: item.cantidad,
+              previous_stock: batch.current_quantity,
+              new_stock: newBatchQuantity,
+              reference_type: "venta",
+              reference_id: params.quoteId,
+              location: params.warehouseId,
+              notes: `Venta - Cotización ${params.quoteId}`,
+              created_by: user.id,
+            })
+            .select("id")
+            .single();
+
+          if (movementError) throw movementError;
+          const movId = insertedMov?.id;
+          undoStack.push(async () => {
+            if (movId) {
+              await supabase.from("inventory_movements").delete().eq("id", movId);
+            }
           });
 
-        if (movementError) throw movementError;
-
-        // Actualizar quote_item con batch_id, lote y fecha_caducidad seleccionados
-        // Usar item_id para precisión en caso de multi-lote (mismo producto, distintos lotes)
-        await supabase
-          .from("quote_items")
-          .update({
-            batch_id: item.batch_id,
-            lote: batch.batch_number,
-            fecha_caducidad: batch.expiration_date,
-          })
-          .eq("id", item.item_id);
+          // Actualizar quote_item con batch_id, lote y fecha_caducidad seleccionados
+          // Usar item_id para precisión en caso de multi-lote (mismo producto, distintos lotes)
+          await supabase
+            .from("quote_items")
+            .update({
+              batch_id: item.batch_id,
+              lote: batch.batch_number,
+              fecha_caducidad: batch.expiration_date,
+            })
+            .eq("id", item.item_id);
+        }
+      } catch (loopError) {
+        // Rollback automático en orden inverso
+        for (const undo of [...undoStack].reverse()) {
+          try { await undo(); } catch { /* ignorar errores de rollback */ }
+        }
+        throw loopError;
       }
 
       // Actualizar estado de la cotización

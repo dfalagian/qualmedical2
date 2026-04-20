@@ -252,7 +252,7 @@ export const BatchSelectionDialog = ({
         });
       setSelections(initialSelections);
     }
-  }, [open, quoteItems, batchesByProduct, selectedWarehouseId]);
+  }, [open, quoteItems, batchesByProduct, selectedWarehouseId, batchWarehouseQtyMap]);
 
   // Handle batch selection change
   const handleBatchChange = (itemId: string, batchId: string) => {
