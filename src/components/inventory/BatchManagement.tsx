@@ -1,6 +1,7 @@
-import { useState, Fragment } from "react";
+import { useState, Fragment, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { syncWarehouseStockFromBatches } from "@/lib/syncWarehouseStock";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { OldBatchesWarningModal } from "./OldBatchesWarningModal";
 import { BatchTraceabilityModal } from "./BatchTraceabilityModal";
 import { BatchTagsDialog } from "./BatchTagsDialog";
+
 import { 
   Plus, 
   Edit, 
@@ -66,15 +68,22 @@ interface RfidTag {
 }
 
 interface BatchManagementProps {
-  searchTerm: string;
   canEdit: boolean;
   isAdmin: boolean;
   products: Product[];
 }
 
-export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdmin, products }: BatchManagementProps) {
+export function BatchManagement({ canEdit, isAdmin, products }: BatchManagementProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const scrollPositionRef = useRef<number>(0);
+  const restoreScrollPosition = useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollPositionRef.current, behavior: "auto" });
+      });
+    });
+  }, []);
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<ProductBatch | null>(null);
@@ -92,15 +101,16 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
     barcode: "",
     expiration_date: "",
     initial_quantity: 0,
+    current_quantity: 0,
     notes: ""
   });
+  // warehouseQty[warehouseId] = quantity for batch-warehouse assignment
+  const [warehouseQty, setWarehouseQty] = useState<Record<string, number>>({});
 
-  // Combine external and local search terms
-  const searchTerm = localSearchTerm || externalSearchTerm;
+  const normalizedSearchTerm = localSearchTerm.trim().toLowerCase();
 
-  // Fetch batches
   const { data: batches = [], isLoading } = useQuery({
-    queryKey: ["product_batches"],
+    queryKey: ["batch-management-list"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("product_batches")
@@ -171,100 +181,67 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
     enabled: warehouses.length > 0,
   });
 
-  // Fetch completed transfers AND sales movements to calculate accurate batch-per-warehouse distribution
-  const { data: batchWarehouseMap = {} } = useQuery({
-    queryKey: ["batch_warehouse_distribution", warehouses],
+  // Fetch batch_warehouse_stock for display
+  const { data: batchWarehouseStockMap = {} } = useQuery({
+    queryKey: ["batch-warehouse-stock-display"],
     queryFn: async () => {
-      const principalWh = warehouses.find(w => w.code === "PRINCIPAL");
-      if (!principalWh) return {};
-
-      // Fetch transfers
-      const { data: transfers, error: tErr } = await supabase
-        .from("warehouse_transfers")
-        .select("batch_id, from_warehouse_id, to_warehouse_id, quantity")
-        .eq("status", "completada")
-        .not("batch_id", "is", null);
-      if (tErr) throw tErr;
-
-      // Fetch inventory movements with batch_id AND location to know sales per warehouse
-      const { data: movements, error: mErr } = await supabase
-        .from("inventory_movements")
-        .select("batch_id, location, movement_type, quantity")
-        .not("batch_id", "is", null)
-        .not("location", "is", null);
-      if (mErr) throw mErr;
-
-      // Build transfer map: batchId -> { warehouseId -> net_transferred }
-      const transferMap: Record<string, Record<string, number>> = {};
-      for (const t of transfers || []) {
-        if (!t.batch_id) continue;
-        if (!transferMap[t.batch_id]) transferMap[t.batch_id] = {};
-        const m = transferMap[t.batch_id];
-        m[t.from_warehouse_id] = (m[t.from_warehouse_id] || 0) - t.quantity;
-        m[t.to_warehouse_id] = (m[t.to_warehouse_id] || 0) + t.quantity;
+      const { data, error } = await (supabase as any)
+        .from("batch_warehouse_stock")
+        .select("batch_id, warehouse_id, quantity")
+        .gt("quantity", 0);
+      if (error) throw error;
+      const map: Record<string, { warehouseId: string; warehouseName: string; quantity: number }[]> = {};
+      for (const row of data || []) {
+        const wh = warehouses.find((w: any) => w.id === row.warehouse_id);
+        if (!wh) continue;
+        if (!map[row.batch_id]) map[row.batch_id] = [];
+        map[row.batch_id].push({ warehouseId: row.warehouse_id, warehouseName: wh.name, quantity: row.quantity });
       }
-
-      // Build sales map: batchId -> { warehouseId -> net_sales (positive = units removed) }
-      const salesMap: Record<string, Record<string, number>> = {};
-      for (const mv of movements || []) {
-        if (!mv.batch_id || !mv.location) continue;
-        if (!salesMap[mv.batch_id]) salesMap[mv.batch_id] = {};
-        const s = salesMap[mv.batch_id];
-        if (mv.movement_type === "salida") {
-          s[mv.location] = (s[mv.location] || 0) + mv.quantity;
-        } else if (mv.movement_type === "entrada") {
-          s[mv.location] = (s[mv.location] || 0) - mv.quantity;
-        }
-      }
-
-      // Combine into result: for each batch, compute per-warehouse qty
-      // Formula: warehouse_qty = initial_in_wh + transfers_in - transfers_out - sales_from_wh
-      // Since all stock starts in Principal: initial_in_principal = current_quantity + total_sales
-      // For other warehouses: initial = 0
-      const allBatchIds = new Set([...Object.keys(transferMap), ...Object.keys(salesMap)]);
-      
-      const result: Record<string, { warehouseId: string; warehouseName: string; quantity: number }[]> = {};
-      for (const batchId of allBatchIds) {
-        const tMap = transferMap[batchId] || {};
-        const sMap = salesMap[batchId] || {};
-        const allWhIds = new Set([...Object.keys(tMap), ...Object.keys(sMap)]);
-        
-        const entries: { warehouseId: string; warehouseName: string; quantity: number }[] = [];
-        for (const wh of warehouses) {
-          if (!allWhIds.has(wh.id)) continue;
-          const netTransfer = tMap[wh.id] || 0;
-          const netSales = sMap[wh.id] || 0; // positive = units sold from this warehouse
-          // For non-principal warehouses: qty = transfers_in - sales
-          // This value is used with the rendering logic which computes principal as remainder
-          entries.push({ 
-            warehouseId: wh.id, 
-            warehouseName: wh.name, 
-            quantity: netTransfer, // net transfer
-            // @ts-ignore - extend type for sales tracking
-            sales: netSales 
-          });
-        }
-        if (entries.length > 0) result[batchId] = entries;
-      }
-      return result;
+      return map;
     },
     enabled: warehouses.length > 0,
   });
 
   // Create/Update batch
+  // Helper to save warehouse assignments for a batch
+  const saveWarehouseAssignments = async (batchId: string) => {
+    const whEntries = Object.entries(warehouseQty).filter(([, qty]) => qty > 0);
+
+    // Delete existing assignments for this batch
+    await (supabase as any)
+      .from("batch_warehouse_stock")
+      .delete()
+      .eq("batch_id", batchId);
+
+    if (whEntries.length === 0) return;
+
+    // Insert new assignments
+    const rows = whEntries.map(([warehouseId, quantity]) => ({
+      batch_id: batchId,
+      warehouse_id: warehouseId,
+      quantity,
+    }));
+    const { error } = await (supabase as any)
+      .from("batch_warehouse_stock")
+      .insert(rows);
+    if (error) throw error;
+  };
+
   const batchMutation = useMutation({
     mutationFn: async (batch: typeof batchForm & { id?: string }) => {
       if (batch.id) {
         // Obtener el lote actual para calcular la diferencia de stock
         const { data: currentBatch, error: fetchError } = await supabase
           .from("product_batches")
-          .select("initial_quantity, product_id")
+          .select("initial_quantity, current_quantity, product_id")
           .eq("id", batch.id)
           .single();
         
         if (fetchError) throw fetchError;
         
-        const quantityDifference = batch.initial_quantity - (currentBatch?.initial_quantity || 0);
+        const oldCurrentQty = currentBatch?.current_quantity || 0;
+        const newCurrentQty = batch.current_quantity;
+        const stockDifference = newCurrentQty - oldCurrentQty;
         
         const { error } = await supabase
           .from("product_batches")
@@ -274,37 +251,20 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
             barcode: batch.barcode,
             expiration_date: batch.expiration_date,
             initial_quantity: batch.initial_quantity,
-            current_quantity: batch.initial_quantity,
+            current_quantity: newCurrentQty,
             notes: batch.notes || null
           })
           .eq("id", batch.id);
         if (error) throw error;
 
-        // Si cambió la cantidad, actualizar el stock del producto
-        if (quantityDifference !== 0) {
-          const { data: product, error: productFetchError } = await supabase
-            .from("products")
-            .select("current_stock")
-            .eq("id", batch.product_id)
-            .single();
-          
-          if (productFetchError) throw productFetchError;
-          
-          const newStock = Math.max(0, (product?.current_stock || 0) + quantityDifference);
-          
-          const { error: productError } = await supabase
-            .from("products")
-            .update({ 
-              current_stock: newStock,
-              updated_at: new Date().toISOString()
-            })
-            .eq("id", batch.product_id);
-          
-          if (productError) throw productError;
-        }
+        // Save warehouse assignments
+        await saveWarehouseAssignments(batch.id);
+        
+        // El trigger sync_stock_from_batch_warehouse se encarga automáticamente de sincronizar
+        // product_batches.current_quantity, warehouse_stock y products.current_stock
       } else {
         // Crear nuevo lote
-        const { error } = await supabase
+        const { data: newBatch, error } = await supabase
           .from("product_batches")
           .insert({
             product_id: batch.product_id,
@@ -314,37 +274,31 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
             initial_quantity: batch.initial_quantity,
             current_quantity: batch.initial_quantity,
             notes: batch.notes || null
-          });
+          })
+          .select("id")
+          .single();
         if (error) throw error;
 
-        // Actualizar el stock del producto sumando la cantidad del nuevo lote
-        const { data: product, error: productFetchError } = await supabase
-          .from("products")
-          .select("current_stock")
-          .eq("id", batch.product_id)
-          .single();
-        
-        if (productFetchError) throw productFetchError;
-        
-        const newStock = (product?.current_stock || 0) + batch.initial_quantity;
-        
-        const { error: productError } = await supabase
-          .from("products")
-          .update({ 
-            current_stock: newStock,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", batch.product_id);
-        
-        if (productError) throw productError;
+        // Save warehouse assignments for the new batch
+        if (newBatch) {
+          await saveWarehouseAssignments(newBatch.id);
+          // El trigger sync_stock_from_batch_warehouse se encarga de la sincronización
+        }
       }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["batch-management-list"] });
       queryClient.invalidateQueries({ queryKey: ["product_batches"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["batch-warehouse-stock-display"] });
+      queryClient.invalidateQueries({ queryKey: ["batch-warehouse-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["product-warehouse-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse_stock_by_product"] });
       setDialogOpen(false);
       setEditingBatch(null);
       resetForm();
+      // Restore scroll position after re-render
+      restoreScrollPosition();
       toast({
         title: editingBatch ? "Lote actualizado" : "Lote creado",
         description: editingBatch 
@@ -364,17 +318,57 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
   // Delete batch
   const deleteBatchMutation = useMutation({
     mutationFn: async (id: string) => {
+      // Get batch info before deletion to recalculate stock
+      const { data: batchToDelete, error: fetchErr } = await supabase
+        .from("product_batches")
+        .select("product_id, current_quantity")
+        .eq("id", id)
+        .single();
+      if (fetchErr) throw fetchErr;
+
+      const productIdToSync = batchToDelete.product_id;
+
+      // Delete batch_warehouse_stock entries for this batch
+      await (supabase as any)
+        .from("batch_warehouse_stock")
+        .delete()
+        .eq("batch_id", id);
+
+      // Delete the batch
       const { error } = await supabase
         .from("product_batches")
         .delete()
         .eq("id", id);
       if (error) throw error;
+
+      // Recalculate product stock from remaining active batches
+      const { data: remainingBatches, error: rbErr } = await supabase
+        .from("product_batches")
+        .select("current_quantity")
+        .eq("product_id", productIdToSync)
+        .eq("is_active", true);
+      if (rbErr) throw rbErr;
+
+      const correctStock = (remainingBatches || []).reduce((sum, b) => sum + (b.current_quantity || 0), 0);
+      await supabase
+        .from("products")
+        .update({ current_stock: correctStock, updated_at: new Date().toISOString() })
+        .eq("id", productIdToSync);
+
+      // Sync warehouse_stock from remaining batch_warehouse_stock
+      await syncWarehouseStockFromBatches(productIdToSync);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["batch-management-list"] });
       queryClient.invalidateQueries({ queryKey: ["product_batches"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["batch-warehouse-stock-display"] });
+      queryClient.invalidateQueries({ queryKey: ["batch-warehouse-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["product-warehouse-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse_stock_by_product"] });
       toast({
         title: "Lote eliminado",
-        description: "El lote fue eliminado correctamente."
+        description: "El lote fue eliminado y el stock fue recalculado correctamente."
       });
     },
     onError: (error: Error) => {
@@ -393,20 +387,34 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
       barcode: "",
       expiration_date: "",
       initial_quantity: 0,
+      current_quantity: 0,
       notes: ""
     });
+    setWarehouseQty({});
   };
 
-  const handleEdit = (batch: ProductBatch) => {
-    setEditingBatch(batch);
+  const handleEdit = async (batch: ProductBatch) => {
+    scrollPositionRef.current = window.scrollY;
     setBatchForm({
       product_id: batch.product_id,
       batch_number: batch.batch_number,
       barcode: batch.barcode,
       expiration_date: batch.expiration_date,
       initial_quantity: batch.initial_quantity,
+      current_quantity: batch.current_quantity,
       notes: batch.notes || ""
     });
+    // Load existing warehouse assignments
+    const { data: existing } = await (supabase as any)
+      .from("batch_warehouse_stock")
+      .select("warehouse_id, quantity")
+      .eq("batch_id", batch.id);
+    const qty: Record<string, number> = {};
+    for (const r of existing || []) {
+      if (r.quantity > 0) qty[r.warehouse_id] = r.quantity;
+    }
+    setWarehouseQty(qty);
+    setEditingBatch(batch);
     setDialogOpen(true);
   };
 
@@ -418,12 +426,14 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
     return { status: "ok", label: `${days} días`, variant: "outline" as const };
   };
 
-  const filteredBatches = batches.filter(b =>
-    b.batch_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (b.products?.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-    (b.products?.sku?.toLowerCase() || "").includes(searchTerm.toLowerCase())
-  );
+  const filteredBatches = !normalizedSearchTerm
+    ? batches
+    : batches.filter((b) =>
+        b.batch_number.toLowerCase().includes(normalizedSearchTerm) ||
+        b.barcode.toLowerCase().includes(normalizedSearchTerm) ||
+        (b.products?.name?.toLowerCase() || "").includes(normalizedSearchTerm) ||
+        (b.products?.sku?.toLowerCase() || "").includes(normalizedSearchTerm)
+      );
 
   // Stats
   const expiredBatches = batches.filter(b => differenceInDays(parseISO(b.expiration_date), new Date()) < 0);
@@ -460,15 +470,22 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
               if (!open) {
                 setEditingBatch(null);
                 resetForm();
+                 restoreScrollPosition();
               }
             }}>
               <DialogTrigger asChild>
-                <Button>
+                <Button onClick={() => { scrollPositionRef.current = window.scrollY; }}>
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo Lote
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent
+              className="max-w-lg"
+              onCloseAutoFocus={(event) => {
+                event.preventDefault();
+                restoreScrollPosition();
+              }}
+            >
               <DialogHeader>
                 <DialogTitle>
                   {editingBatch ? "Editar Lote" : "Nuevo Lote"}
@@ -553,7 +570,7 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className={cn("grid gap-4", editingBatch ? "grid-cols-3" : "grid-cols-2")}>
                   <div className="space-y-2">
                     <Label>Fecha de Caducidad *</Label>
                     <Input
@@ -571,6 +588,22 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
                       onChange={(e) => setBatchForm({ ...batchForm, initial_quantity: parseInt(e.target.value) || 0 })}
                     />
                   </div>
+                  {editingBatch && (
+                    <div className="space-y-2">
+                      <Label>Stock Actual *</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={batchForm.current_quantity}
+                        onChange={(e) => setBatchForm({ ...batchForm, current_quantity: Math.max(0, parseInt(e.target.value) || 0) })}
+                      />
+                      {batchForm.current_quantity !== editingBatch.current_quantity && (
+                        <p className="text-xs text-amber-600">
+                          Antes: {editingBatch.current_quantity} → Nuevo: {batchForm.current_quantity}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -582,16 +615,82 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
                     rows={2}
                   />
                 </div>
+
+                {/* Warehouse assignment section */}
+                {batchForm.initial_quantity > 0 && warehouses.length > 0 && (() => {
+                  // When editing, use the form's current_quantity; when creating, use initial_quantity
+                  const maxDistributable = editingBatch ? batchForm.current_quantity : batchForm.initial_quantity;
+                  return (
+                  <div className="space-y-2 border rounded-md p-3 bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <Warehouse className="h-4 w-4 text-primary" />
+                      <Label className="text-sm font-semibold">Distribución por almacén</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Indica cuántas unidades de este lote van a cada almacén.
+                      {editingBatch && maxDistributable !== batchForm.initial_quantity && (
+                        <span className="block mt-0.5">Stock actual del lote: <strong>{maxDistributable}</strong> (de {batchForm.initial_quantity} iniciales)</span>
+                      )}
+                    </p>
+                    <div className="space-y-2">
+                      {warehouses.map((wh: any) => (
+                        <div key={wh.id} className="flex items-center gap-2">
+                          <span className="text-sm flex-1 truncate">{wh.name}</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={warehouseQty[wh.id] || 0}
+                            onChange={(e) => setWarehouseQty(prev => ({
+                              ...prev,
+                              [wh.id]: Math.max(0, parseInt(e.target.value) || 0)
+                            }))}
+                            className="h-8 w-24 text-sm text-center"
+                          />
+                        </div>
+                      ))}
+                      {(() => {
+                        const total = Object.values(warehouseQty).reduce((s, v) => s + (v || 0), 0);
+                        const over = total > maxDistributable;
+                        const unassigned = maxDistributable - total;
+                        return (
+                          <div className="space-y-1 pt-1 border-t">
+                            <div className={cn("flex justify-between text-xs", over ? "text-amber-600 font-medium" : "text-muted-foreground")}>
+                              <span>Total asignado:</span>
+                              <span>{total} / {maxDistributable} {over && "⚠️ Se actualizará el stock del lote"}</span>
+                            </div>
+                            {!over && unassigned > 0 && (
+                              <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">
+                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                <span><strong>{unassigned}</strong> unidades sin asignar a ningún almacén</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  );
+                })()}
               </div>
               <DialogFooter>
                 <DialogClose asChild>
                   <Button variant="outline">Cancelar</Button>
                 </DialogClose>
                 <Button 
-                  onClick={() => batchMutation.mutate({ 
-                    ...batchForm, 
-                    id: editingBatch?.id 
-                  })}
+                  onClick={() => {
+                    const totalWh = Object.values(warehouseQty).reduce((s, v) => s + (v || 0), 0);
+                    const maxQty = editingBatch ? batchForm.current_quantity : batchForm.initial_quantity;
+                    // If distribution exceeds current stock, auto-update current_quantity
+                    const finalForm = { ...batchForm, id: editingBatch?.id };
+                    if (totalWh > maxQty) {
+                      finalForm.current_quantity = totalWh;
+                      toast({ 
+                        title: "Stock del lote actualizado", 
+                        description: `Se actualizará el stock actual del lote de ${maxQty} a ${totalWh} para coincidir con la distribución.`,
+                      });
+                    }
+                    batchMutation.mutate(finalForm);
+                  }}
                   disabled={
                     !batchForm.product_id || 
                     !batchForm.batch_number || 
@@ -699,14 +798,13 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
               ) : filteredBatches.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No hay lotes registrados
+                    {normalizedSearchTerm ? "Sin resultados para la búsqueda" : "No hay lotes registrados"}
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredBatches.map((batch) => {
                   const expStatus = getExpirationStatus(batch.expiration_date);
                   const tagCount = tagsPerBatch[batch.id] || 0;
-                  const whBreakdown = warehouseStockMap[batch.product_id] || [];
                   
                   return (
                     <Fragment key={batch.id}>
@@ -717,6 +815,9 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
                           <div className="flex items-center gap-1">
                             <Barcode className="h-3 w-3 text-muted-foreground" />
                             <span className="font-mono text-sm">{batch.barcode}</span>
+                            {/^[a-f0-9]{8}-/.test(batch.barcode) && (
+                              <Badge variant="destructive" className="text-[10px] px-1 py-0 ml-1">AUTO</Badge>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -781,48 +882,17 @@ export function BatchManagement({ searchTerm: externalSearchTerm, canEdit, isAdm
                         )}
                       </TableRow>
                       {(() => {
-                        const batchData = batchWarehouseMap[batch.id];
-                        const principalWh = warehouses.find(w => w.code === "PRINCIPAL");
-                        if (!principalWh || batch.current_quantity <= 0) return null;
-                        
-                        // Calculate batch distribution per warehouse
-                        const batchDistribution: { name: string; qty: number }[] = [];
-                        
-                        if (batchData) {
-                          // Calculate qty for non-principal warehouses first
-                          // qty_in_wh = transfers_in - sales_from_wh
-                          let nonPrincipalTotal = 0;
-                          for (const t of batchData) {
-                            if (t.warehouseId === principalWh.id) continue;
-                            const netTransfer = t.quantity; // positive = units transferred IN
-                            const sales = (t as any).sales || 0; // units sold from this warehouse
-                            const whQty = Math.max(0, netTransfer - sales);
-                            if (whQty > 0) {
-                              const wh = warehouses.find(w => w.id === t.warehouseId);
-                              batchDistribution.push({ name: wh?.name || t.warehouseId, qty: whQty });
-                              nonPrincipalTotal += whQty;
-                            }
-                          }
-                          // Principal gets the remainder
-                          const principalQty = batch.current_quantity - nonPrincipalTotal;
-                          if (principalQty > 0) {
-                            batchDistribution.unshift({ name: principalWh.name, qty: principalQty });
-                          }
-                        } else if (whBreakdown.length > 1) {
-                          // No transfers/sales data: batch is entirely in Principal
-                          batchDistribution.push({ name: principalWh.name, qty: batch.current_quantity });
-                        }
-                        
-                        if (batchDistribution.length === 0) return null;
+                        const batchData = batchWarehouseStockMap[batch.id];
+                        if (!batchData || batchData.length === 0 || batch.current_quantity <= 0) return null;
                         
                         return (
                           <TableRow className="bg-muted/20">
                             <TableCell colSpan={canEdit ? 7 : 6} className="py-1 px-6">
                               <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                {batchDistribution.map((bd) => (
-                                  <span key={bd.name} className="inline-flex items-center gap-1">
+                                {batchData.map((bd) => (
+                                  <span key={bd.warehouseId} className="inline-flex items-center gap-1">
                                     <Warehouse className="h-3 w-3" />
-                                    {bd.name}: <span className="font-mono font-medium text-foreground">{bd.qty}</span>
+                                    {bd.warehouseName}: <span className="font-mono font-medium text-foreground">{bd.quantity}</span>
                                   </span>
                                 ))}
                               </div>

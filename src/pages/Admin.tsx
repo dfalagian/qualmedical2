@@ -21,8 +21,9 @@ import { ImageViewer } from "@/components/admin/ImageViewer";
 import { ActivityLog } from "@/components/admin/ActivityLog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NotificationRecipientsManager } from "@/components/admin/NotificationRecipientsManager";
-import { ExportInventoryButton } from "@/components/inventory/ExportInventoryButton";
+
 import { PhysicalInventoryCount } from "@/components/admin/PhysicalInventoryCount";
+import { ReportsSection } from "@/components/admin/ReportsSection";
 
 
 const userFormSchema = z.object({
@@ -802,22 +803,7 @@ const Admin = () => {
           </TabsContent>
 
           <TabsContent value="reports" className="mt-4">
-            <Card className="shadow-md">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Reportes
-                </CardTitle>
-                <CardDescription>
-                  Exporta información del sistema en diferentes formatos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-3">
-                  <ExportInventoryButton />
-                </div>
-              </CardContent>
-            </Card>
+            <ReportsSection />
           </TabsContent>
 
           <TabsContent value="physical-inventory" className="mt-4">

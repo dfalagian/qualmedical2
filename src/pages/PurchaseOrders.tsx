@@ -481,17 +481,39 @@ const PurchaseOrders = () => {
         amount: order.amount?.toLocaleString("es-MX", { minimumFractionDigits: 2 }),
         delivery_date: order.delivery_date || "Sin fecha definida",
       });
-      return order;
+      // Cambiar estado a en_proceso al enviar al proveedor
+      await supabase
+        .from("purchase_orders")
+        .update({ status: "en_proceso" })
+        .eq("id", order.id);
+
+      // Enviar a CONTPAQi
+      const { data: contpaqiData, error: contpaqiError } = await supabase.functions.invoke('send-to-contpaqi', {
+        body: { purchaseOrderId: order.id }
+      });
+
+      if (contpaqiError) {
+        const errorMessage = contpaqiData?.error || 'Error al sincronizar con CONTPAQi';
+        console.error('Error al enviar a CONTPAQi:', errorMessage);
+        toast.error(`Enviada al proveedor, pero falló el envío a CONTPAQi: ${errorMessage}`);
+      } else if (!contpaqiData?.success) {
+        console.error('Error al enviar a CONTPAQi:', contpaqiData?.error);
+        toast.error(`Enviada al proveedor, pero falló el envío a CONTPAQi: ${contpaqiData?.error || 'Error desconocido'}`);
+      }
+
+      return { ...order, contpaqiFolio: contpaqiData?.folio };
     },
     onSuccess: (order) => {
-      toast.success(`Orden ${order.order_number} enviada al proveedor correctamente`);
+      const contpaqiMsg = order.contpaqiFolio ? ` | CONTPAQi folio: ${order.contpaqiFolio}` : '';
+      toast.success(`Orden ${order.order_number} enviada al proveedor y marcada "En Proceso"${contpaqiMsg}`);
+      queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
       logActivity({
         section: "ordenes_compra",
         action: "enviar_proveedor",
         entityType: "orden_compra",
         entityId: order.id,
         entityName: order.order_number,
-        details: { supplier_id: order.supplier_id },
+        details: { supplier_id: order.supplier_id, new_status: "en_proceso", contpaqi_folio: order.contpaqiFolio },
       });
     },
     onError: (error: any) => {

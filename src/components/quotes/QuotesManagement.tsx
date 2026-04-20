@@ -48,6 +48,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useBatchWarehouses } from "@/hooks/useBatchWarehouses";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -101,6 +102,7 @@ interface QuoteItem {
   id: string;
   product_id: string | null;
   batch_id: string | null;
+  warehouse_id: string | null;
   nombre_producto: string;
   marca: string;
   lote: string;
@@ -137,6 +139,7 @@ interface QuoteToEdit {
     id: string;
     product_id: string | null;
     batch_id: string | null;
+    warehouse_id?: string | null;
     nombre_producto: string;
     marca: string | null;
     lote: string | null;
@@ -249,6 +252,28 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     enabled: !!selectedProduct,
   });
 
+  // Fetch active warehouses for per-row selector
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ["warehouses-active-quote-edit"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouses")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Collect all batch_ids currently in the quote items so we can filter
+  // the "Almacén" dropdown to only show warehouses where each lote actually exists.
+  const allBatchIds = useMemo(
+    () => quoteItems.map(i => i.batch_id).filter(Boolean) as string[],
+    [quoteItems]
+  );
+  const { batchWarehousesMap } = useBatchWarehouses(allBatchIds);
+
   // Helper: parse a date string (YYYY-MM-DD) without timezone shift
   const parseDateLocal = (dateStr: string): Date => {
     const [year, month, day] = dateStr.split("-").map(Number);
@@ -277,6 +302,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
           id: item.id,
           product_id: item.product_id,
           batch_id: item.batch_id,
+          warehouse_id: item.warehouse_id || null,
           nombre_producto: item.nombre_producto,
           marca: item.marca || "",
           lote: item.lote || "",
@@ -419,6 +445,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
       id: crypto.randomUUID(),
       product_id: product.id,
       batch_id: batchInfo?.batchId || null,
+      warehouse_id: null,
       nombre_producto: product.name,
       marca: product.brand || "",
       lote: batchInfo?.batchNumber || "",
@@ -480,6 +507,13 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
           return item;
         });
     });
+  };
+
+  // Update item warehouse_id (suggested origin warehouse)
+  const handleUpdateItemWarehouse = (id: string, newWarehouseId: string | null) => {
+    setQuoteItems(prev => prev.map(item =>
+      item.id === id ? { ...item, warehouse_id: newWarehouseId } : item
+    ));
   };
 
   // Update item quantity
@@ -1096,6 +1130,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                   <TableRow>
                     <TableHead>Producto</TableHead>
                     <TableHead>Lote</TableHead>
+                    <TableHead>Almacén</TableHead>
                     <TableHead className="text-center">Cantidad</TableHead>
                     <TableHead>Tipo Precio</TableHead>
                     <TableHead className="text-right">P. Unitario</TableHead>
@@ -1106,7 +1141,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                 <TableBody>
                   {quoteItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         No hay productos agregados
                       </TableCell>
                     </TableRow>
@@ -1192,6 +1227,54 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                             <div className="text-xs text-muted-foreground">
                               {item.fecha_caducidad ? format(item.fecha_caducidad, "dd/MM/yy") : ""}
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              if (!item.product_id) {
+                                return <span className="text-xs text-muted-foreground italic">—</span>;
+                              }
+                              // If no batch selected, disable the warehouse selector to avoid
+                              // assigning a warehouse where the lote doesn't actually exist.
+                              if (!item.batch_id) {
+                                return (
+                                  <span
+                                    className="text-xs text-muted-foreground italic"
+                                    title="Seleccione un lote primero para elegir el almacén"
+                                  >
+                                    Elija lote primero
+                                  </span>
+                                );
+                              }
+                              const available = batchWarehousesMap[item.batch_id] || [];
+                              if (available.length === 0) {
+                                return (
+                                  <span
+                                    className="text-xs text-destructive italic"
+                                    title="Este lote no tiene stock en ningún almacén"
+                                  >
+                                    Sin stock en almacenes
+                                  </span>
+                                );
+                              }
+                              return (
+                                <Select
+                                  value={item.warehouse_id || "__none__"}
+                                  onValueChange={(v) => handleUpdateItemWarehouse(item.id, v === "__none__" ? null : v)}
+                                >
+                                  <SelectTrigger className="w-[180px] h-8 text-xs">
+                                    <SelectValue placeholder="Almacén..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">Sin asignar</SelectItem>
+                                    {available.map(w => (
+                                      <SelectItem key={w.warehouse_id} value={w.warehouse_id}>
+                                        {w.warehouse_name} ({w.quantity})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>
                             <Input

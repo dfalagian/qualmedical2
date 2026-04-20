@@ -22,10 +22,18 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-import { Search, AlertCircle, ShoppingCart, ChevronDown, ChevronUp, FileText, User, Package, ArrowRightCircle, Loader2, Trash2, Plus, Link2, Check, ChevronsUpDown } from "lucide-react";
+import { Search, AlertCircle, ShoppingCart, ChevronDown, ChevronUp, FileText, User, Package, ArrowRightCircle, Loader2, Trash2, Plus, Link2, Check, ChevronsUpDown, Warehouse } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CitioConversionDialog } from "./CitioConversionDialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useBatchWarehouses } from "@/hooks/useBatchWarehouses";
 
 interface ExternalOrderItem {
   id: string;
@@ -45,6 +53,9 @@ interface ExternalOrderItem {
   _linked_product_id?: string | null;
   _linked_product_name?: string | null;
   _linked_brand?: string | null;
+  _batch_id?: string | null;
+  _batch_number?: string | null;
+  _warehouse_id?: string | null;
 }
 
 interface ExternalOrder {
@@ -184,6 +195,82 @@ export function SalesRequestsCitioOrders() {
     },
   });
 
+  // Active warehouses for the warehouse selector
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ["warehouses-active-citio"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouses")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Collect all linked product IDs (manual + auto via citio_id) so we can preload batches
+  const allLinkedProductIds = useMemo(() => {
+    const ids = new Set<string>();
+    editedOrders.forEach(items => {
+      items.forEach(it => {
+        if (it._linked_product_id) ids.add(it._linked_product_id);
+      });
+    });
+    const citioMap = new Map(localProducts.filter(p => p.citio_id).map(p => [p.citio_id!, p.id]));
+    orders.forEach(o => {
+      (o.items || []).forEach(it => {
+        if (it.medication_id && citioMap.has(it.medication_id)) {
+          ids.add(citioMap.get(it.medication_id)!);
+        }
+      });
+    });
+    return Array.from(ids);
+  }, [editedOrders, orders, localProducts]);
+
+  // Batches for all relevant products
+  const { data: batchesByProduct = {} } = useQuery({
+    queryKey: ["citio-product-batches", allLinkedProductIds],
+    enabled: allLinkedProductIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("product_batches")
+        .select("id, product_id, batch_number, expiration_date, current_quantity")
+        .in("product_id", allLinkedProductIds)
+        .eq("is_active", true)
+        .gt("current_quantity", 0)
+        .order("expiration_date", { ascending: true });
+      if (error) throw error;
+      const grouped: Record<string, Array<{ id: string; batch_number: string; expiration_date: string; current_quantity: number }>> = {};
+      (data || []).forEach(b => {
+        if (!grouped[b.product_id]) grouped[b.product_id] = [];
+        grouped[b.product_id].push(b);
+      });
+      return grouped;
+    },
+  });
+
+  // Collect all batch_ids currently selected across editable orders so the
+  // "Almacén" dropdown can be filtered to warehouses where each lote actually exists.
+  const allSelectedBatchIds = useMemo(() => {
+    const ids = new Set<string>();
+    editedOrders.forEach(items => {
+      items.forEach(it => {
+        if (it._batch_id) ids.add(it._batch_id);
+      });
+    });
+    return Array.from(ids);
+  }, [editedOrders]);
+  const { batchWarehousesMap } = useBatchWarehouses(allSelectedBatchIds);
+
+  // Resolve linked product id for any item (manual link OR auto via citio_id)
+  const resolveLinkedProductId = useCallback((item: ExternalOrderItem): string | null => {
+    if (item._linked_product_id) return item._linked_product_id;
+    if (!item.medication_id) return null;
+    const match = localProducts.find(p => p.citio_id === item.medication_id);
+    return match?.id || null;
+  }, [localProducts]);
+
   const qualmedicalOrders = useMemo(() => {
     return orders.filter((order) => {
       const supplier = (
@@ -251,6 +338,32 @@ export function SalesRequestsCitioOrders() {
     setLinkSearch("");
     toast.success(`Vinculado a: ${product.name}`);
   }, [ensureEditable]);
+
+  // Set the batch for an item
+  // When the batch changes we also clear _warehouse_id, because the previously
+  // selected warehouse might not hold the new lote.
+  const handleSetBatch = useCallback((orderId: string, itemId: string, batchId: string | null, order: ExternalOrder) => {
+    const items = ensureEditable(order);
+    const updated = items.map(i => {
+      if (i.id !== itemId) return i;
+      if (!batchId) {
+        return { ...i, _batch_id: null, _batch_number: null, _warehouse_id: null };
+      }
+      const productId = i._linked_product_id || resolveLinkedProductId(i);
+      const list = productId ? (batchesByProduct[productId] || []) : [];
+      const batch = list.find(b => b.id === batchId);
+      return { ...i, _batch_id: batchId, _batch_number: batch?.batch_number || null, _warehouse_id: null };
+    });
+    setEditedOrders(prev => new Map(prev).set(orderId, updated));
+  }, [ensureEditable, batchesByProduct, resolveLinkedProductId]);
+
+  // Set the warehouse for an item
+  const handleSetWarehouse = useCallback((orderId: string, itemId: string, warehouseId: string | null, order: ExternalOrder) => {
+    const items = ensureEditable(order);
+    const updated = items.map(i => i.id === itemId ? { ...i, _warehouse_id: warehouseId } : i);
+    setEditedOrders(prev => new Map(prev).set(orderId, updated));
+  }, [ensureEditable]);
+
 
   // Add a product from catalog to the order
   const handleAddProduct = useCallback((orderId: string, product: LocalProduct, order: ExternalOrder) => {
@@ -449,6 +562,10 @@ export function SalesRequestsCitioOrders() {
             importe: precio * item.quantity,
             tipo_precio: "1",
             is_sub_product: false,
+            // Propagate batch + warehouse selected before conversion
+            batch_id: item._batch_id || null,
+            lote: item._batch_number || null,
+            warehouse_id: item._warehouse_id || null,
           };
         });
 
@@ -500,6 +617,9 @@ export function SalesRequestsCitioOrders() {
               tipo_precio: "1",
               is_sub_product: true,
               parent_item_id: item.parent_medication_id ? (parentMap.get(item.parent_medication_id) || null) : null,
+              batch_id: item._batch_id || null,
+              lote: item._batch_number || null,
+              warehouse_id: item._warehouse_id || null,
             };
           });
 
@@ -711,6 +831,8 @@ export function SalesRequestsCitioOrders() {
                                     <th className="text-left p-2 font-medium">Producto</th>
                                     <th className="text-left p-2 font-medium">Marca</th>
                                     <th className="text-center p-2 font-medium">Cant.</th>
+                                    <th className="text-left p-2 font-medium">Lote</th>
+                                    <th className="text-left p-2 font-medium">Almacén</th>
                                     <th className="text-right p-2 font-medium">P. Unit.</th>
                                     <th className="text-right p-2 font-medium">Subtotal</th>
                                     <th className="text-center p-2 font-medium w-20">Acciones</th>
@@ -767,6 +889,67 @@ export function SalesRequestsCitioOrders() {
                                               onClick={(e) => e.stopPropagation()}
                                             />
                                           </td>
+                                          <td className="p-2" onClick={(e) => e.stopPropagation()}>
+                                            {(() => {
+                                              const pid = resolveLinkedProductId(item);
+                                              const list = pid ? (batchesByProduct[pid] || []) : [];
+                                              if (!pid) return <span className="text-muted-foreground text-xs italic">Vincula primero</span>;
+                                              if (list.length === 0) return <span className="text-muted-foreground text-xs italic">Sin lotes</span>;
+                                              return (
+                                                <Select
+                                                  value={item._batch_id || "__none__"}
+                                                  onValueChange={(v) => handleSetBatch(order.id, item.id, v === "__none__" ? null : v, order)}
+                                                >
+                                                  <SelectTrigger className="h-7 text-xs w-[140px]"><SelectValue placeholder="Lote..." /></SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="__none__">Sin lote</SelectItem>
+                                                    {list.map(b => (
+                                                      <SelectItem key={b.id} value={b.id}>
+                                                        {b.batch_number} ({b.current_quantity})
+                                                      </SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
+                                              );
+                                            })()}
+                                          </td>
+                                          <td className="p-2" onClick={(e) => e.stopPropagation()}>
+                                            {(() => {
+                                              const pid = resolveLinkedProductId(item);
+                                              if (!pid) return <span className="text-muted-foreground text-xs italic">—</span>;
+                                              if (!item._batch_id) {
+                                                return (
+                                                  <span className="text-muted-foreground text-xs italic" title="Seleccione un lote primero">
+                                                    Elija lote
+                                                  </span>
+                                                );
+                                              }
+                                              const available = batchWarehousesMap[item._batch_id] || [];
+                                              if (available.length === 0) {
+                                                return (
+                                                  <span className="text-destructive text-xs italic" title="Este lote no tiene stock en ningún almacén">
+                                                    Sin stock
+                                                  </span>
+                                                );
+                                              }
+                                              return (
+                                                <Select
+                                                  value={item._warehouse_id || "__none__"}
+                                                  onValueChange={(v) => handleSetWarehouse(order.id, item.id, v === "__none__" ? null : v, order)}
+                                                >
+                                                  <SelectTrigger className="h-7 text-xs w-[160px]"><SelectValue placeholder="Almacén..." /></SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="__none__">Sin asignar</SelectItem>
+                                                    {available.map(w => (
+                                                      <SelectItem key={w.warehouse_id} value={w.warehouse_id}>
+                                                        {w.warehouse_name} ({w.quantity})
+                                                      </SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
+                                              );
+                                            })()}
+                                          </td>
                                           <td className="p-2 text-right">{formatCurrency(item.unit_price)}</td>
                                           <td className="p-2 text-right font-medium">{formatCurrency(item.unit_price * item.quantity)}</td>
                                           <td className="p-2 text-center">
@@ -822,9 +1005,70 @@ export function SalesRequestsCitioOrders() {
                                                   onChange={(e) => handleUpdateItemQuantity(order.id, sub.id, parseInt(e.target.value) || 1, order)}
                                                   className="w-14 h-7 text-center text-xs"
                                                 />
-                                              </td>
-                                              <td className="p-2 text-right text-muted-foreground">{formatCurrency(sub.unit_price)}</td>
-                                              <td className="p-2 text-right text-muted-foreground">{formatCurrency(sub.unit_price * sub.quantity)}</td>
+                                               </td>
+                                               <td className="p-2" onClick={(e) => e.stopPropagation()}>
+                                                 {(() => {
+                                                   const pid = resolveLinkedProductId(sub);
+                                                   const list = pid ? (batchesByProduct[pid] || []) : [];
+                                                   if (!pid) return <span className="text-muted-foreground text-xs italic">Vincula primero</span>;
+                                                   if (list.length === 0) return <span className="text-muted-foreground text-xs italic">Sin lotes</span>;
+                                                   return (
+                                                     <Select
+                                                       value={sub._batch_id || "__none__"}
+                                                       onValueChange={(v) => handleSetBatch(order.id, sub.id, v === "__none__" ? null : v, order)}
+                                                     >
+                                                       <SelectTrigger className="h-7 text-xs w-[140px]"><SelectValue placeholder="Lote..." /></SelectTrigger>
+                                                       <SelectContent>
+                                                         <SelectItem value="__none__">Sin lote</SelectItem>
+                                                         {list.map(b => (
+                                                           <SelectItem key={b.id} value={b.id}>
+                                                             {b.batch_number} ({b.current_quantity})
+                                                           </SelectItem>
+                                                         ))}
+                                                       </SelectContent>
+                                                     </Select>
+                                                   );
+                                                 })()}
+                                               </td>
+                                               <td className="p-2" onClick={(e) => e.stopPropagation()}>
+                                                 {(() => {
+                                                   const pid = resolveLinkedProductId(sub);
+                                                   if (!pid) return <span className="text-muted-foreground text-xs italic">—</span>;
+                                                   if (!sub._batch_id) {
+                                                     return (
+                                                       <span className="text-muted-foreground text-xs italic" title="Seleccione un lote primero">
+                                                         Elija lote
+                                                       </span>
+                                                     );
+                                                   }
+                                                   const available = batchWarehousesMap[sub._batch_id] || [];
+                                                   if (available.length === 0) {
+                                                     return (
+                                                       <span className="text-destructive text-xs italic" title="Este lote no tiene stock en ningún almacén">
+                                                         Sin stock
+                                                       </span>
+                                                     );
+                                                   }
+                                                   return (
+                                                     <Select
+                                                       value={sub._warehouse_id || "__none__"}
+                                                       onValueChange={(v) => handleSetWarehouse(order.id, sub.id, v === "__none__" ? null : v, order)}
+                                                     >
+                                                       <SelectTrigger className="h-7 text-xs w-[160px]"><SelectValue placeholder="Almacén..." /></SelectTrigger>
+                                                       <SelectContent>
+                                                         <SelectItem value="__none__">Sin asignar</SelectItem>
+                                                         {available.map(w => (
+                                                           <SelectItem key={w.warehouse_id} value={w.warehouse_id}>
+                                                             {w.warehouse_name} ({w.quantity})
+                                                           </SelectItem>
+                                                         ))}
+                                                       </SelectContent>
+                                                     </Select>
+                                                   );
+                                                 })()}
+                                               </td>
+                                               <td className="p-2 text-right text-muted-foreground">{formatCurrency(sub.unit_price)}</td>
+                                               <td className="p-2 text-right text-muted-foreground">{formatCurrency(sub.unit_price * sub.quantity)}</td>
                                               <td className="p-2 text-center">
                                                 <div className="flex items-center justify-center gap-1">
                                                   <ProductSearchPopover

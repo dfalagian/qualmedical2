@@ -201,6 +201,9 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
           return {
             quote_id: quote.id,
             product_id: productId,
+            // Propagate batch and warehouse selected from the request (if any)
+            batch_id: item.batch_id || null,
+            warehouse_id: item.warehouse_id || null,
             nombre_producto: nombreFinal,
             marca: item.marca,
             lote: item.lote,

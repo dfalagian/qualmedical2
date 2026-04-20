@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { isIvaExempt } from "@/lib/formatters";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -51,7 +52,6 @@ interface SelectedProduct {
 }
 
 const IVA_RATE = 0.16;
-const IVA_EXEMPT_CATEGORIES = ["medicamentos", "inmunoterapia", "oncologicos"];
 
 interface EditPurchaseOrderDialogProps {
   open: boolean;
@@ -210,8 +210,7 @@ export const EditPurchaseOrderDialog = ({
 
   const ivaTotal = useMemo(() => {
     return selectedProducts.reduce((sum, p) => {
-      const cat = (p.category || "").toLowerCase();
-      if (IVA_EXEMPT_CATEGORIES.includes(cat)) return sum;
+      if (isIvaExempt(p.category)) return sum;
       const effectivePrice = p.manualPrice ?? p.savedPrice;
       return sum + effectivePrice * p.quantity * IVA_RATE;
     }, 0);

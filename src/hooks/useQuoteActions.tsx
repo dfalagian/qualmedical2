@@ -8,6 +8,7 @@ interface QuoteItem {
   id: string;
   product_id: string | null;
   batch_id: string | null;
+  warehouse_id?: string | null;
   nombre_producto: string;
   marca: string;
   lote: string;
@@ -98,6 +99,7 @@ export const useQuoteActions = () => {
         quote_id: quote.id,
         product_id: item.product_id,
         batch_id: item.batch_id,
+        warehouse_id: item.warehouse_id || null,
         nombre_producto: item.nombre_producto,
         marca: item.marca,
         lote: item.lote,
@@ -131,6 +133,7 @@ export const useQuoteActions = () => {
           quote_id: quote.id,
           product_id: item.product_id,
           batch_id: item.batch_id,
+          warehouse_id: item.warehouse_id || null,
           nombre_producto: item.nombre_producto,
           marca: item.marca,
           lote: item.lote,
@@ -213,6 +216,7 @@ export const useQuoteActions = () => {
           quote_id: params.quoteId,
           product_id: item.product_id,
           batch_id: item.batch_id,
+          warehouse_id: item.warehouse_id || null,
           nombre_producto: item.nombre_producto,
           marca: item.marca,
           lote: item.lote,
@@ -241,6 +245,7 @@ export const useQuoteActions = () => {
           quote_id: params.quoteId,
           product_id: item.product_id,
           batch_id: item.batch_id,
+          warehouse_id: item.warehouse_id || null,
           nombre_producto: item.nombre_producto,
           marca: item.marca,
           lote: item.lote,
@@ -301,15 +306,57 @@ export const useQuoteActions = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autenticado");
 
+      // 🛡️ BLINDAJE 1: Idempotencia. Si esta cotización ya tiene movimientos
+      // de salida registrados, hubo un intento previo a medias. NO volver a
+      // descontar stock; pedir intervención manual para revertir antes de re-aprobar.
+      const { data: prevMovs, error: prevMovsError } = await supabase
+        .from("inventory_movements")
+        .select("id")
+        .eq("reference_id", params.quoteId)
+        .eq("reference_type", "venta")
+        .eq("movement_type", "salida")
+        .limit(1);
+      if (prevMovsError) throw prevMovsError;
+      if (prevMovs && prevMovs.length > 0) {
+        throw new Error(
+          "Esta cotización ya tiene movimientos de salida registrados de un intento anterior. " +
+          "Contacta al administrador para revertir esos movimientos antes de re-aprobar (evita doble descuento de stock)."
+        );
+      }
+
       // Validar stock - solo bloquear si no se fuerza la aprobación
       const stockValidation = await validateStock(params.items);
       if (!stockValidation.isValid && !params.forceApprove) {
-        // Retornar las advertencias para que el UI muestre el diálogo de confirmación
         throw { 
           type: "STOCK_WARNING", 
           warnings: stockValidation.warnings,
           message: `Stock insuficiente:\n${stockValidation.warnings.join("\n")}`
         };
+      }
+
+      // 🛡️ BLINDAJE 2: Pre-validación atómica. Verificar stock REAL en
+      // batch_warehouse_stock para TODOS los items contra el almacén elegido
+      // ANTES de tocar nada. Si alguno falla, abortar sin descontar.
+      const preflightErrors: string[] = [];
+      for (const item of params.items) {
+        const { data: bwsCheck } = await (supabase as any)
+          .from("batch_warehouse_stock")
+          .select("quantity")
+          .eq("batch_id", item.batch_id)
+          .eq("warehouse_id", params.warehouseId)
+          .maybeSingle();
+        const available = bwsCheck?.quantity ?? 0;
+        if (available < item.cantidad) {
+          preflightErrors.push(
+            `${item.nombre_producto}: disponible ${available}, solicitado ${item.cantidad}`
+          );
+        }
+      }
+      if (preflightErrors.length > 0) {
+        throw new Error(
+          "Stock insuficiente en el almacén seleccionado. No se descontó nada:\n" +
+          preflightErrors.join("\n")
+        );
       }
 
       // Procesar cada item: descontar stock, crear movimiento y guardar batch_id
@@ -325,37 +372,41 @@ export const useQuoteActions = () => {
 
         const newBatchQuantity = batch.current_quantity - item.cantidad;
 
-        // Actualizar stock del lote
-        const { error: batchError } = await supabase
-          .from("product_batches")
-          .update({ current_quantity: newBatchQuantity })
-          .eq("id", item.batch_id);
-
-        if (batchError) throw batchError;
-
-        // NO actualizar products.current_stock manualmente aquí.
-        // El trigger update_product_stock lo hace automáticamente al insertar en inventory_movements.
-
-        // Descontar stock del almacén seleccionado en warehouse_stock
-        const { data: warehouseStockRow } = await supabase
-          .from("warehouse_stock")
-          .select("id, current_stock")
-          .eq("product_id", item.product_id)
+        // Descontar stock del lote en batch_warehouse_stock
+        // El trigger sync_stock_from_batch_warehouse se encarga de actualizar:
+        // - product_batches.current_quantity
+        // - warehouse_stock.current_stock
+        // - products.current_stock
+        const { data: bwsRow } = await (supabase as any)
+          .from("batch_warehouse_stock")
+          .select("id, quantity")
+          .eq("batch_id", item.batch_id)
           .eq("warehouse_id", params.warehouseId)
-          .single();
+          .maybeSingle();
 
-        if (warehouseStockRow) {
-          const availableWhStock = warehouseStockRow.current_stock || 0;
-          if (availableWhStock < item.cantidad) {
+        if (bwsRow && bwsRow.quantity > 0) {
+          const availableBwsQty = bwsRow.quantity;
+          if (availableBwsQty < item.cantidad) {
             throw new Error(
-              `Stock insuficiente en almacén para ${item.nombre_producto}: disponible ${availableWhStock}, solicitado ${item.cantidad}`
+              `Stock insuficiente en almacén para ${item.nombre_producto}: disponible ${availableBwsQty}, solicitado ${item.cantidad}`
             );
           }
-          const newWhStock = availableWhStock - item.cantidad;
-          await supabase
-            .from("warehouse_stock")
-            .update({ current_stock: newWhStock })
-            .eq("id", warehouseStockRow.id);
+          const newBwsQty = availableBwsQty - item.cantidad;
+          if (newBwsQty === 0) {
+            await (supabase as any)
+              .from("batch_warehouse_stock")
+              .delete()
+              .eq("id", bwsRow.id);
+          } else {
+            await (supabase as any)
+              .from("batch_warehouse_stock")
+              .update({ quantity: newBwsQty })
+              .eq("id", bwsRow.id);
+          }
+        } else {
+          throw new Error(
+            `No hay stock del lote en el almacén seleccionado para ${item.nombre_producto}`
+          );
         }
 
         // Crear movimiento de inventario (salida) con referencia al almacén y lote
@@ -460,30 +511,33 @@ export const useQuoteActions = () => {
 
         const newBatchQuantity = batch.current_quantity + item.cantidad;
 
-        // Actualizar stock del lote
-        await supabase
-          .from("product_batches")
-          .update({ current_quantity: newBatchQuantity })
-          .eq("id", item.batch_id);
-
-        // NO actualizar products.current_stock manualmente aquí.
-        // El trigger update_product_stock lo hace automáticamente al insertar en inventory_movements.
-
-        // Devolver stock al almacén origen en warehouse_stock
+        // Restaurar stock en batch_warehouse_stock
+        // El trigger sync_stock_from_batch_warehouse se encarga de actualizar:
+        // - product_batches.current_quantity
+        // - warehouse_stock.current_stock
+        // - products.current_stock
         const warehouseId = warehouseIdByProduct[item.product_id];
         if (warehouseId) {
-          const { data: wsRow } = await supabase
-            .from("warehouse_stock")
-            .select("id, current_stock")
-            .eq("product_id", item.product_id)
+          const { data: bwsRow } = await (supabase as any)
+            .from("batch_warehouse_stock")
+            .select("id, quantity")
+            .eq("batch_id", item.batch_id)
             .eq("warehouse_id", warehouseId)
-            .single();
+            .maybeSingle();
 
-          if (wsRow) {
-            await supabase
-              .from("warehouse_stock")
-              .update({ current_stock: wsRow.current_stock + item.cantidad })
-              .eq("id", wsRow.id);
+          if (bwsRow) {
+            await (supabase as any)
+              .from("batch_warehouse_stock")
+              .update({ quantity: bwsRow.quantity + item.cantidad })
+              .eq("id", bwsRow.id);
+          } else {
+            await (supabase as any)
+              .from("batch_warehouse_stock")
+              .insert({
+                batch_id: item.batch_id,
+                warehouse_id: warehouseId,
+                quantity: item.cantidad,
+              });
           }
         }
 

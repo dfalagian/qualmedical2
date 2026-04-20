@@ -33,11 +33,10 @@ interface PriceTypeConfig {
 }
 
 const PRICE_TYPES: PriceTypeConfig[] = [
-  { key: "price_type_1", label: "T1 - Público", shortLabel: "Público", isBase: true },
-  { key: "price_type_2", label: "T2 - Mayoreo", shortLabel: "Mayoreo" },
-  { key: "price_type_3", label: "T3 - Distribuidor", shortLabel: "Distribuidor" },
-  { key: "price_type_4", label: "T4 - Especial", shortLabel: "Especial" },
-  { key: "price_type_5", label: "T5 - VIP", shortLabel: "VIP" },
+  { key: "price_type_1", label: "Precio PMP (T1)", shortLabel: "PMP", isBase: true },
+  { key: "price_type_2", label: "Precio T2", shortLabel: "T2" },
+  { key: "price_type_3", label: "Precio T3", shortLabel: "T3" },
+  { key: "price_type_4", label: "Precio T4", shortLabel: "T4" },
 ];
 
 type PricesState = {
@@ -180,7 +179,7 @@ export function PriceTypesEditor({
         <div>
           <Label className="text-sm font-medium">Tipos de Precio</Label>
           <p className="text-xs text-muted-foreground">
-            Ajusta T2-T5 por % de incremento vs T1.
+            Ajusta T2, T3 y T4 por % de incremento vs T1.
           </p>
         </div>
         <div className="flex items-center gap-2">

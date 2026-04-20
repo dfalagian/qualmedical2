@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Plus, Check, Pill, Package, CheckSquare, Square, Loader2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { toCanonicalCategory } from "@/lib/formatters";
 
 interface CITIOMedication {
   id: string;
@@ -49,19 +50,43 @@ interface CITIOImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImport: (medication: CITIOMedication) => void;
-  existingCitioIds: string[];
+  existingCitioIds?: string[]; // kept for backward compat but we now fetch internally
 }
 
 export function CITIOImportDialog({
   open,
   onOpenChange,
   onImport,
-  existingCitioIds,
+  existingCitioIds: externalCitioIds = [],
 }: CITIOImportDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMedications, setSelectedMedications] = useState<Set<string>>(new Set());
   const [isImporting, setIsImporting] = useState(false);
   const queryClient = useQueryClient();
+
+  // Fetch existing citio_ids that are ACTIVE in inventory (not catalog_only)
+  // catalog_only products should appear as available to re-import
+  const { data: dbCitioIds = [] } = useQuery({
+    queryKey: ['all-existing-citio-ids'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('citio_id')
+        .not('citio_id', 'is', null)
+        .eq('catalog_only', false);
+      return (data || []).map(p => p.citio_id).filter(Boolean) as string[];
+    },
+    enabled: open,
+  });
+
+  // Merge external + DB citio ids
+  const existingCitioIds = useMemo(() => {
+    const set = new Set([...externalCitioIds, ...dbCitioIds]);
+    return Array.from(set);
+  }, [externalCitioIds, dbCitioIds]);
+
+  // Categories that should NEVER be imported (services belong to CITIO, not QualMedical)
+  const BLOCKED_CATEGORIES = ['servicios', 'servicios medicos'];
 
   // Fetch CITIO medications
   const { data: medications = [], isLoading, error } = useQuery({
@@ -73,13 +98,18 @@ export function CITIOImportDialog({
       
       const result = data?.data;
       
+      let meds: CITIOMedication[] = [];
       if (result?.medications && Array.isArray(result.medications)) {
-        return result.medications as CITIOMedication[];
+        meds = result.medications as CITIOMedication[];
       } else if (Array.isArray(result)) {
-        return result as CITIOMedication[];
+        meds = result as CITIOMedication[];
       }
       
-      return [] as CITIOMedication[];
+      // Filter out blocked categories (services, etc.)
+      return meds.filter(med => {
+        const family = (med.medication_families?.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return !BLOCKED_CATEGORIES.includes(family);
+      });
     },
     enabled: open,
   });
@@ -149,7 +179,7 @@ export function CITIOImportDialog({
     const groups: Record<string, CITIOMedication[]> = {};
     
     filteredMedications.forEach((med) => {
-      const family = med.medication_families?.name || "Sin Familia";
+      const family = toCanonicalCategory(med.medication_families?.name) || "Sin Familia";
       if (!groups[family]) {
         groups[family] = [];
       }
@@ -207,47 +237,81 @@ export function CITIOImportDialog({
       
       for (const med of selectedMeds) {
         try {
-          // SKU = código original del catálogo (sin modificar)
-          // La unicidad se garantiza por citio_id
           const sku = getSKU(med);
           const barcode = med.medication_code?.trim() || null;
           
-          const { error } = await supabase
+          // Check if product already exists as catalog_only (re-import scenario)
+          const { data: existingCatalogOnly } = await supabase
             .from('products')
-            .insert({
-              citio_id: med.id, // Control interno de unicidad
-              sku: sku,         // Código original (escaneable)
-              name: med.name,
-              description: med.description,
-              barcode: barcode, // Código de barras original
-              brand: med.brand || null,
-              category: med.medication_families?.name
-                ? med.medication_families.name
-                    .toLowerCase()
-                    .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "")
-                : null,
-              grupo_sat: med.grupo_sat || null,
-              unit: med.presentacion || 'pieza',
-              price_type_1: med.price_type_1 || null,
-              price_type_2: med.price_type_2 || null,
-              price_type_3: med.price_type_3 || null,
-              price_type_4: med.price_type_4 || null,
-              price_type_5: med.price_type_5 || null,
-              price_with_tax: med.price_with_tax || null,
-              price_without_tax: med.price_without_tax || null,
-              tax_rate: med.tax_rate || null,
-              codigo_sat: med.codigo_sat || null,
-              clave_unidad: med.clave_unidad || null,
-              current_stock: 0,
-              minimum_stock: 0,
-              is_active: true,
-              rfid_required: false,
-            });
+            .select('id')
+            .eq('citio_id', med.id)
+            .eq('catalog_only', true)
+            .maybeSingle();
+          
+          let error;
+          if (existingCatalogOnly) {
+            // Re-activate the catalog_only product
+            ({ error } = await supabase
+              .from('products')
+              .update({
+                catalog_only: false,
+                name: med.name,
+                description: med.description,
+                brand: med.brand || null,
+                category: toCanonicalCategory(med.medication_families?.name),
+                grupo_sat: med.grupo_sat || null,
+                unit: med.presentacion || 'pieza',
+                price_type_1: med.price_type_1 || null,
+                price_type_2: med.price_type_2 || null,
+                price_type_3: med.price_type_3 || null,
+                price_type_4: med.price_type_4 || null,
+                price_type_5: med.price_type_5 || null,
+                price_with_tax: med.price_with_tax || null,
+                price_without_tax: med.price_without_tax || null,
+                tax_rate: med.tax_rate || null,
+                codigo_sat: med.codigo_sat || null,
+                clave_unidad: med.clave_unidad || null,
+              })
+              .eq('id', existingCatalogOnly.id));
+          } else {
+            // New product insert
+            ({ error } = await supabase
+              .from('products')
+              .insert({
+                citio_id: med.id,
+                sku: sku,
+                name: med.name,
+                description: med.description,
+                barcode: barcode,
+                brand: med.brand || null,
+                category: toCanonicalCategory(med.medication_families?.name),
+                grupo_sat: med.grupo_sat || null,
+                unit: med.presentacion || 'pieza',
+                price_type_1: med.price_type_1 || null,
+                price_type_2: med.price_type_2 || null,
+                price_type_3: med.price_type_3 || null,
+                price_type_4: med.price_type_4 || null,
+                price_type_5: med.price_type_5 || null,
+                price_with_tax: med.price_with_tax || null,
+                price_without_tax: med.price_without_tax || null,
+                tax_rate: med.tax_rate || null,
+                codigo_sat: med.codigo_sat || null,
+                clave_unidad: med.clave_unidad || null,
+                current_stock: 0,
+                minimum_stock: 0,
+                is_active: true,
+                rfid_required: false,
+              }));
+          }
           
           if (error) {
-            console.error(`Error importing ${med.name}:`, error);
-            errorCount++;
+            if (error.code === "23505") {
+              console.warn(`Producto "${med.name}" ya existe (duplicado citio_id o SKU), omitiendo.`);
+              // No count as error - it's already imported
+            } else {
+              console.error(`Error importing ${med.name}:`, error);
+              errorCount++;
+            }
           } else {
             successCount++;
           }
@@ -260,6 +324,7 @@ export function CITIOImportDialog({
       // Invalidar queries
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['products-list'] });
+      queryClient.invalidateQueries({ queryKey: ['all-existing-citio-ids'] });
       
       if (successCount > 0) {
         toast.success(`${successCount} producto(s) importado(s) correctamente`);

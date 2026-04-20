@@ -16,8 +16,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Warehouse, Package, AlertTriangle, Search, ChevronDown, ChevronRight } from "lucide-react";
+import { Warehouse, Package, AlertTriangle, Search, ChevronDown, ChevronRight, Boxes } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BatchesByWarehouseSummary } from "@/components/inventory/BatchesByWarehouseSummary";
 
 interface WarehouseProduct {
   id: string;
@@ -55,8 +56,7 @@ export function StockByWarehouseModal() {
 
       const { data: wsData, error: wsError } = await supabase
         .from("warehouse_stock")
-        .select("product_id, warehouse_id, current_stock, products:product_id(id, name, sku, minimum_stock, brand, category)")
-        .gt("current_stock", 0);
+        .select("product_id, warehouse_id, current_stock, products:product_id(id, name, sku, minimum_stock, brand, category)");
 
       if (wsError) throw wsError;
 
@@ -105,7 +105,7 @@ export function StockByWarehouseModal() {
           Stock por Almacén
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh]">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Warehouse className="h-5 w-5" />
@@ -113,18 +113,31 @@ export function StockByWarehouseModal() {
           </DialogTitle>
         </DialogHeader>
 
-        {/* Buscador */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre, SKU o marca..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        <Tabs defaultValue="products" className="w-full">
+          <TabsList>
+            <TabsTrigger value="products" className="gap-2">
+              <Package className="h-4 w-4" />
+              Productos
+            </TabsTrigger>
+            <TabsTrigger value="batches" className="gap-2">
+              <Boxes className="h-4 w-4" />
+              Lotes por Almacén
+            </TabsTrigger>
+          </TabsList>
 
-        {isLoading ? (
+          <TabsContent value="products" className="space-y-4 mt-4">
+            {/* Buscador */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre, SKU o marca..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {isLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-64 w-full" />
@@ -191,6 +204,12 @@ export function StockByWarehouseModal() {
             <p>No hay almacenes configurados</p>
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="batches" className="mt-4">
+            <BatchesByWarehouseSummary />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

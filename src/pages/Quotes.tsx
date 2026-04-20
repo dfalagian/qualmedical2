@@ -31,6 +31,7 @@ interface QuoteToEdit {
     id: string;
     product_id: string | null;
     batch_id: string | null;
+    warehouse_id?: string | null;
     nombre_producto: string;
     marca: string | null;
     lote: string | null;

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { logActivity } from "@/lib/activityLogger";
 import { useAuth } from "@/hooks/useAuth";
+import { isIvaExempt } from "@/lib/formatters";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -16,6 +17,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -30,7 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Package, Trash2, FileText, History, Building2, User, CalendarIcon } from "lucide-react";
+import { Package, Trash2, FileText, History, Building2, User, CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
 import { openPurchaseOrderPrint } from "./purchaseOrderHtmlPrint";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +64,6 @@ interface SelectedProduct {
 }
 
 const IVA_RATE = 0.16;
-const IVA_EXEMPT_CATEGORIES = ["medicamentos", "inmunoterapia", "oncologicos"];
 
 interface CreateSupplierOrderDialogProps {
   open: boolean;
@@ -74,6 +82,7 @@ export const CreateSupplierOrderDialog = ({
   const [description, setDescription] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
   const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(undefined);
+  const [supplierPopoverOpen, setSupplierPopoverOpen] = useState(false);
 
   // Generate next order number automatically
   const { data: nextOrderNumber } = useQuery({
@@ -149,7 +158,6 @@ export const CreateSupplierOrderDialog = ({
         .from("products")
         .select("id, name, sku, unit_price, current_stock, price_type_1, brand, category")
         .eq("is_active", true)
-        .eq("catalog_only", false)
         .order("name");
       if (error) throw error;
       return data;
@@ -242,8 +250,7 @@ export const CreateSupplierOrderDialog = ({
 
   const ivaTotal = useMemo(() => {
     return selectedProducts.reduce((sum, p) => {
-      const cat = (p.category || "").toLowerCase();
-      if (IVA_EXEMPT_CATEGORIES.includes(cat)) return sum;
+      if (isIvaExempt(p.category)) return sum;
       const effectivePrice = p.manualPrice ?? p.savedPrice;
       return sum + effectivePrice * p.quantity * IVA_RATE;
     }, 0);
@@ -440,44 +447,71 @@ export const CreateSupplierOrderDialog = ({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>Proveedor *</Label>
-                <Select value={selectedSupplier} onValueChange={handleSupplierChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona proveedor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {registeredSuppliers && registeredSuppliers.length > 0 && (
-                      <>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          Proveedores Registrados
-                        </div>
-                        {registeredSuppliers.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            <span className="flex items-center gap-2">
-                              {s.company_name || s.full_name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                    {generalSuppliers && generalSuppliers.length > 0 && (
-                      <>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1 mt-2 border-t pt-2">
-                          <Building2 className="h-3 w-3" />
-                          Proveedores Oficiales
-                        </div>
-                        {generalSuppliers.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            <span className="flex items-center gap-2">
-                              {s.nombre_comercial || s.razon_social}
-                              <Badge variant="outline" className="text-xs ml-1">General</Badge>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
+                <Popover modal={true} open={supplierPopoverOpen} onOpenChange={setSupplierPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between h-10 text-left font-normal"
+                    >
+                      {selectedSupplier ? (
+                        supplierType === "registered"
+                          ? registeredSuppliers?.find(s => s.id === selectedSupplier)?.company_name || registeredSuppliers?.find(s => s.id === selectedSupplier)?.full_name
+                          : (() => { const gs = generalSuppliers?.find(s => s.id === selectedSupplier); return gs?.nombre_comercial || gs?.razon_social; })()
+                      ) : "Selecciona proveedor"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[9999]">
+                    <Command>
+                      <CommandInput placeholder="Buscar proveedor..." />
+                      <CommandList>
+                        <CommandEmpty>Sin resultados</CommandEmpty>
+                        {registeredSuppliers && registeredSuppliers.length > 0 && (
+                          <CommandGroup heading={
+                            <span className="flex items-center gap-1"><User className="h-3 w-3" /> Proveedores Registrados</span>
+                          }>
+                            {registeredSuppliers.map((s) => (
+                              <CommandItem
+                                key={s.id}
+                                value={`${s.company_name || ''} ${s.full_name} ${s.rfc || ''}`}
+                                onSelect={() => {
+                                  handleSupplierChange(s.id);
+                                  setSupplierPopoverOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", selectedSupplier === s.id ? "opacity-100" : "opacity-0")} />
+                                {s.company_name || s.full_name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                        {generalSuppliers && generalSuppliers.length > 0 && (
+                          <CommandGroup heading={
+                            <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> Proveedores Oficiales</span>
+                          }>
+                            {generalSuppliers.map((s) => (
+                              <CommandItem
+                                key={s.id}
+                                value={`${s.nombre_comercial || ''} ${s.razon_social} ${s.rfc || ''}`}
+                                onSelect={() => {
+                                  handleSupplierChange(s.id);
+                                  setSupplierPopoverOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", selectedSupplier === s.id ? "opacity-100" : "opacity-0")} />
+                                <span className="flex items-center gap-2">
+                                  {s.nombre_comercial || s.razon_social}
+                                  <Badge variant="outline" className="text-xs ml-1">General</Badge>
+                                </span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">

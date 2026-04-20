@@ -56,8 +56,51 @@ export type Database = {
         }
         Relationships: []
       }
+      batch_warehouse_stock: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          quantity: number
+          updated_at: string
+          warehouse_id: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          quantity?: number
+          updated_at?: string
+          warehouse_id: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          quantity?: number
+          updated_at?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_warehouse_stock_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_warehouse_stock_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cipi_request_items: {
         Row: {
+          batch_id: string | null
           caducidad: string | null
           cantidad: number
           categoria: string | null
@@ -72,8 +115,10 @@ export type Database = {
           precio: number | null
           precio_unitario: number | null
           product_id: string | null
+          warehouse_id: string | null
         }
         Insert: {
+          batch_id?: string | null
           caducidad?: string | null
           cantidad?: number
           categoria?: string | null
@@ -88,8 +133,10 @@ export type Database = {
           precio?: number | null
           precio_unitario?: number | null
           product_id?: string | null
+          warehouse_id?: string | null
         }
         Update: {
+          batch_id?: string | null
           caducidad?: string | null
           cantidad?: number
           categoria?: string | null
@@ -104,8 +151,16 @@ export type Database = {
           precio?: number | null
           precio_unitario?: number | null
           product_id?: string | null
+          warehouse_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cipi_request_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cipi_request_items_cipi_request_id_fkey"
             columns: ["cipi_request_id"]
@@ -118,6 +173,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cipi_request_items_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
             referencedColumns: ["id"]
           },
         ]
@@ -1676,6 +1738,9 @@ export type Database = {
       purchase_orders: {
         Row: {
           amount: number
+          contpaqi_doc_id: number | null
+          contpaqi_folio: number | null
+          contpaqi_synced_at: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
@@ -1693,6 +1758,9 @@ export type Database = {
         }
         Insert: {
           amount: number
+          contpaqi_doc_id?: number | null
+          contpaqi_folio?: number | null
+          contpaqi_synced_at?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -1710,6 +1778,9 @@ export type Database = {
         }
         Update: {
           amount?: number
+          contpaqi_doc_id?: number | null
+          contpaqi_folio?: number | null
+          contpaqi_synced_at?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -1766,6 +1837,7 @@ export type Database = {
           product_id: string | null
           quote_id: string
           tipo_precio: string | null
+          warehouse_id: string | null
         }
         Insert: {
           batch_id?: string | null
@@ -1783,6 +1855,7 @@ export type Database = {
           product_id?: string | null
           quote_id: string
           tipo_precio?: string | null
+          warehouse_id?: string | null
         }
         Update: {
           batch_id?: string | null
@@ -1800,6 +1873,7 @@ export type Database = {
           product_id?: string | null
           quote_id?: string
           tipo_precio?: string | null
+          warehouse_id?: string | null
         }
         Relationships: [
           {
@@ -1828,6 +1902,13 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
             referencedColumns: ["id"]
           },
         ]

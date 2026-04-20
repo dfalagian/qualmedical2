@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +16,10 @@ import {
   Link2,
   Cpu,
   ScanBarcode,
-  Warehouse
+  Warehouse,
+  RefreshCw
 } from "lucide-react";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -82,6 +84,68 @@ export function ProductRowWithBatches({
 }: ProductRowWithBatchesProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [tagAssignmentOpen, setTagAssignmentOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleSyncFromExternal = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!product.citio_id) return;
+    setIsSyncing(true);
+    try {
+      // Fetch all external medications
+      const { data, error } = await supabase.functions.invoke('get-external-medications');
+      if (error) throw error;
+
+      const medications = data?.data?.medications || data?.data || [];
+      const externalMed = Array.isArray(medications)
+        ? medications.find((m: any) => m.id === product.citio_id)
+        : null;
+
+      if (!externalMed) {
+        toast.error("No se encontró el producto en el sistema externo");
+        return;
+      }
+
+      // Update local product with external data
+      const updatePayload: Record<string, any> = {};
+      if (externalMed.name && externalMed.name !== product.name) updatePayload.name = externalMed.name;
+      if (externalMed.brand !== undefined && externalMed.brand !== product.brand) updatePayload.brand = externalMed.brand;
+      if (externalMed.description !== undefined) updatePayload.description = externalMed.description;
+      if (externalMed.price_type_1 !== undefined) updatePayload.price_type_1 = externalMed.price_type_1;
+      if (externalMed.price_type_2 !== undefined) updatePayload.price_type_2 = externalMed.price_type_2;
+      if (externalMed.price_type_3 !== undefined) updatePayload.price_type_3 = externalMed.price_type_3;
+      if (externalMed.price_type_4 !== undefined) updatePayload.price_type_4 = externalMed.price_type_4;
+      if (externalMed.price_type_5 !== undefined) updatePayload.price_type_5 = externalMed.price_type_5;
+      if (externalMed.price_with_tax !== undefined) updatePayload.price_with_tax = externalMed.price_with_tax;
+      if (externalMed.price_without_tax !== undefined) updatePayload.price_without_tax = externalMed.price_without_tax;
+      if (externalMed.tax_rate !== undefined) updatePayload.tax_rate = externalMed.tax_rate;
+      if (externalMed.codigo_sat !== undefined) updatePayload.codigo_sat = externalMed.codigo_sat;
+      if (externalMed.clave_unidad !== undefined) updatePayload.clave_unidad = externalMed.clave_unidad;
+      if (externalMed.grupo_sat !== undefined) updatePayload.grupo_sat = externalMed.grupo_sat;
+
+      if (Object.keys(updatePayload).length === 0) {
+        toast.info("El producto ya está actualizado, no hay cambios");
+        return;
+      }
+
+      const { error: updateError } = await supabase
+        .from("products")
+        .update(updatePayload)
+        .eq("id", product.id);
+
+      if (updateError) throw updateError;
+
+      await queryClient.invalidateQueries({ queryKey: ["products"] });
+      
+      const changedFields = Object.keys(updatePayload).join(", ");
+      toast.success(`Producto sincronizado. Campos actualizados: ${changedFields}`);
+    } catch (err: any) {
+      console.error("Sync error:", err);
+      toast.error("Error al sincronizar: " + (err.message || "Error desconocido"));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Fetch batches for this product when expanded
   const { data: batches = [], isLoading: loadingBatches } = useQuery({
@@ -211,6 +275,17 @@ export function ProductRowWithBatches({
         {canEdit && (
           <TableCell className="text-right">
             <div className="flex justify-end gap-1">
+              {product.citio_id && (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  title="Sincronizar con sistema externo"
+                  disabled={isSyncing}
+                  onClick={handleSyncFromExternal}
+                >
+                  <RefreshCw className={cn("h-4 w-4 text-blue-500", isSyncing && "animate-spin")} />
+                </Button>
+              )}
               {product.rfid_required && (
                 <Button 
                   variant="ghost" 

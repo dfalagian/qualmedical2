@@ -250,6 +250,16 @@ export function WarehouseTransferDialog({
     const product = products.find(p => p.id === selectedProductId);
     if (!product) return;
 
+    // Lote obligatorio (regla del sistema: ninguna transacción de inventario sin lote)
+    if (!selectedBatchId) {
+      toast({
+        title: "Lote obligatorio",
+        description: "Debes seleccionar un lote antes de agregar el producto a la transferencia.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Check if already added (same product + same batch)
     const batchKey = selectedBatchId || "no-batch";
     const existing = manualItems.find(i => i.productId === selectedProductId && (i.batchId || "no-batch") === batchKey);
@@ -335,13 +345,16 @@ export function WarehouseTransferDialog({
 
       // Save manual items as pending transfers (NO stock movement)
       for (const item of manualItems) {
+        if (!item.batchId) {
+          throw new Error(`El producto "${item.productName}" no tiene lote asignado. Las transferencias manuales requieren lote.`);
+        }
         await supabase
           .from("warehouse_transfers")
           .insert({
             from_warehouse_id: fromWarehouseId,
             to_warehouse_id: toWarehouseId,
             product_id: item.productId,
-            batch_id: item.batchId || null,
+            batch_id: item.batchId,
             quantity: item.quantity,
             transfer_type: "manual",
             notes: notes || null,

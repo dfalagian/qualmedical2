@@ -73,58 +73,27 @@ export function QuickStockButtons({
     setIsPending(true);
 
     try {
-      const quantity = 1;
-      const newStock = mode === "increment" 
-        ? currentStock + quantity
-        : Math.max(0, currentStock - quantity);
-
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-
-      // Register movement
-      const { error: movementError } = await supabase
-        .from("inventory_movements")
-        .insert({
-          product_id: productId,
-          movement_type: mode === "increment" ? "entrada" : "salida",
-          // IMPORTANT: quantity is always POSITIVE; direction is defined by movement_type.
-          // This matches backend logic that updates stock based on movement_type.
-          quantity,
-          previous_stock: currentStock,
-          new_stock: newStock,
-          notes: `Ajuste rápido (${mode === "increment" ? "+1" : "-1"})`,
-          location: "Ajuste Manual",
-          created_by: user?.id || null,
-        });
-
-      if (movementError) throw movementError;
-
-      // Read actual stock after backend processing (prevents +2 / -0 mismatches)
-      const { data: updatedProduct, error: readError } = await supabase
-        .from("products")
-        .select("current_stock")
-        .eq("id", productId)
-        .maybeSingle();
-
-      if (readError) throw readError;
-      const actualStock = updatedProduct?.current_stock ?? newStock;
-
-      // Invalidate queries
-      await queryClient.invalidateQueries({ queryKey: ["products"] });
-      await queryClient.invalidateQueries({ queryKey: ["product_batches"] });
+      // NOTA ARQUITECTÓNICA:
+      // El stock real vive en `batch_warehouse_stock` (lote x almacén).
+      // Los ajustes rápidos +1/-1 NO pueden ejecutarse sin lote+almacén porque
+      // romperían la trazabilidad. Este botón queda deshabilitado para evitar
+      // descuadres. Para ajustes manuales usa "Ingreso Producto" o "Conteo Físico".
+      toast({
+        title: "Acción no disponible",
+        description:
+          "Los ajustes rápidos +/- requieren lote y almacén. Usa 'Ingreso Producto' o 'Conteo Físico'.",
+        variant: "destructive",
+      });
 
       logActivity({
         section: "inventario",
-        action: mode === "increment" ? "ingreso" : "salida",
+        action: "estado",
         entityType: "Producto",
         entityId: productId,
         entityName: productName,
-        details: { previous_value: currentStock, new_value: actualStock, note: "Ajuste rápido" },
-      });
-
-      toast({
-        title: mode === "increment" ? "+1" : "-1",
-        description: `${productName}: ${actualStock}`,
+        details: {
+          note: `Intento de ajuste rápido (${mode === "increment" ? "+1" : "-1"}) bloqueado: requiere lote+almacén`,
+        },
       });
 
       onAdjustmentComplete?.();

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { isIvaExempt } from "@/lib/formatters";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import {
   FileText,
   Pencil,
   Radio,
+  ArrowUpDown,
   AlertTriangle,
   Trash2,
   PackageCheck,
@@ -89,6 +91,8 @@ interface QuoteItem {
   id: string;
   product_id: string | null;
   batch_id: string | null;
+  warehouse_id?: string | null;
+  warehouse_name?: string | null;
   nombre_producto: string;
   marca: string | null;
   lote: string | null;
@@ -123,6 +127,7 @@ interface QuoteToEdit {
     id: string;
     product_id: string | null;
     batch_id: string | null;
+    warehouse_id?: string | null;
     nombre_producto: string;
     marca: string | null;
     lote: string | null;
@@ -152,6 +157,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortOrder, setSortOrder] = useState<string>("folio_desc");
   
   // Quote detail dialog
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
@@ -223,36 +229,55 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
     },
   });
 
-  // Filter quotes
-  const filteredQuotes = quotes.filter((quote) => {
-    const matchesSearch = 
-      quote.folio.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.client?.nombre_cliente?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.concepto?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || quote.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
+  // Filter and sort quotes
+  const filteredQuotes = quotes
+    .filter((quote) => {
+      const matchesSearch = 
+        quote.folio.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        quote.client?.nombre_cliente?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        quote.concepto?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === "all" || quote.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      const folioNum = (folio: string) => {
+        const match = folio.match(/(\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      };
+      switch (sortOrder) {
+        case "folio_desc": return folioNum(b.folio) - folioNum(a.folio);
+        case "folio_asc": return folioNum(a.folio) - folioNum(b.folio);
+        case "total_desc": return (b.total || 0) - (a.total || 0);
+        case "total_asc": return (a.total || 0) - (b.total || 0);
+        case "oldest": return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case "newest": return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        default: return folioNum(b.folio) - folioNum(a.folio);
+      }
+    });
 
-  // Fetch quote items for detail view (with product category)
+  // Fetch quote items for detail view (with product category and warehouse name)
   const fetchQuoteItems = async (quoteId: string) => {
     const { data, error } = await supabase
       .from("quote_items")
       .select(`
         *,
-        products:product_id (category)
+        products:product_id (category),
+        warehouse:warehouse_id (id, name)
       `)
       .eq("quote_id", quoteId)
       .order("created_at");
     
     if (error) throw error;
     
-    // Map to include category from joined product
-    return (data || []).map(item => ({
+    // Map to include category and warehouse name from joined records
+    return (data || []).map((item: any) => ({
       ...item,
       categoria: item.products?.category || null,
-      products: undefined, // Remove the nested object
+      warehouse_name: item.warehouse?.name || null,
+      products: undefined,
+      warehouse: undefined,
     })) as QuoteItem[];
   };
 
@@ -586,6 +611,20 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                 <SelectItem value="cancelada">Cancelada</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={sortOrder} onValueChange={setSortOrder}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <ArrowUpDown className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Ordenar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="folio_desc">Folio mayor → menor</SelectItem>
+                <SelectItem value="folio_asc">Folio menor → mayor</SelectItem>
+                <SelectItem value="newest">Más recientes</SelectItem>
+                <SelectItem value="oldest">Más antiguas</SelectItem>
+                <SelectItem value="total_desc">Mayor monto</SelectItem>
+                <SelectItem value="total_asc">Menor monto</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Quotes Table */}
@@ -805,6 +844,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                       <TableHead>Producto</TableHead>
                       <TableHead>Marca</TableHead>
                       <TableHead>Lote</TableHead>
+                      <TableHead>Almacén</TableHead>
                       <TableHead>Caducidad</TableHead>
                       <TableHead className="text-right">Cantidad</TableHead>
                       <TableHead className="text-right">P. Unit.</TableHead>
@@ -822,6 +862,13 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                           <TableCell>{item.marca || "-"}</TableCell>
                           <TableCell>{item.lote || "-"}</TableCell>
                           <TableCell>
+                            {item.warehouse_name ? (
+                              <span className="text-xs">{item.warehouse_name}</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
                             {item.fecha_caducidad 
                               ? format(new Date(item.fecha_caducidad), "dd/MM/yyyy") 
                               : "-"}
@@ -838,10 +885,8 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
 
               {/* Totals */}
               {(() => {
-                const EXEMPT_CATS = ["medicamentos", "oncologicos", "inmunoterapia"];
                 const calcIva = quoteItems.reduce((sum, item) => {
-                  const cat = (item.categoria || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                  if (EXEMPT_CATS.includes(cat)) return sum;
+                  if (isIvaExempt(item.categoria)) return sum;
                   return sum + item.importe * 0.16;
                 }, 0);
                 const calcTotal = selectedQuote.subtotal + calcIva;

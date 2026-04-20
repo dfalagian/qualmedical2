@@ -212,13 +212,54 @@ const Invoices = () => {
     queryKey: ["suppliers"],
     enabled: isAdmin,
     queryFn: async () => {
+      // Solo traer perfiles que tienen rol 'proveedor'
+      const { data: supplierRoles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "proveedor");
+
+      if (rolesError) throw rolesError;
+
+      const supplierIds = supplierRoles?.map((r: any) => r.user_id) || [];
+      if (supplierIds.length === 0) return [];
+
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, company_name, email")
-        .neq("id", user?.id);
+        .select("id, full_name, company_name, email, rfc")
+        .in("id", supplierIds)
+        .not("company_name", "is", null)
+        .neq("company_name", "");
 
       if (error) throw error;
-      return data;
+
+      // Obtener la razón social fiscal (emisor_nombre) de las facturas de cada proveedor
+      const supplierIdsWithData = (data || []).map((s: any) => s.id);
+      const { data: invoicesData } = await supabase
+        .from("invoices")
+        .select("supplier_id, emisor_nombre")
+        .in("supplier_id", supplierIdsWithData)
+        .not("emisor_nombre", "is", null)
+        .neq("emisor_nombre", "");
+
+      // Mapa de supplier_id -> emisor_nombre (razón social fiscal)
+      const fiscalNameMap: Record<string, string> = {};
+      (invoicesData || []).forEach((inv: any) => {
+        if (inv.emisor_nombre && !fiscalNameMap[inv.supplier_id]) {
+          fiscalNameMap[inv.supplier_id] = inv.emisor_nombre;
+        }
+      });
+
+      // Agregar razon_social_fiscal a cada proveedor
+      const enriched = (data || []).map((s: any) => ({
+        ...s,
+        razon_social_fiscal: fiscalNameMap[s.id] || s.company_name || s.full_name,
+      }));
+
+      return enriched.sort((a: any, b: any) => {
+        const nameA = (a.razon_social_fiscal || "").trim().toLowerCase();
+        const nameB = (b.razon_social_fiscal || "").trim().toLowerCase();
+        return nameA.localeCompare(nameB, 'es');
+      });
     },
   });
 
@@ -1447,9 +1488,8 @@ const Invoices = () => {
                     >
                       {supplierFilter === "all"
                         ? "Todos los proveedores"
-                        : (suppliers.find((s: any) => s.id === supplierFilter)?.company_name ||
-                          suppliers.find((s: any) => s.id === supplierFilter)?.full_name ||
-                          "Seleccionar proveedor").toUpperCase()}
+                        : (suppliers.find((s: any) => s.id === supplierFilter)?.razon_social_fiscal ||
+                          "Seleccionar proveedor")}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
@@ -1477,7 +1517,7 @@ const Invoices = () => {
                           {suppliers.map((supplier: any) => (
                             <CommandItem
                               key={supplier.id}
-                              value={`${supplier.company_name || supplier.full_name} ${supplier.rfc || ""}`}
+                              value={`${supplier.razon_social_fiscal} ${supplier.rfc || ""}`}
                               onSelect={() => {
                                 setSupplierFilter(supplier.id);
                                 setSupplierComboOpen(false);
@@ -1489,7 +1529,7 @@ const Invoices = () => {
                                   supplierFilter === supplier.id ? "opacity-100" : "opacity-0"
                                 )}
                               />
-                              {(supplier.company_name || supplier.full_name).toUpperCase()}
+                              {supplier.razon_social_fiscal}
                             </CommandItem>
                           ))}
                         </CommandGroup>

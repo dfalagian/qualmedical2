@@ -35,6 +35,7 @@ interface QuoteItem {
   id: string;
   product_id: string | null;
   batch_id: string | null;
+  warehouse_id?: string | null;
   nombre_producto: string;
   marca: string | null;
   lote: string | null;
@@ -80,6 +81,8 @@ export const BatchSelectionDialog = ({
 }: BatchSelectionDialogProps) => {
   const [selections, setSelections] = useState<BatchSelection[]>([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("");
+  // Track which items the user explicitly wants to edit (override the auto-FEFO selection)
+  const [editingBatchItemIds, setEditingBatchItemIds] = useState<Set<string>>(new Set());
 
   // Get unique product IDs from quote items
   const productIds = useMemo(() => {
@@ -101,16 +104,31 @@ export const BatchSelectionDialog = ({
     enabled: open,
   });
 
-  // Auto-select first warehouse when list loads
+  // Auto-select warehouse when list loads:
+  // - Prefer the most-frequent warehouse_id suggested by the quote items
+  // - Otherwise fall back to the first active warehouse
   useEffect(() => {
-    if (warehouses.length > 0 && !selectedWarehouseId) {
-      setSelectedWarehouseId(warehouses[0].id);
+    if (warehouses.length === 0 || selectedWarehouseId) return;
+    const counts = new Map<string, number>();
+    for (const it of quoteItems) {
+      if (it.warehouse_id && warehouses.some(w => w.id === it.warehouse_id)) {
+        counts.set(it.warehouse_id, (counts.get(it.warehouse_id) || 0) + 1);
+      }
     }
-  }, [warehouses, selectedWarehouseId]);
+    let suggested: string | null = null;
+    let max = 0;
+    counts.forEach((count, id) => {
+      if (count > max) { max = count; suggested = id; }
+    });
+    setSelectedWarehouseId(suggested || warehouses[0].id);
+  }, [warehouses, quoteItems, selectedWarehouseId]);
 
-  // Reset warehouse selection when dialog closes
+  // Reset warehouse + edit state when dialog closes
   useEffect(() => {
-    if (!open) setSelectedWarehouseId("");
+    if (!open) {
+      setSelectedWarehouseId("");
+      setEditingBatchItemIds(new Set());
+    }
   }, [open]);
 
   // Fetch warehouse stock for selected warehouse
@@ -142,7 +160,6 @@ export const BatchSelectionDialog = ({
         .select("id, product_id, batch_number, expiration_date, current_quantity")
         .in("product_id", productIds)
         .eq("is_active", true)
-        .gt("current_quantity", 0)
         .order("expiration_date", { ascending: true });
       
       if (error) throw error;
@@ -160,15 +177,41 @@ export const BatchSelectionDialog = ({
     enabled: open && productIds.length > 0,
   });
 
-  // Get all active batches for a product — no warehouse filtering.
-  // Batch-level stock per warehouse cannot be reliably derived from transfer
-  // history because it doesn't account for sales at the destination or
-  // replenishments at the origin.  Product-level stock validation via
-  // `warehouse_stock` (warehouseStockMap) is the authoritative check;
-  // batch selection is global.
+  // Collect all batch ids across products to query per-warehouse stock
+  const allBatchIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const list of Object.values(batchesByProduct) as Batch[][]) {
+      for (const b of list) ids.push(b.id);
+    }
+    return ids;
+  }, [batchesByProduct]);
+
+  // Fetch per-warehouse stock for these batches in the SELECTED warehouse only
+  const { data: batchWarehouseQtyMap = {} } = useQuery({
+    queryKey: ["batch-warehouse-stock-approval", selectedWarehouseId, allBatchIds],
+    queryFn: async () => {
+      if (!selectedWarehouseId || allBatchIds.length === 0) return {};
+      const { data, error } = await (supabase as any)
+        .from("batch_warehouse_stock")
+        .select("batch_id, quantity")
+        .eq("warehouse_id", selectedWarehouseId)
+        .in("batch_id", allBatchIds);
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      (data || []).forEach((r: any) => { map[r.batch_id] = r.quantity; });
+      return map;
+    },
+    enabled: open && !!selectedWarehouseId && allBatchIds.length > 0,
+  });
+
+  // Return only the batches that have stock IN THE SELECTED WAREHOUSE.
+  // batch_warehouse_stock is the SSOT — if a batch has 0 stock in this warehouse, it must NOT appear.
   const getFilteredBatches = (productId: string): (Batch & { warehouseQty: number })[] => {
     const allBatches = batchesByProduct[productId] || [];
-    return allBatches.map(b => ({ ...b, warehouseQty: b.current_quantity }));
+    if (!selectedWarehouseId) return [];
+    return allBatches
+      .map(b => ({ ...b, warehouseQty: batchWarehouseQtyMap[b.id] ?? 0 }))
+      .filter(b => b.warehouseQty > 0);
   };
 
   // Initialize selections when dialog opens or items change
@@ -417,29 +460,70 @@ export const BatchSelectionDialog = ({
                                 ? "Sin lotes en este almacén" 
                                 : "Sin lotes disponibles"}
                             </span>
-                          ) : (
-                            <Select
-                              value={selection?.batchId || ""}
-                              onValueChange={(value) => handleBatchChange(item.id, value)}
-                            >
-                              <SelectTrigger className="w-[300px]">
-                                <SelectValue placeholder="Seleccionar lote..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {filteredBatches.map(batch => (
-                                  <SelectItem key={batch.id} value={batch.id}>
-                                    <div className="flex items-center justify-between gap-4">
-                                      <span className="font-medium">{batch.batch_number}</span>
-                                      <span className="text-muted-foreground text-xs">
-                                        Cad: {format(new Date(batch.expiration_date), "dd/MM/yyyy")} · 
-                                        Disp: {batch.warehouseQty}
-                                      </span>
+                          ) : (() => {
+                            const isEditing = editingBatchItemIds.has(item.id);
+                            const onlyOneBatch = filteredBatches.length === 1;
+                            const hasAutoSelection = !!selection?.batchId && !!selection.batchNumber;
+                            // Show compact view if user is not editing AND we have an auto-selection (or only 1 lote)
+                            const showCompact = !isEditing && hasAutoSelection;
+
+                            if (showCompact) {
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex flex-col">
+                                    <div className="flex items-center gap-1.5">
+                                      <Package className="h-3.5 w-3.5 text-emerald-600" />
+                                      <span className="font-medium text-sm">{selection.batchNumber}</span>
+                                      {!onlyOneBatch && (
+                                        <Badge variant="outline" className="text-[10px] h-4 px-1 border-emerald-300 text-emerald-700 bg-emerald-50">
+                                          Auto FEFO
+                                        </Badge>
+                                      )}
                                     </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
+                                    <span className="text-[11px] text-muted-foreground">
+                                      Cad: {selection.expirationDate ? format(new Date(selection.expirationDate), "dd/MM/yyyy") : "—"}
+                                    </span>
+                                  </div>
+                                  {!onlyOneBatch && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingBatchItemIds(prev => new Set(prev).add(item.id))}
+                                      className="text-xs text-primary hover:underline ml-auto"
+                                    >
+                                      Cambiar
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <Select
+                                value={selection?.batchId || ""}
+                                onValueChange={(value) => {
+                                  handleBatchChange(item.id, value);
+                                  // Keep editing mode after change so user sees the dropdown they just used
+                                }}
+                              >
+                                <SelectTrigger className="w-[300px]">
+                                  <SelectValue placeholder="Seleccionar lote..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {filteredBatches.map(batch => (
+                                    <SelectItem key={batch.id} value={batch.id}>
+                                      <div className="flex items-center justify-between gap-4">
+                                        <span className="font-medium">{batch.batch_number}</span>
+                                        <span className="text-muted-foreground text-xs">
+                                          Cad: {format(new Date(batch.expiration_date), "dd/MM/yyyy")} · 
+                                          Disp: {batch.warehouseQty}
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="text-center">
                           {!hasProductId ? (

@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Trash2, Minus, Plus, Save, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { POSClientSelector } from "./POSClientSelector";
+import { isIvaExempt } from "@/lib/formatters";
 
 interface CartItem {
   product_id: string;
@@ -31,8 +32,6 @@ interface POSCartProps {
   setSelectedClientId: (id: string) => void;
   onClose?: () => void;
 }
-
-const IVA_EXEMPT_CATEGORIES = ["medicamentos", "inmunoterapia", "oncologicos"];
 
 export const POSCart = ({
   items,
@@ -66,11 +65,11 @@ export const POSCart = ({
 
   // Calculate totals with IVA logic
   const subtotalExento = items
-    .filter((i) => IVA_EXEMPT_CATEGORIES.includes(i.category?.toLowerCase() || ""))
+    .filter((i) => isIvaExempt(i.category))
     .reduce((sum, i) => sum + i.importe, 0);
   
   const subtotalGravado = items
-    .filter((i) => !IVA_EXEMPT_CATEGORIES.includes(i.category?.toLowerCase() || ""))
+    .filter((i) => !isIvaExempt(i.category))
     .reduce((sum, i) => sum + i.importe, 0);
 
   const iva = subtotalGravado * 0.16;

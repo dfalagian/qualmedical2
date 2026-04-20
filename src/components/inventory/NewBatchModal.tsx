@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { format, parse, isValid } from "date-fns";
-import { CalendarIcon, ChevronsUpDown, Check } from "lucide-react";
+import { CalendarIcon, ChevronsUpDown, Check, AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ interface NewBatchModalProps {
   onOpenChange: (open: boolean) => void;
   productName?: string;
   productId?: string;
-  onConfirm: (batchNumber: string, expirationDate: string, selectedProductId?: string, selectedProductName?: string) => void;
+  onConfirm: (batchNumber: string, expirationDate: string, selectedProductId?: string, selectedProductName?: string, barcode?: string) => void;
 }
 
 export function NewBatchModal({ open, onOpenChange, productName, productId, onConfirm }: NewBatchModalProps) {
@@ -25,6 +25,7 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
   const [expirationDate, setExpirationDate] = useState<Date | undefined>(undefined);
   const [dateInputValue, setDateInputValue] = useState("");
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [barcode, setBarcode] = useState("");
 
   // Product search state
   const [productSearchOpen, setProductSearchOpen] = useState(false);
@@ -53,6 +54,16 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
     enabled: open
   });
 
+  // Auto-fill barcode when product is selected
+  useEffect(() => {
+    if (selectedProductId && productos.length > 0) {
+      const product = productos.find(p => p.id === selectedProductId);
+      if (product?.barcode) {
+        setBarcode(product.barcode);
+      }
+    }
+  }, [selectedProductId, productos]);
+
   const filteredProducts = useMemo(() => {
     if (!productSearch) return productos;
     const search = productSearch.toLowerCase();
@@ -69,16 +80,21 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
     if (product) {
       setSelectedProductId(product.id);
       setSelectedProductName(product.name);
+      if (product.barcode) {
+        setBarcode(product.barcode);
+      } else {
+        setBarcode("");
+      }
     }
     setProductSearchOpen(false);
     setProductSearch("");
   };
 
   const handleConfirm = () => {
-    if (!batchNumber.trim() || !expirationDate || !selectedProductId) return;
+    if (!batchNumber.trim() || !expirationDate || !selectedProductId || !barcode.trim()) return;
 
     const formattedDate = format(expirationDate, "yyyy-MM-dd");
-    onConfirm(batchNumber.toUpperCase().trim(), formattedDate, selectedProductId, selectedProductName);
+    onConfirm(batchNumber.toUpperCase().trim(), formattedDate, selectedProductId, selectedProductName, barcode.trim());
 
     resetForm();
     onOpenChange(false);
@@ -93,6 +109,7 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
     setBatchNumber("");
     setExpirationDate(undefined);
     setDateInputValue("");
+    setBarcode("");
     setSelectedProductId(productId);
     setSelectedProductName(productName || "");
   };
@@ -122,7 +139,10 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
     setCalendarOpen(false);
   };
 
-  const isConfirmDisabled = !batchNumber.trim() || !expirationDate || !selectedProductId;
+  const selectedProduct = productos.find(p => p.id === selectedProductId);
+  const productHasNoBarcode = selectedProductId && selectedProduct && !selectedProduct.barcode;
+
+  const isConfirmDisabled = !batchNumber.trim() || !expirationDate || !selectedProductId || !barcode.trim();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -191,6 +211,27 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
               onChange={(e) => setBatchNumber(e.target.value.toUpperCase())}
               placeholder="Ej: LOT-2024-001"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="barcode">Código de Barras</Label>
+            <Input
+              id="barcode"
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              placeholder="Ingrese el código de barras del producto"
+            />
+            {productHasNoBarcode && (
+              <div className="flex items-center gap-1.5 text-xs text-amber-600">
+                <AlertTriangle className="h-3 w-3" />
+                <span>Este producto no tiene código de barras registrado. Ingrese uno manualmente.</span>
+              </div>
+            )}
+            {selectedProduct?.barcode && barcode === selectedProduct.barcode && (
+              <p className="text-xs text-muted-foreground">
+                Código de barras del producto (editable si necesita cambiarlo)
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

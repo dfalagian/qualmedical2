@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { isIvaExempt } from "@/lib/formatters";
 
 interface QuoteItem {
   nombre_producto: string;
@@ -51,14 +52,8 @@ export const printQuoteHtml = (data: QuotePrintData) => {
     return `$${amount.toFixed(2)}`;
   };
 
-  // Categories exempt from IVA (medications in Mexico)
-  const EXEMPT_CATEGORIES = ["medicamentos", "inmunoterapia", "oncologicos"];
-  
-  // Check if an item is exempt from IVA
-  const isExemptFromIva = (categoria: string | null): boolean => {
-    if (!categoria) return false;
-    return EXEMPT_CATEGORIES.includes(categoria.toLowerCase());
-  };
+  // Check if an item is exempt from IVA (centralized with accent normalization)
+  const isExemptFromIva = (categoria: string | null): boolean => isIvaExempt(categoria);
 
   // Calculate IVA only for non-exempt items (16% for items that apply)
   const itemsWithIva = data.items.map(item => ({

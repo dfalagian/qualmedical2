@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Printer, ArrowRightLeft, Package, Tag as TagIcon, Check, X, Pencil, Trash2, ChevronDown, ChevronUp, Plus, Search, Eye, Truck, PackageCheck } from "lucide-react";
 import { TransferReceptionScanDialog } from "./TransferReceptionScanDialog";
+import { TransferCompletionSummaryModal } from "./TransferCompletionSummaryModal";
 import { openWarehouseTransferPrint, TransferPrintItem, TransferPrintData } from "./warehouseTransferPrint";
 import { useToast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLogger";
@@ -78,6 +79,10 @@ export function WarehouseTransferHistory() {
   const [newQuantity, setNewQuantity] = useState<number>(1);
   const [productSearchOpen, setProductSearchOpen] = useState(false);
   const [receptionDialogGroup, setReceptionDialogGroup] = useState<GroupedTransfer | null>(null);
+  const [summaryData, setSummaryData] = useState<{
+    group: GroupedTransfer;
+    items: { product_id: string; product_name: string; product_sku?: string; batch_number?: string; quantity: number }[];
+  } | null>(null);
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ["warehouse_transfers_history"],
@@ -135,9 +140,12 @@ export function WarehouseTransferHistory() {
     }
   }
 
+  // Excluir transferencias canceladas del listado
+  const visibleGrouped = grouped.filter((g) => g.status !== "cancelada");
+
   // Filter grouped transfers by search term
   const filteredGrouped = transferSearch.trim()
-    ? grouped.filter((group) => {
+    ? visibleGrouped.filter((group) => {
         const term = transferSearch.toLowerCase();
         return group.items.some((item) => {
           const isRfid = item.transfer_type === "rfid";
@@ -158,7 +166,7 @@ export function WarehouseTransferHistory() {
           );
         });
       })
-    : grouped;
+    : visibleGrouped;
 
   // Derive the group being added to (after grouped is built)
   const addingGroup = addingToGroup ? grouped.find(g => g.key === addingToGroup) : null;
@@ -203,12 +211,15 @@ export function WarehouseTransferHistory() {
 
   // Add product to pending transfer mutation
   const addProductMutation = useMutation({
-    mutationFn: async ({ group, productId, batchId, quantity }: { group: GroupedTransfer; productId: string; batchId?: string; quantity: number }) => {
+    mutationFn: async ({ group, productId, batchId, quantity }: { group: GroupedTransfer; productId: string; batchId: string; quantity: number }) => {
+      if (!batchId) {
+        throw new Error("Debes seleccionar un lote antes de agregar el producto a la transferencia.");
+      }
       const { error } = await supabase.from("warehouse_transfers").insert({
         from_warehouse_id: group.fromWarehouseId,
         to_warehouse_id: group.toWarehouseId,
         product_id: productId,
-        batch_id: batchId || null,
+        batch_id: batchId,
         quantity,
         transfer_type: "manual",
         status: "pendiente",
@@ -276,7 +287,55 @@ export function WarehouseTransferHistory() {
       const itemIds = group.items.map(i => i.id);
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Atomically mark as completada to prevent double-click
+      // ============================================================
+      // FASE 0 — PRE-VALIDACIÓN ATÓMICA "TODO O NADA"
+      // Verificamos que TODOS los lotes/productos del grupo tengan
+      // stock suficiente en el almacén origen ANTES de mover nada.
+      // Si alguno falla, abortamos sin tocar el inventario.
+      // ============================================================
+      const insufficientStock: string[] = [];
+
+      for (const item of group.items) {
+        if (item.transfer_type !== "manual" || !item.product_id || !item.quantity) continue;
+
+        const prodName = (item.products as any)?.name || "Producto";
+        const batchNum = (item.product_batches as any)?.batch_number;
+        const label = batchNum ? `${prodName} (lote ${batchNum})` : prodName;
+
+        if (item.batch_id) {
+          const { data: sourceBws } = await (supabase as any)
+            .from("batch_warehouse_stock")
+            .select("quantity")
+            .eq("batch_id", item.batch_id)
+            .eq("warehouse_id", group.fromWarehouseId)
+            .maybeSingle();
+
+          const available = sourceBws?.quantity ?? 0;
+          if (available < item.quantity) {
+            insufficientStock.push(`• ${label}: requiere ${item.quantity}, disponible ${available}`);
+          }
+        } else {
+          const { data: sourceStock } = await supabase
+            .from("warehouse_stock")
+            .select("current_stock")
+            .eq("product_id", item.product_id)
+            .eq("warehouse_id", group.fromWarehouseId)
+            .maybeSingle();
+
+          const available = sourceStock?.current_stock ?? 0;
+          if (available < item.quantity) {
+            insufficientStock.push(`• ${label}: requiere ${item.quantity}, disponible ${available}`);
+          }
+        }
+      }
+
+      if (insufficientStock.length > 0) {
+        throw new Error(
+          `No se puede completar la transferencia. Stock insuficiente en ${group.fromWarehouse}:\n\n${insufficientStock.join("\n")}\n\nNINGÚN producto fue movido. Corrige los lotes/cantidades y vuelve a intentar.`
+        );
+      }
+
+      // FASE 1 — Marcar atómicamente como completada (anti doble-click)
       const { data: updatedRows, error: statusError } = await supabase
         .from("warehouse_transfers")
         .update({
@@ -307,45 +366,99 @@ export function WarehouseTransferHistory() {
               .eq("id", item.rfid_tag_id);
             if (tagError) throw tagError;
           } else if (item.transfer_type === "manual" && item.product_id && item.quantity) {
-            const { data: sourceStock } = await supabase
-              .from("warehouse_stock")
-              .select("current_stock")
-              .eq("product_id", item.product_id)
-              .eq("warehouse_id", group.fromWarehouseId)
-              .maybeSingle();
+            // Transferencias actualizan batch_warehouse_stock
+            // El trigger sync_stock_from_batch_warehouse se encarga de warehouse_stock, product_batches y products
+            if (item.batch_id) {
+              // Descontar del almacén origen
+              const { data: sourceBws } = await (supabase as any)
+                .from("batch_warehouse_stock")
+                .select("id, quantity")
+                .eq("batch_id", item.batch_id)
+                .eq("warehouse_id", group.fromWarehouseId)
+                .maybeSingle();
 
-            if (!sourceStock || sourceStock.current_stock < item.quantity) {
-              const prodName = (item.products as any)?.name || "Producto";
-              throw new Error(`Stock insuficiente para ${prodName} en almacén origen`);
-            }
+              if (!sourceBws || sourceBws.quantity < item.quantity) {
+                const prodName = (item.products as any)?.name || "Producto";
+                throw new Error(`Stock insuficiente para ${prodName} en almacén origen`);
+              }
 
-            await supabase
-              .from("warehouse_stock")
-              .update({ current_stock: sourceStock.current_stock - item.quantity })
-              .eq("product_id", item.product_id)
-              .eq("warehouse_id", group.fromWarehouseId);
+              const newSourceQty = sourceBws.quantity - item.quantity;
+              if (newSourceQty === 0) {
+                await (supabase as any)
+                  .from("batch_warehouse_stock")
+                  .delete()
+                  .eq("id", sourceBws.id);
+              } else {
+                await (supabase as any)
+                  .from("batch_warehouse_stock")
+                  .update({ quantity: newSourceQty })
+                  .eq("id", sourceBws.id);
+              }
 
-            const { data: destStock } = await supabase
-              .from("warehouse_stock")
-              .select("current_stock")
-              .eq("product_id", item.product_id)
-              .eq("warehouse_id", group.toWarehouseId)
-              .maybeSingle();
+              // Agregar al almacén destino
+              const { data: destBws } = await (supabase as any)
+                .from("batch_warehouse_stock")
+                .select("id, quantity")
+                .eq("batch_id", item.batch_id)
+                .eq("warehouse_id", group.toWarehouseId)
+                .maybeSingle();
 
-            if (destStock) {
-              await supabase
-                .from("warehouse_stock")
-                .update({ current_stock: destStock.current_stock + item.quantity })
-                .eq("product_id", item.product_id)
-                .eq("warehouse_id", group.toWarehouseId);
+              if (destBws) {
+                await (supabase as any)
+                  .from("batch_warehouse_stock")
+                  .update({ quantity: destBws.quantity + item.quantity })
+                  .eq("id", destBws.id);
+              } else {
+                await (supabase as any)
+                  .from("batch_warehouse_stock")
+                  .insert({
+                    batch_id: item.batch_id,
+                    warehouse_id: group.toWarehouseId,
+                    quantity: item.quantity,
+                  });
+              }
             } else {
+              // Fallback: transferencia sin lote - actualizar warehouse_stock directamente
+              const { data: sourceStock } = await supabase
+                .from("warehouse_stock")
+                .select("current_stock")
+                .eq("product_id", item.product_id)
+                .eq("warehouse_id", group.fromWarehouseId)
+                .maybeSingle();
+
+              if (!sourceStock || sourceStock.current_stock < item.quantity) {
+                const prodName = (item.products as any)?.name || "Producto";
+                throw new Error(`Stock insuficiente para ${prodName} en almacén origen`);
+              }
+
               await supabase
                 .from("warehouse_stock")
-                .insert({
-                  product_id: item.product_id,
-                  warehouse_id: group.toWarehouseId,
-                  current_stock: item.quantity,
-                });
+                .update({ current_stock: sourceStock.current_stock - item.quantity })
+                .eq("product_id", item.product_id)
+                .eq("warehouse_id", group.fromWarehouseId);
+
+              const { data: destStock } = await supabase
+                .from("warehouse_stock")
+                .select("current_stock")
+                .eq("product_id", item.product_id)
+                .eq("warehouse_id", group.toWarehouseId)
+                .maybeSingle();
+
+              if (destStock) {
+                await supabase
+                  .from("warehouse_stock")
+                  .update({ current_stock: destStock.current_stock + item.quantity })
+                  .eq("product_id", item.product_id)
+                  .eq("warehouse_id", group.toWarehouseId);
+              } else {
+                await supabase
+                  .from("warehouse_stock")
+                  .insert({
+                    product_id: item.product_id,
+                    warehouse_id: group.toWarehouseId,
+                    current_stock: item.quantity,
+                  });
+              }
             }
           }
         }
@@ -372,6 +485,19 @@ export function WarehouseTransferHistory() {
         entityName: `${group.fromWarehouse} → ${group.toWarehouse}`,
         details: { items_count: group.items.length },
       });
+
+      // Build summary items from the group
+      const summaryItems = group.items
+        .filter((item) => item.transfer_type === "manual" && item.product_id)
+        .map((item) => ({
+          product_id: item.product_id!,
+          product_name: (item.products as any)?.name || "Sin producto",
+          product_sku: (item.products as any)?.sku || undefined,
+          batch_number: (item.product_batches as any)?.batch_number || undefined,
+          quantity: item.quantity || 1,
+        }));
+
+      setSummaryData({ group, items: summaryItems });
 
       handlePrint(group);
 
@@ -818,7 +944,7 @@ export function WarehouseTransferHistory() {
                           {newProductId && newProductBatches.length > 0 && (
                             <Select value={newBatchId} onValueChange={setNewBatchId}>
                               <SelectTrigger className="h-7 w-[180px] text-xs">
-                                <SelectValue placeholder="Lote (opcional)" />
+                                <SelectValue placeholder="Lote (obligatorio)" />
                               </SelectTrigger>
                               <SelectContent>
                                 {newProductBatches.map((b: any) => (
@@ -842,9 +968,9 @@ export function WarehouseTransferHistory() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-green-600"
-                            disabled={!newProductId || newQuantity < 1 || addProductMutation.isPending}
-                            onClick={() => addProductMutation.mutate({ group, productId: newProductId, batchId: newBatchId || undefined, quantity: newQuantity })}
-                            title="Confirmar"
+                            disabled={!newProductId || !newBatchId || newQuantity < 1 || addProductMutation.isPending}
+                            onClick={() => addProductMutation.mutate({ group, productId: newProductId, batchId: newBatchId, quantity: newQuantity })}
+                            title={!newBatchId ? "Selecciona un lote" : "Confirmar"}
                           >
                             <Check className="h-3 w-3" />
                           </Button>
@@ -938,6 +1064,19 @@ export function WarehouseTransferHistory() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Transfer completion summary modal */}
+      {summaryData && (
+        <TransferCompletionSummaryModal
+          open={!!summaryData}
+          onOpenChange={(open) => { if (!open) setSummaryData(null); }}
+          fromWarehouseId={summaryData.group.fromWarehouseId}
+          fromWarehouseName={summaryData.group.fromWarehouse}
+          toWarehouseId={summaryData.group.toWarehouseId}
+          toWarehouseName={summaryData.group.toWarehouse}
+          transferredItems={summaryData.items}
+        />
+      )}
     </>
   );
 }

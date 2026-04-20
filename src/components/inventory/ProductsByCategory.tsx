@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import { ProductRowWithBatches } from "./ProductRowWithBatches";
+import { toCanonicalCategory } from "@/lib/formatters";
 
 interface Product {
   id: string;
@@ -64,7 +65,7 @@ export function ProductsByCategory({
   const grouped = useMemo(() => {
     const map: Record<string, Product[]> = {};
     for (const p of products) {
-      const cat = p.category || "Sin categoría";
+      const cat = toCanonicalCategory(p.category) || "Sin categoría";
       if (!map[cat]) map[cat] = [];
       map[cat].push(p);
     }

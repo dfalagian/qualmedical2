@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { toCanonicalCategory } from "@/lib/formatters";
 
 interface Medication {
   id: string;
@@ -197,7 +198,7 @@ const MedicationsCatalogCITIO = () => {
 
   // Helper to get family name from medication
   const getFamilyName = (med: Medication): string => {
-    if (med.medication_families?.name) return med.medication_families.name;
+    if (med.medication_families?.name) return toCanonicalCategory(med.medication_families.name) || med.medication_families.name;
     return 'Sin Familia';
   };
 

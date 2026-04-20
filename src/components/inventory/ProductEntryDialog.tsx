@@ -383,32 +383,51 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
             .update({ warehouse_id: formData.almacenId })
             .eq("id", item.productId);
 
-          // Sincronizar warehouse_stock (upsert)
-          const { data: existingWs } = await supabase
-            .from("warehouse_stock")
-            .select("id, current_stock")
-            .eq("product_id", item.productId)
-            .eq("warehouse_id", formData.almacenId)
-            .maybeSingle();
+          // Sincronizar vía batch_warehouse_stock (el trigger se encarga de warehouse_stock, product_batches y products)
+          if (item.batchId) {
+            const { data: existingBws } = await (supabase as any)
+              .from("batch_warehouse_stock")
+              .select("id, quantity")
+              .eq("batch_id", item.batchId)
+              .eq("warehouse_id", formData.almacenId)
+              .maybeSingle();
 
-          if (existingWs) {
-            await supabase
-              .from("warehouse_stock")
-              .update({ current_stock: existingWs.current_stock + item.cantidad })
-              .eq("id", existingWs.id);
-          } else {
-            await supabase
-              .from("warehouse_stock")
-              .insert({
-                product_id: item.productId,
-                warehouse_id: formData.almacenId,
-                current_stock: item.cantidad,
-              });
+            if (existingBws) {
+              await (supabase as any)
+                .from("batch_warehouse_stock")
+                .update({ quantity: existingBws.quantity + item.cantidad })
+                .eq("id", existingBws.id);
+            } else {
+              await (supabase as any)
+                .from("batch_warehouse_stock")
+                .insert({
+                  batch_id: item.batchId,
+                  warehouse_id: formData.almacenId,
+                  quantity: item.cantidad,
+                });
+            }
           }
         }
 
         // Registrar movimiento de inventario
         const { data: { user } } = await supabase.auth.getUser();
+        
+        // Determine location: use selected warehouse, fallback to product's warehouse
+        let movementLocation = formData.almacenId || null;
+        if (!movementLocation) {
+          const { data: productData } = await supabase
+            .from("products")
+            .select("warehouse_id")
+            .eq("id", item.productId)
+            .single();
+          movementLocation = productData?.warehouse_id || null;
+        }
+        // Final fallback: find "Almacén Principal"
+        if (!movementLocation && almacenes.length > 0) {
+          const principal = almacenes.find((a: any) => a.name.toLowerCase().includes("principal"));
+          movementLocation = principal?.id || almacenes[0]?.id || null;
+        }
+        
         const { error: movError } = await supabase
           .from("inventory_movements")
           .insert({
@@ -418,26 +437,17 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
             quantity: item.cantidad,
             reference_id: formData.ordenCompraId || null,
             reference_type: formData.ordenCompraId ? "purchase_order" : null,
-            location: formData.almacenId || null,
+            location: movementLocation,
             created_by: user?.id || null,
             created_at: entryDate.toISOString(),
             notes: formData.numeroFactura ? `Factura: ${formData.numeroFactura}` : `Ingreso de producto - Lote: ${item.lote}`
           });
 
         if (movError) {
-          console.error("Error creating inventory_movement:", movError);
-          const { data: currentProduct } = await supabase
-            .from("products")
-            .select("current_stock")
-            .eq("id", item.productId)
-            .single();
-
-          await supabase
-            .from("products")
-            .update({
-              current_stock: (currentProduct?.current_stock || 0) + item.cantidad
-            })
-            .eq("id", item.productId);
+          // El stock ya fue actualizado por el trigger SSOT al escribir en batch_warehouse_stock arriba.
+          // Aquí solo registramos el fallo del movimiento de auditoría sin tocar products.current_stock
+          // (hacerlo causaría doble suma).
+          console.error("Error creating inventory_movement (stock ya aplicado vía SSOT):", movError);
         }
 
         // Si hay OC vinculada, actualizar quantity_received en purchase_order_items

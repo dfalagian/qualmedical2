@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { toCanonicalCategory } from "@/lib/formatters";
 import { 
   Package, 
   Tag, 
@@ -62,6 +63,7 @@ import { RFIDConsultaDialog } from "@/components/inventory/RFIDConsultaDialog";
 import { ProductEntryDialog } from "@/components/inventory/ProductEntryDialog";
 import { ProductRowWithBatches } from "@/components/inventory/ProductRowWithBatches";
 import { ProductsByCategory } from "@/components/inventory/ProductsByCategory";
+import { CatalogOnlyNotice } from "@/components/inventory/CatalogOnlyNotice";
 
 import { WarehouseTransferDialog } from "@/components/inventory/WarehouseTransferDialog";
 import { WarehouseTransferHistory } from "@/components/inventory/WarehouseTransferHistory";
@@ -70,6 +72,7 @@ import { ProductSalesTrackerModal } from "@/components/inventory/ProductSalesTra
 import { WarehouseFilter } from "@/components/inventory/WarehouseFilter";
 import { StockByWarehouseModal } from "@/components/dashboard/StockByWarehouseModal";
 import { PriceTypesEditor } from "@/components/inventory/PriceTypesEditor";
+import { ProductWarehouseManager } from "@/components/inventory/ProductWarehouseManager";
 
 // Ubicaciones de las antenas RFID
 const ANTENNA_LOCATIONS = [
@@ -368,7 +371,7 @@ export default function Inventory() {
             sku: product.sku,
             name: product.name,
             description: product.description || null,
-            category: product.category || null,
+              category: toCanonicalCategory(product.category),
             unit: product.unit,
             minimum_stock: product.minimum_stock,
             current_stock: product.current_stock,
@@ -391,7 +394,7 @@ export default function Inventory() {
             sku: product.sku,
             name: product.name,
             description: product.description || null,
-            category: product.category || null,
+              category: toCanonicalCategory(product.category),
             unit: product.unit,
             minimum_stock: product.minimum_stock,
             current_stock: product.current_stock,
@@ -516,7 +519,7 @@ export default function Inventory() {
           barcode: barcode || null,
           name: citioMedication.name,
           description: descParts || null,
-          category: citioMedication.medication_families?.name || "Medicamentos",
+          category: toCanonicalCategory(citioMedication.medication_families?.name || "Medicamentos"),
           unit: "pieza",
           minimum_stock: 5,
           current_stock: 0,
@@ -571,15 +574,40 @@ export default function Inventory() {
         supabase.from("purchase_order_items").delete().eq("product_id", id),
         supabase.from("inventory_movements").delete().eq("product_id", id),
         supabase.from("rfid_tags").delete().eq("product_id", id),
-        supabase.from("product_batches").delete().eq("product_id", id),
         supabase.from("product_price_history").delete().eq("product_id", id),
         supabase.from("quote_items").delete().eq("product_id", id),
         supabase.from("stock_alerts").delete().eq("product_id", id),
+        supabase.from("warehouse_stock").delete().eq("product_id", id),
+        supabase.from("warehouse_transfers").delete().eq("product_id", id),
+        supabase.from("medicine_counts").delete().eq("product_id", id),
+        supabase.from("physical_inventory_counts").delete().eq("product_id", id),
       ];
-      const results = await Promise.all(deletes);
+
+      // cipi_request_items: set product_id to null instead of deleting
+      const cipiNullify = supabase
+        .from("cipi_request_items")
+        .update({ product_id: null })
+        .eq("product_id", id);
+
+      const results = await Promise.all([...deletes, cipiNullify]);
       for (const r of results) {
         if (r.error) throw r.error;
       }
+
+      // Delete batch_warehouse_stock for batches of this product
+      const { data: batchIds } = await supabase
+        .from("product_batches")
+        .select("id")
+        .eq("product_id", id);
+      if (batchIds && batchIds.length > 0) {
+        await (supabase as any)
+          .from("batch_warehouse_stock")
+          .delete()
+          .in("batch_id", batchIds.map(b => b.id));
+      }
+
+      // Now delete batches
+      await supabase.from("product_batches").delete().eq("product_id", id);
 
       const { error } = await supabase
         .from("products")
@@ -770,16 +798,16 @@ export default function Inventory() {
       mode: ScanMode; 
       productName: string;
     }) => {
-      // 1. Obtener el tag para saber si tiene lote asignado
+      // 1. Obtener el tag para saber si tiene lote y warehouse asignado
       const { data: tag, error: tagFetchError } = await supabase
         .from("rfid_tags")
-        .select("batch_id, epc")
+        .select("batch_id, warehouse_id, epc")
         .eq("id", tagId)
         .single();
       
       if (tagFetchError) throw tagFetchError;
 
-      // 2. Obtener el producto actual para saber el stock
+      // 2. Obtener el producto actual para saber el stock previo
       const { data: product, error: productError } = await supabase
         .from("products")
         .select("current_stock, name, sku")
@@ -790,60 +818,98 @@ export default function Inventory() {
 
       const previousStock = product.current_stock || 0;
       const quantity = mode === "entrada" ? 1 : -1;
-      const newStock = previousStock + quantity;
 
-      // 3. Si hay lote asignado, actualizar el current_quantity del lote
-      let batchNumber: string | null = null;
-      if (tag.batch_id) {
-        // Obtener el lote
-        const { data: batch, error: batchFetchError } = await supabase
-          .from("product_batches")
-          .select("current_quantity, batch_number")
-          .eq("id", tag.batch_id)
-          .single();
-        
-        if (batchFetchError) throw batchFetchError;
-        
-        batchNumber = batch.batch_number;
-        const batchPreviousQty = batch.current_quantity || 0;
-        const batchNewQty = Math.max(0, batchPreviousQty + quantity);
-        
-        // Actualizar el lote
-        const { error: batchUpdateError } = await supabase
-          .from("product_batches")
-          .update({ 
-            current_quantity: batchNewQty,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", tag.batch_id);
-        
-        if (batchUpdateError) throw batchUpdateError;
-        
-        console.log(`📦 Lote ${batch.batch_number}: ${batchPreviousQty} → ${batchNewQty}`);
+      // 3. Resolver almacén destino (usa el del tag o "Almacén Principal" como fallback)
+      let targetWarehouseId: string | null = (tag as any).warehouse_id ?? null;
+      if (!targetWarehouseId) {
+        const { data: principalWh } = await supabase
+          .from("warehouses")
+          .select("id")
+          .ilike("name", "%principal%")
+          .maybeSingle();
+        targetWarehouseId = principalWh?.id ?? null;
       }
 
-      // 4. Actualizar el stock del producto
-      const { error: productUpdateError } = await supabase
-        .from("products")
-        .update({ 
-          current_stock: Math.max(0, newStock),
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", productId);
-      
-      if (productUpdateError) throw productUpdateError;
+      // 4. Validar que tenemos lote y almacén (requeridos por la SSOT batch_warehouse_stock)
+      if (!tag.batch_id) {
+        throw new Error("El tag RFID no tiene lote asignado. Asigne el tag a un lote antes de mover stock.");
+      }
+      if (!targetWarehouseId) {
+        throw new Error("No se pudo determinar el almacén destino. Configure 'Almacén Principal' o asigne almacén al tag.");
+      }
 
-      // 5. Registrar el movimiento de inventario
+      // 5. Actualizar batch_warehouse_stock — el trigger sync_stock_from_batch_warehouse
+      //    actualiza automáticamente product_batches y products.current_stock.
+      const { data: existingBws } = await (supabase as any)
+        .from("batch_warehouse_stock")
+        .select("id, quantity")
+        .eq("batch_id", tag.batch_id)
+        .eq("warehouse_id", targetWarehouseId)
+        .maybeSingle();
+
+      let batchNumber: string | null = null;
+      const { data: batchInfo } = await supabase
+        .from("product_batches")
+        .select("batch_number")
+        .eq("id", tag.batch_id)
+        .single();
+      batchNumber = batchInfo?.batch_number ?? null;
+
+      if (mode === "entrada") {
+        if (existingBws) {
+          await (supabase as any)
+            .from("batch_warehouse_stock")
+            .update({ quantity: existingBws.quantity + 1 })
+            .eq("id", existingBws.id);
+        } else {
+          await (supabase as any)
+            .from("batch_warehouse_stock")
+            .insert({
+              batch_id: tag.batch_id,
+              warehouse_id: targetWarehouseId,
+              quantity: 1,
+            });
+        }
+      } else {
+        // salida
+        const availableQty = existingBws?.quantity ?? 0;
+        if (availableQty < 1) {
+          throw new Error(`Sin stock del lote en este almacén. Disponible: ${availableQty}`);
+        }
+        const newQty = availableQty - 1;
+        if (newQty === 0) {
+          await (supabase as any)
+            .from("batch_warehouse_stock")
+            .delete()
+            .eq("id", existingBws.id);
+        } else {
+          await (supabase as any)
+            .from("batch_warehouse_stock")
+            .update({ quantity: newQty })
+            .eq("id", existingBws.id);
+        }
+      }
+
+      // 6. Calcular newStock final leyendo de products después de que el trigger SSOT corra
+      const { data: refreshedProduct } = await supabase
+        .from("products")
+        .select("current_stock")
+        .eq("id", productId)
+        .maybeSingle();
+      const newStock = refreshedProduct?.current_stock ?? (previousStock + quantity);
+
+      // 7. Registrar el movimiento de inventario (solo evidencia; ya no descuenta stock)
       const { error: movementError } = await supabase
         .from("inventory_movements")
         .insert({
           product_id: productId,
+          batch_id: tag.batch_id,
           rfid_tag_id: tagId,
           movement_type: mode === "entrada" ? "entrada" : "salida",
-          quantity: Math.abs(quantity),
+          quantity: 1,
           previous_stock: previousStock,
           new_stock: Math.max(0, newStock),
-          location: mode === "entrada" ? "Almacén Principal" : "Zona de Salida",
+          location: targetWarehouseId,
           notes: `${mode === "entrada" ? "Entrada" : "Salida"} vía NFC${batchNumber ? ` - Lote: ${batchNumber}` : ''}`
         });
       
@@ -1079,7 +1145,7 @@ export default function Inventory() {
             sku: data.sku,
             name: data.name,
             description: data.description || "",
-            category: data.category || "",
+            category: toCanonicalCategory(data.category) || "",
             unit: data.unit || "pieza",
             minimum_stock: data.minimum_stock || 0,
             current_stock: data.current_stock || 0,
@@ -1373,7 +1439,6 @@ export default function Inventory() {
             </div>
             
             <BatchManagement 
-              searchTerm={searchTerm}
               canEdit={canEdit}
               isAdmin={isAdmin}
               products={products}
@@ -1421,17 +1486,10 @@ export default function Inventory() {
                     Cargando...
                   </div>
                  ) : filteredProducts.length === 0 ? (
-                   <div className="text-center py-8 text-muted-foreground">
-                     {warehouseFilter !== "all" ? (
-                       <div className="space-y-2">
-                         <Package className="h-8 w-8 mx-auto opacity-50" />
-                         <p>No hay productos con stock en este almacén</p>
-                         <p className="text-xs">Prueba seleccionando "Todos los almacenes" para ver el catálogo completo</p>
-                       </div>
-                     ) : (
-                       "No hay productos registrados"
-                     )}
-                   </div>
+                   <CatalogOnlyNotice
+                     searchTerm={searchTerm}
+                     warehouseFilter={warehouseFilter}
+                   />
                 ) : (
                    <ProductsByCategory
                      products={filteredProducts}
@@ -2318,8 +2376,8 @@ export default function Inventory() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex-1 min-h-0">
-              <div className="grid gap-4 py-2 h-full">
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className="grid gap-4 py-2">
                 <div className="grid grid-cols-1 lg:grid-cols-[1.25fr,1fr] gap-4">
                   {/* Datos generales */}
                   <div className="space-y-3">
@@ -2484,7 +2542,17 @@ export default function Inventory() {
                         )}
                       </div>
                     </div>
-                  </div>
+                    </div>
+
+                    {/* Warehouse location manager - only in edit mode */}
+                    {editingProduct && (
+                      <ProductWarehouseManager
+                        productId={editingProduct.id}
+                        productName={editingProduct.name}
+                        currentStock={editingProduct.current_stock}
+                        warehouseId={editingProduct.warehouse_id}
+                      />
+                    )}
                   </div>
 
                   {/* Stock y precios */}
@@ -2515,7 +2583,7 @@ export default function Inventory() {
                       </div>
 
                       <div className="space-y-1">
-                        <Label htmlFor="unit_price" className="text-xs">Precio Base</Label>
+                        <Label htmlFor="unit_price" className="text-xs">Precio Costo</Label>
                         <Input
                           id="unit_price"
                           type="number"
@@ -2532,13 +2600,12 @@ export default function Inventory() {
                       </div>
                     </div>
 
-                    {/* 5 Tipos de Precio con ajuste por % (visible sin scroll) */}
                     <PriceTypesEditor
-                      priceType1={productForm.price_type_1}
-                      priceType2={productForm.price_type_2}
-                      priceType3={productForm.price_type_3}
-                      priceType4={productForm.price_type_4}
-                      priceType5={productForm.price_type_5}
+                      priceType1={productForm.price_type_1 || 0}
+                      priceType2={productForm.price_type_2 || 0}
+                      priceType3={productForm.price_type_3 || 0}
+                      priceType4={productForm.price_type_4 || 0}
+                      priceType5={productForm.price_type_5 || 0}
                       onChange={(prices) =>
                         setProductForm({
                           ...productForm,

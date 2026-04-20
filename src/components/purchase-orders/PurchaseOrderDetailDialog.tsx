@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -29,8 +29,24 @@ import {
   TrendingUp,
   TrendingDown,
   Scale,
-  Link2
+  Link2,
+  ChevronsUpDown,
+  Building2,
 } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { formatSupplierName } from "@/lib/formatters";
 import { PriceHistoryDialog } from "./PriceHistoryDialog";
 import { OrderReconciliation } from "./OrderReconciliation";
@@ -88,6 +104,54 @@ export function PurchaseOrderDetailDialog({
     supplierId: string;
     productName: string;
   } | null>(null);
+  const [editingSupplier, setEditingSupplier] = useState(false);
+  const [supplierPopoverOpen, setSupplierPopoverOpen] = useState(false);
+
+  const { data: registeredSuppliers } = useQuery({
+    queryKey: ["suppliers-for-oc-edit"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, company_name, rfc")
+        .eq("approved", true)
+        .order("company_name");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: editingSupplier,
+  });
+
+  const { data: generalSuppliers } = useQuery({
+    queryKey: ["general-suppliers-for-oc-edit"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("general_suppliers")
+        .select("id, razon_social, nombre_comercial, rfc")
+        .eq("is_active", true)
+        .order("razon_social");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: editingSupplier,
+  });
+
+  const updateSupplierMutation = useMutation({
+    mutationFn: async ({ supplierId }: { supplierId: string }) => {
+      const { error } = await supabase
+        .from("purchase_orders")
+        .update({ supplier_id: supplierId })
+        .eq("id", order!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Proveedor actualizado");
+      queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
+      setEditingSupplier(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar proveedor");
+    },
+  });
 
   const updatePriceMutation = useMutation({
     mutationFn: async ({
@@ -272,7 +336,77 @@ export function PurchaseOrderDetailDialog({
                       <User className="h-4 w-4" />
                       Proveedor
                     </div>
-                    <p className="font-medium">{formatSupplierName(order.profiles)}</p>
+                    {editingSupplier ? (
+                      <div className="flex items-center gap-2">
+                        <Popover modal={true} open={supplierPopoverOpen} onOpenChange={setSupplierPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" role="combobox" className="w-full justify-between h-9 text-left font-normal text-sm">
+                              {formatSupplierName(order.profiles)}
+                              <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0 z-[9999]">
+                            <Command>
+                              <CommandInput placeholder="Buscar proveedor..." />
+                              <CommandList>
+                                <CommandEmpty>Sin resultados</CommandEmpty>
+                                {registeredSuppliers && registeredSuppliers.length > 0 && (
+                                  <CommandGroup heading={
+                                    <span className="flex items-center gap-1"><User className="h-3 w-3" /> Registrados</span>
+                                  }>
+                                    {registeredSuppliers.map((s) => (
+                                      <CommandItem
+                                        key={s.id}
+                                        value={`${s.company_name || ''} ${s.full_name} ${s.rfc || ''}`}
+                                        onSelect={() => {
+                                          updateSupplierMutation.mutate({ supplierId: s.id });
+                                          setSupplierPopoverOpen(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", order.supplier_id === s.id ? "opacity-100" : "opacity-0")} />
+                                        {s.company_name || s.full_name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                )}
+                                {generalSuppliers && generalSuppliers.length > 0 && (
+                                  <CommandGroup heading={
+                                    <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> Oficiales</span>
+                                  }>
+                                    {generalSuppliers.map((s) => (
+                                      <CommandItem
+                                        key={s.id}
+                                        value={`${s.nombre_comercial || ''} ${s.razon_social} ${s.rfc || ''}`}
+                                        onSelect={() => {
+                                          updateSupplierMutation.mutate({ supplierId: s.id });
+                                          setSupplierPopoverOpen(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", order.supplier_id === s.id ? "opacity-100" : "opacity-0")} />
+                                        <span className="flex items-center gap-2">
+                                          {s.nombre_comercial || s.razon_social}
+                                          <Badge variant="outline" className="text-xs">General</Badge>
+                                        </span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                )}
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setEditingSupplier(false)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{formatSupplierName(order.profiles)}</p>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditingSupplier(true)}>
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="space-y-1">
