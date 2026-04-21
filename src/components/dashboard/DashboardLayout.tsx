@@ -19,7 +19,8 @@ import {
   FileSpreadsheet,
   ArrowLeftRight,
   Store,
-  MessageCircle
+  MessageCircle,
+  BotMessageSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "react-router-dom";
@@ -124,6 +125,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       { name: "Catálogo", href: "/dashboard/medications-citio", icon: Pill },
       { name: "Órdenes de Compra", href: "/dashboard/orders", icon: ShoppingCart },
       { name: "WhatsApp", href: "/dashboard/whatsapp", icon: MessageCircle },
+      { name: "Agente IA", href: "/dashboard/agente", icon: BotMessageSquare },
       { name: "Administración", href: "/dashboard/admin", icon: Settings },
       { name: "Backup BD", href: "/dashboard/database-backup", icon: Database },
     ] : []),

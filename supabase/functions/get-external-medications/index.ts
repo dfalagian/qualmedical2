@@ -15,6 +15,9 @@ serve(async (req) => {
     const externalFunctionUrl = Deno.env.get('EXTERNAL_SUPABASE_URL');
     const externalApiKey = Deno.env.get('EXTERNAL_SUPABASE_ANON_KEY');
 
+    console.log('DEBUG URL:', externalFunctionUrl);
+    console.log('DEBUG KEY (first 20):', externalApiKey?.substring(0, 20));
+
     if (!externalFunctionUrl || !externalApiKey) {
       console.error('Missing external function credentials');
       return new Response(
