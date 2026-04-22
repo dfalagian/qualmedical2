@@ -1511,6 +1511,7 @@ export type Database = {
           price_type_2: number | null
           price_type_3: number | null
           price_type_4: number | null
+          precio_pmp: number | null
           price_type_5: number | null
           price_with_tax: number | null
           price_without_tax: number | null
@@ -1544,6 +1545,7 @@ export type Database = {
           price_type_2?: number | null
           price_type_3?: number | null
           price_type_4?: number | null
+          precio_pmp?: number | null
           price_type_5?: number | null
           price_with_tax?: number | null
           price_without_tax?: number | null
@@ -1577,6 +1579,7 @@ export type Database = {
           price_type_2?: number | null
           price_type_3?: number | null
           price_type_4?: number | null
+          precio_pmp?: number | null
           price_type_5?: number | null
           price_with_tax?: number | null
           price_without_tax?: number | null

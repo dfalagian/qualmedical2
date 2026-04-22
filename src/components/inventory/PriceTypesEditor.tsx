@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Calculator, RotateCcw } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const TAX_RATES = [
+  { value: 0, label: "0%" },
+  { value: 8, label: "8%" },
+  { value: 16, label: "16%" },
+];
 
 interface PriceTypesEditorProps {
   priceType1: number;
@@ -11,61 +15,58 @@ interface PriceTypesEditorProps {
   priceType3: number;
   priceType4: number;
   priceType5: number;
+  costPrice?: number;   // unit_price del producto (precio costo base)
+  taxRate?: number;     // IVA persistido en DB
+  precioPmp?: number;   // Precio medio ponderado persistido en DB
   onChange: (prices: {
     price_type_1: number;
     price_type_2: number;
     price_type_3: number;
     price_type_4: number;
     price_type_5: number;
+    tax_rate: number;
+    precio_pmp: number;
   }) => void;
 }
 
-interface PriceTypeConfig {
-  key:
-    | "price_type_1"
-    | "price_type_2"
-    | "price_type_3"
-    | "price_type_4"
-    | "price_type_5";
-  label: string;
-  shortLabel: string;
-  isBase?: boolean;
-}
+type PriceKey = "price_type_1" | "price_type_2" | "price_type_3" | "price_type_4" | "price_type_5";
 
-const PRICE_TYPES: PriceTypeConfig[] = [
-  { key: "price_type_1", label: "Precio PMP (T1)", shortLabel: "PMP", isBase: true },
-  { key: "price_type_2", label: "Precio T2", shortLabel: "T2" },
-  { key: "price_type_3", label: "Precio T3", shortLabel: "T3" },
-  { key: "price_type_4", label: "Precio T4", shortLabel: "T4" },
+const PRICE_LABELS: Record<PriceKey, string> = {
+  price_type_1: "Tipo 1",
+  price_type_2: "Tipo 2",
+  price_type_3: "Tipo 3",
+  price_type_4: "Tipo 4",
+  price_type_5: "Tipo 5",
+};
+
+const PRICE_KEYS: PriceKey[] = [
+  "price_type_1",
+  "price_type_2",
+  "price_type_3",
+  "price_type_4",
+  "price_type_5",
 ];
 
-type PricesState = {
-  price_type_1: number;
-  price_type_2: number;
-  price_type_3: number;
-  price_type_4: number;
-  price_type_5: number;
+// Precio con IVA almacenado → precio sin IVA
+const removeTax = (priceWithTax: number, rate: number): number => {
+  if (rate === 0 || priceWithTax <= 0) return priceWithTax;
+  return priceWithTax / (1 + rate / 100);
 };
 
-type PercentagesState = {
-  price_type_2: number;
-  price_type_3: number;
-  price_type_4: number;
-  price_type_5: number;
+// Precio sin IVA → precio con IVA
+const addTax = (priceWithoutTax: number, rate: number): number => {
+  return Math.round(priceWithoutTax * (1 + rate / 100) * 100) / 100;
 };
 
-// Calcula el % de incremento dado el precio base y el precio actual
-const calculatePercentage = (basePrice: number, currentPrice: number): number => {
-  if (basePrice <= 0 || currentPrice <= 0) return 0;
-  return Math.round(((currentPrice - basePrice) / basePrice) * 100);
+// % de markup sobre el costo base
+const toPercent = (costBase: number, priceWithoutTax: number): string => {
+  if (costBase <= 0 || priceWithoutTax <= 0) return "0";
+  return (((priceWithoutTax - costBase) / costBase) * 100).toFixed(2);
 };
 
-// Calcula el precio aplicando un % de incremento sobre el precio base
-const calculatePriceFromPercentage = (
-  basePrice: number,
-  incrementPercent: number
-): number => {
-  return Math.round(basePrice * (1 + incrementPercent / 100) * 100) / 100;
+// Precio sin IVA desde costo base + %
+const fromPercent = (costBase: number, percent: number): string => {
+  return (Math.round(costBase * (1 + percent / 100) * 100) / 100).toFixed(2);
 };
 
 export function PriceTypesEditor({
@@ -74,212 +75,253 @@ export function PriceTypesEditor({
   priceType3,
   priceType4,
   priceType5,
+  costPrice = 0,
+  taxRate: taxRateProp = 16,
+  precioPmp: precioPmpProp = 0,
   onChange,
 }: PriceTypesEditorProps) {
-  const [prices, setPrices] = useState<PricesState>({
-    price_type_1: priceType1,
-    price_type_2: priceType2,
-    price_type_3: priceType3,
-    price_type_4: priceType4,
-    price_type_5: priceType5,
+  const [taxRate, setTaxRate] = useState(taxRateProp);
+  const [precioPmpStr, setPrecioPmpStr] = useState(precioPmpProp > 0 ? precioPmpProp.toFixed(2) : "");
+
+  // Precios sin IVA editables (el valor almacenado en DB es CON IVA)
+  const [manuals, setManuals] = useState<Record<PriceKey, string>>({
+    price_type_1: "",
+    price_type_2: "",
+    price_type_3: "",
+    price_type_4: "",
+    price_type_5: "",
   });
 
-  const [percentages, setPercentages] = useState<PercentagesState>({
-    price_type_2: 0,
-    price_type_3: 0,
-    price_type_4: 0,
-    price_type_5: 0,
+  // Porcentajes de markup sobre el costo
+  const [percentages, setPercentages] = useState<Record<PriceKey, string>>({
+    price_type_1: "0",
+    price_type_2: "0",
+    price_type_3: "0",
+    price_type_4: "0",
+    price_type_5: "0",
   });
 
-  // Sincronizar con props cuando cambian (al abrir edición)
+  // Sincronizar cuando cambian las props (al abrir edición)
   useEffect(() => {
-    setPrices({
+    const storedPrices: Record<PriceKey, number> = {
       price_type_1: priceType1,
       price_type_2: priceType2,
       price_type_3: priceType3,
       price_type_4: priceType4,
       price_type_5: priceType5,
-    });
-  }, [priceType1, priceType2, priceType3, priceType4, priceType5]);
-
-  // Mantener % visibles siempre, calculados vs T1
-  useEffect(() => {
-    if (prices.price_type_1 <= 0) {
-      setPercentages({
-        price_type_2: 0,
-        price_type_3: 0,
-        price_type_4: 0,
-        price_type_5: 0,
-      });
-      return;
-    }
-
-    setPercentages({
-      price_type_2: calculatePercentage(prices.price_type_1, prices.price_type_2),
-      price_type_3: calculatePercentage(prices.price_type_1, prices.price_type_3),
-      price_type_4: calculatePercentage(prices.price_type_1, prices.price_type_4),
-      price_type_5: calculatePercentage(prices.price_type_1, prices.price_type_5),
-    });
-  }, [
-    prices.price_type_1,
-    prices.price_type_2,
-    prices.price_type_3,
-    prices.price_type_4,
-    prices.price_type_5,
-  ]);
-
-  const handlePriceChange = (key: keyof PricesState, value: number) => {
-    const newPrices = { ...prices, [key]: value } as PricesState;
-    setPrices(newPrices);
-    onChange(newPrices);
-  };
-
-  const handlePercentageChange = (
-    key: keyof PercentagesState,
-    percent: number
-  ) => {
-    const safePercent = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
-    setPercentages((prev) => ({ ...prev, [key]: safePercent }));
-
-    if (prices.price_type_1 > 0) {
-      const newPrice = calculatePriceFromPercentage(prices.price_type_1, safePercent);
-      const newPrices = { ...prices, [key]: newPrice } as PricesState;
-      setPrices(newPrices);
-      onChange(newPrices);
-    }
-  };
-
-  const applyAllPercentages = () => {
-    if (prices.price_type_1 <= 0) return;
-
-    const newPrices: PricesState = {
-      ...prices,
-      price_type_2: calculatePriceFromPercentage(prices.price_type_1, percentages.price_type_2),
-      price_type_3: calculatePriceFromPercentage(prices.price_type_1, percentages.price_type_3),
-      price_type_4: calculatePriceFromPercentage(prices.price_type_1, percentages.price_type_4),
-      price_type_5: calculatePriceFromPercentage(prices.price_type_1, percentages.price_type_5),
     };
 
-    setPrices(newPrices);
-    onChange(newPrices);
+    const newManuals: Record<PriceKey, string> = {} as Record<PriceKey, string>;
+    const newPercentages: Record<PriceKey, string> = {} as Record<PriceKey, string>;
+
+    for (const key of PRICE_KEYS) {
+      const stored = storedPrices[key];
+      const withoutTax = stored > 0 ? removeTax(stored, taxRate) : 0;
+      newManuals[key] = withoutTax > 0 ? withoutTax.toFixed(2) : "";
+      newPercentages[key] = toPercent(costPrice, withoutTax);
+    }
+
+    setManuals(newManuals);
+    setPercentages(newPercentages);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priceType1, priceType2, priceType3, priceType4, priceType5]);
+
+  // Sincronizar taxRate desde props (al abrir edición de un producto guardado)
+  useEffect(() => {
+    setTaxRate(taxRateProp);
+  }, [taxRateProp]);
+
+  // Sincronizar precio_pmp desde props
+  useEffect(() => {
+    setPrecioPmpStr(precioPmpProp > 0 ? precioPmpProp.toFixed(2) : "");
+  }, [precioPmpProp]);
+
+  // Recalcular porcentajes cuando cambia el costo base
+  useEffect(() => {
+    setPercentages((prev) => {
+      const updated = { ...prev };
+      for (const key of PRICE_KEYS) {
+        const manual = parseFloat(manuals[key]) || 0;
+        updated[key] = toPercent(costPrice, manual);
+      }
+      return updated;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [costPrice]);
+
+  const buildPrices = (m: Record<PriceKey, string>, rate: number) => ({
+    price_type_1: addTax(parseFloat(m.price_type_1) || 0, rate),
+    price_type_2: addTax(parseFloat(m.price_type_2) || 0, rate),
+    price_type_3: addTax(parseFloat(m.price_type_3) || 0, rate),
+    price_type_4: addTax(parseFloat(m.price_type_4) || 0, rate),
+    price_type_5: addTax(parseFloat(m.price_type_5) || 0, rate),
+    tax_rate: rate,
+    precio_pmp: parseFloat(precioPmpStr) || 0,
+  });
+
+  const handleManualChange = (key: PriceKey, value: string) => {
+    const manual = parseFloat(value) || 0;
+    const newManuals = { ...manuals, [key]: value };
+    const newPercentages = { ...percentages, [key]: toPercent(costPrice, manual) };
+    setManuals(newManuals);
+    setPercentages(newPercentages);
+    onChange(buildPrices(newManuals, taxRate));
   };
 
-  const resetPercentages = () => {
-    setPercentages({
-      price_type_2: 0,
-      price_type_3: 0,
-      price_type_4: 0,
-      price_type_5: 0,
+  const handlePercentageChange = (key: PriceKey, value: string) => {
+    const percent = parseFloat(value) || 0;
+    const newManual = costPrice > 0 ? fromPercent(costPrice, percent) : manuals[key];
+    const newManuals = { ...manuals, [key]: newManual };
+    const newPercentages = { ...percentages, [key]: value };
+    setManuals(newManuals);
+    setPercentages(newPercentages);
+    onChange(buildPrices(newManuals, taxRate));
+  };
+
+  const handleTaxRateChange = (value: string) => {
+    const newRate = parseInt(value);
+    setTaxRate(newRate);
+    onChange(buildPrices(manuals, newRate));
+  };
+
+  const handlePmpChange = (value: string) => {
+    setPrecioPmpStr(value);
+    onChange({
+      ...buildPrices(manuals, taxRate),
+      precio_pmp: parseFloat(value) || 0,
     });
   };
 
   return (
-    <div className="border rounded-lg p-3 space-y-2">
-      <div className="flex items-center justify-between gap-2">
+    <div className="border rounded-lg p-3 space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
         <div>
           <Label className="text-sm font-medium">Tipos de Precio</Label>
           <p className="text-xs text-muted-foreground">
-            Ajusta T2, T3 y T4 por % de incremento vs T1.
+            Precio manual sin IVA + % de markup sobre el costo.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={applyAllPercentages}
-            disabled={prices.price_type_1 <= 0}
-            className="h-8 text-xs gap-1"
-          >
-            <Calculator className="h-3 w-3" />
-            Aplicar %
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={resetPercentages}
-            className="h-8 text-xs gap-1"
-          >
-            <RotateCcw className="h-3 w-3" />
-            Reset
-          </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Label className="text-xs text-muted-foreground whitespace-nowrap">IVA</Label>
+          <Select value={taxRate.toString()} onValueChange={handleTaxRateChange}>
+            <SelectTrigger className="h-8 w-20 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TAX_RATES.map((r) => (
+                <SelectItem key={r.value} value={r.value.toString()}>
+                  {r.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
+      {/* Precio PMP */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">
+            Precio Costo (referencia)
+          </Label>
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+            <Input
+              type="number"
+              step="0.01"
+              value={costPrice > 0 ? costPrice.toFixed(2) : ""}
+              readOnly
+              className="h-8 pl-6 text-xs bg-muted/50 cursor-not-allowed"
+              placeholder="0.00"
+            />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Precio PMP</Label>
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={precioPmpStr}
+              onChange={(e) => handlePmpChange(e.target.value)}
+              className="h-8 pl-6 text-xs"
+              placeholder="0.00"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Columnas header */}
+      <div className="grid grid-cols-[80px,1fr,72px,90px] gap-2 items-center text-xs text-muted-foreground px-1">
+        <span>Tipo</span>
+        <span>Precio sin IVA</span>
+        <span className="text-center">% Markup</span>
+        <span className="text-right">Con IVA</span>
+      </div>
+
+      {/* 5 tipos de precio */}
       <div className="grid gap-2">
-        {PRICE_TYPES.map((priceType) => {
-          const priceKey = priceType.key;
-          const currentPrice = prices[priceKey];
-          const isBase = !!priceType.isBase;
+        {PRICE_KEYS.map((key) => {
+          const manual = parseFloat(manuals[key]) || 0;
+          const withTax = addTax(manual, taxRate);
 
           return (
             <div
-              key={priceKey}
-              className={cn(
-                "grid items-center gap-2",
-                "grid-cols-[120px,1fr,84px]"
-              )}
+              key={key}
+              className="grid grid-cols-[80px,1fr,72px,90px] items-center gap-2"
             >
-              <Label
-                htmlFor={priceKey}
-                className={cn(
-                  "text-xs",
-                  isBase ? "text-primary font-medium" : "text-muted-foreground"
-                )}
-              >
-                {priceType.label}
-                {isBase && " (Base)"}
-              </Label>
+              <Label className="text-xs font-medium">{PRICE_LABELS[key]}</Label>
 
               <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                  $
-                </span>
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
                 <Input
-                  id={priceKey}
                   type="number"
                   step="0.01"
                   min="0"
-                  value={currentPrice || ""}
-                  onChange={(e) =>
-                    handlePriceChange(priceKey, parseFloat(e.target.value) || 0)
-                  }
-                  className={cn(
-                    "h-8 pl-6",
-                    isBase && "border-primary/50 bg-primary/5"
-                  )}
+                  value={manuals[key]}
+                  onChange={(e) => handleManualChange(key, e.target.value)}
+                  className="h-8 pl-6 text-xs"
                   placeholder="0.00"
                 />
               </div>
 
-              {isBase ? (
-                <div />
-              ) : (
-                <div className="flex items-center justify-end gap-1">
-                  <Input
-                    type="number"
-                    step="1"
-                    min="0"
-                    max="100"
-                    value={percentages[priceKey as keyof PercentagesState] || ""}
-                    onChange={(e) =>
-                      handlePercentageChange(
-                        priceKey as keyof PercentagesState,
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                    className="h-8 w-[64px] text-center text-xs"
-                    placeholder="0"
-                    aria-label={`% incremento ${priceType.shortLabel}`}
-                  />
-                  <span className="text-xs text-muted-foreground">%</span>
-                </div>
-              )}
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={percentages[key]}
+                  onChange={(e) => handlePercentageChange(key, e.target.value)}
+                  className="h-8 text-center text-xs"
+                  placeholder="0"
+                  disabled={costPrice <= 0}
+                  title={costPrice <= 0 ? "Ingresa el Precio Costo para usar porcentajes" : undefined}
+                />
+                <span className="text-xs text-muted-foreground">%</span>
+              </div>
+
+              <div className="text-right">
+                {manual > 0 ? (
+                  <span className="text-xs font-semibold text-primary">
+                    ${withTax.toFixed(2)}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
+
+      {costPrice <= 0 && (
+        <p className="text-xs text-amber-600">
+          Ingresa el Precio Costo para calcular porcentajes de markup automáticamente.
+        </p>
+      )}
     </div>
   );
 }

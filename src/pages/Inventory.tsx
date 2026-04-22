@@ -212,6 +212,8 @@ export default function Inventory() {
     minimum_stock: 0,
     current_stock: 0,
     unit_price: 0,
+    tax_rate: 16,
+    precio_pmp: 0,
     price_type_1: 0,
     price_type_2: 0,
     price_type_3: 0,
@@ -376,6 +378,8 @@ export default function Inventory() {
             minimum_stock: product.minimum_stock,
             current_stock: product.current_stock,
             unit_price: product.unit_price || null,
+            tax_rate: product.tax_rate ?? 16,
+            precio_pmp: product.precio_pmp || null,
             price_type_1: product.price_type_1 || null,
             price_type_2: product.price_type_2 || null,
             price_type_3: product.price_type_3 || null,
@@ -399,6 +403,8 @@ export default function Inventory() {
             minimum_stock: product.minimum_stock,
             current_stock: product.current_stock,
             unit_price: product.unit_price || null,
+            tax_rate: product.tax_rate ?? 16,
+            precio_pmp: product.precio_pmp || null,
             price_type_1: product.price_type_1 || null,
             price_type_2: product.price_type_2 || null,
             price_type_3: product.price_type_3 || null,
@@ -1109,6 +1115,8 @@ export default function Inventory() {
       minimum_stock: 0,
       current_stock: 0,
       unit_price: 0,
+      tax_rate: 16,
+      precio_pmp: 0,
       price_type_1: 0,
       price_type_2: 0,
       price_type_3: 0,
@@ -1150,6 +1158,8 @@ export default function Inventory() {
             minimum_stock: data.minimum_stock || 0,
             current_stock: data.current_stock || 0,
             unit_price: data.unit_price || 0,
+            tax_rate: data.tax_rate ?? 16,
+            precio_pmp: data.precio_pmp || 0,
             price_type_1: data.price_type_1 || 0,
             price_type_2: data.price_type_2 || 0,
             price_type_3: data.price_type_3 || 0,
@@ -2606,6 +2616,9 @@ export default function Inventory() {
                       priceType3={productForm.price_type_3 || 0}
                       priceType4={productForm.price_type_4 || 0}
                       priceType5={productForm.price_type_5 || 0}
+                      costPrice={productForm.unit_price || 0}
+                      taxRate={productForm.tax_rate ?? 16}
+                      precioPmp={productForm.precio_pmp || 0}
                       onChange={(prices) =>
                         setProductForm({
                           ...productForm,
