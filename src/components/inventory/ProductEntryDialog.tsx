@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Trash2, Plus, ChevronsUpDown, Check, Link2, CalendarIcon } from "lucide-react";
+import { Trash2, Plus, ChevronsUpDown, Check, Link2, CalendarIcon, FileText, Printer } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -77,6 +77,86 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
 
   // Lista de items ingresados
   const [items, setItems] = useState<EntryItem[]>([]);
+
+  // Estado del reporte post-guardado
+  const [showReport, setShowReport] = useState(false);
+  const [savedReport, setSavedReport] = useState<{
+    fecha: string;
+    ordenCompra: string;
+    numeroFactura: string;
+    proveedor: string;
+    almacen: string;
+    items: EntryItem[];
+  } | null>(null);
+
+  const handleGeneratePDF = () => {
+    if (!savedReport) return;
+    const totalUnidades = savedReport.items.reduce((s, i) => s + i.cantidad, 0);
+    const win = window.open("", "_blank", "width=800,height=600");
+    if (!win) return;
+    win.document.write(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Informe de Ingreso</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: Arial, sans-serif; font-size: 12px; color: #111; padding: 32px; }
+          h1 { font-size: 18px; margin-bottom: 4px; }
+          .subtitle { font-size: 12px; color: #555; margin-bottom: 20px; }
+          .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 20px; }
+          .meta-item { display: flex; gap: 6px; }
+          .meta-label { font-weight: bold; color: #555; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+          th { background: #f3f4f6; text-align: left; padding: 6px 8px; border-bottom: 2px solid #ddd; font-size: 11px; }
+          td { padding: 5px 8px; border-bottom: 1px solid #eee; font-size: 11px; }
+          tr:last-child td { border-bottom: none; }
+          .total { text-align: right; font-weight: bold; font-size: 13px; margin-top: 8px; }
+          .footer { margin-top: 32px; font-size: 10px; color: #999; text-align: center; }
+          @media print { body { padding: 16px; } }
+        </style>
+      </head>
+      <body>
+        <h1>Informe de Ingreso de Productos</h1>
+        <p class="subtitle">QualMedical — Generado el ${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}</p>
+        <div class="meta">
+          <div class="meta-item"><span class="meta-label">Fecha de ingreso:</span><span>${savedReport.fecha}</span></div>
+          <div class="meta-item"><span class="meta-label">Almacén:</span><span>${savedReport.almacen}</span></div>
+          <div class="meta-item"><span class="meta-label">Nº Factura:</span><span>${savedReport.numeroFactura || "—"}</span></div>
+          <div class="meta-item"><span class="meta-label">Proveedor:</span><span>${savedReport.proveedor || "—"}</span></div>
+          <div class="meta-item"><span class="meta-label">Orden de Compra:</span><span>${savedReport.ordenCompra || "—"}</span></div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Producto</th>
+              <th>Lote</th>
+              <th>Caducidad</th>
+              <th style="text-align:right">Cantidad</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${savedReport.items.map(item => `
+              <tr>
+                <td style="font-family:monospace">${item.codigo}</td>
+                <td>${item.producto}</td>
+                <td style="font-family:monospace">${item.lote}</td>
+                <td>${item.caducidad}</td>
+                <td style="text-align:right;font-weight:bold">${item.cantidad}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+        <p class="total">Total unidades ingresadas: ${totalUnidades}</p>
+        <p class="footer">Este documento es un comprobante de movimiento de inventario.</p>
+        <script>window.onload = () => { window.print(); }</script>
+      </body>
+      </html>
+    `);
+    win.document.close();
+  };
 
   // Fetch proveedores (profiles + general_suppliers)
   const { data: proveedores = [] } = useQuery({
@@ -480,17 +560,28 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
           details: { items_count: item.cantidad, note: `Lote: ${item.lote}` },
         });
       }
-      toast({
-        title: "Ingreso guardado",
-        description: `Se guardaron ${items.length} productos correctamente`
-      });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["product-batches"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse-stock-map"] });
       queryClient.invalidateQueries({ queryKey: ["stock-by-warehouse"] });
       queryClient.invalidateQueries({ queryKey: ["purchase-orders-for-entry"] });
-      handleClose();
+
+      // Construir reporte antes de limpiar el estado
+      const almacenNombre = almacenes.find(a => a.id === formData.almacenId)?.name || formData.almacenId;
+      const proveedorNombre = proveedores.find(p => p.id === formData.proveedor)?.label || formData.proveedor;
+      const ocNumero = formData.ordenCompraId === "sin_orden" ? "Sin orden"
+        : ordenesCompra.find((oc: any) => oc.id === formData.ordenCompraId)?.order_number || formData.ordenCompraId;
+
+      setSavedReport({
+        fecha: format(entryDate, "dd/MM/yyyy", { locale: es }),
+        ordenCompra: ocNumero || "",
+        numeroFactura: formData.numeroFactura,
+        proveedor: proveedorNombre || "",
+        almacen: almacenNombre,
+        items: [...items],
+      });
+      setShowReport(true);
     },
     onError: (error: any) => {
       toast({
@@ -518,6 +609,8 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
     });
     setItems([]);
     setEntryDate(new Date());
+    setShowReport(false);
+    setSavedReport(null);
     onOpenChange(false);
   };
 
@@ -901,18 +994,77 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
             </Table>
           </div>
 
-          {/* Botón Guardar */}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={handleClose}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={() => saveMutation.mutate()}
-              disabled={items.length === 0 || saveMutation.isPending}
-            >
-              {saveMutation.isPending ? "Guardando..." : "Guardar"}
-            </Button>
-          </div>
+          {/* Reporte post-guardado */}
+          {showReport && savedReport ? (
+            <div className="border rounded-lg p-4 bg-muted/30 space-y-4">
+              <div className="flex items-center gap-2 text-green-700 font-semibold">
+                <FileText className="h-5 w-5" />
+                Ingreso guardado correctamente
+              </div>
+
+              {/* Datos del movimiento */}
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                <div><span className="text-muted-foreground">Fecha:</span> <span className="font-medium">{savedReport.fecha}</span></div>
+                <div><span className="text-muted-foreground">Almacén:</span> <span className="font-medium">{savedReport.almacen}</span></div>
+                <div><span className="text-muted-foreground">Nº Factura:</span> <span className="font-medium">{savedReport.numeroFactura || "—"}</span></div>
+                <div><span className="text-muted-foreground">Proveedor:</span> <span className="font-medium">{savedReport.proveedor || "—"}</span></div>
+                <div><span className="text-muted-foreground">Orden de Compra:</span> <span className="font-medium">{savedReport.ordenCompra || "—"}</span></div>
+              </div>
+
+              {/* Tabla resumen */}
+              <div className="border rounded overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Código</TableHead>
+                      <TableHead className="text-xs">Producto</TableHead>
+                      <TableHead className="text-xs">Lote</TableHead>
+                      <TableHead className="text-xs">Caducidad</TableHead>
+                      <TableHead className="text-xs text-right">Cantidad</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {savedReport.items.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-mono text-xs">{item.codigo}</TableCell>
+                        <TableCell className="text-xs">{item.producto}</TableCell>
+                        <TableCell className="font-mono text-xs">{item.lote}</TableCell>
+                        <TableCell className="text-xs">{item.caducidad}</TableCell>
+                        <TableCell className="text-xs text-right font-bold">{item.cantidad}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="text-sm text-right text-muted-foreground">
+                Total unidades ingresadas: <span className="font-bold text-foreground">{savedReport.items.reduce((s, i) => s + i.cantidad, 0)}</span>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" onClick={handleGeneratePDF} className="gap-2">
+                  <Printer className="h-4 w-4" />
+                  Generar PDF
+                </Button>
+                <Button onClick={handleClose}>
+                  Cerrar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* Botón Guardar normal */
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={handleClose}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => saveMutation.mutate()}
+                disabled={items.length === 0 || saveMutation.isPending}
+              >
+                {saveMutation.isPending ? "Guardando..." : "Guardar"}
+              </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
 

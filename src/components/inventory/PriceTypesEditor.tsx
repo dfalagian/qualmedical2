@@ -18,6 +18,7 @@ interface PriceTypesEditorProps {
   costPrice?: number;   // unit_price del producto (precio costo base)
   taxRate?: number;     // IVA persistido en DB
   precioPmp?: number;   // Precio medio ponderado persistido en DB
+  resetKey?: string;    // Cambia cuando se abre un producto diferente; dispara la sincronización de precios
   onChange: (prices: {
     price_type_1: number;
     price_type_2: number;
@@ -78,6 +79,7 @@ export function PriceTypesEditor({
   costPrice = 0,
   taxRate: taxRateProp = 16,
   precioPmp: precioPmpProp = 0,
+  resetKey,
   onChange,
 }: PriceTypesEditorProps) {
   const [taxRate, setTaxRate] = useState(taxRateProp);
@@ -101,8 +103,11 @@ export function PriceTypesEditor({
     price_type_5: "0",
   });
 
-  // Sincronizar cuando cambian las props (al abrir edición)
+  // Sincronizar cuando se abre un producto diferente (resetKey cambia).
+  // NO debe depender de priceType1..5 directamente porque onChange los actualiza
+  // en cada teclazo, creando un loop que reinicia los campos mientras el usuario escribe.
   useEffect(() => {
+    const rate = taxRateProp;
     const storedPrices: Record<PriceKey, number> = {
       price_type_1: priceType1,
       price_type_2: priceType2,
@@ -116,25 +121,17 @@ export function PriceTypesEditor({
 
     for (const key of PRICE_KEYS) {
       const stored = storedPrices[key];
-      const withoutTax = stored > 0 ? removeTax(stored, taxRate) : 0;
+      const withoutTax = stored > 0 ? removeTax(stored, rate) : 0;
       newManuals[key] = withoutTax > 0 ? withoutTax.toFixed(2) : "";
       newPercentages[key] = toPercent(costPrice, withoutTax);
     }
 
+    setTaxRate(rate);
+    setPrecioPmpStr(precioPmpProp > 0 ? precioPmpProp.toFixed(2) : "");
     setManuals(newManuals);
     setPercentages(newPercentages);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [priceType1, priceType2, priceType3, priceType4, priceType5]);
-
-  // Sincronizar taxRate desde props (al abrir edición de un producto guardado)
-  useEffect(() => {
-    setTaxRate(taxRateProp);
-  }, [taxRateProp]);
-
-  // Sincronizar precio_pmp desde props
-  useEffect(() => {
-    setPrecioPmpStr(precioPmpProp > 0 ? precioPmpProp.toFixed(2) : "");
-  }, [precioPmpProp]);
+  }, [resetKey]);
 
   // Recalcular porcentajes cuando cambia el costo base
   useEffect(() => {
@@ -255,7 +252,7 @@ export function PriceTypesEditor({
       </div>
 
       {/* Columnas header */}
-      <div className="grid grid-cols-[80px,1fr,72px,90px] gap-2 items-center text-xs text-muted-foreground px-1">
+      <div className="grid grid-cols-[80px,1fr,100px,90px] gap-2 items-center text-xs text-muted-foreground px-1">
         <span>Tipo</span>
         <span>Precio sin IVA</span>
         <span className="text-center">% Markup</span>
@@ -271,7 +268,7 @@ export function PriceTypesEditor({
           return (
             <div
               key={key}
-              className="grid grid-cols-[80px,1fr,72px,90px] items-center gap-2"
+              className="grid grid-cols-[80px,1fr,100px,90px] items-center gap-2"
             >
               <Label className="text-xs font-medium">{PRICE_LABELS[key]}</Label>
 

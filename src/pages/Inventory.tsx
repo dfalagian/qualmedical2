@@ -2397,9 +2397,8 @@ export default function Inventory() {
                         <Input
                           id="sku"
                           value={productForm.sku}
-                          onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
-                          className="h-9"
-                          disabled={!!editingProduct}
+                          readOnly
+                          className="h-9 bg-muted cursor-default"
                         />
                       </div>
 
@@ -2619,6 +2618,7 @@ export default function Inventory() {
                       costPrice={productForm.unit_price || 0}
                       taxRate={productForm.tax_rate ?? 16}
                       precioPmp={productForm.precio_pmp || 0}
+                      resetKey={editingProduct?.id ?? "new"}
                       onChange={(prices) =>
                         setProductForm({
                           ...productForm,
