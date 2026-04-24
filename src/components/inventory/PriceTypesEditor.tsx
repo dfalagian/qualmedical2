@@ -239,9 +239,8 @@ export function PriceTypesEditor({
           <div className="relative">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
             <Input
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
+              inputMode="decimal"
               value={precioPmpStr}
               onChange={(e) => handlePmpChange(e.target.value)}
               className="h-8 pl-6 text-xs"
@@ -275,9 +274,8 @@ export function PriceTypesEditor({
               <div className="relative">
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
                 <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   value={manuals[key]}
                   onChange={(e) => handleManualChange(key, e.target.value)}
                   className="h-8 pl-6 text-xs"
@@ -287,9 +285,8 @@ export function PriceTypesEditor({
 
               <div className="flex items-center gap-1">
                 <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   value={percentages[key]}
                   onChange={(e) => handlePercentageChange(key, e.target.value)}
                   className="h-8 text-center text-xs"
