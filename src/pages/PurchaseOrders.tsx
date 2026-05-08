@@ -270,7 +270,11 @@ const PurchaseOrders = () => {
               unit_price: item.unit_price,
             }));
 
-          if (itemsToInsert.length === 0) continue;
+          if (itemsToInsert.length === 0) {
+            throw new Error(
+              `La orden ${extOrder.order_number} no tiene productos identificables. Sincroniza el catálogo CITIO primero e intenta de nuevo.`
+            );
+          }
 
           // Ensure referenced products exist locally by citio_id (not by id)
           // First, check which products already exist by citio_id
