@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { format, parse, isValid } from "date-fns";
-import { CalendarIcon, ChevronsUpDown, Check, AlertTriangle } from "lucide-react";
+import { CalendarIcon, ChevronsUpDown, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,13 +54,11 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
     enabled: open
   });
 
-  // Auto-fill barcode when product is selected
+  // Auto-fill barcode from product (barcode field, fallback to SKU)
   useEffect(() => {
     if (selectedProductId && productos.length > 0) {
       const product = productos.find(p => p.id === selectedProductId);
-      if (product?.barcode) {
-        setBarcode(product.barcode);
-      }
+      setBarcode(product?.barcode || product?.sku || "");
     }
   }, [selectedProductId, productos]);
 
@@ -80,11 +78,7 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
     if (product) {
       setSelectedProductId(product.id);
       setSelectedProductName(product.name);
-      if (product.barcode) {
-        setBarcode(product.barcode);
-      } else {
-        setBarcode("");
-      }
+      setBarcode(product.barcode || product.sku || "");
     }
     setProductSearchOpen(false);
     setProductSearch("");
@@ -140,7 +134,6 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
   };
 
   const selectedProduct = productos.find(p => p.id === selectedProductId);
-  const productHasNoBarcode = selectedProductId && selectedProduct && !selectedProduct.barcode;
 
   const isConfirmDisabled = !batchNumber.trim() || !expirationDate || !selectedProductId || !barcode.trim();
 
@@ -218,18 +211,13 @@ export function NewBatchModal({ open, onOpenChange, productName, productId, onCo
             <Input
               id="barcode"
               value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
-              placeholder="Ingrese el código de barras del producto"
+              disabled
+              placeholder="Se asigna automáticamente del catálogo"
+              className="bg-muted text-muted-foreground"
             />
-            {productHasNoBarcode && (
-              <div className="flex items-center gap-1.5 text-xs text-amber-600">
-                <AlertTriangle className="h-3 w-3" />
-                <span>Este producto no tiene código de barras registrado. Ingrese uno manualmente.</span>
-              </div>
-            )}
-            {selectedProduct?.barcode && barcode === selectedProduct.barcode && (
-              <p className="text-xs text-muted-foreground">
-                Código de barras del producto (editable si necesita cambiarlo)
+            {selectedProduct && !barcode && (
+              <p className="text-xs text-amber-600">
+                Este producto no tiene código de barras ni SKU en el catálogo.
               </p>
             )}
           </div>

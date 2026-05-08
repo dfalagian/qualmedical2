@@ -225,9 +225,17 @@ const Admin = () => {
 
       if (response.error) {
         console.error("Response error:", response.error);
-        throw response.error;
+        try {
+          const errorBody = await (response.error as any).context?.json();
+          if (errorBody?.error) throw new Error(errorBody.error);
+        } catch (parseError) {
+          if (parseError instanceof Error && parseError.message !== response.error.message) {
+            throw parseError;
+          }
+        }
+        throw new Error(response.error.message || "Error al crear usuario");
       }
-      
+
       if (response.data?.error) {
         console.error("Data error:", response.data.error);
         throw new Error(response.data.error);

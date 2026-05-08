@@ -296,54 +296,19 @@ const PurchaseOrders = () => {
           const missingCitioIds = citioIds.filter((id) => !citioToLocalId.has(id));
 
           if (missingCitioIds.length > 0) {
-            // Build products from external item payload for missing ones
-            const productPayloadById = new Map<string, any>();
-            for (const item of extOrder.items) {
-              const citioId = item.medication_id || item.product_id;
-              const citioIdStr = citioId ? String(citioId) : "";
-              if (!citioIdStr || productPayloadById.has(citioIdStr) || citioToLocalId.has(citioIdStr)) continue;
+            const missingNames = extOrder.items
+              .filter((item: any) => {
+                const id = String(item.medication_id || item.product_id || "");
+                return missingCitioIds.includes(id);
+              })
+              .map((item: any) =>
+                item.medications?.name || item.medication_name || item.products?.name || `ID: ${item.medication_id || item.product_id}`
+              );
 
-              const name =
-                item.medications?.name ||
-                item.medication_name ||
-                item.products?.name ||
-                "Medicamento";
-
-              const satCode = item.medications?.codigo_sat || item.products?.codigo_sat;
-              const sku = satCode
-                ? `SAT-${satCode}-${citioIdStr.slice(0, 6)}`
-                : `CITIO-${citioIdStr.slice(0, 8).toUpperCase()}`;
-
-              productPayloadById.set(citioIdStr, {
-                // Let Supabase auto-generate the id (don't use citio_id as id)
-                name,
-                sku,
-                citio_id: citioIdStr,
-                supplier_id: supplierId,
-                unit_price: item.unit_price ?? null,
-                is_active: true,
-              });
-            }
-
-            const productsToInsert = missingCitioIds
-              .map((id) => productPayloadById.get(id))
-              .filter(Boolean);
-
-            if (productsToInsert.length > 0) {
-              const { data: newProducts, error: insertError } = await supabase
-                .from("products")
-                .insert(productsToInsert)
-                .select("id, citio_id");
-
-              if (insertError) throw insertError;
-              
-              // Add new products to the map
-              for (const p of newProducts || []) {
-                if (p.citio_id) {
-                  citioToLocalId.set(p.citio_id, p.id);
-                }
-              }
-            }
+            const uniqueNames = [...new Set(missingNames)];
+            throw new Error(
+              `Los siguientes productos no existen en el catálogo local:\n• ${uniqueNames.join("\n• ")}\n\nSincroniza el catálogo CITIO primero e intenta de nuevo.`
+            );
           }
           
           // Update itemsToInsert to use local product IDs instead of citio_ids
