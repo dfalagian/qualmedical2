@@ -231,7 +231,6 @@ const PurchaseOrders = () => {
 
       // Verificar en una sola consulta que todos los productos existen
       const uniqueCitioIds = [...new Set(allCitioIds)];
-      toast.info(`DEBUG-A: ${uniqueCitioIds.length} citio_ids a buscar`, { duration: 15000 });
       const { data: existingProducts, error: productsError } = await supabase
         .from("products")
         .select("id, citio_id, name")
@@ -239,7 +238,6 @@ const PurchaseOrders = () => {
         .eq("is_active", true);
 
       if (productsError) throw productsError;
-      toast.info(`DEBUG-B: encontrados ${existingProducts?.length || 0} productos activos`, { duration: 15000 });
 
       const citioToLocalId = new Map<string, string>();
       for (const p of existingProducts || []) {
@@ -261,7 +259,7 @@ const PurchaseOrders = () => {
       }
 
       // ── FASE 2: ESCRITURA EN BD (solo si toda la validación pasó) ───────────
-      for (const { extOrder, supplierId, citioIds } of validatedOrders) {
+      for (const { extOrder, supplierId } of validatedOrders) {
         let orderId: string;
 
         const { data: existingOrder, error: existingOrderError } = await supabase
