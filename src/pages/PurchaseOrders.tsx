@@ -185,35 +185,80 @@ const PurchaseOrders = () => {
     mutationFn: async (externalOrders: any[]) => {
       if (!user) throw new Error("Usuario no autenticado");
       if (!suppliers || suppliers.length === 0) throw new Error("No hay proveedores disponibles");
-      
+
+      // ── FASE 1: VALIDACIÓN COMPLETA (sin escrituras en BD) ──────────────────
+      // Recopila todos los citio_ids necesarios para consultarlos de una vez
+      const allCitioIds: string[] = [];
+      const validatedOrders: Array<{ extOrder: any; supplierId: string; citioIds: string[] }> = [];
+
       for (const extOrder of externalOrders) {
-        // Always search for local supplier by name - external IDs don't match local IDs
         const externalSupplierName = (extOrder.suppliers?.name || extOrder.supplier_name || '').toLowerCase().trim();
-        
+
         if (!externalSupplierName) {
           throw new Error(`La orden ${extOrder.order_number} no tiene nombre de proveedor`);
         }
-        
+
         const matchingSupplier = suppliers.find((s: any) => {
           const companyName = (s.company_name || '').toLowerCase().trim();
           const fullName = (s.full_name || '').toLowerCase().trim();
-          
-          // Only match if there's actual content to compare
           if (companyName && companyName.includes(externalSupplierName)) return true;
           if (companyName && externalSupplierName.includes(companyName)) return true;
           if (fullName && fullName.includes(externalSupplierName)) return true;
           if (fullName && externalSupplierName.includes(fullName)) return true;
-          
           return false;
         });
-        
-        const supplierId = matchingSupplier?.id;
 
-        if (!supplierId) {
+        if (!matchingSupplier) {
           throw new Error(`No se encontró proveedor local para "${extOrder.suppliers?.name || extOrder.supplier_name}". Orden: ${extOrder.order_number}`);
         }
 
-        // Insert (or reuse) the purchase order. Some orders may already exist (unique by order_number).
+        if (!extOrder.items || extOrder.items.length === 0) {
+          throw new Error(`La orden ${extOrder.order_number} no tiene productos. Verifica en CITIO.`);
+        }
+
+        const orderCitioIds = extOrder.items
+          .map((item: any) => item.medication_id || item.product_id)
+          .filter(Boolean)
+          .map(String);
+
+        if (orderCitioIds.length === 0) {
+          throw new Error(`La orden ${extOrder.order_number} no tiene productos identificables. Sincroniza el catálogo CITIO primero.`);
+        }
+
+        allCitioIds.push(...orderCitioIds);
+        validatedOrders.push({ extOrder, supplierId: matchingSupplier.id, citioIds: orderCitioIds });
+      }
+
+      // Verificar en una sola consulta que todos los productos existen
+      const uniqueCitioIds = [...new Set(allCitioIds)];
+      const { data: existingProducts, error: productsError } = await supabase
+        .from("products")
+        .select("id, citio_id, name")
+        .in("citio_id", uniqueCitioIds);
+
+      if (productsError) throw productsError;
+
+      const citioToLocalId = new Map<string, string>();
+      for (const p of existingProducts || []) {
+        if (p.citio_id) citioToLocalId.set(p.citio_id, p.id);
+      }
+
+      // Verificar productos faltantes antes de escribir nada
+      for (const { extOrder, citioIds } of validatedOrders) {
+        const missingIds = citioIds.filter((id) => !citioToLocalId.has(id));
+        if (missingIds.length > 0) {
+          const missingNames = extOrder.items
+            .filter((item: any) => missingIds.includes(String(item.medication_id || item.product_id || "")))
+            .map((item: any) => item.medications?.name || item.medication_name || item.products?.name || `ID: ${item.medication_id || item.product_id}`);
+          const uniqueNames = [...new Set(missingNames)];
+          throw new Error(
+            `La orden ${extOrder.order_number} tiene productos que no existen en el catálogo local:\n• ${uniqueNames.join("\n• ")}\n\nSincroniza el catálogo CITIO primero e intenta de nuevo.`
+          );
+        }
+      }
+
+      // ── FASE 2: ESCRITURA EN BD (solo si toda la validación pasó) ───────────
+      for (const { extOrder, supplierId, citioIds } of validatedOrders) {
         let orderId: string;
 
         const { data: existingOrder, error: existingOrderError } = await supabase
@@ -241,7 +286,6 @@ const PurchaseOrders = () => {
             .single();
 
           if (orderError) {
-            // If a concurrent import created it, reuse it
             if ((orderError as any)?.code === "23505") {
               const { data: concurrentOrder, error: concurrentError } = await supabase
                 .from("purchase_orders")
@@ -259,87 +303,25 @@ const PurchaseOrders = () => {
           }
         }
 
-        // Insert order items. CITIO uses medication_id; we align by ensuring local products.id = medication_id.
-        if (extOrder.items && extOrder.items.length > 0) {
-          const itemsToInsert = extOrder.items
-            .filter((item: any) => item.medication_id || item.product_id)
-            .map((item: any) => ({
-              purchase_order_id: orderId,
-              product_id: String(item.medication_id || item.product_id),
-              quantity_ordered: item.quantity,
-              unit_price: item.unit_price,
-            }));
+        const itemsToInsert = extOrder.items
+          .filter((item: any) => item.medication_id || item.product_id)
+          .map((item: any) => ({
+            purchase_order_id: orderId,
+            product_id: citioToLocalId.get(String(item.medication_id || item.product_id))!,
+            quantity_ordered: item.quantity,
+            unit_price: item.unit_price,
+          }));
 
-          if (itemsToInsert.length === 0) {
-            throw new Error(
-              `La orden ${extOrder.order_number} no tiene productos identificables. Sincroniza el catálogo CITIO primero e intenta de nuevo.`
-            );
-          }
+        const { error: deleteError } = await supabase
+          .from("purchase_order_items")
+          .delete()
+          .eq("purchase_order_id", orderId);
+        if (deleteError) throw deleteError;
 
-          // Ensure referenced products exist locally by citio_id (not by id)
-          // First, check which products already exist by citio_id
-          const citioIds: string[] = Array.from(
-            new Set(itemsToInsert.map((i) => String(i.product_id)))
-          );
-          
-          const { data: existingProducts, error: existingProductsError } = await supabase
-            .from("products")
-            .select("id, citio_id")
-            .in("citio_id", citioIds);
-
-          if (existingProductsError) throw existingProductsError;
-
-          // Create a map of citio_id -> local product id
-          const citioToLocalId = new Map<string, string>();
-          for (const p of existingProducts || []) {
-            if (p.citio_id) {
-              citioToLocalId.set(p.citio_id, p.id);
-            }
-          }
-
-          const missingCitioIds = citioIds.filter((id) => !citioToLocalId.has(id));
-
-          if (missingCitioIds.length > 0) {
-            const missingNames = extOrder.items
-              .filter((item: any) => {
-                const id = String(item.medication_id || item.product_id || "");
-                return missingCitioIds.includes(id);
-              })
-              .map((item: any) =>
-                item.medications?.name || item.medication_name || item.products?.name || `ID: ${item.medication_id || item.product_id}`
-              );
-
-            const uniqueNames = [...new Set(missingNames)];
-            throw new Error(
-              `Los siguientes productos no existen en el catálogo local:\n• ${uniqueNames.join("\n• ")}\n\nSincroniza el catálogo CITIO primero e intenta de nuevo.`
-            );
-          }
-          
-          // Update itemsToInsert to use local product IDs instead of citio_ids
-          for (const item of itemsToInsert) {
-            const citioId = String(item.product_id);
-            const localId = citioToLocalId.get(citioId);
-            if (localId) {
-              item.product_id = localId;
-            }
-          }
-
-          // Replace items on re-import to avoid duplicates
-          const { error: deleteExistingItemsError } = await supabase
-            .from("purchase_order_items")
-            .delete()
-            .eq("purchase_order_id", orderId);
-          if (deleteExistingItemsError) throw deleteExistingItemsError;
-
-          const { error: itemsError } = await supabase
-            .from("purchase_order_items")
-            .insert(itemsToInsert);
-
-          if (itemsError) {
-            console.error("Error inserting items:", itemsError);
-            // Don't throw - order was created, just items failed
-          }
-        }
+        const { error: itemsError } = await supabase
+          .from("purchase_order_items")
+          .insert(itemsToInsert);
+        if (itemsError) throw itemsError;
       }
     },
     onSuccess: (_, variables) => {
