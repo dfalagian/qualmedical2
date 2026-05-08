@@ -231,6 +231,7 @@ const PurchaseOrders = () => {
 
       // Verificar en una sola consulta que todos los productos existen
       const uniqueCitioIds = [...new Set(allCitioIds)];
+      toast.info(`DEBUG: verificando ${uniqueCitioIds.length} IDs. Muestra: ${uniqueCitioIds.slice(0,3).join(", ")}`);
       const { data: existingProducts, error: productsError } = await supabase
         .from("products")
         .select("id, citio_id, name")
@@ -238,6 +239,7 @@ const PurchaseOrders = () => {
         .eq("is_active", true);
 
       if (productsError) throw productsError;
+      toast.info(`DEBUG: ${existingProducts?.length || 0} productos encontrados en BD`);
 
       const citioToLocalId = new Map<string, string>();
       for (const p of existingProducts || []) {
