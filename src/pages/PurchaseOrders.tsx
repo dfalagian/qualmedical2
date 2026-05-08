@@ -234,7 +234,8 @@ const PurchaseOrders = () => {
       const { data: existingProducts, error: productsError } = await supabase
         .from("products")
         .select("id, citio_id, name")
-        .in("citio_id", uniqueCitioIds);
+        .in("citio_id", uniqueCitioIds)
+        .eq("is_active", true);
 
       if (productsError) throw productsError;
 
