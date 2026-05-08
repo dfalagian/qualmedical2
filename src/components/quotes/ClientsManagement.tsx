@@ -111,6 +111,7 @@ export const ClientsManagement = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["clients-active"] });
       toast.success("Cliente creado exitosamente");
       handleCloseDialog();
     },
@@ -140,6 +141,7 @@ export const ClientsManagement = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["clients-active"] });
       toast.success("Cliente actualizado exitosamente");
       handleCloseDialog();
     },
@@ -158,6 +160,7 @@ export const ClientsManagement = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["clients-active"] });
       toast.success("Cliente eliminado exitosamente");
       setDeleteClientId(null);
     },
