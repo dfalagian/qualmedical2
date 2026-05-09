@@ -61,6 +61,7 @@ import { BatchManagement } from "@/components/inventory/BatchManagement";
 import { VirginTagAssignment } from "@/components/inventory/VirginTagAssignment";
 import { RFIDConsultaDialog } from "@/components/inventory/RFIDConsultaDialog";
 import { ProductEntryDialog } from "@/components/inventory/ProductEntryDialog";
+import { CreateProductModal } from "@/components/inventory/CreateProductModal";
 import { ProductRowWithBatches } from "@/components/inventory/ProductRowWithBatches";
 import { ProductsByCategory } from "@/components/inventory/ProductsByCategory";
 import { CatalogOnlyNotice } from "@/components/inventory/CatalogOnlyNotice";
@@ -169,6 +170,7 @@ export default function Inventory() {
   const [tagStatusFilter, setTagStatusFilter] = useState<string>("all");
   const [tagDateFilter, setTagDateFilter] = useState<Date | undefined>(undefined);
   const [productEntryDialogOpen, setProductEntryDialogOpen] = useState<boolean>(false);
+  const [createProductModalOpen, setCreateProductModalOpen] = useState<boolean>(false);
   
   const [warehouseTransferDialogOpen, setWarehouseTransferDialogOpen] = useState<boolean>(false);
   const [warehouseFilter, setWarehouseFilter] = useState<string>("all");
@@ -1480,9 +1482,13 @@ export default function Inventory() {
                     <Pill className="h-4 w-4" />
                     Importar desde CITIO
                   </Button>
+                  <Button onClick={() => setCreateProductModalOpen(true)} variant="outline" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Crear nuevo producto
+                  </Button>
                   <Button onClick={() => setProductEntryDialogOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Nuevo Producto
+                    Agregar producto desde OC
                   </Button>
                 </div>
               )}
@@ -2360,10 +2366,16 @@ export default function Inventory() {
           onOpenChange={setConsultaDialogOpen}
         />
 
-        {/* Modal de ingreso de productos */}
+        {/* Modal de ingreso de productos desde OC */}
         <ProductEntryDialog
           open={productEntryDialogOpen}
           onOpenChange={setProductEntryDialogOpen}
+        />
+
+        {/* Modal de creación manual de producto */}
+        <CreateProductModal
+          open={createProductModalOpen}
+          onOpenChange={setCreateProductModalOpen}
         />
 
         {/* Modal de edición de productos */}
