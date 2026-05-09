@@ -17,10 +17,10 @@ import { OldBatchesWarningModal } from "./OldBatchesWarningModal";
 import { BatchTraceabilityModal } from "./BatchTraceabilityModal";
 import { BatchTagsDialog } from "./BatchTagsDialog";
 
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Edit,
+  Trash2,
   Package,
   Barcode,
   Calendar,
@@ -30,8 +30,15 @@ import {
   Search,
   ChevronsUpDown,
   Check,
-  Warehouse
+  Warehouse,
+  Info
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -263,8 +270,9 @@ export function BatchManagement({ canEdit, isAdmin, products }: BatchManagementP
         // El trigger sync_stock_from_batch_warehouse se encarga automáticamente de sincronizar
         // product_batches.current_quantity, warehouse_stock y products.current_stock
       } else {
-        // Crear nuevo lote
-        const { data: newBatch, error } = await supabase
+        // Crear nuevo lote — current_quantity = 0 siempre.
+        // El stock sube únicamente al recibir una OC o registrar un movimiento de entrada.
+        const { error } = await supabase
           .from("product_batches")
           .insert({
             product_id: batch.product_id,
@@ -272,18 +280,12 @@ export function BatchManagement({ canEdit, isAdmin, products }: BatchManagementP
             barcode: batch.barcode,
             expiration_date: batch.expiration_date,
             initial_quantity: batch.initial_quantity,
-            current_quantity: batch.initial_quantity,
+            current_quantity: 0,
             notes: batch.notes || null
-          })
-          .select("id")
-          .single();
+          });
         if (error) throw error;
-
-        // Save warehouse assignments for the new batch
-        if (newBatch) {
-          await saveWarehouseAssignments(newBatch.id);
-          // El trigger sync_stock_from_batch_warehouse se encarga de la sincronización
-        }
+        // No se crean entradas en batch_warehouse_stock aquí:
+        // el stock llega vía OC (ProductEntryDialog) o movimiento de entrada.
       }
     },
     onSuccess: () => {
@@ -492,6 +494,21 @@ export function BatchManagement({ canEdit, isAdmin, products }: BatchManagementP
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                {/* Banner informativo solo en modo creación */}
+                {!editingBatch && (
+                  <div className="flex gap-2 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40 p-3 text-sm text-blue-800 dark:text-blue-300">
+                    <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium">Crear un lote no suma existencias al inventario.</p>
+                      <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-400">
+                        El stock se incrementa únicamente al recibir mercancía desde una
+                        <strong> Orden de Compra</strong> o al registrar un
+                        <strong> Movimiento de Inventario</strong> de entrada.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label>Producto *</Label>
                   <Popover open={productComboOpen} onOpenChange={setProductComboOpen} modal={true}>
@@ -580,10 +597,26 @@ export function BatchManagement({ canEdit, isAdmin, products }: BatchManagementP
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Cantidad Inicial *</Label>
+                    <div className="flex items-center gap-1">
+                      <Label>{editingBatch ? "Cantidad Inicial" : "Cantidad Inicial (referencia)"}</Label>
+                      {!editingBatch && (
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs text-xs">
+                              Este valor es solo referencial — indica cuántas unidades se esperan
+                              para este lote. <strong>No modifica el stock.</strong> El stock real
+                              se registra al recibir una OC o al crear un movimiento de entrada.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
                     <Input
                       type="number"
-                      min="1"
+                      min="0"
                       value={batchForm.initial_quantity}
                       onChange={(e) => setBatchForm({ ...batchForm, initial_quantity: parseInt(e.target.value) || 0 })}
                     />
@@ -616,8 +649,8 @@ export function BatchManagement({ canEdit, isAdmin, products }: BatchManagementP
                   />
                 </div>
 
-                {/* Warehouse assignment section */}
-                {batchForm.initial_quantity > 0 && warehouses.length > 0 && (() => {
+                {/* Warehouse assignment section — solo en modo edición */}
+                {editingBatch && batchForm.initial_quantity > 0 && warehouses.length > 0 && (() => {
                   // When editing, use the form's current_quantity; when creating, use initial_quantity
                   const maxDistributable = editingBatch ? batchForm.current_quantity : batchForm.initial_quantity;
                   return (
@@ -692,11 +725,11 @@ export function BatchManagement({ canEdit, isAdmin, products }: BatchManagementP
                     batchMutation.mutate(finalForm);
                   }}
                   disabled={
-                    !batchForm.product_id || 
-                    !batchForm.batch_number || 
-                    !batchForm.barcode || 
+                    !batchForm.product_id ||
+                    !batchForm.batch_number ||
+                    !batchForm.barcode ||
                     !batchForm.expiration_date ||
-                    batchForm.initial_quantity <= 0 ||
+                    (!!editingBatch && batchForm.initial_quantity <= 0) ||
                     batchMutation.isPending
                   }
                 >
