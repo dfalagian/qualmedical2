@@ -97,6 +97,7 @@ export const printQuoteHtml = (data: QuotePrintData) => {
     <html lang="es">
     <head>
       <meta charset="UTF-8">
+      <link rel="icon" href="data:,">
       <title>Cotización ${data.folio}</title>
       <style>
         @page { 

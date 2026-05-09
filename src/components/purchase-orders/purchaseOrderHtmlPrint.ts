@@ -60,6 +60,7 @@ export function openPurchaseOrderPrint(orderData: PrintOrderData): void {
     <html lang="es">
     <head>
       <meta charset="UTF-8">
+      <link rel="icon" href="data:,">
       <title>OC-${orderData.orderNumber}</title>
       <style>
         * {

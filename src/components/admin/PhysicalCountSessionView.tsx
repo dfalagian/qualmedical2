@@ -172,6 +172,7 @@ export function PhysicalCountSessionView({ open, onOpenChange, counts, warehouse
       <!DOCTYPE html>
       <html><head>
         <meta charset="utf-8">
+        <link rel="icon" href="data:,">
         <title>Conteo Físico - ${warehouseName}</title>
         <style>
           body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }

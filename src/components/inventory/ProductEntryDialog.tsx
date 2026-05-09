@@ -99,6 +99,7 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
       <html lang="es">
       <head>
         <meta charset="UTF-8" />
+        <link rel="icon" href="data:,">
         <title>Informe de Ingreso</title>
         <style>
           * { box-sizing: border-box; margin: 0; padding: 0; }

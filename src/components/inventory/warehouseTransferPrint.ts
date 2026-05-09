@@ -57,6 +57,7 @@ export function openWarehouseTransferPrint(data: TransferPrintData): void {
     <html lang="es">
     <head>
       <meta charset="UTF-8" />
+      <link rel="icon" href="data:,">
       <title>Transferencia entre Almacenes - ${fechaCorta}</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
