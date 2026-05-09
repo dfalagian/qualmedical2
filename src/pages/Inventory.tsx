@@ -63,6 +63,7 @@ import { RFIDConsultaDialog } from "@/components/inventory/RFIDConsultaDialog";
 import { ProductEntryDialog } from "@/components/inventory/ProductEntryDialog";
 import { CreateProductModal } from "@/components/inventory/CreateProductModal";
 import { InventoryMovementModal } from "@/components/inventory/InventoryMovementModal";
+import { InventoryMovementsHistory } from "@/components/inventory/InventoryMovementsHistory";
 import { ProductRowWithBatches } from "@/components/inventory/ProductRowWithBatches";
 import { ProductsByCategory } from "@/components/inventory/ProductsByCategory";
 import { CatalogOnlyNotice } from "@/components/inventory/CatalogOnlyNotice";
@@ -1398,7 +1399,7 @@ export default function Inventory() {
 
         {/* Tabs */}
         <Tabs defaultValue="batches" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 max-w-4xl">
+          <TabsList className="grid w-full grid-cols-7 max-w-5xl">
             <TabsTrigger value="batches" className="flex items-center gap-2">
               <Boxes className="h-4 w-4" />
               Lotes
@@ -1406,6 +1407,10 @@ export default function Inventory() {
             <TabsTrigger value="products" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
               Productos
+            </TabsTrigger>
+            <TabsTrigger value="movements" className="flex items-center gap-2">
+              <ArrowRightLeft className="h-4 w-4" />
+              Movimientos
             </TabsTrigger>
             <TabsTrigger value="tags" className="flex items-center gap-2">
               <Tag className="h-4 w-4" />
@@ -1529,6 +1534,25 @@ export default function Inventory() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Movements Tab */}
+          <TabsContent value="movements" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Historial de Movimientos</h2>
+                <p className="text-sm text-muted-foreground">
+                  Entradas y salidas registradas manualmente (mermas, bonificaciones, ajustes, etc.)
+                </p>
+              </div>
+              {canEdit && (
+                <Button onClick={() => setInventoryMovementModalOpen(true)} className="gap-2">
+                  <ArrowRightLeft className="h-4 w-4" />
+                  Nuevo Movimiento
+                </Button>
+              )}
+            </div>
+            <InventoryMovementsHistory />
           </TabsContent>
 
           {/* Tags Tab */}
