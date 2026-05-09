@@ -62,6 +62,7 @@ import { VirginTagAssignment } from "@/components/inventory/VirginTagAssignment"
 import { RFIDConsultaDialog } from "@/components/inventory/RFIDConsultaDialog";
 import { ProductEntryDialog } from "@/components/inventory/ProductEntryDialog";
 import { CreateProductModal } from "@/components/inventory/CreateProductModal";
+import { InventoryMovementModal } from "@/components/inventory/InventoryMovementModal";
 import { ProductRowWithBatches } from "@/components/inventory/ProductRowWithBatches";
 import { ProductsByCategory } from "@/components/inventory/ProductsByCategory";
 import { CatalogOnlyNotice } from "@/components/inventory/CatalogOnlyNotice";
@@ -171,6 +172,7 @@ export default function Inventory() {
   const [tagDateFilter, setTagDateFilter] = useState<Date | undefined>(undefined);
   const [productEntryDialogOpen, setProductEntryDialogOpen] = useState<boolean>(false);
   const [createProductModalOpen, setCreateProductModalOpen] = useState<boolean>(false);
+  const [inventoryMovementModalOpen, setInventoryMovementModalOpen] = useState<boolean>(false);
   
   const [warehouseTransferDialogOpen, setWarehouseTransferDialogOpen] = useState<boolean>(false);
   const [warehouseFilter, setWarehouseFilter] = useState<string>("all");
@@ -1486,6 +1488,10 @@ export default function Inventory() {
                     <Plus className="h-4 w-4" />
                     Crear nuevo producto
                   </Button>
+                  <Button onClick={() => setInventoryMovementModalOpen(true)} variant="outline" className="gap-2">
+                    <ArrowRightLeft className="h-4 w-4" />
+                    Movimientos de Inventario
+                  </Button>
                   <Button onClick={() => setProductEntryDialogOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Agregar producto desde OC
@@ -2376,6 +2382,12 @@ export default function Inventory() {
         <CreateProductModal
           open={createProductModalOpen}
           onOpenChange={setCreateProductModalOpen}
+        />
+
+        {/* Modal de movimientos de inventario */}
+        <InventoryMovementModal
+          open={inventoryMovementModalOpen}
+          onOpenChange={setInventoryMovementModalOpen}
         />
 
         {/* Modal de edición de productos */}
