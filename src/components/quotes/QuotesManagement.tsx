@@ -1031,6 +1031,26 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                 </p>
               )}
             </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1">
+                <DollarSign className="h-3.5 w-3.5" />
+                Lista de Precios
+              </Label>
+              <Select value={selectedPriceType} onValueChange={(v) => handlePriceTypeChange(v as PriceType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(PRICE_TYPE_LABELS) as [PriceType, string][]).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Se aplica a los productos que se agreguen
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
