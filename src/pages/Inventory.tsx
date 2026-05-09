@@ -1480,26 +1480,41 @@ export default function Inventory() {
                 </div>
               </div>
               {canEdit && (
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setCitioImportDialogOpen(true)}
-                    className="gap-2"
+                    className="gap-1.5 text-xs h-8"
                   >
-                    <Pill className="h-4 w-4" />
-                    Importar desde CITIO
+                    <Pill className="h-3.5 w-3.5" />
+                    Importar CITIO
                   </Button>
-                  <Button onClick={() => setCreateProductModalOpen(true)} variant="outline" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Crear nuevo producto
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCreateProductModalOpen(true)}
+                    className="gap-1.5 text-xs h-8"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Nuevo producto
                   </Button>
-                  <Button onClick={() => setInventoryMovementModalOpen(true)} variant="outline" className="gap-2">
-                    <ArrowRightLeft className="h-4 w-4" />
-                    Movimientos de Inventario
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setInventoryMovementModalOpen(true)}
+                    className="gap-1.5 text-xs h-8"
+                  >
+                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                    Movimientos
                   </Button>
-                  <Button onClick={() => setProductEntryDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Agregar producto desde OC
+                  <Button
+                    size="sm"
+                    onClick={() => setProductEntryDialogOpen(true)}
+                    className="gap-1.5 text-xs h-8"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Agregar desde OC
                   </Button>
                 </div>
               )}
