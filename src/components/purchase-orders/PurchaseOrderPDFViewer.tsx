@@ -211,6 +211,7 @@ export const generateAndOpenPDF = (orderData: OrderData, targetWindow?: Window |
 <html lang="es">
   <head>
     <meta charset="utf-8" />
+    <link rel="icon" href="data:,">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OC-${orderData.orderNumber}</title>
     <style>
