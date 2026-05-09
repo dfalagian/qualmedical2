@@ -4,14 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activityLogger";
 import { format } from "date-fns";
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, Check, ChevronsUpDown, Info } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface InventoryMovementModalProps {
   open: boolean;
@@ -42,6 +52,12 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
   const queryClient = useQueryClient();
   const [form, setForm] = useState(initialForm);
   const [newBatch, setNewBatch] = useState(initialNewBatch);
+
+  // Combobox open states
+  const [productOpen, setProductOpen] = useState(false);
+  const [movementOpen, setMovementOpen] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [warehouseOpen, setWarehouseOpen] = useState(false);
 
   const { data: movementTypes = [] } = useQuery<MovementType[]>({
     queryKey: ["inventory-movement-types"],
@@ -115,6 +131,7 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
     enabled: open,
   });
 
+  const selectedProduct = products.find((p) => p.id === form.product_id);
   const selectedBatchStock = batchStocks.find((bs) => bs.id === form.batch_stock_id);
   const selectedMovement = movementTypes.find((m) => m.code === form.movement_code);
   const isExit = selectedMovement?.direction === "S";
@@ -124,6 +141,9 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
   const hasNoBatches = !!form.product_id && !batchStocksLoading && batchStocks.length === 0;
   const isEntryNoBatch = hasNoBatches && !!form.movement_code && !isExit;
   const isExitNoBatch = hasNoBatches && !!form.movement_code && isExit;
+
+  const entradas = movementTypes.filter((m) => m.direction === "E");
+  const salidas = movementTypes.filter((m) => m.direction === "S");
 
   const moveMutation = useMutation({
     mutationFn: async () => {
@@ -135,7 +155,6 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
         if (!newBatch.batch_number.trim()) throw new Error("Ingresa el número de lote");
         if (!newBatch.warehouse_id) throw new Error("Selecciona un almacén");
 
-        // Create batch
         const { data: createdBatch, error: batchError } = await supabase
           .from("product_batches")
           .insert({
@@ -150,19 +169,13 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
           .single();
         if (batchError) throw batchError;
 
-        // Create batch_warehouse_stock with qty=0
         const { data: createdBws, error: bwsError } = await supabase
           .from("batch_warehouse_stock")
-          .insert({
-            batch_id: createdBatch.id,
-            warehouse_id: newBatch.warehouse_id,
-            quantity: 0,
-          })
+          .insert({ batch_id: createdBatch.id, warehouse_id: newBatch.warehouse_id, quantity: 0 })
           .select("id")
           .single();
         if (bwsError) throw bwsError;
 
-        // Update quantity — SSOT trigger cascades to product_batches + products
         const { error: stockError } = await supabase
           .from("batch_warehouse_stock")
           .update({ quantity: qty, updated_at: new Date().toISOString() })
@@ -185,7 +198,6 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
         return { newQty: qty };
       }
 
-      // Normal flow (batch already exists)
       if (!form.batch_stock_id) throw new Error("Selecciona un lote / almacén");
       if (exceedsStock) throw new Error("La cantidad supera el stock disponible en este lote/almacén");
 
@@ -218,7 +230,6 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
       queryClient.invalidateQueries({ queryKey: ["batch-stocks-for-movement"] });
       queryClient.invalidateQueries({ queryKey: ["inventory-movements-history"] });
 
-      const product = products.find((p) => p.id === form.product_id);
       const batchLabel = isEntryNoBatch
         ? newBatch.batch_number
         : selectedBatchStock?.product_batches?.batch_number;
@@ -230,7 +241,7 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
         section: "inventario",
         action: isExit ? "ajuste" : "entrada",
         entityType: "Movimiento",
-        entityName: product?.name || form.product_id,
+        entityName: selectedProduct?.name || form.product_id,
         details: {
           tipo: form.movement_code,
           tipo_label: selectedMovement?.label,
@@ -271,9 +282,6 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
     (isEntryNoBatch && (!newBatch.batch_number.trim() || !newBatch.warehouse_id)) ||
     moveMutation.isPending;
 
-  const entradas = movementTypes.filter((m) => m.direction === "E");
-  const salidas = movementTypes.filter((m) => m.direction === "S");
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -282,76 +290,147 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
-          {/* Producto */}
+
+          {/* ── Producto ── */}
           <div className="space-y-1">
             <Label className="text-xs">
               Producto <span className="text-destructive">*</span>
             </Label>
-            <Select
-              value={form.product_id || ""}
-              onValueChange={(v) => {
-                setForm({ ...initialForm, product_id: v });
-                setNewBatch(initialNewBatch);
-              }}
-            >
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Seleccionar producto..." />
-              </SelectTrigger>
-              <SelectContent>
-                {products.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    <span className="font-medium">{p.name}</span>
-                    <span className="text-muted-foreground ml-1 text-xs">({p.sku})</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={productOpen} onOpenChange={setProductOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={productOpen}
+                  className="h-9 w-full justify-between font-normal text-sm"
+                >
+                  {selectedProduct ? (
+                    <span className="truncate">
+                      {selectedProduct.name}
+                      <span className="text-muted-foreground ml-1 text-xs">({selectedProduct.sku})</span>
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Seleccionar producto...</span>
+                  )}
+                  <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar por nombre o SKU..." className="h-9" />
+                  <CommandList>
+                    <CommandEmpty>No se encontró el producto.</CommandEmpty>
+                    <CommandGroup>
+                      {products.map((p) => (
+                        <CommandItem
+                          key={p.id}
+                          value={`${p.name} ${p.sku}`}
+                          onSelect={() => {
+                            setForm({ ...initialForm, product_id: p.id });
+                            setNewBatch(initialNewBatch);
+                            setProductOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn("mr-2 h-4 w-4 shrink-0", form.product_id === p.id ? "opacity-100" : "opacity-0")}
+                          />
+                          <span className="flex-1 truncate">
+                            {p.name}
+                            <span className="text-muted-foreground ml-1 text-xs">({p.sku})</span>
+                          </span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
-          {/* Tipo de movimiento — shown before batch when product has no batches */}
+          {/* ── Tipo de Movimiento ── */}
           <div className="space-y-1">
             <Label className="text-xs">
               Tipo de Movimiento <span className="text-destructive">*</span>
             </Label>
-            <Select
-              value={form.movement_code || ""}
-              onValueChange={(v) => setForm({ ...form, movement_code: v, quantity: "", batch_stock_id: "" })}
-            >
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Seleccionar tipo..." />
-              </SelectTrigger>
-              <SelectContent>
-                {entradas.length > 0 && (
-                  <>
-                    <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Entradas
-                    </div>
-                    {entradas.map((m) => (
-                      <SelectItem key={m.code} value={m.code}>
-                        <span className="font-mono text-xs text-green-600 mr-2">[{m.code}]</span>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-                {salidas.length > 0 && (
-                  <>
-                    <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Salidas
-                    </div>
-                    {salidas.map((m) => (
-                      <SelectItem key={m.code} value={m.code}>
-                        <span className="font-mono text-xs text-destructive mr-2">[{m.code}]</span>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-              </SelectContent>
-            </Select>
+            <Popover open={movementOpen} onOpenChange={setMovementOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={movementOpen}
+                  className="h-9 w-full justify-between font-normal text-sm"
+                >
+                  {selectedMovement ? (
+                    <span className="flex items-center gap-1">
+                      <span
+                        className={cn(
+                          "font-mono text-xs",
+                          selectedMovement.direction === "E" ? "text-green-600" : "text-destructive"
+                        )}
+                      >
+                        [{selectedMovement.code}]
+                      </span>
+                      {selectedMovement.label}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Seleccionar tipo...</span>
+                  )}
+                  <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar por código o nombre..." className="h-9" />
+                  <CommandList>
+                    <CommandEmpty>No se encontró el tipo.</CommandEmpty>
+                    {entradas.length > 0 && (
+                      <CommandGroup heading="Entradas">
+                        {entradas.map((m) => (
+                          <CommandItem
+                            key={m.code}
+                            value={`${m.code} ${m.label}`}
+                            onSelect={() => {
+                              setForm({ ...form, movement_code: m.code, quantity: "", batch_stock_id: "" });
+                              setMovementOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn("mr-2 h-4 w-4 shrink-0", form.movement_code === m.code ? "opacity-100" : "opacity-0")}
+                            />
+                            <span className="font-mono text-xs text-green-600 mr-2">[{m.code}]</span>
+                            {m.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                    {entradas.length > 0 && salidas.length > 0 && <CommandSeparator />}
+                    {salidas.length > 0 && (
+                      <CommandGroup heading="Salidas">
+                        {salidas.map((m) => (
+                          <CommandItem
+                            key={m.code}
+                            value={`${m.code} ${m.label}`}
+                            onSelect={() => {
+                              setForm({ ...form, movement_code: m.code, quantity: "", batch_stock_id: "" });
+                              setMovementOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn("mr-2 h-4 w-4 shrink-0", form.movement_code === m.code ? "opacity-100" : "opacity-0")}
+                            />
+                            <span className="font-mono text-xs text-destructive mr-2">[{m.code}]</span>
+                            {m.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
-          {/* Lote + Almacén */}
+          {/* ── Lote + Almacén ── */}
           {form.product_id && (
             <div className="space-y-1">
               <Label className="text-xs">
@@ -372,9 +451,7 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
                 <div className="space-y-3 p-3 border rounded-md bg-blue-50/50 dark:bg-blue-950/20">
                   <div className="flex items-start gap-2 text-xs text-blue-700 dark:text-blue-400">
                     <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                    <span>
-                      Este producto no tiene lotes. Se creará un lote nuevo al registrar la entrada.
-                    </span>
+                    <span>Este producto no tiene lotes. Se creará uno nuevo al registrar la entrada.</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
@@ -402,62 +479,123 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
                     <Label className="text-xs">
                       Almacén <span className="text-destructive">*</span>
                     </Label>
-                    <Select
-                      value={newBatch.warehouse_id}
-                      onValueChange={(v) => setNewBatch({ ...newBatch, warehouse_id: v })}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Seleccionar almacén..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {warehouses.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={warehouseOpen} onOpenChange={setWarehouseOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={warehouseOpen}
+                          className="h-8 w-full justify-between font-normal text-xs"
+                        >
+                          {warehouses.find((w) => w.id === newBatch.warehouse_id)?.name || (
+                            <span className="text-muted-foreground">Seleccionar almacén...</span>
+                          )}
+                          <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Buscar almacén..." className="h-8" />
+                          <CommandList>
+                            <CommandEmpty>No se encontró el almacén.</CommandEmpty>
+                            <CommandGroup>
+                              {warehouses.map((w) => (
+                                <CommandItem
+                                  key={w.id}
+                                  value={w.name}
+                                  onSelect={() => {
+                                    setNewBatch({ ...newBatch, warehouse_id: w.id });
+                                    setWarehouseOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn("mr-2 h-4 w-4 shrink-0", newBatch.warehouse_id === w.id ? "opacity-100" : "opacity-0")}
+                                  />
+                                  {w.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
               ) : (
-                <Select
-                  value={form.batch_stock_id || ""}
-                  onValueChange={(v) => setForm({ ...form, batch_stock_id: v, quantity: "" })}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Seleccionar lote..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {batchStocks.map((bs) => (
-                      <SelectItem key={bs.id} value={bs.id}>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs">{bs.product_batches.batch_number}</span>
-                          <span className="text-muted-foreground text-xs">— {bs.warehouses.name}</span>
+                <Popover open={batchOpen} onOpenChange={setBatchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={batchOpen}
+                      className="h-9 w-full justify-between font-normal text-sm"
+                    >
+                      {selectedBatchStock ? (
+                        <span className="flex items-center gap-2 truncate">
+                          <span className="font-mono text-xs">{selectedBatchStock.product_batches.batch_number}</span>
+                          <span className="text-muted-foreground text-xs">— {selectedBatchStock.warehouses.name}</span>
                           <Badge
-                            variant={bs.quantity > 0 ? "secondary" : "destructive"}
-                            className="text-xs ml-1"
+                            variant={selectedBatchStock.quantity > 0 ? "secondary" : "destructive"}
+                            className="text-xs"
                           >
-                            {bs.quantity} uds
+                            {selectedBatchStock.quantity} uds
                           </Badge>
-                          {bs.product_batches.expiration_date && (
-                            <span className="text-muted-foreground text-xs">
-                              Cad:{" "}
-                              {format(
-                                new Date(bs.product_batches.expiration_date + "T00:00:00"),
-                                "dd/MM/yyyy"
-                              )}
-                            </span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Seleccionar lote...</span>
+                      )}
+                      <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar por lote o almacén..." className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>No se encontró el lote.</CommandEmpty>
+                        <CommandGroup>
+                          {batchStocks.map((bs) => (
+                            <CommandItem
+                              key={bs.id}
+                              value={`${bs.product_batches.batch_number} ${bs.warehouses.name}`}
+                              onSelect={() => {
+                                setForm({ ...form, batch_stock_id: bs.id, quantity: "" });
+                                setBatchOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn("mr-2 h-4 w-4 shrink-0", form.batch_stock_id === bs.id ? "opacity-100" : "opacity-0")}
+                              />
+                              <span className="flex items-center gap-2 flex-1 min-w-0">
+                                <span className="font-mono text-xs">{bs.product_batches.batch_number}</span>
+                                <span className="text-muted-foreground text-xs truncate">— {bs.warehouses.name}</span>
+                                <Badge
+                                  variant={bs.quantity > 0 ? "secondary" : "destructive"}
+                                  className="text-xs shrink-0"
+                                >
+                                  {bs.quantity} uds
+                                </Badge>
+                                {bs.product_batches.expiration_date && (
+                                  <span className="text-muted-foreground text-xs shrink-0 ml-auto">
+                                    Cad:{" "}
+                                    {format(
+                                      new Date(bs.product_batches.expiration_date + "T00:00:00"),
+                                      "dd/MM/yyyy"
+                                    )}
+                                  </span>
+                                )}
+                              </span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
           )}
 
-          {/* Cantidad */}
+          {/* ── Cantidad ── */}
           {form.movement_code && !isExitNoBatch && (
             <div className="space-y-1">
               <Label htmlFor="mov-qty" className="text-xs">
@@ -502,7 +640,7 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
             </div>
           )}
 
-          {/* Notas */}
+          {/* ── Notas ── */}
           {!isExitNoBatch && (
             <div className="space-y-1">
               <Label htmlFor="mov-notes" className="text-xs">
