@@ -49,13 +49,15 @@ import {
   Boxes,
   CalendarIcon,
   X,
-  ScanBarcode
+  ScanBarcode,
+  Pencil
 } from "lucide-react";
 
 import { logActivity } from "@/lib/activityLogger";
 import { RFIDScannerCard, ScanMode } from "@/components/inventory/RFIDScannerCard";
 import { MassRFIDScanner, MassScanMode } from "@/components/inventory/MassRFIDScanner";
 import { CITIOImportDialog } from "@/components/inventory/CITIOImportDialog";
+import { FixCitioSkusDialog } from "@/components/inventory/FixCitioSkusDialog";
 import { NFCConfirmationModal, NFCMovementResult } from "@/components/inventory/NFCConfirmationModal";
 import { BatchManagement } from "@/components/inventory/BatchManagement";
 import { VirginTagAssignment } from "@/components/inventory/VirginTagAssignment";
@@ -158,6 +160,7 @@ export default function Inventory() {
   const [productDialogOpen, setProductDialogOpen] = useState<boolean>(false);
   const [tagDialogOpen, setTagDialogOpen] = useState<boolean>(false);
   const [citioImportDialogOpen, setCitioImportDialogOpen] = useState<boolean>(false);
+  const [fixSkusDialogOpen, setFixSkusDialogOpen] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingTag, setEditingTag] = useState<RfidTag | null>(null);
   
@@ -236,6 +239,21 @@ export default function Inventory() {
     status: "disponible",
     last_location: "",
     notes: ""
+  });
+
+  // Count of products with auto-generated SKU (CITIO-*)
+  const { data: citioSkuCount = 0 } = useQuery({
+    queryKey: ["products-citio-sku-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .like("sku", "CITIO-%")
+        .eq("is_active", true)
+        .eq("catalog_only", false);
+      if (error) throw error;
+      return count ?? 0;
+    },
   });
 
   // Fetch products
@@ -1490,6 +1508,20 @@ export default function Inventory() {
                     <Pill className="h-3.5 w-3.5" />
                     Importar CITIO
                   </Button>
+                  {citioSkuCount > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFixSkusDialogOpen(true)}
+                      className="gap-1.5 text-xs h-8 border-orange-300 text-orange-700 hover:bg-orange-50"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Corregir SKUs
+                      <Badge className="ml-0.5 h-4 px-1 text-xs bg-orange-200 text-orange-800 hover:bg-orange-200">
+                        {citioSkuCount}
+                      </Badge>
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -2246,6 +2278,12 @@ export default function Inventory() {
           onOpenChange={setCitioImportDialogOpen}
           onImport={(medication) => importFromCitioMutation.mutate(medication)}
           existingCitioIds={existingCitioIds}
+        />
+
+        {/* Fix auto-generated SKUs Dialog */}
+        <FixCitioSkusDialog
+          open={fixSkusDialogOpen}
+          onOpenChange={setFixSkusDialogOpen}
         />
 
         {/* NFC Confirmation Modal */}
