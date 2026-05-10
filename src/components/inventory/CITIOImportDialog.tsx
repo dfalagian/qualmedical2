@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Plus, Check, Pill, Package, CheckSquare, Square, Loader2, AlertTriangle } from "lucide-react";
+import { Search, Plus, Check, Pill, Package, CheckSquare, Square, Loader2, AlertTriangle, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { toCanonicalCategory } from "@/lib/formatters";
@@ -62,6 +62,8 @@ export function CITIOImportDialog({
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMedications, setSelectedMedications] = useState<Set<string>>(new Set());
   const [isImporting, setIsImporting] = useState(false);
+  const [customSkus, setCustomSkus] = useState<Record<string, string>>({});
+  const [editingSkuId, setEditingSkuId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch existing citio_ids that are ACTIVE in inventory (not catalog_only)
@@ -213,16 +215,14 @@ export function CITIOImportDialog({
   const allSelected = availableMedications.length > 0 && 
     availableMedications.every(med => selectedMedications.has(med.id));
 
-  // Generar SKU: usar el código original del catálogo externo
-  // La unicidad se controla mediante citio_id, no mediante modificaciones al SKU
-  const getSKU = (med: CITIOMedication): string => {
-    // Prioridad: medication_code (código de barras) > id de CITIO > generar uno
-    if (med.medication_code && med.medication_code.trim()) {
-      return med.medication_code.trim();
-    }
-    // Fallback: usar el ID de CITIO como SKU
-    return `CITIO-${med.id.substring(0, 8)}`;
+  // Devuelve el SKU que se usará y si es un fallback auto-generado
+  const getSkuInfo = (med: CITIOMedication): { sku: string; isAuto: boolean } => {
+    if (customSkus[med.id]?.trim()) return { sku: customSkus[med.id].trim(), isAuto: false };
+    if (med.medication_code?.trim()) return { sku: med.medication_code.trim(), isAuto: false };
+    return { sku: `CITIO-${med.id.substring(0, 8)}`, isAuto: true };
   };
+
+  const getSKU = (med: CITIOMedication): string => getSkuInfo(med).sku;
 
   // Importación masiva
   const handleBulkImport = async () => {
@@ -336,6 +336,8 @@ export function CITIOImportDialog({
       // Limpiar selección y cerrar
       setSelectedMedications(new Set());
       setSearchTerm("");
+      setCustomSkus({});
+      setEditingSkuId(null);
       onOpenChange(false);
       
     } catch (error: any) {
@@ -399,14 +401,26 @@ export function CITIOImportDialog({
           </Button>
         </div>
 
-        {selectedMedications.size > 0 && (
-          <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg">
-            <Package className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">
-              {selectedMedications.size} producto(s) seleccionado(s)
-            </span>
-          </div>
-        )}
+        {selectedMedications.size > 0 && (() => {
+          const autoSkuCount = Array.from(selectedMedications).filter(id => {
+            const med = medications.find(m => m.id === id);
+            return med && getSkuInfo(med).isAuto;
+          }).length;
+          return (
+            <div className={`flex items-center gap-2 p-2 rounded-lg ${autoSkuCount > 0 ? 'bg-orange-50 border border-orange-200' : 'bg-primary/10'}`}>
+              <Package className={`h-4 w-4 ${autoSkuCount > 0 ? 'text-orange-600' : 'text-primary'}`} />
+              <span className="text-sm font-medium flex-1">
+                {selectedMedications.size} producto(s) seleccionado(s)
+              </span>
+              {autoSkuCount > 0 && (
+                <span className="text-xs text-orange-700 flex items-center gap-1">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  {autoSkuCount} sin SKU — edita el SKU naranja antes de importar
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
         <ScrollArea className="h-[300px] border rounded-md">
           {isLoading ? (
@@ -449,6 +463,8 @@ export function CITIOImportDialog({
                               ? isSelected
                                 ? "bg-destructive/10 border-destructive"
                                 : "border-destructive/50 hover:bg-destructive/5"
+                              : getSkuInfo(med).isAuto && isSelected
+                              ? "bg-orange-50 border-orange-300"
                               : isSelected
                               ? "bg-primary/10 border-primary"
                               : "hover:bg-accent hover:border-accent-foreground/20"
@@ -501,10 +517,54 @@ export function CITIOImportDialog({
                                   )}
                                 </div>
                               </div>
-                              <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
+                              <div className="flex flex-wrap gap-1 text-xs text-muted-foreground items-center">
                                 {med.medication_code && (
                                   <span className="font-mono bg-muted px-1 rounded">CB: {med.medication_code}</span>
                                 )}
+                                {/* SKU que se asignará */}
+                                {!imported && (() => {
+                                  const { sku, isAuto } = getSkuInfo(med);
+                                  return isAuto ? (
+                                    editingSkuId === med.id ? (
+                                      <input
+                                        autoFocus
+                                        className="font-mono border border-orange-400 rounded px-1 h-5 w-28 text-xs bg-white text-foreground outline-none"
+                                        value={customSkus[med.id] || ""}
+                                        placeholder="Ingresa SKU"
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) =>
+                                          setCustomSkus((prev) => ({ ...prev, [med.id]: e.target.value }))
+                                        }
+                                        onBlur={() => setEditingSkuId(null)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter" || e.key === "Escape") setEditingSkuId(null);
+                                          e.stopPropagation();
+                                        }}
+                                      />
+                                    ) : (
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); setEditingSkuId(med.id); }}
+                                              className="flex items-center gap-0.5 font-mono bg-orange-100 text-orange-700 border border-orange-300 px-1 rounded hover:bg-orange-200 transition-colors"
+                                            >
+                                              <Pencil className="h-2.5 w-2.5" />
+                                              {sku}
+                                            </button>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="top">
+                                            SKU auto-generado — haz clic para ingresar el SKU correcto
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )
+                                  ) : (
+                                    <span className="font-mono bg-green-50 text-green-700 border border-green-200 px-1 rounded">
+                                      SKU: {sku}
+                                    </span>
+                                  );
+                                })()}
                                 {med.grupo_sat && (
                                   <span className="bg-accent text-accent-foreground px-1 rounded truncate max-w-[300px]" title={med.grupo_sat}>
                                     {med.grupo_sat}
