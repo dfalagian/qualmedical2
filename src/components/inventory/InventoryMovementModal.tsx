@@ -12,9 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -30,6 +28,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@/components/ui/command";
 import {
   Table,
@@ -118,6 +117,7 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
   const [batchCache, setBatchCache] = useState<Record<string, BatchStock[]>>({});
   const [addProductId, setAddProductId] = useState("");
   const [addProductOpen, setAddProductOpen] = useState(false);
+  const [movTypeOpen, setMovTypeOpen] = useState<Record<string, boolean>>({});
   const [isAdding, setIsAdding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -368,6 +368,7 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
     setRows([]);
     setBatchCache({});
     setAddProductId("");
+    setMovTypeOpen({});
     onOpenChange(false);
   };
 
@@ -565,52 +566,104 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
 
                       {/* Tipo de movimiento */}
                       <TableCell className="py-2">
-                        <Select
-                          value={row.movement_code}
-                          onValueChange={(v) =>
-                            updateRow(row.rowId, {
-                              movement_code: v,
-                              quantity: "",
-                              batch_stock_id: "",
-                            })
+                        <Popover
+                          open={movTypeOpen[row.rowId] ?? false}
+                          onOpenChange={(o) =>
+                            setMovTypeOpen((prev) => ({ ...prev, [row.rowId]: o }))
                           }
                         >
-                          <SelectTrigger className="h-8 text-xs w-full">
-                            <SelectValue placeholder="Tipo..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {entradas.length > 0 && (
-                              <SelectGroup>
-                                <SelectLabel className="text-xs text-green-700">
-                                  Entradas
-                                </SelectLabel>
-                                {entradas.map((m) => (
-                                  <SelectItem key={m.code} value={m.code}>
-                                    <span className="font-mono text-xs text-green-600 mr-1">
-                                      [{m.code}]
-                                    </span>
-                                    {m.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            )}
-                            {salidas.length > 0 && (
-                              <SelectGroup>
-                                <SelectLabel className="text-xs text-destructive">
-                                  Salidas
-                                </SelectLabel>
-                                {salidas.map((m) => (
-                                  <SelectItem key={m.code} value={m.code}>
-                                    <span className="font-mono text-xs text-destructive mr-1">
-                                      [{m.code}]
-                                    </span>
-                                    {m.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            )}
-                          </SelectContent>
-                        </Select>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className="h-8 w-full justify-between font-normal text-xs px-2"
+                            >
+                              {mt ? (
+                                <span className="flex items-center gap-1 truncate min-w-0">
+                                  <span
+                                    className={cn(
+                                      "font-mono text-xs shrink-0",
+                                      mt.direction === "E" ? "text-green-600" : "text-destructive"
+                                    )}
+                                  >
+                                    [{mt.code}]
+                                  </span>
+                                  <span className="truncate">{mt.label}</span>
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">Tipo...</span>
+                              )}
+                              <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-72 p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Buscar por código o nombre..." className="h-8" />
+                              <CommandList>
+                                <CommandEmpty>No se encontró el tipo.</CommandEmpty>
+                                {entradas.length > 0 && (
+                                  <CommandGroup heading="Entradas">
+                                    {entradas.map((m) => (
+                                      <CommandItem
+                                        key={m.code}
+                                        value={`${m.code} ${m.label}`}
+                                        onSelect={() => {
+                                          updateRow(row.rowId, {
+                                            movement_code: m.code,
+                                            quantity: "",
+                                            batch_stock_id: "",
+                                          });
+                                          setMovTypeOpen((prev) => ({ ...prev, [row.rowId]: false }));
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-3.5 w-3.5 shrink-0",
+                                            row.movement_code === m.code ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        <span className="font-mono text-xs text-green-600 mr-1.5">
+                                          [{m.code}]
+                                        </span>
+                                        {m.label}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                )}
+                                {entradas.length > 0 && salidas.length > 0 && <CommandSeparator />}
+                                {salidas.length > 0 && (
+                                  <CommandGroup heading="Salidas">
+                                    {salidas.map((m) => (
+                                      <CommandItem
+                                        key={m.code}
+                                        value={`${m.code} ${m.label}`}
+                                        onSelect={() => {
+                                          updateRow(row.rowId, {
+                                            movement_code: m.code,
+                                            quantity: "",
+                                            batch_stock_id: "",
+                                          });
+                                          setMovTypeOpen((prev) => ({ ...prev, [row.rowId]: false }));
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-3.5 w-3.5 shrink-0",
+                                            row.movement_code === m.code ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        <span className="font-mono text-xs text-destructive mr-1.5">
+                                          [{m.code}]
+                                        </span>
+                                        {m.label}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                )}
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </TableCell>
 
                       {/* Disponible */}
