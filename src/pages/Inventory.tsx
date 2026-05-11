@@ -214,6 +214,7 @@ export default function Inventory() {
   const [productForm, setProductForm] = useState({
     sku: "",
     name: "",
+    brand: "",
     description: "",
     category: "",
     unit: "pieza",
@@ -395,6 +396,7 @@ export default function Inventory() {
           .update({
             sku: product.sku,
             name: product.name,
+            brand: product.brand?.trim() || null,
             description: product.description || null,
               category: toCanonicalCategory(product.category),
             unit: product.unit,
@@ -1132,6 +1134,7 @@ export default function Inventory() {
     setProductForm({
       sku: "",
       name: "",
+      brand: "",
       description: "",
       category: "",
       unit: "pieza",
@@ -1175,6 +1178,7 @@ export default function Inventory() {
           setProductForm({
             sku: data.sku,
             name: data.name,
+            brand: data.brand || "",
             description: data.description || "",
             category: toCanonicalCategory(data.category) || "",
             unit: data.unit || "pieza",
@@ -2524,7 +2528,18 @@ export default function Inventory() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="brand" className="text-xs">Marca</Label>
+                        <Input
+                          id="brand"
+                          value={productForm.brand}
+                          onChange={(e) => setProductForm({ ...productForm, brand: e.target.value })}
+                          placeholder="Marca o laboratorio"
+                          className="h-9"
+                        />
+                      </div>
+
                       <div className="space-y-1">
                         <Label htmlFor="category" className="text-xs">Categoría</Label>
                         <Input
