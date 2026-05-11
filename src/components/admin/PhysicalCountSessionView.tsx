@@ -107,37 +107,41 @@ export function PhysicalCountSessionView({ open, onOpenChange, counts, warehouse
           });
         if (movError) throw movError;
 
-        // 2. Update batch_warehouse_stock (trigger syncs product_batches, warehouse_stock, products)
+        // 2. Update batch_warehouse_stock to match the counted quantity (physical count sets stock directly)
         if (c.batch_id) {
-          const { data: bwsRow } = await (supabase as any)
+          const { data: bwsRow, error: bwsFindError } = await (supabase as any)
             .from("batch_warehouse_stock")
             .select("id, quantity")
             .eq("batch_id", c.batch_id)
             .eq("warehouse_id", c.warehouse_id)
             .maybeSingle();
 
+          if (bwsFindError) throw bwsFindError;
+
           if (bwsRow) {
-            const newQty = Math.max(0, bwsRow.quantity + diff);
-            if (newQty === 0) {
-              await (supabase as any)
+            if (c.counted_quantity === 0) {
+              const { error } = await (supabase as any)
                 .from("batch_warehouse_stock")
                 .delete()
                 .eq("id", bwsRow.id);
+              if (error) throw error;
             } else {
-              await (supabase as any)
+              const { error } = await (supabase as any)
                 .from("batch_warehouse_stock")
-                .update({ quantity: newQty })
+                .update({ quantity: c.counted_quantity })
                 .eq("id", bwsRow.id);
+              if (error) throw error;
             }
-          } else if (diff > 0) {
-            // Batch exists in this warehouse but no record yet — create it
-            await (supabase as any)
+          } else if (c.counted_quantity > 0) {
+            // No existing record — create one with the counted quantity
+            const { error } = await (supabase as any)
               .from("batch_warehouse_stock")
               .insert({
                 batch_id: c.batch_id,
                 warehouse_id: c.warehouse_id,
-                quantity: diff,
+                quantity: c.counted_quantity,
               });
+            if (error) throw error;
           }
         }
       }
