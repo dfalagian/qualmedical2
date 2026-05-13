@@ -971,11 +971,6 @@ export function PhysicalInventoryCount() {
               </p>
               <Button
                 onClick={() => {
-                  const allZero = entries.every((e) => e.counted_quantity === 0);
-                  if (allZero) {
-                    toast.error("Debes registrar el conteo de al menos un producto antes de guardar");
-                    return;
-                  }
                   if (uncountedProducts.length > 0) {
                     setShowSaveConfirm(true);
                   } else {

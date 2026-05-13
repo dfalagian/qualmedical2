@@ -230,7 +230,10 @@ export default function Inventory() {
     price_type_5: 0,
     rfid_required: false,
     warehouse_id: "",
-    image_url: ""
+    image_url: "",
+    codigo_sat: "",
+    clave_unidad: "",
+    objeto_impuesto: false,
   });
 
   const [tagForm, setTagForm] = useState({
@@ -391,14 +394,14 @@ export default function Inventory() {
       }
       
       if (product.id) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("products")
           .update({
             sku: product.sku,
             name: product.name,
             brand: product.brand?.trim() || null,
             description: product.description || null,
-              category: toCanonicalCategory(product.category),
+            category: toCanonicalCategory(product.category),
             unit: product.unit,
             minimum_stock: product.minimum_stock,
             current_stock: product.current_stock,
@@ -412,18 +415,21 @@ export default function Inventory() {
             price_type_5: product.price_type_5 || null,
             rfid_required: product.rfid_required,
             warehouse_id: warehouseId || null,
-            image_url: product.image_url || null
+            image_url: product.image_url || null,
+            codigo_sat: product.codigo_sat?.trim() || null,
+            clave_unidad: product.clave_unidad?.trim() || null,
+            objeto_impuesto: product.objeto_impuesto ?? false,
           })
           .eq("id", product.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("products")
           .insert({
             sku: product.sku,
             name: product.name,
             description: product.description || null,
-              category: toCanonicalCategory(product.category),
+            category: toCanonicalCategory(product.category),
             unit: product.unit,
             minimum_stock: product.minimum_stock,
             current_stock: product.current_stock,
@@ -437,7 +443,10 @@ export default function Inventory() {
             price_type_5: product.price_type_5 || null,
             rfid_required: product.rfid_required,
             warehouse_id: warehouseId || null,
-            image_url: product.image_url || null
+            image_url: product.image_url || null,
+            codigo_sat: product.codigo_sat?.trim() || null,
+            clave_unidad: product.clave_unidad?.trim() || null,
+            objeto_impuesto: product.objeto_impuesto ?? false,
           });
         if (error) throw error;
       }
@@ -1150,7 +1159,10 @@ export default function Inventory() {
       price_type_5: 0,
       rfid_required: false,
       warehouse_id: "",
-      image_url: ""
+      image_url: "",
+      codigo_sat: "",
+      clave_unidad: "",
+      objeto_impuesto: false,
     });
   };
 
@@ -1194,7 +1206,10 @@ export default function Inventory() {
             price_type_5: data.price_type_5 || 0,
             rfid_required: data.rfid_required || false,
             warehouse_id: data.warehouse_id || "",
-            image_url: data.image_url || ""
+            image_url: data.image_url || "",
+            codigo_sat: (data as any).codigo_sat || "",
+            clave_unidad: (data as any).clave_unidad || "",
+            objeto_impuesto: (data as any).objeto_impuesto || false,
           });
           setProductDialogOpen(true);
         }
@@ -2502,8 +2517,9 @@ export default function Inventory() {
                         <Input
                           id="sku"
                           value={productForm.sku}
-                          readOnly
-                          className="h-9 bg-muted cursor-default"
+                          onChange={(e) => setProductForm({ ...productForm, sku: e.target.value.toUpperCase() })}
+                          placeholder="Ej: MED-001"
+                          className="h-9 font-mono"
                         />
                       </div>
 
@@ -2567,6 +2583,50 @@ export default function Inventory() {
                             <SelectItem value="sobre">Sobre</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                    </div>
+
+                    {/* Datos SAT */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="codigo_sat" className="text-xs">Clave SAT</Label>
+                        <Input
+                          id="codigo_sat"
+                          value={productForm.codigo_sat}
+                          onChange={(e) => setProductForm({ ...productForm, codigo_sat: e.target.value })}
+                          placeholder="Ej: 51101500"
+                          className="h-9 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="clave_unidad" className="text-xs">Unidad SAT</Label>
+                        <Input
+                          id="clave_unidad"
+                          value={productForm.clave_unidad}
+                          onChange={(e) => setProductForm({ ...productForm, clave_unidad: e.target.value.toUpperCase() })}
+                          placeholder="Ej: H87, KGM, MTR"
+                          className="h-9 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Objeto de impuesto</Label>
+                        <div className="flex items-center gap-3 h-9 px-3 border rounded-md bg-background">
+                          <button
+                            type="button"
+                            onClick={() => setProductForm({ ...productForm, objeto_impuesto: false })}
+                            className={`flex-1 text-xs py-1 rounded transition-colors ${!productForm.objeto_impuesto ? "bg-muted font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+                          >
+                            No
+                          </button>
+                          <div className="w-px h-4 bg-border" />
+                          <button
+                            type="button"
+                            onClick={() => setProductForm({ ...productForm, objeto_impuesto: true })}
+                            className={`flex-1 text-xs py-1 rounded transition-colors ${productForm.objeto_impuesto ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+                          >
+                            Sí
+                          </button>
+                        </div>
                       </div>
                     </div>
 
