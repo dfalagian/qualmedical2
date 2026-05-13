@@ -394,7 +394,7 @@ export default function Inventory() {
       }
       
       if (product.id) {
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from("products")
           .update({
             sku: product.sku,
@@ -423,7 +423,7 @@ export default function Inventory() {
           .eq("id", product.id);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from("products")
           .insert({
             sku: product.sku,
@@ -1207,9 +1207,9 @@ export default function Inventory() {
             rfid_required: data.rfid_required || false,
             warehouse_id: data.warehouse_id || "",
             image_url: data.image_url || "",
-            codigo_sat: (data as any).codigo_sat || "",
-            clave_unidad: (data as any).clave_unidad || "",
-            objeto_impuesto: (data as any).objeto_impuesto || false,
+            codigo_sat: data.codigo_sat || "",
+            clave_unidad: data.clave_unidad || "",
+            objeto_impuesto: data.objeto_impuesto || false,
           });
           setProductDialogOpen(true);
         }

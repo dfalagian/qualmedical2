@@ -1507,6 +1507,7 @@ export type Database = {
           is_active: boolean | null
           minimum_stock: number | null
           name: string
+          objeto_impuesto: boolean
           price_type_1: number | null
           price_type_2: number | null
           price_type_3: number | null
@@ -1541,6 +1542,7 @@ export type Database = {
           is_active?: boolean | null
           minimum_stock?: number | null
           name: string
+          objeto_impuesto?: boolean
           price_type_1?: number | null
           price_type_2?: number | null
           price_type_3?: number | null
@@ -1575,6 +1577,7 @@ export type Database = {
           is_active?: boolean | null
           minimum_stock?: number | null
           name?: string
+          objeto_impuesto?: boolean
           price_type_1?: number | null
           price_type_2?: number | null
           price_type_3?: number | null
