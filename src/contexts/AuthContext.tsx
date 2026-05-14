@@ -3,7 +3,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export type UserRole = "admin" | "proveedor" | "contador" | "contador_proveedor" | "inventario_rfid" | "vendedor";
+export type UserRole = "admin" | "proveedor" | "contador" | "contador_proveedor" | "inventario_rfid" | "vendedor" | "asistente_cotizaciones";
 
 export interface AuthContextValue {
   user: User | null;
@@ -20,6 +20,7 @@ export interface AuthContextValue {
   isContadorProveedor: boolean;
   isInventarioRfid: boolean;
   isVendedor: boolean;
+  isAsistenteCotizaciones: boolean;
   parentSupplierId: string | null;
 }
 
@@ -173,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isContadorProveedor: userRole === "contador_proveedor",
     isInventarioRfid: userRole === "inventario_rfid",
     isVendedor: userRole === "vendedor",
+    isAsistenteCotizaciones: userRole === "asistente_cotizaciones",
     parentSupplierId,
   };
 

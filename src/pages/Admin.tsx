@@ -38,7 +38,7 @@ const createUserFormSchema = z.object({
   full_name: z.string().min(1, "El nombre es requerido"),
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
-  role: z.enum(["admin", "proveedor", "contador", "contador_proveedor", "inventario_rfid"], { required_error: "Selecciona un rol" }),
+  role: z.enum(["admin", "proveedor", "contador", "contador_proveedor", "inventario_rfid", "vendedor", "asistente_cotizaciones"], { required_error: "Selecciona un rol" }),
   company_name: z.string().optional(),
   rfc: z.string().optional(),
   phone: z.string().optional(),
@@ -451,6 +451,8 @@ const Admin = () => {
                                 <SelectItem value="contador">Contador</SelectItem>
                                 <SelectItem value="contador_proveedor">Contador Proveedor</SelectItem>
                                 <SelectItem value="inventario_rfid">Inventario RFID</SelectItem>
+                                <SelectItem value="vendedor">Vendedor (POS)</SelectItem>
+                                <SelectItem value="asistente_cotizaciones">Asistente Cotizaciones</SelectItem>
                                 <SelectItem value="admin">Administrador</SelectItem>
                               </SelectContent>
                             </Select>
@@ -527,6 +529,10 @@ const Admin = () => {
                   const userRole = user.user_roles?.[0]?.role;
                   const isUserAdmin = userRole === "admin";
                   const isUserContador = userRole === "contador";
+                  const isUserContadorProv = userRole === "contador_proveedor";
+                  const isUserInvRfid = userRole === "inventario_rfid";
+                  const isUserVendedor = userRole === "vendedor";
+                  const isUserAsistente = userRole === "asistente_cotizaciones";
 
                   return (
                     <div
@@ -543,6 +549,14 @@ const Admin = () => {
                             </Badge>
                           ) : isUserContador ? (
                             <Badge className="bg-blue-500">Contador</Badge>
+                          ) : isUserContadorProv ? (
+                            <Badge className="bg-blue-600">Contador Proveedor</Badge>
+                          ) : isUserInvRfid ? (
+                            <Badge className="bg-purple-500">Inventario RFID</Badge>
+                          ) : isUserVendedor ? (
+                            <Badge className="bg-orange-500">Vendedor (POS)</Badge>
+                          ) : isUserAsistente ? (
+                            <Badge className="bg-teal-500">Asistente Cotizaciones</Badge>
                           ) : (
                             <>
                               <Badge variant="secondary">Proveedor</Badge>

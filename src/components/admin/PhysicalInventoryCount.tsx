@@ -571,25 +571,26 @@ export function PhysicalInventoryCount() {
     const exists = entries.find((e) => e.product_id === product.id && e.warehouse_id === whId);
     if (exists) { toast.info("Este producto ya está en la lista"); return; }
 
-    const createEntries = (batches: ProductBatchRow[], useWarehouseSystemQuantity = true): CountEntry[] => {
-      // Use warehouse_stock as the authoritative total for this product in this warehouse
-      const warehouseTotalStock = warehouseStockMap.get(product.id) ?? 0;
-      const batchCalcTotal = useWarehouseSystemQuantity
-        ? batches.reduce((sum, b) => sum + b.current_quantity, 0)
-        : 0;
+    // Read REAL stock per (batch, warehouse) from batch_warehouse_stock (SSOT).
+    // No estimations, no proportional math — strict direct read.
+    const createEntries = async (batches: ProductBatchRow[]): Promise<CountEntry[]> => {
+      const batchIds = batches.map((b) => b.id);
+      const bwsMap = new Map<string, number>();
+      if (batchIds.length > 0) {
+        const { data: bwsRows, error: bwsErr } = await (supabase as any)
+          .from("batch_warehouse_stock")
+          .select("batch_id, quantity")
+          .in("batch_id", batchIds)
+          .eq("warehouse_id", whId);
+        if (bwsErr) {
+          toast.error(bwsErr.message || "Error al leer stock por lote/almacén");
+          return [];
+        }
+        (bwsRows || []).forEach((row: any) => bwsMap.set(row.batch_id, row.quantity ?? 0));
+      }
 
       return batches.map((b) => {
-        let systemQty = 0;
-        if (useWarehouseSystemQuantity) {
-          if (warehouseTotalStock > 0 && batchCalcTotal > 0) {
-            systemQty = Math.round((b.current_quantity / batchCalcTotal) * warehouseTotalStock);
-          } else if (warehouseTotalStock > 0) {
-            systemQty = b.current_quantity;
-          } else {
-            // warehouse_stock is 0 — system quantity should be 0
-            systemQty = 0;
-          }
-        }
+        const systemQty = bwsMap.get(b.id) ?? 0;
         return {
           product_id: product.id,
           product_name: product.name,
@@ -607,7 +608,8 @@ export function PhysicalInventoryCount() {
 
     const batches = batchesMap[product.id] || [];
     if (batches.length > 0) {
-      setEntries((prev) => [...createEntries(batches), ...prev]);
+      const newEntries = await createEntries(batches);
+      setEntries((prev) => [...newEntries, ...prev]);
       setSearch("");
       return;
     }
@@ -626,9 +628,10 @@ export function PhysicalInventoryCount() {
     }
 
     if ((globalBatches || []).length > 0) {
-      setEntries((prev) => [...createEntries((globalBatches || []) as ProductBatchRow[], false), ...prev]);
+      const newEntries = await createEntries((globalBatches || []) as ProductBatchRow[]);
+      setEntries((prev) => [...newEntries, ...prev]);
       setSearch("");
-      toast.info("Se agregaron los lotes existentes con stock sistema 0 para este almacén.");
+      toast.info("Se agregaron los lotes existentes. Stock sistema leído directo de batch_warehouse_stock.");
       return;
     }
 

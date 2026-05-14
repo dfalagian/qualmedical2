@@ -2016,6 +2016,39 @@ export type Database = {
           },
         ]
       }
+      report_templates: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          report_type: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          report_type: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          report_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       rfid_tags: {
         Row: {
           batch_id: string | null
@@ -2568,6 +2601,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_quote_atomic: {
+        Args: {
+          _items: Json
+          _quote_id: string
+          _user_id: string
+          _warehouse_id: string
+        }
+        Returns: Json
+      }
+      cancel_quote_atomic: {
+        Args: { _quote_id: string; _user_id: string }
+        Returns: Json
+      }
       generate_budget_folio: { Args: never; Returns: string }
       generate_quote_folio: { Args: never; Returns: string }
       get_parent_supplier_id: { Args: { _user_id: string }; Returns: string }
@@ -2579,6 +2625,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_asistente_cotizaciones: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       is_contador: { Args: { _user_id: string }; Returns: boolean }
       is_contador_proveedor: { Args: { _user_id: string }; Returns: boolean }
       is_inventario_rfid: { Args: { _user_id: string }; Returns: boolean }
@@ -2612,6 +2662,7 @@ export type Database = {
         | "contador_proveedor"
         | "inventario_rfid"
         | "vendedor"
+        | "asistente_cotizaciones"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2768,6 +2819,7 @@ export const Constants = {
         "contador_proveedor",
         "inventario_rfid",
         "vendedor",
+        "asistente_cotizaciones",
       ],
     },
   },

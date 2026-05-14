@@ -7,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { ShoppingCart, TrendingUp, Wallet, Package, CalendarDays, Users, BarChart3 } from "lucide-react";
+import { ShoppingCart, TrendingUp, Wallet, Package, CalendarDays, Users, BarChart3, Sparkles } from "lucide-react";
 import { ExportInventoryButton } from "@/components/inventory/ExportInventoryButton";
 import { ExportBatchesButton } from "@/components/inventory/ExportBatchesButton";
+import { ReportGenerator } from "./ReportGenerator";
 
 const formatCurrency = (val: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(val);
@@ -551,8 +552,12 @@ export function ReportsSection() {
       </Card>
 
       {/* Reports tabs */}
-      <Tabs defaultValue="purchases" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-lg">
+      <Tabs defaultValue="generator" className="w-full">
+        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+          <TabsTrigger value="generator" className="gap-1.5">
+            <Sparkles className="h-4 w-4" />
+            <span className="hidden sm:inline">Generador</span>
+          </TabsTrigger>
           <TabsTrigger value="purchases" className="gap-1.5">
             <ShoppingCart className="h-4 w-4" />
             <span className="hidden sm:inline">Compras</span>
@@ -566,6 +571,23 @@ export function ReportsSection() {
             <span className="hidden sm:inline">Valor Inventario</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="generator" className="mt-4">
+          <Card className="shadow-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Generador de Informes
+              </CardTitle>
+              <CardDescription>
+                Configura informes a tu medida (stock, caducidades, ventas, valor, movimientos…) o pídelos en lenguaje natural a la IA. Exporta a PDF o Excel y guarda tus plantillas favoritas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ReportGenerator />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="purchases" className="mt-4">
           <Card className="shadow-md">
