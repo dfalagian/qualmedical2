@@ -2648,6 +2648,22 @@ export type Database = {
         }
         Returns: boolean
       }
+      ingress_product_atomic: {
+        Args: {
+          _operation_id: string
+          _warehouse_id: string
+          _purchase_order_id: string
+          _invoice_number: string
+          _entry_date: string
+          _items: Json
+          _user_id: string
+        }
+        Returns: Json
+      }
+      inventory_adjustment_atomic: {
+        Args: { _items: Json; _user_id: string }
+        Returns: Json
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_asistente_cotizaciones: {
         Args: { _user_id: string }
