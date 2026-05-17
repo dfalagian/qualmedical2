@@ -259,7 +259,9 @@ export function OrderReconciliation({ order }: OrderReconciliationProps) {
       invoiced: matched ? Number(matched.cantidad) : 0,
       invoicedPrice: matched ? Number(matched.valor_unitario) : 0,
       invoicedSubtotal: matched ? Number(matched.importe) : 0,
-      received: receivedByProduct.get(item.product_id) || (item.quantity_received || 0),
+      received: (item.quantity_received ?? 0) > 0
+        ? (item.quantity_received as number)
+        : (receivedByProduct.get(item.product_id) || 0),
     };
   });
 

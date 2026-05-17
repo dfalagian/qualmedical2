@@ -78,6 +78,13 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
   // Lista de items ingresados
   const [items, setItems] = useState<EntryItem[]>([]);
 
+  // ID único por operación para idempotencia del RPC
+  const [operationId, setOperationId] = useState(() => crypto.randomUUID());
+
+  useEffect(() => {
+    if (open) setOperationId(crypto.randomUUID());
+  }, [open]);
+
   // Estado del reporte post-guardado
   const [showReport, setShowReport] = useState(false);
   const [savedReport, setSavedReport] = useState<{
@@ -416,140 +423,34 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
   // Mutation para guardar todo el ingreso
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (items.length === 0) {
-        throw new Error("No hay productos para guardar");
-      }
+      if (items.length === 0) throw new Error("No hay productos para guardar");
 
-      for (const item of items) {
-        if (item.isExistingBatch && item.batchId) {
-          // Si es lote existente, solo actualizar cantidad
-          const { data: currentBatch } = await supabase
-            .from("product_batches")
-            .select("current_quantity, initial_quantity")
-            .eq("id", item.batchId)
-            .single();
+      const { data: { user } } = await supabase.auth.getUser();
 
-          await supabase
-            .from("product_batches")
-            .update({
-              current_quantity: (currentBatch?.current_quantity || 0) + item.cantidad,
-              initial_quantity: (currentBatch?.initial_quantity || 0) + item.cantidad
-            })
-            .eq("id", item.batchId);
-        } else {
-          // Crear nuevo lote
-          const { data: newBatch, error: batchError } = await supabase
-            .from("product_batches")
-            .insert({
-              product_id: item.productId,
-              batch_number: item.lote,
-              barcode: item.codigo,
-              expiration_date: item.caducidad,
-              initial_quantity: item.cantidad,
-              current_quantity: item.cantidad,
-              notes: formData.numeroFactura ? `Factura: ${formData.numeroFactura}` : null
-            })
-            .select("id")
-            .single();
+      const rpcItems = items.map((item) => ({
+        product_id: item.productId,
+        batch_id: item.batchId || null,
+        batch_number: item.lote,
+        barcode: item.codigo,
+        expiration_date: item.caducidad || null,
+        cantidad: item.cantidad,
+        is_existing_batch: item.isExistingBatch,
+      }));
 
-          if (batchError) throw batchError;
-          // Store the new batch ID for the movement record
-          item.batchId = newBatch?.id;
-        }
+      const { error } = await supabase.rpc("ingress_product_atomic", {
+        _operation_id: operationId,
+        _warehouse_id: formData.almacenId || null,
+        _purchase_order_id:
+          formData.ordenCompraId && formData.ordenCompraId !== "sin_orden"
+            ? formData.ordenCompraId
+            : null,
+        _invoice_number: formData.numeroFactura || null,
+        _entry_date: entryDate.toISOString(),
+        _items: rpcItems,
+        _user_id: user?.id,
+      });
 
-        // Actualizar warehouse_id del producto al almacén seleccionado
-        if (formData.almacenId) {
-          await supabase
-            .from("products")
-            .update({ warehouse_id: formData.almacenId })
-            .eq("id", item.productId);
-
-          // Sincronizar vía batch_warehouse_stock (el trigger se encarga de warehouse_stock, product_batches y products)
-          if (item.batchId) {
-            const { data: existingBws } = await (supabase as any)
-              .from("batch_warehouse_stock")
-              .select("id, quantity")
-              .eq("batch_id", item.batchId)
-              .eq("warehouse_id", formData.almacenId)
-              .maybeSingle();
-
-            if (existingBws) {
-              await (supabase as any)
-                .from("batch_warehouse_stock")
-                .update({ quantity: existingBws.quantity + item.cantidad })
-                .eq("id", existingBws.id);
-            } else {
-              await (supabase as any)
-                .from("batch_warehouse_stock")
-                .insert({
-                  batch_id: item.batchId,
-                  warehouse_id: formData.almacenId,
-                  quantity: item.cantidad,
-                });
-            }
-          }
-        }
-
-        // Registrar movimiento de inventario
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        // Determine location: use selected warehouse, fallback to product's warehouse
-        let movementLocation = formData.almacenId || null;
-        if (!movementLocation) {
-          const { data: productData } = await supabase
-            .from("products")
-            .select("warehouse_id")
-            .eq("id", item.productId)
-            .single();
-          movementLocation = productData?.warehouse_id || null;
-        }
-        // Final fallback: find "Almacén Principal"
-        if (!movementLocation && almacenes.length > 0) {
-          const principal = almacenes.find((a: any) => a.name.toLowerCase().includes("principal"));
-          movementLocation = principal?.id || almacenes[0]?.id || null;
-        }
-        
-        const { error: movError } = await supabase
-          .from("inventory_movements")
-          .insert({
-            product_id: item.productId,
-            batch_id: item.batchId || null,
-            movement_type: "entrada",
-            quantity: item.cantidad,
-            reference_id: formData.ordenCompraId || null,
-            reference_type: formData.ordenCompraId ? "purchase_order" : null,
-            location: movementLocation,
-            created_by: user?.id || null,
-            created_at: entryDate.toISOString(),
-            notes: formData.numeroFactura ? `Factura: ${formData.numeroFactura}` : `Ingreso de producto - Lote: ${item.lote}`
-          });
-
-        if (movError) {
-          // El stock ya fue actualizado por el trigger SSOT al escribir en batch_warehouse_stock arriba.
-          // Aquí solo registramos el fallo del movimiento de auditoría sin tocar products.current_stock
-          // (hacerlo causaría doble suma).
-          console.error("Error creating inventory_movement (stock ya aplicado vía SSOT):", movError);
-        }
-
-        // Si hay OC vinculada, actualizar quantity_received en purchase_order_items
-        if (formData.ordenCompraId) {
-          const { data: poItem } = await supabase
-            .from("purchase_order_items")
-            .select("id, quantity_received")
-            .eq("purchase_order_id", formData.ordenCompraId)
-            .eq("product_id", item.productId)
-            .maybeSingle();
-
-          if (poItem) {
-            await supabase
-              .from("purchase_order_items")
-              .update({
-                quantity_received: (poItem.quantity_received || 0) + item.cantidad
-              })
-              .eq("id", poItem.id);
-          }
-        }
-      }
+      if (error) throw error;
     },
     onSuccess: () => {
       for (const item of items) {

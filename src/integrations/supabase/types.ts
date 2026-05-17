@@ -643,6 +643,30 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_movement_types: {
+        Row: {
+          code: string
+          created_at: string | null
+          direction: string
+          is_active: boolean
+          label: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          direction: string
+          is_active?: boolean
+          label: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          direction?: string
+          is_active?: boolean
+          label?: string
+        }
+        Relationships: []
+      }
       inventory_movements: {
         Row: {
           batch_id: string | null

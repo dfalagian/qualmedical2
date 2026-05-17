@@ -252,115 +252,48 @@ export function InventoryMovementModal({ open, onOpenChange }: InventoryMovement
   const handleSave = async () => {
     if (validRows.length === 0) return;
     setIsSaving(true);
-
-    let successCount = 0;
-    const errors: string[] = [];
-
-    for (const row of validRows) {
-      try {
-        const mt = getRowMovement(row)!;
-        const isExit = mt.direction === "S";
-        const qty = row.quantity as number;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const rpcItems = validRows.map((row) => {
         const batches = getRowBatches(row);
+        const bs = getRowBatchStock(row);
+        return {
+          product_id: row.product_id,
+          batch_stock_id: bs?.id ?? null,
+          movement_code: row.movement_code,
+          quantity: row.quantity as number,
+          notes: row.notes.trim() || null,
+          new_batch_number: batches.length === 0 ? row.newBatchNumber.trim() || null : null,
+          new_batch_expiration: batches.length === 0 ? row.newBatchExpiration || null : null,
+          new_batch_warehouse_id: batches.length === 0 ? row.newBatchWarehouseId || null : null,
+        };
+      });
+      const { error } = await supabase.rpc("inventory_adjustment_atomic", {
+        _items: rpcItems,
+        _user_id: user?.id,
+      });
+      if (error) throw error;
 
-        if (batches.length === 0) {
-          // Create new batch for entry
-          const { data: createdBatch, error: batchErr } = await supabase
-            .from("product_batches")
-            .insert({
-              product_id: row.product_id,
-              batch_number: row.newBatchNumber.trim(),
-              expiration_date: row.newBatchExpiration || null,
-              barcode: "",
-              initial_quantity: 0,
-              current_quantity: 0,
-            })
-            .select("id")
-            .single();
-          if (batchErr) throw batchErr;
-
-          const { data: createdBws, error: bwsErr } = await supabase
-            .from("batch_warehouse_stock")
-            .insert({
-              batch_id: createdBatch.id,
-              warehouse_id: row.newBatchWarehouseId,
-              quantity: 0,
-            })
-            .select("id")
-            .single();
-          if (bwsErr) throw bwsErr;
-
-          const { error: stockErr } = await supabase
-            .from("batch_warehouse_stock")
-            .update({ quantity: qty, updated_at: new Date().toISOString() })
-            .eq("id", createdBws.id);
-          if (stockErr) throw stockErr;
-
-          await supabase.from("inventory_movements").insert({
-            product_id: row.product_id,
-            batch_id: createdBatch.id,
-            movement_type: "entrada",
-            quantity: qty,
-            previous_stock: 0,
-            new_stock: qty,
-            reference_type: row.movement_code,
-            location: row.newBatchWarehouseId,
-            notes: row.notes.trim() || null,
-          });
-        } else {
-          const bs = getRowBatchStock(row)!;
-          const newQty = isExit ? bs.quantity - qty : bs.quantity + qty;
-
-          const { error: stockErr } = await supabase
-            .from("batch_warehouse_stock")
-            .update({ quantity: newQty, updated_at: new Date().toISOString() })
-            .eq("id", row.batch_stock_id);
-          if (stockErr) throw stockErr;
-
-          await supabase.from("inventory_movements").insert({
-            product_id: row.product_id,
-            batch_id: bs.batch_id,
-            movement_type: isExit ? "salida" : "entrada",
-            quantity: qty,
-            previous_stock: bs.quantity,
-            new_stock: newQty,
-            reference_type: row.movement_code,
-            location: bs.warehouse_id,
-            notes: row.notes.trim() || null,
-          });
-        }
-
+      for (const row of validRows) {
+        const isExit = getRowMovement(row)?.direction === "S";
         logActivity({
           section: "inventario",
           action: isExit ? "ajuste" : "entrada",
           entityType: "Movimiento",
           entityName: row.product_name,
-          details: { tipo: row.movement_code, cantidad: qty },
+          details: { tipo: row.movement_code, cantidad: row.quantity },
         });
-
-        successCount++;
-      } catch {
-        errors.push(row.product_name);
       }
-    }
 
-    queryClient.invalidateQueries({ queryKey: ["products"] });
-    queryClient.invalidateQueries({ queryKey: ["batch-stocks-for-movement"] });
-    queryClient.invalidateQueries({ queryKey: ["inventory-movements-history"] });
-
-    if (successCount > 0)
-      toast.success(`${successCount} movimiento(s) registrado(s) correctamente`);
-    if (errors.length > 0)
-      toast.error(`Error en: ${errors.join(", ")}`);
-
-    setIsSaving(false);
-    if (errors.length === 0) handleClose();
-    else {
-      // Remove successfully saved rows, keep failed ones
-      const failedNames = new Set(errors);
-      setRows((prev) =>
-        prev.filter((r) => failedNames.has(r.product_name) && !getRowStatus(r).valid)
-      );
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["batch-stocks-for-movement"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-movements-history"] });
+      toast.success(`${validRows.length} movimiento(s) registrado(s) correctamente`);
+      handleClose();
+    } catch (err: any) {
+      toast.error(err.message || "Error al guardar movimientos");
+    } finally {
+      setIsSaving(false);
     }
   };
 

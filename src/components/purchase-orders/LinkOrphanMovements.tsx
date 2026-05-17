@@ -83,31 +83,53 @@ export function LinkOrphanMovements({ order }: LinkOrphanMovementsProps) {
         .in("id", movementIds);
       if (linkError) throw linkError;
 
-      // 2. Calculate quantities per product from selected movements
+      // 2. Identify affected products from selected movements
       const selectedMovements = orphanMovements.filter((m) =>
         movementIds.includes(m.id)
       );
-      const qtyByProduct = new Map<string, number>();
-      for (const m of selectedMovements) {
-        qtyByProduct.set(
-          m.product_id,
-          (qtyByProduct.get(m.product_id) || 0) + m.quantity
-        );
-      }
+      const affectedProductIds = Array.from(
+        new Set(selectedMovements.map((m) => m.product_id))
+      );
 
-      // 3. Update quantity_received in purchase_order_items
-      for (const [productId, qty] of qtyByProduct) {
+      // 3. Recompute quantity_received from the DB as the SUM of ALL "entrada"
+      //    movements now linked to this OC (idempotent: re-vincular no duplica).
+      //    Validar contra quantity_ordered para alertar excedente.
+      const warnings: string[] = [];
+      for (const productId of affectedProductIds) {
         const item = (order.purchase_order_items || []).find(
           (i) => i.product_id === productId
         );
-        if (item) {
-          const newReceived = (item.quantity_received || 0) + qty;
-          const { error } = await supabase
-            .from("purchase_order_items")
-            .update({ quantity_received: newReceived })
-            .eq("id", item.id);
-          if (error) throw error;
+        if (!item) continue;
+
+        const { data: entradas, error: sumErr } = await supabase
+          .from("inventory_movements")
+          .select("quantity")
+          .eq("reference_id", order.id)
+          .eq("reference_type", "purchase_order")
+          .eq("product_id", productId)
+          .eq("movement_type", "entrada");
+        if (sumErr) throw sumErr;
+
+        const totalReceived = (entradas || []).reduce(
+          (s, m) => s + (m.quantity || 0),
+          0
+        );
+
+        if (totalReceived > item.quantity_ordered) {
+          warnings.push(
+            `${item.products?.name || "Producto"}: recibido ${totalReceived} excede lo ordenado ${item.quantity_ordered}`
+          );
         }
+
+        const { error } = await supabase
+          .from("purchase_order_items")
+          .update({ quantity_received: totalReceived })
+          .eq("id", item.id);
+        if (error) throw error;
+      }
+
+      if (warnings.length > 0) {
+        toast.warning("Cantidades exceden lo ordenado: " + warnings.join(" | "));
       }
     },
     onSuccess: () => {
