@@ -13,6 +13,8 @@ function extractUUIDFromComplementXML(xmlContent: string): {
   monto_pagado: number | null;
   fecha_pago: string | null;
   num_parcialidad: string | null;
+  imp_saldo_ant: number | null;
+  imp_saldo_insoluto: number | null;
 } {
   console.log('Parseando XML del complemento...');
   
@@ -93,7 +95,7 @@ function extractUUIDFromComplementXML(xmlContent: string): {
   const parcialidadPatterns = [
     /NumParcialidad\s*=\s*["'](\d+)["']/i,
   ];
-  
+
   let num_parcialidad: string | null = null;
   for (const pattern of parcialidadPatterns) {
     const match = cleanXml.match(pattern);
@@ -104,12 +106,42 @@ function extractUUIDFromComplementXML(xmlContent: string): {
     }
   }
 
+  // 6. Extraer saldo anterior (ImpSaldoAnt en DoctoRelacionado)
+  const saldoAntPatterns = [
+    /ImpSaldoAnt\s*=\s*["']([0-9.]+)["']/i,
+  ];
+  let imp_saldo_ant: number | null = null;
+  for (const pattern of saldoAntPatterns) {
+    const match = cleanXml.match(pattern);
+    if (match && match[1]) {
+      imp_saldo_ant = parseFloat(match[1]);
+      console.log('ImpSaldoAnt encontrado:', imp_saldo_ant);
+      break;
+    }
+  }
+
+  // 7. Extraer saldo insoluto (ImpSaldoInsoluto en DoctoRelacionado)
+  const saldoInsolutoPatterns = [
+    /ImpSaldoInsoluto\s*=\s*["']([0-9.]+)["']/i,
+  ];
+  let imp_saldo_insoluto: number | null = null;
+  for (const pattern of saldoInsolutoPatterns) {
+    const match = cleanXml.match(pattern);
+    if (match && match[1]) {
+      imp_saldo_insoluto = parseFloat(match[1]);
+      console.log('ImpSaldoInsoluto encontrado:', imp_saldo_insoluto);
+      break;
+    }
+  }
+
   return {
     uuid_documento_relacionado,
     uuid_complemento,
     monto_pagado,
     fecha_pago,
-    num_parcialidad
+    num_parcialidad,
+    imp_saldo_ant,
+    imp_saldo_insoluto,
   };
 }
 

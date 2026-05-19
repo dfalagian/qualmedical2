@@ -1159,8 +1159,11 @@ export type Database = {
           created_at: string
           fecha_pago: string | null
           id: string
+          imp_saldo_ant: number | null
+          imp_saldo_insoluto: number | null
           invoice_id: string
           monto: number | null
+          num_parcialidad: number | null
           payment_proof_id: string
           pdf_url: string | null
           supplier_id: string
@@ -1172,8 +1175,11 @@ export type Database = {
           created_at?: string
           fecha_pago?: string | null
           id?: string
+          imp_saldo_ant?: number | null
+          imp_saldo_insoluto?: number | null
           invoice_id: string
           monto?: number | null
+          num_parcialidad?: number | null
           payment_proof_id: string
           pdf_url?: string | null
           supplier_id: string
@@ -1185,8 +1191,11 @@ export type Database = {
           created_at?: string
           fecha_pago?: string | null
           id?: string
+          imp_saldo_ant?: number | null
+          imp_saldo_insoluto?: number | null
           invoice_id?: string
           monto?: number | null
+          num_parcialidad?: number | null
           payment_proof_id?: string
           pdf_url?: string | null
           supplier_id?: string
