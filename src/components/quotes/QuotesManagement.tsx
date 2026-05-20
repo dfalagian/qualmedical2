@@ -1427,6 +1427,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
           }}
           productId={pendingProductForBatch.id}
           productName={pendingProductForBatch.name}
+          warehouseId={selectedWarehouseId}
           onSelect={handleBatchSelected}
         />
       )}

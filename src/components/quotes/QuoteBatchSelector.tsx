@@ -44,6 +44,7 @@ interface QuoteBatchSelectorProps {
   onOpenChange: (open: boolean) => void;
   productId: string;
   productName: string;
+  warehouseId?: string | null;
   onSelect: (batch: SelectedBatchInfo | null) => void;
 }
 
@@ -52,14 +53,35 @@ export const QuoteBatchSelector = ({
   onOpenChange,
   productId,
   productName,
+  warehouseId,
   onSelect,
 }: QuoteBatchSelectorProps) => {
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
 
-  // Fetch batches for the product
+  // Fetch batches filtered by warehouse when available, otherwise show all
   const { data: batches = [], isLoading } = useQuery({
-    queryKey: ["product-batches-quote-selector", productId],
+    queryKey: ["product-batches-quote-selector", productId, warehouseId],
     queryFn: async () => {
+      if (warehouseId) {
+        const { data, error } = await (supabase as any)
+          .from("batch_warehouse_stock")
+          .select("quantity, product_batches!inner(id, batch_number, expiration_date, product_id, is_active)")
+          .eq("warehouse_id", warehouseId)
+          .eq("product_batches.product_id", productId)
+          .eq("product_batches.is_active", true)
+          .gt("quantity", 0);
+        if (error) throw error;
+        return (data || [])
+          .map((bws: any) => ({
+            id: bws.product_batches.id,
+            batch_number: bws.product_batches.batch_number,
+            expiration_date: bws.product_batches.expiration_date,
+            current_quantity: bws.quantity,
+          }))
+          .sort((a: any, b: any) =>
+            new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime()
+          ) as Batch[];
+      }
       const { data, error } = await supabase
         .from("product_batches")
         .select("id, batch_number, expiration_date, current_quantity")
