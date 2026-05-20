@@ -19,6 +19,7 @@ export interface TransferPrintData {
   toWarehouse: string;
   items: TransferPrintItem[];
   notes?: string;
+  transferNumber?: string;
 }
 
 export function openWarehouseTransferPrint(data: TransferPrintData): void {
@@ -58,7 +59,7 @@ export function openWarehouseTransferPrint(data: TransferPrintData): void {
     <head>
       <meta charset="UTF-8" />
       <link rel="icon" href="data:,">
-      <title>Transferencia entre Almacenes - ${fechaCorta}</title>
+      <title>Transferencia ${data.transferNumber || ""} - ${fechaCorta}</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -97,6 +98,13 @@ export function openWarehouseTransferPrint(data: TransferPrintData): void {
         .header-right {
           text-align: right;
           font-size: 11px;
+        }
+        .header-right .transfer-number {
+          font-size: 18px;
+          font-weight: bold;
+          color: #0071a3;
+          font-family: monospace;
+          letter-spacing: 1px;
         }
         .header-right .date {
           font-size: 13px;
@@ -237,6 +245,7 @@ export function openWarehouseTransferPrint(data: TransferPrintData): void {
           </div>
         </div>
         <div class="header-right">
+          ${data.transferNumber ? `<div class="transfer-number">${data.transferNumber}</div>` : ""}
           <div class="date">${fechaCorta}</div>
           <div>${fecha}</div>
         </div>

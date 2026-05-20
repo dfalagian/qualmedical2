@@ -41,6 +41,7 @@ interface TransferRecord {
   created_at: string;
   status: string;
   transfer_group_id: string | null;
+  transfer_number?: number | null;
   from_warehouse?: { name: string } | null;
   to_warehouse?: { name: string } | null;
   products?: { name: string; brand: string | null; unit: string | null; sku?: string } | null;
@@ -64,6 +65,7 @@ interface GroupedTransfer {
   items: TransferRecord[];
   notes: string | null;
   status: string;
+  transferNumber?: number | null;
 }
 
 export function WarehouseTransferHistory() {
@@ -136,6 +138,7 @@ export function WarehouseTransferHistory() {
         items: groupItems,
         notes: t.notes,
         status: t.status || "aprobada",
+        transferNumber: t.transfer_number ?? null,
       });
     }
   }
@@ -147,6 +150,10 @@ export function WarehouseTransferHistory() {
   const filteredGrouped = transferSearch.trim()
     ? visibleGrouped.filter((group) => {
         const term = transferSearch.toLowerCase();
+        const trNum = group.transferNumber
+          ? `tr-${String(group.transferNumber).padStart(3, "0")}`
+          : null;
+        if (trNum && trNum.includes(term)) return true;
         return group.items.some((item) => {
           const isRfid = item.transfer_type === "rfid";
           const prodName = isRfid
@@ -604,6 +611,9 @@ export function WarehouseTransferHistory() {
       toWarehouse: group.toWarehouse,
       items: printItems,
       notes: group.notes || undefined,
+      transferNumber: group.transferNumber
+        ? `TR-${String(group.transferNumber).padStart(3, "0")}`
+        : undefined,
     });
   };
 
@@ -705,6 +715,11 @@ export function WarehouseTransferHistory() {
                 <React.Fragment key={group.key}>
                   <TableRow className={isPending ? "bg-yellow-50/50" : isEnCurso ? "bg-blue-50/50" : ""}>
                     <TableCell className="text-xs">
+                      {group.transferNumber && (
+                        <div className="font-mono font-bold text-primary text-[11px] mb-0.5">
+                          TR-{String(group.transferNumber).padStart(3, "0")}
+                        </div>
+                      )}
                       {format(new Date(group.date), "dd/MM/yyyy HH:mm", { locale: es })}
                     </TableCell>
                     <TableCell className="text-sm font-medium">{group.fromWarehouse}</TableCell>

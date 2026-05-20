@@ -331,6 +331,10 @@ export function WarehouseTransferDialog({
       const results = { rfidCount: 0, manualCount: 0 };
       const groupId = crypto.randomUUID();
 
+      const { data: nextNum, error: numError } = await (supabase as any).rpc("get_next_transfer_number");
+      if (numError) throw numError;
+      const transferNumber: number = nextNum;
+
       // Save RFID tags as pending transfers (NO stock movement)
       if (scannedTags.length > 0) {
         const transfers = scannedTags.map(tag => ({
@@ -342,6 +346,7 @@ export function WarehouseTransferDialog({
           created_at: transferDate.toISOString(),
           status: "pendiente",
           transfer_group_id: groupId,
+          transfer_number: transferNumber,
         }));
 
         const { error: transferError } = await supabase
@@ -370,6 +375,7 @@ export function WarehouseTransferDialog({
             created_at: transferDate.toISOString(),
             status: "pendiente",
             transfer_group_id: groupId,
+            transfer_number: transferNumber,
           });
 
         results.manualCount += item.quantity;
