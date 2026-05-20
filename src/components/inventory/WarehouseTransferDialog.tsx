@@ -129,21 +129,30 @@ export function WarehouseTransferDialog({
     enabled: !!fromWarehouseId,
   });
 
-  // Fetch batches for selected product
+  // Fetch batches for selected product filtered by source warehouse
   const { data: productBatches = [] } = useQuery({
-    queryKey: ["batches_for_transfer", selectedProductId],
+    queryKey: ["batches_for_transfer", selectedProductId, fromWarehouseId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("product_batches")
-        .select("id, batch_number, expiration_date, current_quantity")
-        .eq("product_id", selectedProductId)
-        .eq("is_active", true)
-        .gt("current_quantity", 0)
-        .order("expiration_date", { ascending: true });
+      const { data, error } = await (supabase as any)
+        .from("batch_warehouse_stock")
+        .select("quantity, product_batches!inner(id, batch_number, expiration_date, product_id, is_active)")
+        .eq("warehouse_id", fromWarehouseId)
+        .eq("product_batches.product_id", selectedProductId)
+        .eq("product_batches.is_active", true)
+        .gt("quantity", 0);
       if (error) throw error;
-      return data;
+      return (data || [])
+        .map((bws: any) => ({
+          id: bws.product_batches.id,
+          batch_number: bws.product_batches.batch_number,
+          expiration_date: bws.product_batches.expiration_date,
+          current_quantity: bws.quantity,
+        }))
+        .sort((a: any, b: any) =>
+          new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime()
+        );
     },
-    enabled: !!selectedProductId,
+    enabled: !!selectedProductId && !!fromWarehouseId,
   });
 
   // Set default warehouses when loaded
