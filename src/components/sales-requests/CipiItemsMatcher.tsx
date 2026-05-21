@@ -81,24 +81,46 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
     [items]
   );
 
-  // Batches for all linked products
+  // Batches for all linked products, enriched with per-warehouse stock from batch_warehouse_stock
   const { data: batchesByProduct = {} } = useQuery({
     queryKey: ["cipi-product-batches", linkedProductIds],
     enabled: linkedProductIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: batchData, error: batchError } = await supabase
         .from("product_batches")
-        .select("id, product_id, batch_number, expiration_date, current_quantity")
+        .select("id, product_id, batch_number, expiration_date")
         .in("product_id", linkedProductIds)
         .eq("is_active", true)
-        .gt("current_quantity", 0)
         .order("expiration_date", { ascending: true });
-      if (error) throw error;
-      const grouped: Record<string, Array<{ id: string; batch_number: string; expiration_date: string; current_quantity: number }>> = {};
-      (data || []).forEach(b => {
+      if (batchError) throw batchError;
+
+      const batchIds = (batchData || []).map((b) => b.id);
+      let stockMap: Record<string, Record<string, number>> = {};
+
+      if (batchIds.length > 0) {
+        const { data: stockData, error: stockError } = await (supabase as any)
+          .from("batch_warehouse_stock")
+          .select("batch_id, warehouse_id, quantity")
+          .in("batch_id", batchIds)
+          .gt("quantity", 0);
+        if (stockError) throw stockError;
+        for (const row of (stockData || []) as any[]) {
+          if (!stockMap[row.batch_id]) stockMap[row.batch_id] = {};
+          stockMap[row.batch_id][row.warehouse_id] = row.quantity;
+        }
+      }
+
+      const grouped: Record<
+        string,
+        Array<{ id: string; batch_number: string; expiration_date: string; current_quantity: number; warehouseStock: Record<string, number> }>
+      > = {};
+      for (const b of batchData || []) {
+        const ws = stockMap[b.id] || {};
+        const totalStock = Object.values(ws).reduce((s, q) => s + q, 0);
+        if (totalStock === 0) continue;
         if (!grouped[b.product_id]) grouped[b.product_id] = [];
-        grouped[b.product_id].push(b);
-      });
+        grouped[b.product_id].push({ ...b, current_quantity: totalStock, warehouseStock: ws });
+      }
       return grouped;
     },
   });
@@ -361,7 +383,11 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
           </TableHeader>
           <TableBody>
             {sortedItems.map((item: any) => {
-              const productBatches = item.product_id ? (batchesByProduct[item.product_id] || []) : [];
+              const effectiveWarehouseId: string | null = item.warehouse_id || generalWarehouseId || null;
+              const allProductBatches = item.product_id ? (batchesByProduct[item.product_id] || []) : [];
+              const productBatches = effectiveWarehouseId
+                ? allProductBatches.filter(b => (b.warehouseStock[effectiveWarehouseId] ?? 0) > 0)
+                : allProductBatches;
               const hasProduct = !!item.product_id;
               return (
                 <TableRow key={item.id}>
@@ -495,11 +521,16 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
                               Sin lotes con stock
                             </div>
                           )}
-                          {productBatches.map((b) => (
-                            <SelectItem key={b.id} value={b.id} className="text-xs">
-                              {b.batch_number} · Cad: {b.expiration_date} · Stk: {b.current_quantity}
-                            </SelectItem>
-                          ))}
+                          {productBatches.map((b) => {
+                            const stockQty = effectiveWarehouseId
+                              ? (b.warehouseStock[effectiveWarehouseId] ?? 0)
+                              : b.current_quantity;
+                            return (
+                              <SelectItem key={b.id} value={b.id} className="text-xs">
+                                {b.batch_number} · Cad: {b.expiration_date} · Stk: {stockQty}
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                     ) : item.lote ? (
