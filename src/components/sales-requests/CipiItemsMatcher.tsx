@@ -522,12 +522,30 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
                             </div>
                           )}
                           {productBatches.map((b) => {
-                            const stockQty = effectiveWarehouseId
-                              ? (b.warehouseStock[effectiveWarehouseId] ?? 0)
-                              : b.current_quantity;
+                            if (effectiveWarehouseId) {
+                              const stockQty = b.warehouseStock[effectiveWarehouseId] ?? 0;
+                              return (
+                                <SelectItem key={b.id} value={b.id} className="text-xs">
+                                  {b.batch_number} · Cad: {b.expiration_date} · Stk: {stockQty}
+                                </SelectItem>
+                              );
+                            }
+                            const warehouseEntries = Object.entries(b.warehouseStock).filter(([, qty]) => qty > 0);
                             return (
-                              <SelectItem key={b.id} value={b.id} className="text-xs">
-                                {b.batch_number} · Cad: {b.expiration_date} · Stk: {stockQty}
+                              <SelectItem key={b.id} value={b.id} className="text-xs py-2">
+                                <div>
+                                  <div>{b.batch_number} · Cad: {b.expiration_date}</div>
+                                  <div className="text-[10px] text-muted-foreground mt-0.5 flex flex-wrap gap-x-2">
+                                    {warehouseEntries.map(([wId, qty]) => {
+                                      const wName = warehouses.find((w) => w.id === wId)?.name ?? wId.slice(0, 8);
+                                      return (
+                                        <span key={wId}>
+                                          {wName}: <span className="font-medium text-foreground">{qty}</span>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
                               </SelectItem>
                             );
                           })}
