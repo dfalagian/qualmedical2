@@ -133,16 +133,22 @@ export function PriceTypesEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);
 
-  // Recalcular porcentajes cuando cambia el costo base
+  // Cuando cambia el costo base: mantener porcentajes fijos y recalcular precios sin IVA
   useEffect(() => {
-    setPercentages((prev) => {
-      const updated = { ...prev };
-      for (const key of PRICE_KEYS) {
-        const manual = parseFloat(manuals[key]) || 0;
-        updated[key] = toPercent(costPrice, manual);
+    if (costPrice <= 0) return;
+    const newManuals = { ...manuals };
+    let changed = false;
+    for (const key of PRICE_KEYS) {
+      const percent = parseFloat(percentages[key]) || 0;
+      if (percent > 0) {
+        newManuals[key] = fromPercent(costPrice, percent);
+        changed = true;
       }
-      return updated;
-    });
+    }
+    if (changed) {
+      setManuals(newManuals);
+      onChange(buildPrices(newManuals, taxRate));
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [costPrice]);
 
