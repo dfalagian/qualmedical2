@@ -84,6 +84,30 @@ serve(async (req) => {
       throw new Error('Error al eliminar roles del usuario');
     }
 
+    // NULL out all nullable FK references to profiles(id) that lack ON DELETE CASCADE/SET NULL.
+    // Without this, the profile deletion fails with a FK violation if the user was referenced
+    // as reviewer, creator, approver, etc. in any of these tables.
+    const nullifyUpdates = [
+      supabaseAdmin.from('documents').update({ reviewed_by: null }).eq('reviewed_by', userId),
+      supabaseAdmin.from('purchase_orders').update({ created_by: null }).eq('created_by', userId),
+      supabaseAdmin.from('products').update({ supplier_id: null }).eq('supplier_id', userId),
+      supabaseAdmin.from('inventory_movements').update({ created_by: null }).eq('created_by', userId),
+      supabaseAdmin.from('stock_alerts').update({ resolved_by: null }).eq('resolved_by', userId),
+      supabaseAdmin.from('product_price_history').update({ created_by: null }).eq('created_by', userId),
+      supabaseAdmin.from('purchase_order_items').update({ price_updated_by: null }).eq('price_updated_by', userId),
+      supabaseAdmin.from('quotes').update({ approved_by: null }).eq('approved_by', userId),
+      supabaseAdmin.from('quotes').update({ cancelled_by: null }).eq('cancelled_by', userId),
+      supabaseAdmin.from('warehouse_transfers').update({ created_by: null }).eq('created_by', userId),
+    ];
+
+    const nullifyResults = await Promise.all(nullifyUpdates);
+    for (const { error } of nullifyResults) {
+      if (error) {
+        console.error('Error nullifying FK reference:', error);
+        throw new Error('Error al limpiar referencias del usuario');
+      }
+    }
+
     // Delete profile
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
