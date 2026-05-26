@@ -161,8 +161,12 @@ export const AuthForm = () => {
 
     try {
       const redirectUrl = `${window.location.origin}/`;
-      
+      const tipoPersonaValue = data.rfc.length === 13 ? 'fisica' : 'moral';
+
       // Crear usuario con Supabase Auth
+      // Todos los campos del perfil se pasan en raw_user_meta_data para que
+      // el trigger handle_new_user los guarde directamente (evita upsert
+      // posterior que falla por RLS cuando el email no está confirmado).
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -170,6 +174,11 @@ export const AuthForm = () => {
           emailRedirectTo: redirectUrl,
           data: {
             full_name: data.full_name,
+            company_name: data.company_name,
+            rfc: data.rfc,
+            phone: data.phone || null,
+            tipo_persona: tipoPersonaValue,
+            tipo_venta: data.tipo_venta,
           }
         }
       });
@@ -183,29 +192,6 @@ export const AuthForm = () => {
 
       if (!authData.user) {
         throw new Error("Error al crear la cuenta");
-      }
-
-      // Determinar tipo de persona por longitud del RFC
-      const tipoPersonaValue = data.rfc.length === 13 ? 'fisica' : 'moral';
-
-      // Actualizar perfil con tipo_persona y tipo_venta
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert({
-          id: authData.user.id,
-          email: data.email,
-          full_name: data.full_name,
-          company_name: data.company_name,
-          rfc: data.rfc,
-          phone: data.phone || null,
-          tipo_persona: tipoPersonaValue,
-          tipo_venta: data.tipo_venta,
-        }, {
-          onConflict: 'id'
-        });
-
-      if (profileError) {
-        throw new Error("Error al actualizar el perfil");
       }
 
       toast.success("Cuenta creada correctamente. Puedes iniciar sesión.");
