@@ -169,14 +169,22 @@ export function CreateProductModal({ open, onOpenChange }: CreateProductModalPro
           {/* Fila 3: Categoría + Unidad */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="cp-category" className="text-xs">Categoría</Label>
-              <Input
-                id="cp-category"
+              <Label className="text-xs">Categoría</Label>
+              <Select
                 value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-                placeholder="Ej: Medicamentos"
-                className="h-9"
-              />
+                onValueChange={(value) => setForm({ ...form, category: value })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Seleccionar categoría..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Medicamentos">Medicamentos</SelectItem>
+                  <SelectItem value="Oncológicos">Oncológicos</SelectItem>
+                  <SelectItem value="Inmunoterapia">Inmunoterapia</SelectItem>
+                  <SelectItem value="Insumos">Insumos</SelectItem>
+                  <SelectItem value="Otros">Otros</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Unidad</Label>
