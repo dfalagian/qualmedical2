@@ -43,11 +43,6 @@ serve(async (req) => {
       .update({ extraction_status: 'processing' })
       .eq('id', requestId);
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY no está configurado');
-    }
-
     // Build prompt content
     const contentParts: any[] = [];
     let hasContent = false;
@@ -82,14 +77,12 @@ serve(async (req) => {
 
           if (isPdf) {
             contentParts.push({
-              type: 'image_url',
-              image_url: { url: `data:application/pdf;base64,${base64}` },
+              inline_data: { mime_type: 'application/pdf', data: base64 },
             });
             hasContent = true;
           } else if (isImage) {
             contentParts.push({
-              type: 'image_url',
-              image_url: { url: `data:${mimeType};base64,${base64}` },
+              inline_data: { mime_type: mimeType, data: base64 },
             });
             hasContent = true;
           } else {
@@ -117,7 +110,6 @@ serve(async (req) => {
     // If there's raw text
     if (request.raw_text) {
       contentParts.push({
-        type: 'text',
         text: `Texto proporcionado por el proveedor:\n${request.raw_text}`,
       });
       hasContent = true;
@@ -136,7 +128,6 @@ serve(async (req) => {
 
     // Add instruction
     contentParts.unshift({
-      type: 'text',
       text: `Analiza el siguiente documento o texto de un proveedor y extrae TODA la información posible.
 
 Responde ÚNICAMENTE con un objeto JSON válido con las siguientes secciones (incluye solo las que apliquen):
@@ -175,49 +166,42 @@ Si algún campo no está disponible, omítelo. No inventes datos.`,
 
     console.log('Enviando a Gemini para extracción...');
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'Eres un experto en análisis de documentos comerciales y fiscales mexicanos. Extraes información estructurada de facturas, listas de productos, cotizaciones y otros documentos. Responde siempre en JSON válido.',
+    const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
+    if (!GEMINI_API_KEY) throw new Error('GEMINIKEY no está configurado');
+
+    const aiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: 'Eres un experto en análisis de documentos comerciales y fiscales mexicanos. Extraes información estructurada de facturas, listas de productos, cotizaciones y otros documentos. Responde siempre en JSON válido.' }]
           },
-          {
-            role: 'user',
-            content: contentParts,
-          },
-        ],
-        max_tokens: 4096,
-      }),
-    });
+          contents: [{ role: 'user', parts: contentParts }],
+          generationConfig: { maxOutputTokens: 4096 },
+        }),
+      }
+    );
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
       console.error('Error de AI gateway:', aiResponse.status, errText);
 
       const status = aiResponse.status;
-      if (status === 429 || status === 402) {
+      if (status === 429) {
         await supabase.from('sales_requests').update({
           extraction_status: 'failed',
-          extracted_data: { error: status === 429 ? 'Límite de solicitudes excedido' : 'Créditos insuficientes' },
+          extracted_data: { error: 'Límite de solicitudes excedido' },
         }).eq('id', requestId);
-
-        return new Response(JSON.stringify({
-          error: status === 429 ? 'Rate limit exceeded' : 'Payment required',
-        }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       throw new Error(`AI error: ${aiResponse.status}`);
     }
 
     const aiData = await aiResponse.json();
-    const responseContent = aiData.choices?.[0]?.message?.content || '';
+    const responseContent = aiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     console.log('Respuesta AI recibida, parseando...');
 

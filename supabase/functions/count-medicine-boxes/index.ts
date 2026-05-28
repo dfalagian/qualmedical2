@@ -20,25 +20,26 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY no configurado");
+    const GEMINI_API_KEY = Deno.env.get("GEMINIKEY");
+    if (!GEMINI_API_KEY) {
+      throw new Error("GEMINIKEY no configurado");
     }
+
+    // Parse data URL to extract media type and raw base64
+    const dataUrlMatch = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
+    const mediaType = dataUrlMatch ? dataUrlMatch[1] : "image/jpeg";
+    const rawBase64 = dataUrlMatch ? dataUrlMatch[2] : imageBase64;
 
     console.log("Iniciando análisis de imagen con IA mejorada...");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro", // Modelo más potente para mejor precisión
-        messages: [
-          {
-            role: "system",
-            content: `Eres un experto en análisis de inventarios médicos con visión artificial avanzada. 
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: `Eres un experto en análisis de inventarios médicos con visión artificial avanzada.
 Tu tarea es contar con máxima precisión el número de cajas de medicamentos en imágenes.
 
 INSTRUCCIONES CRÍTICAS:
@@ -51,14 +52,20 @@ INSTRUCCIONES CRÍTICAS:
 7. Describe la organización espacial de las cajas
 8. Detecta si hay anomalías (cajas dañadas, mal etiquetadas, etc.)
 
-IMPORTANTE: Sé conservador en el conteo. Es mejor reportar menos cajas con alta confianza que más cajas con incertidumbre.`
+IMPORTANTE: Sé conservador en el conteo. Es mejor reportar menos cajas con alta confianza que más cajas con incertidumbre.` }]
           },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `Analiza esta imagen de inventario médico y proporciona:
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  inline_data: {
+                    mime_type: mediaType,
+                    data: rawBase64,
+                  }
+                },
+                {
+                  text: `Analiza esta imagen de inventario médico y proporciona:
 
 FORMATO DE RESPUESTA (usa EXACTAMENTE este formato):
 ---
@@ -74,19 +81,17 @@ DETALLES DEL ANÁLISIS:
 4. Recomendaciones: [sugerencias para mejorar el conteo si aplica]
 
 Si la calidad de imagen es insuficiente para un conteo preciso, indícalo claramente.`
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: imageBase64
                 }
-              }
-            ]
-          }
-        ],
-        temperature: 0.2, // Baja temperatura para más consistencia
-      }),
-    });
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 1024,
+          },
+        }),
+      }
+    );
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -112,7 +117,7 @@ Si la calidad de imagen es insuficiente para un conteo preciso, indícalo claram
     }
 
     const data = await response.json();
-    const analysis = data.choices?.[0]?.message?.content;
+    const analysis = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!analysis) {
       throw new Error("No se recibió respuesta del modelo");
@@ -158,7 +163,7 @@ Si la calidad de imagen es insuficiente para un conteo preciso, indícalo claram
         warnings: warnings.length > 0 ? warnings : undefined,
         success: true,
         metadata: {
-          model: "google/gemini-2.5-pro",
+          model: "gemini-2.0-flash",
           timestamp: new Date().toISOString(),
         }
       }),

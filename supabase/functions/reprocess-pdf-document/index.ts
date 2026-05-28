@@ -109,42 +109,39 @@ serve(async (req) => {
 
     console.log('PDF descargado y convertido a base64, tamaño:', pdfArrayBuffer.byteLength, 'bytes');
 
-    // Usar Gemini para procesar el PDF directamente (soporta PDFs nativamente)
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY no está configurado');
+    const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINIKEY no está configurado');
     }
 
-    // Determinar número máximo de páginas según tipo de documento
-    const maxPages = document.document_type === 'acta_constitutiva' ? 50 : 20;
+    console.log(`Procesando PDF con Gemini...`);
 
-    console.log(`Procesando PDF con Gemini Vision (máx ${maxPages} páginas)...`);
-
-    // Llamar a Gemini para extraer información del PDF
-    const extractionResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { 
-            role: 'system', 
-            content: `Eres un experto en análisis de documentos legales y fiscales mexicanos. Tu trabajo es:
+    const extractionResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: `Eres un experto en análisis de documentos legales y fiscales mexicanos. Tu trabajo es:
 1. Verificar que el documento sea del tipo correcto: ${document.document_type}
 2. Extraer la información relevante del documento
 3. Determinar el número total de páginas del documento
 
-Responde SIEMPRE en formato JSON válido.` 
+Responde SIEMPRE en formato JSON válido.` }]
           },
-          {
-            role: 'user',
-            content: [
-              { 
-                type: 'text', 
-                text: `Analiza este documento PDF que debería ser de tipo "${document.document_type}".
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inline_data: {
+                    mime_type: 'application/pdf',
+                    data: pdfBase64,
+                  }
+                },
+                {
+                  text: `Analiza este documento PDF que debería ser de tipo "${document.document_type}".
 
 Extrae la siguiente información según el tipo de documento:
 
@@ -167,23 +164,18 @@ Para constancia_fiscal:
 Para otros documentos, extrae la información relevante disponible.
 
 Responde ÚNICAMENTE con un objeto JSON con los campos encontrados y un campo "is_valid" (boolean) indicando si es un documento válido del tipo esperado.`
-              },
-              {
-                type: 'image_url',
-                image_url: { 
-                  url: `data:application/pdf;base64,${pdfBase64}` 
                 }
-              }
-            ]
-          }
-        ],
-        max_tokens: 4096,
-      }),
-    });
+              ]
+            }
+          ],
+          generationConfig: { maxOutputTokens: 4096 },
+        }),
+      }
+    );
 
     if (!extractionResponse.ok) {
       const errorText = await extractionResponse.text();
-      console.error('Error de Gemini:', errorText);
+      console.error('Error de Claude:', errorText);
       
       await supabaseClient
         .from('documents')
@@ -200,8 +192,8 @@ Responde ÚNICAMENTE con un objeto JSON con los campos encontrados y un campo "i
     }
 
     const extractionData = await extractionResponse.json();
-    const responseContent = extractionData.choices[0]?.message?.content;
-    
+    const responseContent = extractionData.candidates?.[0]?.content?.parts?.[0]?.text;
+
     console.log('Respuesta de Gemini:', responseContent);
 
     // Parsear la respuesta JSON

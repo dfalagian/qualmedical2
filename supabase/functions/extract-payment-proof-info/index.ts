@@ -40,41 +40,90 @@ serve(async (req) => {
     }
     
     const imageBuffer = await imageData.arrayBuffer();
-    
+
     // Usar la API nativa de Deno para base64 (maneja archivos grandes sin stack overflow)
     const base64Image = base64Encode(imageBuffer);
-    const imageDataUrl = `data:image/jpeg;base64,${base64Image}`;
 
-    console.log('Imagen descargada, tamaño:', imageBuffer.byteLength);
-    
+    // Detectar mime type según extensión
+    const lowerPath = filePath.toLowerCase();
+    let mimeType = 'image/jpeg';
+    if (lowerPath.endsWith('.pdf')) {
+      mimeType = 'application/pdf';
+    } else if (lowerPath.endsWith('.png')) {
+      mimeType = 'image/png';
+    }
+
+    console.log('Imagen descargada, tamaño:', imageBuffer.byteLength, 'mime:', mimeType);
+
     // Obtener la URL pública para guardarla en la base de datos
     const { data: { publicUrl } } = supabaseAdmin.storage
       .from('documents')
       .getPublicUrl(filePath);
 
-    // Llamar a Lovable AI para extraer la fecha de pago
-    console.log('Llamando a Lovable AI para extraer fecha de pago...');
-    
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY no está configurada');
+    // Llamar a Gemini para extraer la información del comprobante
+    console.log('Llamando a Gemini para extraer información del comprobante...');
+
+    const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINIKEY no está configurada');
     }
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Analiza este comprobante de pago bancario mexicano y extrae la siguiente información:
+    const aiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tools: [
+            {
+              functionDeclarations: [
+                {
+                  name: 'extract_payment_info',
+                  description: 'Extrae la información del comprobante de pago bancario',
+                  parameters: {
+                    type: 'object',
+                    properties: {
+                      fecha_pago: {
+                        type: 'string',
+                        description: 'Fecha de pago en formato YYYY-MM-DD, o null si no está visible'
+                      },
+                      numero_cuenta: {
+                        type: 'string',
+                        description: 'Número de cuenta destino (puede ser cuenta completa o CLABE), o null si no está visible'
+                      },
+                      tipo_cuenta: {
+                        type: 'string',
+                        description: 'Tipo de cuenta (Ahorro, Corriente, CLABE, etc.), o null si no está visible'
+                      },
+                      monto: {
+                        type: 'number',
+                        description: 'Monto/Importe de la transferencia como número decimal, o null si no está visible'
+                      }
+                    },
+                    required: ['fecha_pago', 'numero_cuenta', 'tipo_cuenta', 'monto']
+                  }
+                }
+              ]
+            }
+          ],
+          toolConfig: {
+            functionCallingConfig: {
+              mode: 'ANY',
+              allowedFunctionNames: ['extract_payment_info'],
+            }
+          },
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64Image,
+                  }
+                },
+                {
+                  text: `Analiza este comprobante de pago bancario mexicano y extrae la siguiente información:
 
 **Instrucciones MUY importantes:**
 1. Busca la fecha de pago/transferencia en el documento
@@ -82,7 +131,7 @@ serve(async (req) => {
 3. Devuelve la fecha en formato YYYY-MM-DD
 4. Extrae el número de cuenta destino (puede ser cuenta completa o CLABE)
 5. Identifica el tipo de cuenta (puede ser "Ahorro", "Corriente", "CLABE", etc.)
-6. **CRÍTICO PARA EL MONTO**: 
+6. **CRÍTICO PARA EL MONTO**:
    - Busca el monto principal de la transferencia en campos como "Monto", "Importe", "Cantidad", "Referere", "Total"
    - El monto suele estar precedido por el símbolo "$" o "MXN"
    - IGNORA montos que aparezcan dentro de razones sociales o nombres de empresas (ej: "SA de CV ($1)" NO es el monto)
@@ -92,75 +141,33 @@ serve(async (req) => {
 7. Si no encuentras algún dato, devuelve null
 
 Por favor, extrae toda la información solicitada del comprobante de pago.`
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: imageDataUrl
                 }
-              }
-            ]
-          }
-        ],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'extract_payment_info',
-              description: 'Extrae la información del comprobante de pago bancario',
-              parameters: {
-                type: 'object',
-                properties: {
-                  fecha_pago: {
-                    type: 'string',
-                    description: 'Fecha de pago en formato YYYY-MM-DD, o null si no está visible'
-                  },
-                  numero_cuenta: {
-                    type: 'string',
-                    description: 'Número de cuenta destino (puede ser cuenta completa o CLABE), o null si no está visible'
-                  },
-                  tipo_cuenta: {
-                    type: 'string',
-                    description: 'Tipo de cuenta (Ahorro, Corriente, CLABE, etc.), o null si no está visible'
-                  },
-                  monto: {
-                    type: 'number',
-                    description: 'Monto/Importe de la transferencia como número decimal, o null si no está visible'
-                  }
-                },
-                required: ['fecha_pago', 'numero_cuenta', 'tipo_cuenta', 'monto']
-              }
+              ]
             }
-          }
-        ],
-        tool_choice: 'required'
-      })
-    });
+          ],
+          generationConfig: { maxOutputTokens: 1024 },
+        })
+      }
+    );
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error('Error de IA:', errorText);
-      throw new Error(`Error llamando a Lovable AI: ${aiResponse.statusText}`);
+      throw new Error(`Error llamando a Gemini: ${aiResponse.statusText}`);
     }
 
     const aiData = await aiResponse.json();
     console.log('Respuesta de IA recibida:', JSON.stringify(aiData));
 
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) {
+    const parts = aiData.candidates?.[0]?.content?.parts || [];
+    const functionCallPart = parts.find((p: any) => p.functionCall);
+    if (!functionCallPart) {
       throw new Error('No se recibió respuesta válida de la IA');
     }
 
     let extractedInfo;
     try {
-      const content = toolCall.function.arguments;
-      // Intentar parsear directamente
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        extractedInfo = JSON.parse(jsonMatch[0]);
-      } else {
-        extractedInfo = JSON.parse(content);
-      }
+      extractedInfo = functionCallPart.functionCall.args;
     } catch (parseError) {
       console.error('Error parseando respuesta de AI:', parseError);
       extractedInfo = {

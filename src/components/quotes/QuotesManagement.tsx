@@ -111,6 +111,7 @@ interface QuoteItem {
   precio_unitario: number;
   importe: number;
   tipo_precio: PriceType;
+  available_quantity?: number | null;
   categoria: string | null;
   is_sub_product?: boolean;
   parent_item_id?: string | null;
@@ -465,6 +466,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
       precio_unitario: precio,
       importe: importe,
       tipo_precio: selectedPriceType,
+      available_quantity: batchInfo?.availableQuantity ?? null,
       categoria: product.category,
       precios_disponibles: {
         price_type_1: product.price_type_1 || 0,
@@ -531,7 +533,11 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
   const handleUpdateQuantity = (id: string, newQuantity: number) => {
     setQuoteItems(quoteItems.map(item => {
       if (item.id === id) {
-        const cantidad = Math.max(1, newQuantity);
+        const maxQty = item.available_quantity ?? Infinity;
+        const cantidad = Math.min(maxQty, Math.max(1, newQuantity));
+        if (newQuantity > maxQty) {
+          toast.warning(`Stock insuficiente. Solo hay ${maxQty} piezas disponibles de este lote.`, { duration: 3000 });
+        }
         return {
           ...item,
           cantidad,
@@ -1286,6 +1292,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                             <Input
                               type="number"
                               min={1}
+                              max={item.available_quantity ?? undefined}
                               value={item.cantidad}
                               onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
                               className="w-16 h-8 text-center"

@@ -306,13 +306,12 @@ serve(async (req) => {
       console.log('⚠️ ADVERTENCIA: Documento muy grande detectado. Esto puede causar timeouts.');
     }
 
-    console.log('Llamando a Lovable AI para extraer información y validar autenticidad');
+    console.log('Llamando a Claude para extraer información y validar autenticidad');
     console.log('Tipo de documento:', document.document_type);
 
-    // Llamar a Lovable AI para extraer información
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY no está configurado');
+    const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINIKEY no está configurado');
     }
 
     // PASO 1: Primero validar que el documento sea legítimo
@@ -322,71 +321,72 @@ serve(async (req) => {
     let validationResponse;
     try {
       validationResponse = await retryWithBackoff(async () => {
-        const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-pro',
-            messages: [
-              { 
-                role: 'system', 
-                content: 'Eres un experto en validación de documentos legales y fiscales mexicanos. Tu trabajo es determinar si una imagen contiene el tipo de documento esperado o si es una imagen falsa/irrelevante.' 
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              system_instruction: {
+                parts: [{ text: 'Eres un experto en validación de documentos legales y fiscales mexicanos. Tu trabajo es determinar si una imagen contiene el tipo de documento esperado o si es una imagen falsa/irrelevante.' }]
               },
-              {
-                role: 'user',
-                content: [
-                  { 
-                    type: 'text', 
-                    text: validationPrompt
-                  },
-                  ...imageDataArray.map(imgData => ({
-                    type: 'image_url' as const,
-                    image_url: { 
-                      url: `data:${imgData.mimeType};base64,${imgData.base64}` 
-                    }
-                  }))
-                ]
-              }
-            ],
-            tools: [
-              {
-                type: 'function',
-                function: {
-                  name: 'validate_document',
-                  description: 'Validar si el documento es auténtico y del tipo correcto',
-                  parameters: {
-                    type: 'object',
-                    properties: {
-                      is_valid_type: { 
-                        type: 'boolean', 
-                        description: 'true si el documento es del tipo esperado, false si es una foto random, ticket, o documento no relacionado' 
-                      },
-                      confidence_score: { 
-                        type: 'number', 
-                        description: 'Puntuación de confianza de 0 a 100 sobre la autenticidad del documento' 
-                      },
-                      validation_notes: { 
-                        type: 'string', 
-                        description: 'Notas sobre por qué el documento es válido o no. Si es inválido, explicar qué se detectó en la imagen.' 
-                      },
-                      detected_issues: {
-                        type: 'array',
-                        items: { type: 'string' },
-                        description: 'Lista de problemas específicos detectados (baja calidad, texto ilegible, no es el documento correcto, etc.)'
+              tools: [
+                {
+                  functionDeclarations: [
+                    {
+                      name: 'validate_document',
+                      description: 'Validar si el documento es auténtico y del tipo correcto',
+                      parameters: {
+                        type: 'object',
+                        properties: {
+                          is_valid_type: {
+                            type: 'boolean',
+                            description: 'true si el documento es del tipo esperado, false si es una foto random, ticket, o documento no relacionado'
+                          },
+                          confidence_score: {
+                            type: 'number',
+                            description: 'Puntuación de confianza de 0 a 100 sobre la autenticidad del documento'
+                          },
+                          validation_notes: {
+                            type: 'string',
+                            description: 'Notas sobre por qué el documento es válido o no. Si es inválido, explicar qué se detectó en la imagen.'
+                          },
+                          detected_issues: {
+                            type: 'array',
+                            items: { type: 'string' },
+                            description: 'Lista de problemas específicos detectados (baja calidad, texto ilegible, no es el documento correcto, etc.)'
+                          }
+                        },
+                        required: ['is_valid_type', 'confidence_score', 'validation_notes', 'detected_issues']
                       }
-                    },
-                    required: ['is_valid_type', 'confidence_score', 'validation_notes', 'detected_issues'],
-                    additionalProperties: false
-                  }
+                    }
+                  ]
                 }
-              }
-            ],
-            tool_choice: { type: 'function', function: { name: 'validate_document' } }
-          }),
-        });
+              ],
+              toolConfig: {
+                functionCallingConfig: {
+                  mode: 'ANY',
+                  allowedFunctionNames: ['validate_document'],
+                }
+              },
+              contents: [
+                {
+                  role: 'user',
+                  parts: [
+                    { text: validationPrompt },
+                    ...imageDataArray.map(imgData => ({
+                      inline_data: {
+                        mime_type: imgData.mimeType,
+                        data: imgData.base64,
+                      }
+                    }))
+                  ]
+                }
+              ],
+              generationConfig: { maxOutputTokens: 1024 },
+            }),
+          }
+        );
         
         if (!response.ok) {
           throw new Error(`API error: ${response.status} ${response.statusText}`);
@@ -414,13 +414,14 @@ serve(async (req) => {
     }
 
     const validationData = await validationResponse.json();
-    const validationCall = validationData.choices[0]?.message?.tool_calls?.[0];
-    
-    if (!validationCall) {
+    const validationParts = validationData.candidates?.[0]?.content?.parts || [];
+    const validationFnCall = validationParts.find((p: any) => p.functionCall);
+
+    if (!validationFnCall) {
       throw new Error('No se recibió validación del documento');
     }
 
-    const validationResult = JSON.parse(validationCall.function.arguments);
+    const validationResult = validationFnCall.functionCall.args;
     console.log('Resultado de validación:', validationResult);
 
     // Si el documento no es válido, marcarlo y no continuar con la extracción
@@ -465,27 +466,21 @@ serve(async (req) => {
       systemPrompt = 'Eres un asistente especializado en extraer información de actas constitutivas mexicanas. Extrae la información solicitada de forma precisa y estructurada.';
       userPrompt = 'Extrae la siguiente información del acta constitutiva: Razón Social, Representante Legal, Objeto Social, y Registro Público. Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'extract_acta_info',
-              description: 'Extraer información estructurada del acta constitutiva',
-              parameters: {
-                type: 'object',
-                properties: {
-                  razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
-                  representante_legal: { type: 'string', description: 'Nombre completo del representante legal' },
-                  objeto_social: { type: 'string', description: 'Descripción del objeto social de la empresa' },
-                  registro_publico: { type: 'string', description: 'Información del registro público (número, fecha, notaría, etc.)' }
-                },
-                required: ['razon_social', 'representante_legal', 'objeto_social', 'registro_publico'],
-                additionalProperties: false
-              }
-            }
+        tools: [{ functionDeclarations: [{
+          name: 'extract_acta_info',
+          description: 'Extraer información estructurada del acta constitutiva',
+          parameters: {
+            type: 'object',
+            properties: {
+              razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
+              representante_legal: { type: 'string', description: 'Nombre completo del representante legal' },
+              objeto_social: { type: 'string', description: 'Descripción del objeto social de la empresa' },
+              registro_publico: { type: 'string', description: 'Información del registro público (número, fecha, notaría, etc.)' }
+            },
+            required: ['razon_social', 'representante_legal', 'objeto_social', 'registro_publico']
           }
-        ],
-        tool_choice: { type: 'function', function: { name: 'extract_acta_info' } }
+        }]}],
+        toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['extract_acta_info'] } }
       };
     } else if (document.document_type === 'constancia_fiscal') {
       systemPrompt = 'Eres un experto en documentos fiscales del SAT mexicano. Tu trabajo es extraer SOLO la información exacta que se te solicita, sin confundir conceptos.';
@@ -535,57 +530,45 @@ REGLA FINAL:
 
 Si NO encuentras algún dato, escribe "No encontrado".`;
       toolConfig = {
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'extract_constancia_info',
-              description: 'Extraer información estructurada de la constancia de situación fiscal',
-              parameters: {
-                type: 'object',
-                properties: {
-                  razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
-                  rfc: { type: 'string', description: 'RFC del contribuyente' },
-                  actividad_economica: { type: 'string', description: 'Actividad económica principal' },
-                  regimen_tributario: { type: 'string', description: 'Tipo de constitución legal (ej: SOCIEDAD ANONIMA DE CAPITAL VARIABLE, PERSONA FÍSICA, etc.)' },
-                  regimen_fiscal: { type: 'string', description: 'Régimen fiscal del SAT. PUEDE tener dos formatos: 1) Código de 3 dígitos + guión + descripción (ej: "601 - General de Ley Personas Morales", "626 - Régimen Simplificado de Confianza"), 2) Solo nombre del régimen sin código (ej: "Régimen Simplificado de Confianza", "General de Ley Personas Morales"). NUNCA extraer tipos de constitución como "SOCIEDAD ANONIMA" o "S.A. DE C.V." - esos NO son regímenes fiscales. Si no encuentras ninguna mención del régimen fiscal en el documento, devuelve "No encontrado".' },
-                  direccion: { type: 'string', description: 'Dirección completa del domicilio fiscal' },
-                  codigo_postal: { type: 'string', description: 'Código postal del domicilio fiscal (5 dígitos)' },
-                  fecha_emision: { type: 'string', description: 'Fecha de emisión de la constancia en formato YYYY-MM-DD' }
-                },
-                required: ['razon_social', 'rfc', 'actividad_economica', 'regimen_tributario', 'regimen_fiscal', 'direccion', 'codigo_postal', 'fecha_emision'],
-                additionalProperties: false
-              }
-            }
+        tools: [{ functionDeclarations: [{
+          name: 'extract_constancia_info',
+          description: 'Extraer información estructurada de la constancia de situación fiscal',
+          parameters: {
+            type: 'object',
+            properties: {
+              razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
+              rfc: { type: 'string', description: 'RFC del contribuyente' },
+              actividad_economica: { type: 'string', description: 'Actividad económica principal' },
+              regimen_tributario: { type: 'string', description: 'Tipo de constitución legal (ej: SOCIEDAD ANONIMA DE CAPITAL VARIABLE, PERSONA FÍSICA, etc.)' },
+              regimen_fiscal: { type: 'string', description: 'Régimen fiscal del SAT. PUEDE tener dos formatos: 1) Código de 3 dígitos + guión + descripción (ej: "601 - General de Ley Personas Morales", "626 - Régimen Simplificado de Confianza"), 2) Solo nombre del régimen sin código (ej: "Régimen Simplificado de Confianza", "General de Ley Personas Morales"). NUNCA extraer tipos de constitución como "SOCIEDAD ANONIMA" o "S.A. DE C.V." - esos NO son regímenes fiscales. Si no encuentras ninguna mención del régimen fiscal en el documento, devuelve "No encontrado".' },
+              direccion: { type: 'string', description: 'Dirección completa del domicilio fiscal' },
+              codigo_postal: { type: 'string', description: 'Código postal del domicilio fiscal (5 dígitos)' },
+              fecha_emision: { type: 'string', description: 'Fecha de emisión de la constancia en formato YYYY-MM-DD' }
+            },
+            required: ['razon_social', 'rfc', 'actividad_economica', 'regimen_tributario', 'regimen_fiscal', 'direccion', 'codigo_postal', 'fecha_emision']
           }
-        ],
-        tool_choice: { type: 'function', function: { name: 'extract_constancia_info' } }
+        }]}],
+        toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['extract_constancia_info'] } }
       };
     } else if (document.document_type === 'comprobante_domicilio') {
       systemPrompt = 'Eres un asistente especializado en extraer información de comprobantes de domicilio (recibos de luz, agua, teléfono, predial, etc.). Extrae la información solicitada de forma precisa y estructurada.';
       userPrompt = 'Extrae la siguiente información del comprobante de domicilio: Razón Social o Nombre del titular, RFC (si está disponible), Código Postal, y Fecha de Emisión. Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'extract_comprobante_domicilio_info',
-              description: 'Extraer información estructurada del comprobante de domicilio',
-              parameters: {
-                type: 'object',
-                properties: {
-                  razon_social: { type: 'string', description: 'Razón social o nombre del titular del servicio' },
-                  rfc: { type: 'string', description: 'RFC del titular (si está disponible en el documento)' },
-                  codigo_postal: { type: 'string', description: 'Código postal del domicilio (5 dígitos)' },
-                  fecha_emision: { type: 'string', description: 'Fecha de emisión del comprobante en formato YYYY-MM-DD' }
-                },
-                required: ['razon_social', 'codigo_postal', 'fecha_emision'],
-                additionalProperties: false
-              }
-            }
+        tools: [{ functionDeclarations: [{
+          name: 'extract_comprobante_domicilio_info',
+          description: 'Extraer información estructurada del comprobante de domicilio',
+          parameters: {
+            type: 'object',
+            properties: {
+              razon_social: { type: 'string', description: 'Razón social o nombre del titular del servicio' },
+              rfc: { type: 'string', description: 'RFC del titular (si está disponible en el documento)' },
+              codigo_postal: { type: 'string', description: 'Código postal del domicilio (5 dígitos)' },
+              fecha_emision: { type: 'string', description: 'Fecha de emisión del comprobante en formato YYYY-MM-DD' }
+            },
+            required: ['razon_social', 'codigo_postal', 'fecha_emision']
           }
-        ],
-        tool_choice: { type: 'function', function: { name: 'extract_comprobante_domicilio_info' } }
+        }]}],
+        toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['extract_comprobante_domicilio_info'] } }
       };
     } else if (document.document_type === 'aviso_funcionamiento') {
       systemPrompt = 'Eres un asistente experto en extraer información de Avisos de Funcionamiento emitidos por COFEPRIS en México. Analiza TODA la imagen con atención al detalle.';
@@ -624,123 +607,94 @@ Extrae:
 - responsable_sanitario_curp: CURP del responsable sanitario`;
 
       toolConfig = {
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'extract_aviso_funcionamiento_info',
-              description: 'Extraer información estructurada del aviso de funcionamiento',
-              parameters: {
-                type: 'object',
-                properties: {
-                  razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
-                  direccion: { type: 'string', description: 'Dirección completa del establecimiento' },
-                  responsable_sanitario_nombre: { type: 'string', description: 'Nombre completo del responsable sanitario' },
-                  responsable_sanitario_curp: { type: 'string', description: 'CURP del responsable sanitario (si está disponible)' }
-                },
-                required: ['razon_social', 'direccion', 'responsable_sanitario_nombre'],
-                additionalProperties: false
-              }
-            }
+        tools: [{ functionDeclarations: [{
+          name: 'extract_aviso_funcionamiento_info',
+          description: 'Extraer información estructurada del aviso de funcionamiento',
+          parameters: {
+            type: 'object',
+            properties: {
+              razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
+              direccion: { type: 'string', description: 'Dirección completa del establecimiento' },
+              responsable_sanitario_nombre: { type: 'string', description: 'Nombre completo del responsable sanitario' },
+              responsable_sanitario_curp: { type: 'string', description: 'CURP del responsable sanitario (si está disponible)' }
+            },
+            required: ['razon_social', 'direccion', 'responsable_sanitario_nombre']
           }
-        ],
-        tool_choice: { type: 'function', function: { name: 'extract_aviso_funcionamiento_info' } }
+        }]}],
+        toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['extract_aviso_funcionamiento_info'] } }
       };
     } else if (document.document_type === 'ine') {
       systemPrompt = 'Eres un asistente especializado en extraer información de credenciales INE mexicanas. Extrae la información solicitada de forma precisa y estructurada.';
       userPrompt = 'Extrae la siguiente información de la credencial INE: Nombre completo del titular y CURP. Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'extract_ine_info',
-              description: 'Extraer información estructurada de la credencial INE',
-              parameters: {
-                type: 'object',
-                properties: {
-                  nombre_completo: { type: 'string', description: 'Nombre completo del titular de la credencial' },
-                  curp: { type: 'string', description: 'CURP del titular (18 caracteres)' }
-                },
-                required: ['nombre_completo', 'curp'],
-                additionalProperties: false
-              }
-            }
+        tools: [{ functionDeclarations: [{
+          name: 'extract_ine_info',
+          description: 'Extraer información estructurada de la credencial INE',
+          parameters: {
+            type: 'object',
+            properties: {
+              nombre_completo: { type: 'string', description: 'Nombre completo del titular de la credencial' },
+              curp: { type: 'string', description: 'CURP del titular (18 caracteres)' }
+            },
+            required: ['nombre_completo', 'curp']
           }
-        ],
-        tool_choice: { type: 'function', function: { name: 'extract_ine_info' } }
+        }]}],
+        toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['extract_ine_info'] } }
       };
     } else if (document.document_type === 'datos_bancarios') {
       systemPrompt = 'Eres un asistente especializado en extraer información de estados de cuenta bancarios mexicanos. Extrae la información solicitada de forma precisa y estructurada.';
       userPrompt = 'Extrae la siguiente información del estado de cuenta bancario: Nombre del Banco (usualmente aparece en la parte superior izquierda o encabezado), Número de Cuenta, Número de Cuenta CLABE (18 dígitos), y Nombre del Cliente/Titular. Si algún dato no está disponible, indica "No encontrado".';
       toolConfig = {
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'extract_datos_bancarios_info',
-              description: 'Extraer información estructurada del estado de cuenta bancario',
-              parameters: {
-                type: 'object',
-                properties: {
-                  nombre_banco: { type: 'string', description: 'Nombre del banco (ej: BBVA, Santander, Banamex). Usualmente aparece en la parte superior o encabezado del documento' },
-                  numero_cuenta: { type: 'string', description: 'Número de cuenta bancaria' },
-                  numero_cuenta_clabe: { type: 'string', description: 'Número de cuenta CLABE (18 dígitos)' },
-                  nombre_cliente: { type: 'string', description: 'Nombre completo del titular o cliente de la cuenta' }
-                },
-                required: ['nombre_banco', 'numero_cuenta', 'numero_cuenta_clabe', 'nombre_cliente'],
-                additionalProperties: false
-              }
-            }
+        tools: [{ functionDeclarations: [{
+          name: 'extract_datos_bancarios_info',
+          description: 'Extraer información estructurada del estado de cuenta bancario',
+          parameters: {
+            type: 'object',
+            properties: {
+              nombre_banco: { type: 'string', description: 'Nombre del banco (ej: BBVA, Santander, Banamex). Usualmente aparece en la parte superior o encabezado del documento' },
+              numero_cuenta: { type: 'string', description: 'Número de cuenta bancaria' },
+              numero_cuenta_clabe: { type: 'string', description: 'Número de cuenta CLABE (18 dígitos)' },
+              nombre_cliente: { type: 'string', description: 'Nombre completo del titular o cliente de la cuenta' }
+            },
+            required: ['nombre_banco', 'numero_cuenta', 'numero_cuenta_clabe', 'nombre_cliente']
           }
-        ],
-        tool_choice: { type: 'function', function: { name: 'extract_datos_bancarios_info' } }
+        }]}],
+        toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['extract_datos_bancarios_info'] } }
       };
     } else {
       throw new Error(`Tipo de documento no soportado para extracción: ${document.document_type}`);
     }
 
-    // Llamar a Lovable AI para extraer información de la imagen
-    // Usar modelo más potente para documentos fiscales complejos y actas constitutivas
-    const modelToUse = (document.document_type === 'aviso_funcionamiento' || 
-                         document.document_type === 'constancia_fiscal' ||
-                         document.document_type === 'acta_constitutiva')
-      ? 'google/gemini-2.5-pro' 
-      : 'google/gemini-2.5-flash';
-    
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: modelToUse,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: [
-              { 
-                type: 'text', 
-                text: userPrompt 
-              },
-              ...imageDataArray.map(imgData => ({
-                type: 'image_url' as const,
-                image_url: { 
-                  url: `data:${imgData.mimeType};base64,${imgData.base64}` 
-                }
-              }))
-            ]
-          }
-        ],
-        ...toolConfig
-      }),
-    });
+    const aiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          ...toolConfig,
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: userPrompt },
+                ...imageDataArray.map(imgData => ({
+                  inline_data: {
+                    mime_type: imgData.mimeType,
+                    data: imgData.base64,
+                  }
+                }))
+              ]
+            }
+          ],
+          generationConfig: { maxOutputTokens: 2048 },
+        }),
+      }
+    );
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('Error de Lovable AI:', aiResponse.status, errorText);
+      console.error('Error de Claude:', aiResponse.status, errorText);
       
       if (aiResponse.status === 429) {
         await supabaseClient
@@ -764,16 +718,16 @@ Extrae:
         );
       }
 
-      throw new Error(`Error de Lovable AI: ${errorText}`);
+      throw new Error(`Error de Claude: ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
-    console.log('Respuesta de IA recibida:', JSON.stringify(aiData));
+    console.log('Respuesta de Gemini recibida:', JSON.stringify(aiData));
 
-    // Extraer la información del tool call
-    const toolCall = aiData.choices[0]?.message?.tool_calls?.[0];
-    if (!toolCall) {
-      console.error('No se recibió tool call en la respuesta');
+    const aiParts = aiData.candidates?.[0]?.content?.parts || [];
+    const aiFnCall = aiParts.find((p: any) => p.functionCall);
+    if (!aiFnCall) {
+      console.error('No se recibió functionCall en la respuesta');
       await supabaseClient
         .from('documents')
         .update({ extraction_status: 'failed' })
@@ -784,7 +738,7 @@ Extrae:
       );
     }
 
-    let extractedInfo = JSON.parse(toolCall.function.arguments);
+    let extractedInfo = aiFnCall.functionCall.args;
     console.log('Información extraída del primer bloque:', extractedInfo);
 
     // PROCESAMIENTO ADICIONAL PARA ACTA CONSTITUTIVA CON BLOQUES MÚLTIPLES
@@ -848,42 +802,40 @@ Extrae:
         
         // Procesar este bloque con IA
         try {
-          const blockResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'google/gemini-2.5-flash', // Usar modelo más rápido para bloques adicionales
-              messages: [
-                { role: 'system', content: systemPrompt },
-                {
-                  role: 'user',
-                  content: [
-                    { 
-                      type: 'text', 
-                      text: `${userPrompt}\n\nNOTA: Estás analizando las páginas ${startPage + 1}-${endPage} de un acta. Extrae SOLO la información que encuentres en estas páginas.`
-                    },
-                    ...blockImageData.map(imgData => ({
-                      type: 'image_url' as const,
-                      image_url: { 
-                        url: `data:${imgData.mimeType};base64,${imgData.base64}` 
-                      }
-                    }))
-                  ]
-                }
-              ],
-              ...toolConfig
-            }),
-          });
+          const blockResponse = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                system_instruction: { parts: [{ text: systemPrompt }] },
+                ...toolConfig,
+                contents: [
+                  {
+                    role: 'user',
+                    parts: [
+                      { text: `${userPrompt}\n\nNOTA: Estás analizando las páginas ${startPage + 1}-${endPage} de un acta. Extrae SOLO la información que encuentres en estas páginas.` },
+                      ...blockImageData.map(imgData => ({
+                        inline_data: {
+                          mime_type: imgData.mimeType,
+                          data: imgData.base64,
+                        }
+                      }))
+                    ]
+                  }
+                ],
+                generationConfig: { maxOutputTokens: 2048 },
+              }),
+            }
+          );
           
           if (blockResponse.ok) {
             const blockData = await blockResponse.json();
-            const blockToolCall = blockData.choices[0]?.message?.tool_calls?.[0];
-            
-            if (blockToolCall) {
-              const blockInfo = JSON.parse(blockToolCall.function.arguments);
+            const blockParts = blockData.candidates?.[0]?.content?.parts || [];
+            const blockFnCall = blockParts.find((p: any) => p.functionCall);
+
+            if (blockFnCall) {
+              const blockInfo = blockFnCall.functionCall.args;
               console.log(`✅ Información adicional extraída del bloque ${currentBlock + 1}:`, blockInfo);
               
               // Consolidar información

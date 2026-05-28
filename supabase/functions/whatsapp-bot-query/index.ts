@@ -236,27 +236,26 @@ Deno.serve(async (req) => {
     // Fetch relevant context data from the database
     const contextData = await getContextData(supabase, question);
 
-    // Call Lovable AI
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
+    // Call Anthropic AI
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "LOVABLE_API_KEY not configured" }),
+        JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: `Eres el asistente IA de QualMedical, una empresa de distribución de medicamentos y dispositivos médicos. 
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
+        system: `Eres el asistente IA de QualMedical, una empresa de distribución de medicamentos y dispositivos médicos.
 Respondes preguntas de gerentes sobre el estado del negocio: inventario, ventas, cotizaciones, órdenes de compra y solicitudes de venta.
 
 REGLAS:
@@ -276,8 +275,8 @@ BÚSQUEDA DE PRODUCTOS:
 - NUNCA digas que no existe un producto sin antes revisar toda la lista cuidadosamente
 
 DATOS ACTUALES DEL SISTEMA:
-${contextData}`
-          },
+${contextData}`,
+        messages: [
           {
             role: "user",
             content: question
@@ -296,7 +295,7 @@ ${contextData}`
     }
 
     const aiData = await aiResponse.json();
-    const reply = aiData.choices?.[0]?.message?.content || "No pude generar una respuesta.";
+    const reply = aiData.content?.[0]?.text || "No pude generar una respuesta.";
 
     return new Response(
       JSON.stringify({ authorized: true, reply }),

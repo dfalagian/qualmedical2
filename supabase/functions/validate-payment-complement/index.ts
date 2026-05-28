@@ -8,7 +8,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -21,12 +20,10 @@ serve(async (req) => {
       throw new Error('invoiceId y filePath son requeridos');
     }
 
-    // Inicializar Supabase Admin Client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Obtener el UUID de la factura desde la base de datos
     console.log('Obteniendo UUID de la factura...');
     const { data: invoiceData, error: invoiceError } = await supabaseAdmin
       .from('invoices')
@@ -46,54 +43,95 @@ serve(async (req) => {
       throw new Error('La factura no tiene un UUID registrado. Por favor, verifique que el XML de la factura fue procesado correctamente.');
     }
 
-    // Descargar el archivo del complemento desde Storage
     console.log('Descargando complemento desde storage:', filePath);
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
       .from('documents')
       .download(filePath);
-    
+
     if (downloadError || !fileData) {
       throw new Error(`Error descargando archivo: ${downloadError?.message || 'No data'}`);
     }
-    
+
     const fileBuffer = await fileData.arrayBuffer();
     const base64File = base64Encode(fileBuffer);
-    
-    // Determinar el tipo MIME
+
     let mimeType = 'image/jpeg';
     if (fileType === 'pdf') {
       mimeType = 'application/pdf';
     } else if (filePath.toLowerCase().endsWith('.png')) {
       mimeType = 'image/png';
     }
-    
-    const fileDataUrl = `data:${mimeType};base64,${base64File}`;
 
     console.log('Archivo descargado, tamaño:', fileBuffer.byteLength);
-    
-    // Llamar a Lovable AI para extraer el UUID del complemento de pago
-    console.log('Llamando a Lovable AI para extraer UUID del complemento...');
-    
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY no está configurada');
+
+    const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINIKEY no está configurada');
     }
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Este es un Complemento de Pago CFDI mexicano (puede ser imagen o PDF). Necesito que extraigas el UUID del documento fiscal digital relacionado.
+    console.log('Llamando a Gemini para extraer UUID del complemento...');
+
+    const isPdf = mimeType === 'application/pdf';
+
+    const aiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: 'Eres un experto en análisis de Complementos de Pago CFDI mexicanos. Extraes información estructurada con precisión.' }]
+          },
+          tools: [
+            {
+              functionDeclarations: [
+                {
+                  name: 'extract_complement_uuid',
+                  description: 'Extrae el UUID del documento relacionado desde el complemento de pago CFDI',
+                  parameters: {
+                    type: 'object',
+                    properties: {
+                      uuid_documento_relacionado: {
+                        type: 'string',
+                        description: 'UUID del documento relacionado (factura) en formato xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx, o null si no se encuentra'
+                      },
+                      monto_pagado: {
+                        type: 'number',
+                        description: 'Monto pagado en el complemento, o null si no está visible'
+                      },
+                      fecha_pago: {
+                        type: 'string',
+                        description: 'Fecha de pago en formato YYYY-MM-DD, o null si no está visible'
+                      },
+                      uuid_complemento: {
+                        type: 'string',
+                        description: 'UUID del propio complemento de pago (si se puede distinguir del documento relacionado), o null'
+                      }
+                    },
+                    required: ['uuid_documento_relacionado']
+                  }
+                }
+              ]
+            }
+          ],
+          toolConfig: {
+            functionCallingConfig: {
+              mode: 'ANY',
+              allowedFunctionNames: ['extract_complement_uuid'],
+            }
+          },
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inline_data: {
+                    mime_type: isPdf ? 'application/pdf' : mimeType,
+                    data: base64File,
+                  }
+                },
+                {
+                  text: `Este es un Complemento de Pago CFDI mexicano. Necesito que extraigas el UUID del documento fiscal digital relacionado.
 
 **Instrucciones CRÍTICAS:**
 
@@ -105,92 +143,39 @@ serve(async (req) => {
    - En la sección "Documentos Relacionados" o "DoctoRelacionado"
    - Campo "IdDocumento" o "UUID Documento"
    - Puede aparecer como "Folio Fiscal del Documento" o similar
-   
+
 4. **NO confundir con:**
    - El UUID del propio complemento (Folio Fiscal del Complemento)
    - El UUID debe ser el del DOCUMENTO RELACIONADO/PAGADO
 
 5. **Extrae también:**
    - El monto pagado en este complemento (campo "ImpPagado" o similar)
-   - La fecha de pago si está visible
-
-Por favor, extrae el UUID del documento relacionado (la factura que se está pagando).`
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: fileDataUrl
+   - La fecha de pago si está visible`
                 }
-              }
-            ]
-          }
-        ],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'extract_complement_uuid',
-              description: 'Extrae el UUID del documento relacionado desde el complemento de pago CFDI',
-              parameters: {
-                type: 'object',
-                properties: {
-                  uuid_documento_relacionado: {
-                    type: 'string',
-                    description: 'UUID del documento relacionado (factura) en formato xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx, o null si no se encuentra'
-                  },
-                  monto_pagado: {
-                    type: 'number',
-                    description: 'Monto pagado en el complemento, o null si no está visible'
-                  },
-                  fecha_pago: {
-                    type: 'string',
-                    description: 'Fecha de pago en formato YYYY-MM-DD, o null si no está visible'
-                  },
-                  uuid_complemento: {
-                    type: 'string',
-                    description: 'UUID del propio complemento de pago (si se puede distinguir del documento relacionado), o null'
-                  }
-                },
-                required: ['uuid_documento_relacionado']
-              }
+              ]
             }
-          }
-        ],
-        tool_choice: 'required'
-      })
-    });
+          ],
+          generationConfig: { maxOutputTokens: 1024 },
+        }),
+      }
+    );
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('Error de IA:', errorText);
-      throw new Error(`Error llamando a Lovable AI: ${aiResponse.statusText}`);
+      console.error('Error de Gemini:', errorText);
+      throw new Error(`Error llamando a Gemini: ${aiResponse.statusText}`);
     }
 
     const aiData = await aiResponse.json();
-    console.log('Respuesta de IA recibida:', JSON.stringify(aiData));
+    console.log('Respuesta de Gemini recibida:', JSON.stringify(aiData));
 
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) {
+    const parts = aiData.candidates?.[0]?.content?.parts || [];
+    const functionCallPart = parts.find((p: any) => p.functionCall);
+    if (!functionCallPart) {
       throw new Error('No se recibió respuesta válida de la IA');
     }
 
-    let extractedInfo;
-    try {
-      const content = toolCall.function.arguments;
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        extractedInfo = JSON.parse(jsonMatch[0]);
-      } else {
-        extractedInfo = JSON.parse(content);
-      }
-    } catch (parseError) {
-      console.error('Error parseando respuesta de AI:', parseError);
-      extractedInfo = {
-        uuid_documento_relacionado: null,
-        monto_pagado: null,
-        fecha_pago: null
-      };
-    }
+    const extractedInfo = functionCallPart.functionCall.args;
 
     console.log('Información extraída del complemento:', extractedInfo);
 
@@ -200,7 +185,6 @@ Por favor, extrae el UUID del documento relacionado (la factura que se está pag
     console.log('UUID extraído del complemento:', extractedUUID);
     console.log('UUID de la factura (normalizado):', normalizedInvoiceUUID);
 
-    // Validar que el UUID coincida
     if (!extractedUUID) {
       return new Response(
         JSON.stringify({
@@ -210,21 +194,17 @@ Por favor, extrae el UUID del documento relacionado (la factura que se está pag
           extractedUUID: null,
           extractedInfo
         }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    // Comparar UUIDs
     const uuidsMatch = extractedUUID === normalizedInvoiceUUID;
 
     if (!uuidsMatch) {
       console.warn('⚠️ UUID NO COINCIDE');
       console.warn('UUID Factura:', normalizedInvoiceUUID);
       console.warn('UUID Complemento:', extractedUUID);
-      
+
       return new Response(
         JSON.stringify({
           valid: false,
@@ -234,10 +214,7 @@ Por favor, extrae el UUID del documento relacionado (la factura que se está pag
           invoiceNumber: invoiceData.invoice_number,
           extractedInfo
         }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
@@ -252,24 +229,15 @@ Por favor, extrae el UUID del documento relacionado (la factura que se está pag
         invoiceNumber: invoiceData.invoice_number,
         extractedInfo
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
 
   } catch (error: unknown) {
     console.error('Error en validate-payment-complement:', error);
     const errorMessage = error instanceof Error ? error.message : 'Error validando el complemento de pago';
     return new Response(
-      JSON.stringify({ 
-        valid: false,
-        error: errorMessage
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
-      }
+      JSON.stringify({ valid: false, error: errorMessage }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 });

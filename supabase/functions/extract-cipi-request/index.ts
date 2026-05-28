@@ -37,8 +37,8 @@ Deno.serve(async (req) => {
 
     await supabase.from('cipi_requests').update({ extraction_status: 'processing' }).eq('id', requestId);
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY no está configurado');
+    const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
+    if (!GEMINI_API_KEY) throw new Error('GEMINIKEY no está configurado');
 
     const contentParts: any[] = [];
     let hasContent = false;
@@ -70,10 +70,14 @@ Deno.serve(async (req) => {
           const isImage = mimeType.startsWith('image/');
           const isPdf = mimeType.includes('pdf');
 
-          if (isPdf || isImage) {
+          if (isPdf) {
             contentParts.push({
-              type: 'image_url',
-              image_url: { url: `data:${mimeType};base64,${base64}` },
+              inline_data: { mime_type: 'application/pdf', data: base64 },
+            });
+            hasContent = true;
+          } else if (isImage) {
+            contentParts.push({
+              inline_data: { mime_type: mimeType, data: base64 },
             });
             hasContent = true;
           }
@@ -84,7 +88,7 @@ Deno.serve(async (req) => {
     }
 
     if (request.raw_text) {
-      contentParts.push({ type: 'text', text: `Texto del usuario:\n${request.raw_text}` });
+      contentParts.push({ text: `Texto del usuario:\n${request.raw_text}` });
       hasContent = true;
     }
 
@@ -99,7 +103,6 @@ Deno.serve(async (req) => {
     }
 
     contentParts.unshift({
-      type: 'text',
       text: `Analiza el documento/texto de una solicitud médica (CIPI, CIPI Pro o CEMI) y extrae la información.
 
 IMPORTANTE: Excluye cualquier fila que NO sea un producto real. Las filas que contienen textos informativos como condiciones de pago, métodos de pago, datos bancarios (CLABE, cuenta, banco), notas legales, avisos sobre IVA, honorarios médicos, cláusulas, instrucciones de pago o cualquier texto que no sea un producto médico concreto, NO deben incluirse en el listado. Ejemplos de filas a EXCLUIR: "Los precios ya incluyen IVA en los rubros de servicios e insumos médicos...", "Los métodos de pago son: pago con terminal y transferencia electrónica: BANCOMER...", "La cotización incluye honorarios médicos, preparación, suministro y aplicación de infusión.". Solo incluye filas que representen medicamentos, insumos, soluciones u otros productos médicos concretos con descripción de producto real, cantidad y precio.
@@ -124,21 +127,20 @@ Responde ÚNICAMENTE con JSON válido:
 Si algún campo no está disponible, omítelo. No inventes datos.`,
     });
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: 'Experto en documentos médicos mexicanos. Extrae info estructurada. Responde siempre en JSON válido.' },
-          { role: 'user', content: contentParts },
-        ],
-        max_tokens: 4096,
-      }),
-    });
+    const aiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: 'Experto en documentos médicos mexicanos. Extrae info estructurada. Responde siempre en JSON válido.' }]
+          },
+          contents: [{ role: 'user', parts: contentParts }],
+          generationConfig: { maxOutputTokens: 4096 },
+        }),
+      }
+    );
 
     if (!aiResponse.ok) {
       const status = aiResponse.status;
@@ -152,7 +154,7 @@ Si algún campo no está disponible, omítelo. No inventes datos.`,
     }
 
     const aiData = await aiResponse.json();
-    const responseContent = aiData.choices?.[0]?.message?.content || '';
+    const responseContent = aiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     let extractedData: any = {};
     try {
