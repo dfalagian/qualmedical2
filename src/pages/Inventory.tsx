@@ -2557,13 +2557,22 @@ export default function Inventory() {
                       </div>
 
                       <div className="space-y-1">
-                        <Label htmlFor="category" className="text-xs">Categoría</Label>
-                        <Input
-                          id="category"
+                        <Label className="text-xs">Categoría</Label>
+                        <Select
                           value={productForm.category}
-                          onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
-                          className="h-9"
-                        />
+                          onValueChange={(value) => setProductForm({ ...productForm, category: value })}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Seleccionar categoría..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Medicamentos">Medicamentos</SelectItem>
+                            <SelectItem value="Oncológicos">Oncológicos</SelectItem>
+                            <SelectItem value="Inmunoterapia">Inmunoterapia</SelectItem>
+                            <SelectItem value="Insumos">Insumos</SelectItem>
+                            <SelectItem value="Otros">Otros</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="space-y-1">
