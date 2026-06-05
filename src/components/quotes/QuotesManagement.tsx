@@ -196,6 +196,8 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
   // Batch selector dialog state (for showing multiple batches)
   const [batchSelectorOpen, setBatchSelectorOpen] = useState(false);
   const [pendingProductForBatch, setPendingProductForBatch] = useState<Product | null>(null);
+  const [editBatchSelectorOpen, setEditBatchSelectorOpen] = useState(false);
+  const [editingBatchItem, setEditingBatchItem] = useState<QuoteItem | null>(null);
   
   // Price type selection
   const [selectedPriceType, setSelectedPriceType] = useState<PriceType>("1");
@@ -422,7 +424,24 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
     setPendingProductForBatch(null);
     setBatchSelectorOpen(false);
   };
-  
+
+  const handleEditBatch = (item: QuoteItem) => {
+    setEditingBatchItem(item);
+    setEditBatchSelectorOpen(true);
+  };
+
+  const handleBatchEditSelected = (batchInfo: { batchId: string; batchNumber: string; expirationDate: string; availableQuantity: number } | null) => {
+    if (batchInfo && editingBatchItem) {
+      setQuoteItems(prev => prev.map(item =>
+        item.id === editingBatchItem.id
+          ? { ...item, lote: batchInfo.batchNumber, batch_id: batchInfo.batchId, fecha_caducidad: batchInfo.expirationDate ? new Date(batchInfo.expirationDate) : null }
+          : item
+      ));
+    }
+    setEditingBatchItem(null);
+    setEditBatchSelectorOpen(false);
+  };
+
   // Helper function to add product to quote
   const addProductToQuote = (
     product: Product, 
@@ -1283,10 +1302,25 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="text-sm">{item.lote || "-"}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {item.fecha_caducidad ? format(item.fecha_caducidad, "dd/MM/yy") : ""}
-                            </div>
+                            {item.product_id && !isSubProduct ? (
+                              <button
+                                type="button"
+                                onClick={() => handleEditBatch(item)}
+                                className="text-left hover:underline focus:outline-none"
+                              >
+                                <div className="text-sm text-primary">{item.lote || "-"}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {item.fecha_caducidad ? format(item.fecha_caducidad, "dd/MM/yy") : ""}
+                                </div>
+                              </button>
+                            ) : (
+                              <>
+                                <div className="text-sm">{item.lote || "-"}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {item.fecha_caducidad ? format(item.fecha_caducidad, "dd/MM/yy") : ""}
+                                </div>
+                              </>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Input
@@ -1422,7 +1456,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
         </CardContent>
       </Card>
       
-      {/* Batch Selector Dialog */}
+      {/* Batch Selector Dialog - nuevo producto */}
       {pendingProductForBatch && (
         <QuoteBatchSelector
           open={batchSelectorOpen}
@@ -1436,6 +1470,21 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
           productName={pendingProductForBatch.name}
           warehouseId={selectedWarehouseId}
           onSelect={handleBatchSelected}
+        />
+      )}
+
+      {/* Batch Selector Dialog - editar lote de item existente */}
+      {editingBatchItem && (
+        <QuoteBatchSelector
+          open={editBatchSelectorOpen}
+          onOpenChange={(open) => {
+            if (!open) setEditingBatchItem(null);
+            setEditBatchSelectorOpen(open);
+          }}
+          productId={editingBatchItem.product_id!}
+          productName={editingBatchItem.nombre_producto}
+          warehouseId={editingBatchItem.warehouse_id ?? selectedWarehouseId}
+          onSelect={handleBatchEditSelected}
         />
       )}
     </div>
