@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   DollarSign,
   Link2,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -1306,12 +1307,21 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                               <button
                                 type="button"
                                 onClick={() => handleEditBatch(item)}
-                                className="text-left hover:underline focus:outline-none"
+                                className="flex items-center gap-1 text-left hover:underline focus:outline-none group"
                               >
-                                <div className="text-sm text-primary">{item.lote || "-"}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {item.fecha_caducidad ? format(item.fecha_caducidad, "dd/MM/yy") : ""}
-                                </div>
+                                {item.lote ? (
+                                  <>
+                                    <div className="text-sm text-primary">{item.lote}</div>
+                                    <Search className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </>
+                                ) : (
+                                  <Search className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                                )}
+                                {item.fecha_caducidad && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {format(item.fecha_caducidad, "dd/MM/yy")}
+                                  </div>
+                                )}
                               </button>
                             ) : (
                               <>
