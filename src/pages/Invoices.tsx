@@ -39,9 +39,50 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+const downloadFromStorageUrl = async (fullUrl: string, downloadName: string) => {
+  // Parse bucket + path from a public/signed/object storage URL
+  const u = new URL(fullUrl);
+  const path = u.pathname;
+  // Match .../storage/v1/object/(public|sign)/<bucket>/<...path>
+  const m = path.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+)$/);
+  let bucket: string;
+  let filePath: string;
+  if (m) {
+    bucket = m[1];
+    filePath = decodeURIComponent(m[2].split("?")[0]);
+  } else {
+    // Fallback: assume "documents" bucket and use last 3 segments
+    const parts = path.split("/").filter(Boolean);
+    bucket = "documents";
+    filePath = parts.slice(-3).join("/");
+  }
+  const { data, error } = await supabase.storage.from(bucket).download(filePath);
+  if (error) throw error;
+  const blobUrl = URL.createObjectURL(data);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = downloadName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(blobUrl);
+};
+
+const getStorageBucketFromUrl = (fullUrl?: string | null, fallback = "documents") => {
+  if (!fullUrl) return fallback;
+  try {
+    const { pathname } = new URL(fullUrl);
+    const match = pathname.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\//);
+    return match?.[1] || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 const Invoices = () => {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
+
   const [searchParams] = useSearchParams();
   const [isUploading, setIsUploading] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -172,9 +213,18 @@ const Invoices = () => {
 
       if (pagosError) console.error("Error fetching pagos:", pagosError);
 
+      // Obtener complementos de pago (fuente de verdad para complementos)
+      const { data: complementsData, error: complementsError } = await supabase
+        .from("payment_complements")
+        .select("id, invoice_id, xml_url, pdf_url, uuid_cfdi, fecha_pago, monto, created_at")
+        .order("created_at", { ascending: false });
+
+      if (complementsError) console.error("Error fetching payment_complements:", complementsError);
+
       // Combinar datos
       const invoicesWithComprobantes = invoicesData?.map(invoice => {
         const pago = pagosData?.find(p => p.invoice_id === invoice.id);
+        const complements = (complementsData || []).filter(c => c.invoice_id === invoice.id);
         return {
           ...invoice,
           comprobante_pago_url: pago?.comprobante_pago_url || null,
@@ -182,13 +232,15 @@ const Invoices = () => {
           is_split_payment: pago?.is_split_payment || false,
           total_installments: pago?.total_installments || null,
           paid_amount: pago?.paid_amount || 0,
-          pago_status: pago?.status || null
+          pago_status: pago?.status || null,
+          complements,
         };
       });
 
       return invoicesWithComprobantes;
     },
   });
+
 
   const { data: invoiceItems } = useQuery({
     queryKey: ["invoice-items", selectedInvoice?.id],
@@ -1604,7 +1656,7 @@ const Invoices = () => {
                           Proveedor: {formatSupplierName(invoice.profiles)}
                         </p>
                       )}
-                      {!isAdmin && invoice.requiere_complemento && !invoice.complemento_pago_url && (
+                      {!isAdmin && invoice.requiere_complemento && !invoice.complemento_pago_url && (!invoice.complements || invoice.complements.length === 0) && (
                         <div className="mt-2 flex items-center gap-2">
                           <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
                             Requiere Complemento de Pago
@@ -1621,13 +1673,14 @@ const Invoices = () => {
                           </Button>
                         </div>
                       )}
-                      {invoice.complemento_pago_url && (
+                      {(invoice.complemento_pago_url || (invoice.complements && invoice.complements.length > 0)) && (
                         <div className="mt-2">
                           <Badge variant="outline" className="bg-success/10 text-success border-success/30">
-                            Complemento de Pago Adjuntado
+                            Complemento de Pago Adjuntado{invoice.complements && invoice.complements.length > 1 ? ` (${invoice.complements.length})` : ""}
                           </Badge>
                         </div>
                       )}
+
                     </div>
 
                     <div className="flex gap-1">
@@ -1749,36 +1802,102 @@ const Invoices = () => {
                         </Tooltip>
                       </TooltipProvider>
 
-                      {invoice.complemento_pago_url && (
+                      {/* Descargar complementos desde payment_complements (fuente de verdad) */}
+                      {invoice.complements && invoice.complements.length > 0 && invoice.complements.map((c: any, idx: number) => {
+                        const suffix = invoice.complements.length > 1 ? `-${idx + 1}` : "";
+                        return (
+                          <span key={c.id} className="flex gap-1">
+                            {c.pdf_url && (
+                              <ImageViewer
+                                fileUrl={c.pdf_url}
+                                fileName={`Complemento${suffix}-${invoice.invoice_number}.pdf`}
+                                triggerText={`Ver Complemento de Pago${invoice.complements.length > 1 ? ` ${idx + 1}` : ""}`}
+                                triggerSize="sm"
+                                triggerVariant="outline"
+                                bucket={getStorageBucketFromUrl(c.pdf_url, "invoices")}
+                              />
+                            )}
+                            {c.pdf_url && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={async () => {
+                                        try {
+                                          await downloadFromStorageUrl(c.pdf_url, `complemento${suffix}-${invoice.invoice_number}.pdf`);
+                                        } catch (err) {
+                                          console.error("Error descargando complemento PDF:", err);
+                                          toast.error("Error al descargar el complemento (PDF)");
+                                        }
+                                      }}
+                                    >
+                                      <FileText className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Descargar complemento PDF{suffix}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {c.xml_url && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={async () => {
+                                        try {
+                                          await downloadFromStorageUrl(c.xml_url, `complemento${suffix}-${invoice.invoice_number}.xml`);
+                                        } catch (err) {
+                                          console.error("Error descargando complemento XML:", err);
+                                          toast.error("Error al descargar el complemento (XML)");
+                                        }
+                                      }}
+                                    >
+                                      <Download className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Descargar complemento XML{suffix}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </span>
+                        );
+                      })}
+
+                      {/* Compatibilidad: complemento legado guardado en invoices.complemento_pago_url */}
+                      {invoice.complemento_pago_url && (!invoice.complements || invoice.complements.length === 0) && (
                         <>
+                          <ImageViewer
+                            fileUrl={invoice.complemento_pago_url}
+                            fileName={`Complemento-${invoice.invoice_number}`}
+                            triggerText="Ver Complemento de Pago"
+                            triggerSize="sm"
+                            triggerVariant="outline"
+                            bucket={getStorageBucketFromUrl(invoice.complemento_pago_url, "documents")}
+                          />
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button 
-                                  variant="outline" 
+                                <Button
+                                  variant="outline"
                                   size="icon"
                                   className="h-8 w-8"
                                   onClick={async () => {
                                     try {
-                                      const urlPath = new URL(invoice.complemento_pago_url).pathname;
-                                      const filePath = urlPath.split('/').slice(-3).join('/');
-                                      
-                                      const { data, error } = await supabase.storage
-                                        .from('invoices')
-                                        .download(filePath);
-                                      
-                                      if (error) throw error;
-                                      
-                                      const url = URL.createObjectURL(data);
-                                      const link = document.createElement('a');
-                                      link.href = url;
-                                      link.download = `complemento-${invoice.invoice_number}.pdf`;
-                                      document.body.appendChild(link);
-                                      link.click();
-                                      document.body.removeChild(link);
-                                      URL.revokeObjectURL(url);
-                                    } catch (error) {
-                                      toast.error('Error al descargar el complemento');
+                                      const ext = invoice.complemento_pago_url.toLowerCase().endsWith(".xml") ? "xml" : "pdf";
+                                      await downloadFromStorageUrl(invoice.complemento_pago_url, `complemento-${invoice.invoice_number}.${ext}`);
+                                    } catch (err) {
+                                      console.error("Error descargando complemento:", err);
+                                      toast.error("Error al descargar el complemento");
                                     }
                                   }}
                                 >
@@ -1786,33 +1905,37 @@ const Invoices = () => {
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>Descargar complemento de pago (PDF)</p>
+                                <p>Descargar complemento de pago</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                          {isAdmin && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() => {
-                                      setComplementoToDelete(invoice.id);
-                                    }}
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Eliminar complemento de pago</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
                         </>
                       )}
+
+                      {/* Eliminar (solo admin) cuando hay cualquier complemento */}
+                      {isAdmin && (invoice.complemento_pago_url || (invoice.complements && invoice.complements.length > 0)) && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => {
+                                  setComplementoToDelete(invoice.id);
+                                }}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Eliminar complemento de pago (legado)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+
+
 
                       {/* Botón de historial de pagos */}
                       {invoice.pago_id && invoice.paid_amount > 0 && (
@@ -2165,7 +2288,6 @@ const Invoices = () => {
                           supplierId={invoice.supplier_id}
                           invoiceNumber={invoice.invoice_number}
                           invoiceUUID={invoice.uuid}
-                          invoiceTotal={invoice.amount}
                         />
                       )}
 

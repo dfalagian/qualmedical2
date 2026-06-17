@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,6 @@ interface PaymentComplementUploadProps {
   supplierId: string;
   invoiceNumber: string;
   invoiceUUID?: string | null;
-  invoiceTotal?: number | null;
 }
 
 interface ProofWithComplement {
@@ -45,26 +44,14 @@ interface ProofWithComplement {
     uuid_cfdi: string | null;
     fecha_pago: string | null;
     monto: number | null;
-    num_parcialidad: number | null;
-    imp_saldo_ant: number | null;
-    imp_saldo_insoluto: number | null;
   } | null;
 }
 
-interface ValidationCheck {
-  label: string;
-  xmlValue: string;
-  proofValue: string;
-  pass: boolean | null;
-  detail?: string;
-}
-
-export function PaymentComplementUpload({
-  invoiceId,
+export function PaymentComplementUpload({ 
+  invoiceId, 
   supplierId,
   invoiceNumber,
-  invoiceUUID,
-  invoiceTotal,
+  invoiceUUID
 }: PaymentComplementUploadProps) {
   const [open, setOpen] = useState(false);
   const [xmlFile, setXmlFile] = useState<File | null>(null);
@@ -124,6 +111,21 @@ export function PaymentComplementUpload({
       );
 
       return proofsWithComplements as ProofWithComplement[];
+    },
+    enabled: open
+  });
+
+  // Fetch previous (pre-migration) complemento_pago_url from invoices
+  const { data: previousComplementUrl } = useQuery({
+    queryKey: ["invoice-previous-complement", invoiceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoices")
+        .select("complemento_pago_url")
+        .eq("id", invoiceId)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.complemento_pago_url || null;
     },
     enabled: open
   });
@@ -251,12 +253,12 @@ export function PaymentComplementUpload({
 
       // Agregar datos extraídos
       if (xmlValidationData.extractedInfo) {
-        const ei = xmlValidationData.extractedInfo;
-        if (ei.fecha_pago) complementData.fecha_pago = ei.fecha_pago;
-        if (ei.monto_pagado != null) complementData.monto = ei.monto_pagado;
-        if (ei.num_parcialidad != null) complementData.num_parcialidad = parseInt(ei.num_parcialidad, 10);
-        if (ei.imp_saldo_ant != null) complementData.imp_saldo_ant = ei.imp_saldo_ant;
-        if (ei.imp_saldo_insoluto != null) complementData.imp_saldo_insoluto = ei.imp_saldo_insoluto;
+        if (xmlValidationData.extractedInfo.fecha_pago) {
+          complementData.fecha_pago = xmlValidationData.extractedInfo.fecha_pago;
+        }
+        if (xmlValidationData.extractedInfo.monto_pagado) {
+          complementData.monto = xmlValidationData.extractedInfo.monto_pagado;
+        }
       }
       if (xmlValidationData.uuidComplemento) {
         complementData.uuid_cfdi = xmlValidationData.uuidComplemento;
@@ -327,7 +329,7 @@ export function PaymentComplementUpload({
     setXmlValidationData(null);
   };
 
-  const handleXmlFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleXmlFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
     
@@ -346,7 +348,7 @@ export function PaymentComplementUpload({
     setPdfFile(null);
   };
 
-  const handlePdfFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handlePdfFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
     
@@ -381,91 +383,8 @@ export function PaymentComplementUpload({
     saveComplementMutation.mutate({ proofId });
   };
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
-
-  const buildValidationChecks = (
-    ei: any,
-    proof: ProofWithComplement
-  ): ValidationCheck[] => {
-    const checks: ValidationCheck[] = [];
-    const tol = 0.02;
-
-    checks.push({
-      label: 'IdDocumento == UUID Factura',
-      xmlValue: ei.uuid_documento_relacionado ?? '—',
-      proofValue: invoiceUUID ?? '—',
-      pass: true,
-      detail: 'Validado por el sistema al subir el XML',
-    });
-
-    // NumParcialidad vs número de comprobante de pago
-    if (ei.num_parcialidad != null) {
-      const xmlParcialidad = parseInt(ei.num_parcialidad, 10);
-      const pass = xmlParcialidad === proof.proof_number;
-      checks.push({
-        label: 'NumParcialidad == Número de pago',
-        xmlValue: `Parcialidad ${xmlParcialidad}`,
-        proofValue: `Pago #${proof.proof_number}`,
-        pass,
-        detail: pass ? undefined : `El complemento es de la parcialidad ${xmlParcialidad} pero se está subiendo al comprobante de pago #${proof.proof_number}`,
-      });
-    }
-
-    if (ei.monto_pagado != null && proof.amount != null) {
-      const diff = Math.abs(ei.monto_pagado - proof.amount);
-      checks.push({
-        label: 'Monto (ImpPagado) vs Pago registrado',
-        xmlValue: formatCurrency(ei.monto_pagado),
-        proofValue: formatCurrency(proof.amount),
-        pass: diff <= tol,
-        detail: diff > tol ? `Diferencia: ${formatCurrency(diff)}` : undefined,
-      });
-    }
-
-    if (ei.fecha_pago && proof.fecha_pago) {
-      const xmlDate = ei.fecha_pago.substring(0, 10);
-      const proofDate = proof.fecha_pago.substring(0, 10);
-      checks.push({
-        label: 'FechaPago vs Fecha pago registrada',
-        xmlValue: xmlDate,
-        proofValue: proofDate,
-        pass: xmlDate === proofDate,
-      });
-    }
-
-    if (ei.imp_saldo_ant != null && invoiceTotal != null && ei.num_parcialidad === '1') {
-      const diff = Math.abs(ei.imp_saldo_ant - invoiceTotal);
-      checks.push({
-        label: 'ImpSaldoAnt == Total Factura (1ª parcialidad)',
-        xmlValue: formatCurrency(ei.imp_saldo_ant),
-        proofValue: formatCurrency(invoiceTotal),
-        pass: diff <= tol,
-        detail: diff > tol ? `Diferencia: ${formatCurrency(diff)}` : undefined,
-      });
-    } else if (ei.imp_saldo_ant != null) {
-      checks.push({
-        label: `ImpSaldoAnt (Parcialidad ${ei.num_parcialidad ?? '?'})`,
-        xmlValue: formatCurrency(ei.imp_saldo_ant),
-        proofValue: '—',
-        pass: null,
-        detail: 'Saldo pendiente antes de este pago',
-      });
-    }
-
-    if (ei.imp_saldo_ant != null && ei.monto_pagado != null && ei.imp_saldo_insoluto != null) {
-      const expected = ei.imp_saldo_ant - ei.monto_pagado;
-      const diff = Math.abs(expected - ei.imp_saldo_insoluto);
-      checks.push({
-        label: 'ImpSaldoAnt − ImpPagado == ImpSaldoInsoluto',
-        xmlValue: `${formatCurrency(ei.imp_saldo_ant)} − ${formatCurrency(ei.monto_pagado)} = ${formatCurrency(expected)}`,
-        proofValue: formatCurrency(ei.imp_saldo_insoluto),
-        pass: diff <= tol,
-        detail: `Saldo insoluto: ${formatCurrency(ei.imp_saldo_insoluto)}`,
-      });
-    }
-
-    return checks;
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
   };
 
   // Ver complemento en visor interno
@@ -533,18 +452,12 @@ export function PaymentComplementUpload({
         <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-2">
           <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-blue-700 dark:text-blue-300">
-            {isAdmin ? (
-              <p>Vista de complementos de pago. El proveedor es quien los carga después de recibir el pago.</p>
-            ) : (
-              <>
-                <strong>Proceso de carga:</strong>
-                <ol className="list-decimal ml-4 mt-1 space-y-1">
-                  <li><strong>Primero suba el XML</strong> del Complemento de Pago CFDI (obligatorio)</li>
-                  <li>El sistema validará UUID y cruzará los datos con el pago registrado</li>
-                  <li>Después suba el <strong>PDF</strong> del complemento (representación impresa, opcional)</li>
-                </ol>
-              </>
-            )}
+            <strong>Proceso de carga:</strong>
+            <ol className="list-decimal ml-4 mt-1 space-y-1">
+              <li><strong>Primero suba el XML</strong> del complemento de pago (obligatorio)</li>
+              <li>El sistema validará que el UUID coincida con la factura</li>
+              <li>Después puede subir el <strong>PDF o imagen</strong> (opcional)</li>
+            </ol>
           </div>
         </div>
 
@@ -553,13 +466,23 @@ export function PaymentComplementUpload({
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : !paymentProofs || paymentProofs.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No hay comprobantes de pago registrados para esta factura.</p>
-            <p className="text-sm mt-2">Los complementos de pago se asocian a cada comprobante de pago.</p>
+          <div className="space-y-6">
+            {previousComplementUrl && (
+              <PreviousComplementCard url={previousComplementUrl} onView={handleViewComplement} />
+            )}
+            <div className="text-center py-8 text-muted-foreground">
+              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No hay comprobantes de pago registrados para esta factura.</p>
+              <p className="text-sm mt-2">Los complementos de pago se asocian a cada comprobante de pago.</p>
+            </div>
           </div>
         ) : (
           <div className="space-y-6">
+            {/* Previous-system complement (no XML) */}
+            {previousComplementUrl && proofsWithComplement.length === 0 && (
+              <PreviousComplementCard url={previousComplementUrl} onView={handleViewComplement} />
+            )}
+
             {/* Comprobantes pendientes de complemento */}
             {proofsWithoutComplement.length > 0 && (
               <div className="space-y-4">
@@ -581,9 +504,7 @@ export function PaymentComplementUpload({
                       <Badge variant="destructive">Sin Complemento</Badge>
                     </div>
 
-                    {isAdmin ? (
-                      <p className="text-xs text-muted-foreground italic">El proveedor debe subir el complemento de pago.</p>
-                    ) : selectedProofId === proof.id ? (
+                    {selectedProofId === proof.id ? (
                       <div className="space-y-4 pt-2 border-t">
                         {/* Paso 1: Subir y validar XML */}
                         <div className="space-y-2">
@@ -620,44 +541,47 @@ export function PaymentComplementUpload({
                             </Button>
                           )}
                           {xmlValidated && xmlValidationData?.extractedInfo && (
-                            <div className="rounded-lg border border-green-200 dark:border-green-800 text-sm overflow-hidden">
-                              <div className="bg-green-50 dark:bg-green-950/40 px-3 py-2 flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                <span className="font-medium text-green-700 dark:text-green-300">
-                                  XML Validado — Cruce con pago registrado
-                                </span>
-                                {xmlValidationData.extractedInfo.num_parcialidad && (
-                                  <Badge variant="outline" className="ml-auto text-xs">
-                                    Parcialidad #{xmlValidationData.extractedInfo.num_parcialidad}
-                                  </Badge>
+                            <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-sm space-y-2">
+                              <p className="font-medium text-green-700 dark:text-green-300">✓ XML Validado - Información extraída:</p>
+                              
+                              {/* UUIDs claramente diferenciados */}
+                              <div className="space-y-1 bg-white/50 dark:bg-black/20 rounded p-2">
+                                <p className="text-xs text-muted-foreground font-medium">Validación de UUID:</p>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground w-32">UUID Factura (BD):</span>
+                                  <span className="font-mono text-xs text-green-700 dark:text-green-300">{invoiceUUID}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground w-32">UUID Relacionado (XML):</span>
+                                  <span className="font-mono text-xs text-green-700 dark:text-green-300">
+                                    {xmlValidationData.extractedInfo.uuid_documento_relacionado}
+                                  </span>
+                                  <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                </div>
+                                {xmlValidationData.uuidComplemento && (
+                                  <div className="flex items-center gap-2 pt-1 border-t border-green-200 dark:border-green-800 mt-1">
+                                    <span className="text-xs text-muted-foreground w-32">UUID del CFDI Pago:</span>
+                                    <span className="font-mono text-xs text-blue-600 dark:text-blue-400">
+                                      {xmlValidationData.uuidComplemento}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">(folio del complemento)</span>
+                                  </div>
                                 )}
                               </div>
-                              <div className="divide-y divide-border">
-                                {buildValidationChecks(xmlValidationData.extractedInfo, proof).map((chk, i) => (
-                                  <div key={i} className="px-3 py-2 flex items-start gap-2">
-                                    <span className="text-base leading-tight mt-0.5 flex-shrink-0">
-                                      {chk.pass === true ? '✅' : chk.pass === false ? '❌' : 'ℹ️'}
-                                    </span>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="font-medium text-xs text-muted-foreground">{chk.label}</p>
-                                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                                        <span className="text-xs"><span className="text-muted-foreground">XML: </span>{chk.xmlValue}</span>
-                                        {chk.proofValue !== '—' && (
-                                          <span className="text-xs"><span className="text-muted-foreground">Registrado: </span>{chk.proofValue}</span>
-                                        )}
-                                      </div>
-                                      {chk.detail && (
-                                        <p className={`text-xs mt-0.5 ${chk.pass === false ? 'text-destructive' : 'text-muted-foreground'}`}>{chk.detail}</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
+
+                              {/* Otros datos */}
+                              <div className="flex flex-wrap gap-4">
+                                {xmlValidationData.extractedInfo.fecha_pago && (
+                                  <p className="text-green-600 dark:text-green-400">
+                                    <span className="text-muted-foreground">Fecha:</span> {xmlValidationData.extractedInfo.fecha_pago}
+                                  </p>
+                                )}
+                                {xmlValidationData.extractedInfo.monto_pagado && (
+                                  <p className="text-green-600 dark:text-green-400">
+                                    <span className="text-muted-foreground">Monto:</span> {formatCurrency(xmlValidationData.extractedInfo.monto_pagado)}
+                                  </p>
+                                )}
                               </div>
-                              {xmlValidationData.uuidComplemento && (
-                                <div className="bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground border-t border-border">
-                                  UUID CFDI Pago: <span className="font-mono">{xmlValidationData.uuidComplemento}</span>
-                                </div>
-                              )}
                             </div>
                           )}
                         </div>
@@ -668,11 +592,11 @@ export function PaymentComplementUpload({
                             <div className="flex items-center gap-2">
                               <Badge variant="secondary" className="gap-1">
                                 <FileText className="h-3 w-3" />
-                                Paso 2: PDF del Complemento (Opcional)
+                                Paso 2: PDF/Imagen (Opcional)
                               </Badge>
                             </div>
                             <Label htmlFor={`pdf-${proof.id}`}>
-                              Representación impresa (PDF) del Complemento de Pago
+                              Archivo PDF o imagen del Complemento (Opcional)
                             </Label>
                             <Input 
                               id={`pdf-${proof.id}`} 
@@ -751,60 +675,36 @@ export function PaymentComplementUpload({
                       </Badge>
                     </div>
 
-                    {/* Resumen del cruce ya guardado */}
-                    <div className="rounded-lg border border-green-200 dark:border-green-800 text-sm overflow-hidden">
-                      <div className="bg-green-50 dark:bg-green-950/40 px-3 py-2 flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <span className="font-medium text-green-700 dark:text-green-300 text-xs">Complemento validado y cruzado</span>
-                        {proof.complement?.num_parcialidad != null && (
-                          <Badge variant="outline" className="ml-auto text-xs">
-                            Parcialidad #{proof.complement.num_parcialidad}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="px-3 py-2 space-y-1 text-xs">
-                        <div className="flex gap-1 items-center text-green-600">
-                          <span>✅</span>
-                          <span className="text-muted-foreground">IdDocumento == UUID Factura</span>
-                        </div>
-                        {proof.complement?.monto != null && (
-                          <div className="flex gap-1 items-center">
-                            <span>{Math.abs(proof.complement.monto - proof.amount) <= 0.02 ? '✅' : '❌'}</span>
-                            <span className="text-muted-foreground">Monto XML: </span>
-                            <span>{formatCurrency(proof.complement.monto)}</span>
-                            <span className="text-muted-foreground ml-1">/ Banco: </span>
-                            <span>{formatCurrency(proof.amount)}</span>
-                          </div>
-                        )}
-                        {proof.complement?.fecha_pago && proof.fecha_pago && (
-                          <div className="flex gap-1 items-center">
-                            <span>{proof.complement.fecha_pago.substring(0,10) === proof.fecha_pago.substring(0,10) ? '✅' : '❌'}</span>
-                            <span className="text-muted-foreground">FechaPago XML: </span>
-                            <span>{proof.complement.fecha_pago.substring(0,10)}</span>
-                            <span className="text-muted-foreground ml-1">/ Banco: </span>
-                            <span>{proof.fecha_pago.substring(0,10)}</span>
-                          </div>
-                        )}
-                        {proof.complement?.imp_saldo_ant != null && (
-                          <div className="flex gap-1 items-center">
-                            <span>ℹ️</span>
-                            <span className="text-muted-foreground">ImpSaldoAnt: </span>
-                            <span>{formatCurrency(proof.complement.imp_saldo_ant)}</span>
-                            {proof.complement.imp_saldo_insoluto != null && (
-                              <><span className="text-muted-foreground ml-1">→ Insoluto: </span>
-                              <span>{formatCurrency(proof.complement.imp_saldo_insoluto)}</span></>
-                            )}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1 pt-1 border-t border-green-200 dark:border-green-800 mt-1">
-                          <span className="text-muted-foreground">UUID Factura:</span>
-                          <span className="font-mono truncate max-w-[220px]">{invoiceUUID || '—'}</span>
+                    {/* Mostrar que los UUIDs coinciden */}
+                    <div className="bg-muted/50 rounded-lg p-3 space-y-2 text-xs">
+                      <div className="font-medium text-sm mb-2 text-muted-foreground">UUID Validado:</div>
+                      
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">UUID Factura:</span>
+                        <div className="flex items-center gap-1 font-mono bg-background rounded px-2 py-1">
+                          <span className="truncate max-w-[250px]" title={invoiceUUID || 'No disponible'}>
+                            {invoiceUUID || 'No disponible'}
+                          </span>
                           {invoiceUUID && (
-                            <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => handleCopyUUID(invoiceUUID)}>
-                              {copiedUUID === invoiceUUID ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={() => handleCopyUUID(invoiceUUID)}
+                            >
+                              {copiedUUID === invoiceUUID ? (
+                                <Check className="h-3 w-3 text-green-600" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
                             </Button>
                           )}
                         </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-1 text-green-600 mt-1">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span>El UUID del documento relacionado en el complemento coincide con la factura</span>
                       </div>
                     </div>
 
@@ -833,17 +733,15 @@ export function PaymentComplementUpload({
                           Ver PDF
                         </Button>
                       )}
-                      {!isAdmin && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedProofId(proof.id)}
-                          className="gap-1 text-muted-foreground"
-                        >
-                          <Upload className="h-3.5 w-3.5" />
-                          Reemplazar
-                        </Button>
-                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setSelectedProofId(proof.id)}
+                        className="gap-1 text-muted-foreground"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Reemplazar
+                      </Button>
                       {isAdmin && (
                         <Button 
                           variant="ghost" 
@@ -857,7 +755,7 @@ export function PaymentComplementUpload({
                       )}
                     </div>
 
-                    {!isAdmin && selectedProofId === proof.id && (
+                    {selectedProofId === proof.id && (
                       <div className="space-y-4 pt-2 border-t border-green-200 dark:border-green-900">
                         {/* Paso 1: Nuevo XML */}
                         <div className="space-y-2">
@@ -1014,3 +912,51 @@ export function PaymentComplementUpload({
     </>
   );
 }
+
+// Card for pre-migration complements (only PDF stored in invoices.complemento_pago_url)
+function PreviousComplementCard({
+  url,
+  onView,
+}: {
+  url: string;
+  onView: (url: string, type: 'xml' | 'pdf' | 'image') => void;
+}) {
+  const lower = url.toLowerCase();
+  const isPdf = lower.includes('.pdf');
+  const isImage = /\.(jpg|jpeg|png)(\?|$)/.test(lower);
+  const type: 'pdf' | 'image' = isPdf ? 'pdf' : isImage ? 'image' : 'pdf';
+
+  return (
+    <div className="border rounded-lg p-4 space-y-3 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="border-amber-500 text-amber-700">
+            Complemento Anterior
+          </Badge>
+          <span className="text-sm text-muted-foreground">
+            Cargado con el sistema anterior (sin XML)
+          </span>
+        </div>
+        <Badge className="bg-amber-600">
+          <FileText className="h-3 w-3 mr-1" />
+          Solo PDF
+        </Badge>
+      </div>
+      <div className="text-xs text-muted-foreground">
+        Este complemento fue subido antes de la validación por XML. Si necesita reemplazarlo por uno con XML validado, use el botón "Subir Complemento de Pago" en el comprobante correspondiente.
+      </div>
+      <div className="flex gap-2 pt-2 border-t border-amber-200 dark:border-amber-900">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onView(url, type)}
+          className="gap-1"
+        >
+          <Eye className="h-3.5 w-3.5" />
+          Ver Complemento
+        </Button>
+      </div>
+    </div>
+  );
+}
+
