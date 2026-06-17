@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { parseLocalDate } from "@/lib/formatters";
 
 interface PaymentComplementUploadProps {
   invoiceId: string;
@@ -573,7 +574,7 @@ export function PaymentComplementUpload({
                         <span className="font-medium">{formatCurrency(proof.amount)}</span>
                         {proof.fecha_pago && (
                           <span className="text-sm text-muted-foreground">
-                            {format(new Date(proof.fecha_pago), "d MMM yyyy", { locale: es })}
+                            {format(parseLocalDate(proof.fecha_pago)!, "d MMM yyyy", { locale: es })}
                           </span>
                         )}
                       </div>
@@ -740,7 +741,7 @@ export function PaymentComplementUpload({
                         <span className="font-medium">{formatCurrency(proof.amount)}</span>
                         {proof.fecha_pago && (
                           <span className="text-sm text-muted-foreground">
-                            {format(new Date(proof.fecha_pago), "d MMM yyyy", { locale: es })}
+                            {format(parseLocalDate(proof.fecha_pago)!, "d MMM yyyy", { locale: es })}
                           </span>
                         )}
                       </div>

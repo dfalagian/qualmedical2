@@ -1,4 +1,4 @@
-import { todayLocalStr } from "@/lib/formatters";
+import { todayLocalStr, parseLocalDate } from "@/lib/formatters";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -1591,7 +1591,7 @@ const Invoices = () => {
                           </span>
                         ) : invoice.fecha_emision ? (
                           <span>
-                            {new Date(invoice.fecha_emision).toLocaleDateString('es-MX')}
+                            {parseLocalDate(invoice.fecha_emision)!.toLocaleDateString('es-MX')}
                           </span>
                         ) : (
                           <span>
