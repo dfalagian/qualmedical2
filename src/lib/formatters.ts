@@ -15,6 +15,27 @@ export const toLocalDateStr = (d: Date): string => {
 export const todayLocalStr = (): string => toLocalDateStr(new Date());
 
 /**
+ * Parsea un string de fecha (YYYY-MM-DD o ISO con hora) como Date LOCAL,
+ * evitando el desfase de un día que ocurre cuando JS interpreta "YYYY-MM-DD" como UTC.
+ *
+ * - "2026-06-12"            -> Date(2026, 5, 12) local (sin shift)
+ * - "2026-06-12T15:30:00Z"  -> parser nativo (timestamps con hora son seguros)
+ * - Date                    -> retorna la misma Date
+ * - null/undefined/""       -> null
+ */
+export function parseLocalDate(value: string | Date): Date;
+export function parseLocalDate(value: string | Date | null | undefined): Date | null;
+export function parseLocalDate(
+  value: string | Date | null | undefined
+): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return new Date(value);
+}
+
+/**
  * Categorías exentas de IVA (medicamentos en México).
  * Usar siempre con normalizeCategory() para comparación.
  */
