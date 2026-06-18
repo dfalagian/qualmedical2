@@ -897,7 +897,8 @@ export function PhysicalInventoryCount() {
                               min={0}
                               value={entry.counted_quantity}
                               onChange={(e) => updateEntry(idx, "counted_quantity", parseInt(e.target.value) || 0)}
-                              className="w-20 h-8 text-center text-sm mx-auto"
+                              onWheel={(e) => e.currentTarget.blur()}
+                              className="w-20 h-8 text-center text-sm mx-auto [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </TableCell>
                           <TableCell className="text-center">
@@ -1507,7 +1508,8 @@ function PhysicalCountEditDialog({
                       min={0}
                       value={c.counted_quantity}
                       onChange={(e) => onUpdateEntry(idx, "counted_quantity", parseInt(e.target.value) || 0)}
-                      className="w-20 h-8 text-center text-sm mx-auto"
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className="w-20 h-8 text-center text-sm mx-auto [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </TableCell>
                   <TableCell className="text-center">
