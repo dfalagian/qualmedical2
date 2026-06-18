@@ -670,6 +670,9 @@ export function PhysicalInventoryCount() {
 
   // View dialog data
   const viewSession = savedSessions.find((s) => s.sessionId === viewSessionId);
+  const viewSessionNumber = viewSessionId
+    ? savedSessions.length - savedSessions.findIndex((s) => s.sessionId === viewSessionId)
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -1059,6 +1062,7 @@ export function PhysicalInventoryCount() {
           warehouseName={viewSession.warehouseName}
           sessionDate={viewSession.countedAt}
           sessionId={viewSession.sessionId}
+          sessionNumber={viewSessionNumber}
         />
       )}
 

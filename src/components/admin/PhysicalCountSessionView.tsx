@@ -45,9 +45,10 @@ interface Props {
   warehouseName: string;
   sessionDate: string;
   sessionId: string;
+  sessionNumber?: number;
 }
 
-export function PhysicalCountSessionView({ open, onOpenChange, counts, warehouseName, sessionDate, sessionId }: Props) {
+export function PhysicalCountSessionView({ open, onOpenChange, counts, warehouseName, sessionDate, sessionId, sessionNumber }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showConfirm, setShowConfirm] = useState(false);
@@ -192,7 +193,7 @@ export function PhysicalCountSessionView({ open, onOpenChange, counts, warehouse
           @media print { body { margin: 10px; } }
         </style>
       </head><body>
-        <h1>Reporte de Conteo Físico</h1>
+        <h1>Reporte de Conteo Físico${sessionNumber ? ` #${sessionNumber}` : ""}</h1>
         <div class="header-info">
           <strong>Almacén:</strong> ${warehouseName} &nbsp;&nbsp;|&nbsp;&nbsp;
           <strong>Fecha:</strong> ${new Date(sessionDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
@@ -268,7 +269,7 @@ export function PhysicalCountSessionView({ open, onOpenChange, counts, warehouse
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
-              <span>Detalle de Conteo Físico</span>
+              <span>Detalle de Conteo Físico{sessionNumber ? ` #${sessionNumber}` : ""}</span>
               <div className="flex items-center gap-2">
                 {withDiff > 0 && !adjustmentsApplied && !checkingAdjustments && (
                   <Button
