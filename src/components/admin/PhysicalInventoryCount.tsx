@@ -1008,6 +1008,7 @@ export function PhysicalInventoryCount() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Folio</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Almacén</TableHead>
                   <TableHead className="text-center">Productos</TableHead>
@@ -1017,8 +1018,11 @@ export function PhysicalInventoryCount() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {savedSessions.map((session) => (
+                {savedSessions.map((session, index) => (
                   <TableRow key={session.sessionId}>
+                    <TableCell className="font-mono text-xs font-semibold">
+                      #{savedSessions.length - index}
+                    </TableCell>
                     <TableCell className="text-sm">
                       {new Date(session.countedAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </TableCell>
