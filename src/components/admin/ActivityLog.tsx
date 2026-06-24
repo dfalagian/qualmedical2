@@ -35,6 +35,7 @@ const SECTION_LABELS: Record<string, { label: string; icon: any; color: string }
 const ACTION_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   crear: { label: "Creó", variant: "default" },
   editar: { label: "Editó", variant: "secondary" },
+  editar_aprobada: { label: "Corrigió (aprobada)", variant: "outline" },
   eliminar: { label: "Eliminó", variant: "destructive" },
   importar: { label: "Importó", variant: "outline" },
   vincular: { label: "Vinculó", variant: "default" },
@@ -180,7 +181,11 @@ export function ActivityLog() {
                 return (
                   <div
                     key={log.id}
-                    className="p-3 border rounded-lg hover:bg-muted/30 transition-colors"
+                    className={`p-3 border rounded-lg hover:bg-muted/30 transition-colors ${
+                      log.action === "editar_aprobada"
+                        ? "border-amber-400 bg-amber-50 hover:bg-amber-100"
+                        : ""
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -190,7 +195,10 @@ export function ActivityLog() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm">{log.user_name}</span>
-                            <Badge variant={actionInfo.variant} className="text-xs">
+                            <Badge
+                              variant={actionInfo.variant}
+                              className={`text-xs ${log.action === "editar_aprobada" ? "border-amber-500 text-amber-800 bg-amber-100" : ""}`}
+                            >
                               {actionInfo.label}
                             </Badge>
                             <span className="text-sm text-muted-foreground">
@@ -210,6 +218,18 @@ export function ActivityLog() {
                           {/* Show detail fields */}
                           {Object.keys(details).length > 0 && (
                             <div className="mt-1.5 text-xs text-muted-foreground space-y-0.5">
+                              {details.motivo !== undefined && (
+                                <p className="text-amber-800 font-medium">
+                                  Motivo: {details.motivo}
+                                </p>
+                              )}
+                              {details.total_anterior !== undefined && details.total_nuevo !== undefined && (
+                                <p>
+                                  Total: <span className="line-through">${Number(details.total_anterior).toLocaleString("es-MX", { minimumFractionDigits: 2 })}</span>
+                                  {" → "}
+                                  <span className="font-medium text-foreground">${Number(details.total_nuevo).toLocaleString("es-MX", { minimumFractionDigits: 2 })}</span>
+                                </p>
+                              )}
                               {details.previous_value !== undefined && (
                                 <p>
                                   Anterior: <span className="line-through">{String(details.previous_value)}</span>

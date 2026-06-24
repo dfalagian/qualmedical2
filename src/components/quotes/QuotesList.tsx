@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   Trash2,
   PackageCheck,
+  ShieldAlert,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -60,8 +61,10 @@ import {
 } from "@/components/ui/select";
 import { printQuoteHtml } from "./quoteHtmlPrint";
 import { useQuoteActions } from "@/hooks/useQuoteActions";
+import { useAuth } from "@/hooks/useAuth";
 import { BatchSelectionDialog } from "./BatchSelectionDialog";
 import { InventoryExitScanDialog } from "./InventoryExitScanDialog";
+import { EditApprovedQuoteDialog } from "./EditApprovedQuoteDialog";
 
 interface Quote {
   id: string;
@@ -77,6 +80,7 @@ interface Quote {
   is_remision: boolean;
   subtotal: number;
   total: number;
+  notes: string | null;
   created_at: string;
   client: {
     id: string;
@@ -153,6 +157,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 
 export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
   const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
   const { approveQuote, cancelQuote, isApproving, isCancelling } = useQuoteActions();
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -193,6 +198,22 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
   const [quoteToDelete, setQuoteToDelete] = useState<Quote | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Admin override edit for approved quotes
+  const [adminEditOpen, setAdminEditOpen] = useState(false);
+  const [quoteForAdminEdit, setQuoteForAdminEdit] = useState<{
+    id: string; folio: string; concepto: string | null;
+    fecha_cotizacion: string; fecha_entrega: string | null;
+    notes: string | null; client_id: string;
+    client: { id: string; nombre_cliente: string };
+    subtotal: number; total: number;
+    items: Array<{
+      id: string; nombre_producto: string; marca: string | null;
+      lote: string | null; fecha_caducidad: string | null;
+      cantidad: number; precio_unitario: number; importe: number;
+      categoria: string | null; is_sub_product?: boolean;
+    }>;
+  } | null>(null);
+
   // Fetch quotes
   const { data: quotes = [], isLoading } = useQuery({
     queryKey: ["quotes"],
@@ -213,6 +234,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
           is_remision,
           subtotal,
           total,
+          notes,
           created_at,
           client:clients!quotes_client_id_fkey (
             id,
@@ -321,11 +343,45 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
     }
   };
 
+  // Admin override edit for approved quotes
+  const handleAdminEditQuote = async (quote: Quote) => {
+    try {
+      const items = await fetchQuoteItems(quote.id);
+      setQuoteForAdminEdit({
+        id: quote.id,
+        folio: quote.folio,
+        concepto: quote.concepto,
+        fecha_cotizacion: quote.fecha_cotizacion,
+        fecha_entrega: quote.fecha_entrega,
+        notes: quote.notes ?? null,
+        client_id: quote.client.id,
+        client: { id: quote.client.id, nombre_cliente: quote.client.nombre_cliente },
+        subtotal: quote.subtotal,
+        total: quote.total,
+        items: items.map((item) => ({
+          id: item.id,
+          nombre_producto: item.nombre_producto,
+          marca: item.marca,
+          lote: item.lote,
+          fecha_caducidad: item.fecha_caducidad,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio_unitario,
+          importe: item.importe,
+          categoria: item.categoria ?? null,
+          is_sub_product: item.is_sub_product,
+        })),
+      });
+      setAdminEditOpen(true);
+    } catch (error) {
+      toast.error("Error al cargar la cotización para corrección");
+    }
+  };
+
   // Print quote
   const handlePrintQuote = async (quote: Quote) => {
     try {
       const items = await fetchQuoteItems(quote.id);
-      
+
       printQuoteHtml({
         folio: quote.folio,
         concepto: quote.concepto || "",
@@ -715,6 +771,17 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                                 <Pencil className="h-4 w-4" />
                               </Button>
                             )}
+                            {quote.status === "aprobada" && isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleAdminEditQuote(quote)}
+                                title="Corrección administrativa (solo admin)"
+                                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                              >
+                                <ShieldAlert className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -1059,6 +1126,17 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Admin override edit dialog for approved quotes */}
+      <EditApprovedQuoteDialog
+        open={adminEditOpen}
+        onOpenChange={setAdminEditOpen}
+        quote={quoteForAdminEdit}
+        onSuccess={() => {
+          setQuoteForAdminEdit(null);
+          queryClient.invalidateQueries({ queryKey: ["quotes"] });
+        }}
+      />
     </div>
   );
 };

@@ -7,14 +7,15 @@ export type ActivitySection =
   | "catalogo" 
   | "ordenes_compra";
 
-export type ActivityAction = 
-  | "crear" 
-  | "editar" 
-  | "eliminar" 
-  | "importar" 
-  | "vincular" 
+export type ActivityAction =
+  | "crear"
+  | "editar"
+  | "editar_aprobada"
+  | "eliminar"
+  | "importar"
+  | "vincular"
   | "desvincular"
-  | "estado" 
+  | "estado"
   | "cargar"
   | "aprobar"
   | "cancelar"

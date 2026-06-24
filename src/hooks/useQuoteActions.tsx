@@ -40,6 +40,20 @@ interface UpdateQuoteParams extends SaveQuoteParams {
   quoteId: string;
 }
 
+interface UpdateApprovedQuoteParams {
+  quoteId: string;
+  clientId: string;
+  folio: string;
+  concepto: string;
+  fechaCotizacion: string;
+  fechaEntrega?: string | null;
+  notes?: string | null;
+  subtotal: number;
+  total: number;
+  motivoCorreccion: string;
+  items: Array<{ id: string; precio_unitario: number; importe: number }>;
+}
+
 interface ApproveQuoteParams {
   quoteId: string;
   warehouseId: string;
@@ -637,13 +651,77 @@ export const useQuoteActions = () => {
     },
   });
 
+  // Corregir cotización aprobada (solo metadatos y precios, sin tocar stock ni lotes)
+  const updateApprovedQuoteMutation = useMutation({
+    mutationFn: async (params: UpdateApprovedQuoteParams) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No autenticado");
+
+      const { data: before } = await supabase
+        .from("quotes")
+        .select("folio, total")
+        .eq("id", params.quoteId)
+        .single();
+
+      const { data: quote, error: quoteError } = await supabase
+        .from("quotes")
+        .update({
+          client_id: params.clientId,
+          folio: params.folio,
+          concepto: params.concepto,
+          fecha_cotizacion: params.fechaCotizacion,
+          fecha_entrega: params.fechaEntrega || null,
+          notes: params.notes || null,
+          subtotal: params.subtotal,
+          total: params.total,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", params.quoteId)
+        .select()
+        .single();
+
+      if (quoteError) throw quoteError;
+
+      for (const item of params.items) {
+        const { error: itemError } = await supabase
+          .from("quote_items")
+          .update({ precio_unitario: item.precio_unitario, importe: item.importe })
+          .eq("id", item.id);
+        if (itemError) throw itemError;
+      }
+
+      return { quote, before, motivo: params.motivoCorreccion };
+    },
+    onSuccess: ({ quote, before, motivo }) => {
+      toast.success("Cotización corregida correctamente");
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      logActivity({
+        section: "cotizaciones",
+        action: "editar_aprobada",
+        entityType: "cotización",
+        entityId: quote?.id,
+        entityName: quote?.folio,
+        details: {
+          motivo,
+          total_anterior: before?.total,
+          total_nuevo: quote?.total,
+        },
+      });
+    },
+    onError: (error: any) => {
+      toast.error("Error al corregir: " + error.message);
+    },
+  });
+
   return {
     saveQuote: saveQuoteMutation.mutateAsync,
     updateQuote: updateQuoteMutation.mutateAsync,
+    updateApprovedQuote: updateApprovedQuoteMutation.mutateAsync,
     approveQuote: approveQuoteMutation.mutateAsync,
     cancelQuote: cancelQuoteMutation.mutateAsync,
     isSaving: saveQuoteMutation.isPending,
     isUpdating: updateQuoteMutation.isPending,
+    isUpdatingApproved: updateApprovedQuoteMutation.isPending,
     isApproving: approveQuoteMutation.isPending,
     isCancelling: cancelQuoteMutation.isPending,
     validateStock,
