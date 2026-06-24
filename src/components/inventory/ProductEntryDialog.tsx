@@ -631,8 +631,8 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
                         {productBatches.map((batch) => (
                           <CommandItem
                             key={batch.id}
-                            value={batch.id}
-                            onSelect={handleSelectBatch}
+                            value={batch.batch_number}
+                            onSelect={() => handleSelectBatch(batch.id)}
                           >
                             <Check
                               className={cn(
