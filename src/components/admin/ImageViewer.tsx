@@ -5,6 +5,7 @@ import { useMemo, useState, useEffect } from "react";
 import { getSignedUrls } from "@/lib/storage";
 import { toast } from "sonner";
 import { PdfInlineViewer } from "@/components/pdf/PdfInlineViewer";
+import jsPDF from "jspdf";
 
 interface ImageViewerProps {
   fileUrl?: string;
@@ -182,36 +183,47 @@ export const ImageViewer = ({
     }
   };
 
-  const downloadAllImages = async () => {
+  const downloadAsPdf = async () => {
     if (signedUrls.length === 0) return;
-    
+
     setIsDownloading(true);
     try {
+      const pdf = new jsPDF({ orientation: "portrait", unit: "px" });
+      let firstPage = true;
+
       for (let i = 0; i < signedUrls.length; i++) {
-        const response = await fetch(signedUrls[i]);
-        const blob = await response.blob();
-        
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        
-        const extension = signedUrls[i].includes('.png') ? 'png' : 'jpg';
-        const downloadName = `${fileName.replace(/\.[^/.]+$/, '')}_pagina_${i + 1}.${extension}`;
-        
-        a.download = downloadName;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        // Pequeña pausa entre descargas para evitar problemas
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Load each image into an HTMLImageElement to get natural dimensions
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new Image();
+          el.crossOrigin = "anonymous";
+          el.onload = () => resolve(el);
+          el.onerror = reject;
+          el.src = signedUrls[i];
+        });
+
+        const imgW = img.naturalWidth;
+        const imgH = img.naturalHeight;
+
+        if (firstPage) {
+          // Resize first page to match image proportions
+          pdf.internal.pageSize.setWidth(imgW);
+          pdf.internal.pageSize.setHeight(imgH);
+          firstPage = false;
+        } else {
+          pdf.addPage([imgW, imgH]);
+        }
+
+        // Draw image filling the full page
+        const format = signedUrls[i].includes(".png") ? "PNG" : "JPEG";
+        pdf.addImage(img, format, 0, 0, imgW, imgH);
       }
-      
-      toast.success(`${signedUrls.length} imágenes descargadas`);
+
+      const baseName = fileName.replace(/\.[^/.]+$/, "");
+      pdf.save(`${baseName}.pdf`);
+      toast.success(`PDF generado: ${baseName}.pdf (${signedUrls.length} página${signedUrls.length !== 1 ? "s" : ""})`);
     } catch (error) {
-      console.error('Error downloading images:', error);
-      toast.error('Error al descargar las imágenes');
+      console.error("Error generating PDF:", error);
+      toast.error("Error al generar el PDF");
     } finally {
       setIsDownloading(false);
     }
@@ -251,15 +263,15 @@ export const ImageViewer = ({
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={downloadAllImages}
+                    onClick={downloadAsPdf}
                     disabled={isDownloading}
                   >
                     {isDownloading ? (
                       <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                     ) : (
-                      <Download className="h-4 w-4 mr-1" />
+                      <FileText className="h-4 w-4 mr-1" />
                     )}
-                    Descargar Todo ({totalPages})
+                    Descargar PDF ({totalPages} pág.)
                   </Button>
                 )}
               </div>
