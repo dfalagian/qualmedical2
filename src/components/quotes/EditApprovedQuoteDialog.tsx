@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/select";
 import { AlertTriangle, Lock, Loader2 } from "lucide-react";
 import { useQuoteActions } from "@/hooks/useQuoteActions";
-import { isIvaExempt } from "@/lib/formatters";
 
 interface AdminEditItem {
   id: string;
@@ -104,23 +103,20 @@ export function EditApprovedQuoteDialog({
     enabled: open,
   });
 
-  // Recalculate totals when prices change
+  // Recalculate totals when prices change.
+  // IVA rate is derived from the stored quote totals to avoid discrepancies
+  // caused by product data changes after the quote was created.
   const { subtotal, iva, total } = useMemo(() => {
     if (!quote) return { subtotal: 0, iva: 0, total: 0 };
+    const originalIvaRate = quote.subtotal > 0
+      ? (quote.total - quote.subtotal) / quote.subtotal
+      : 0;
     let sub = 0;
-    let ivaAmt = 0;
     for (const item of quote.items) {
       const precio = itemPrices[item.id] ?? item.precio_unitario;
-      const importe = precio * item.cantidad;
-      sub += importe;
-      let rate = 0;
-      if (item.tax_rate !== null && item.tax_rate !== undefined) {
-        rate = item.tax_rate / 100;
-      } else if (item.categoria !== null) {
-        rate = isIvaExempt(item.categoria) ? 0 : 0.16;
-      }
-      ivaAmt += importe * rate;
+      sub += precio * item.cantidad;
     }
+    const ivaAmt = sub * originalIvaRate;
     return { subtotal: sub, iva: ivaAmt, total: sub + ivaAmt };
   }, [quote, itemPrices]);
 
