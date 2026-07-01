@@ -33,6 +33,7 @@ interface AdminEditItem {
   precio_unitario: number;
   importe: number;
   categoria: string | null;
+  tax_rate: number | null;
   is_sub_product?: boolean;
 }
 
@@ -112,9 +113,13 @@ export function EditApprovedQuoteDialog({
       const precio = itemPrices[item.id] ?? item.precio_unitario;
       const importe = precio * item.cantidad;
       sub += importe;
-      if (!isIvaExempt(item.categoria)) {
-        ivaAmt += importe * 0.16;
+      let rate = 0;
+      if (item.tax_rate !== null && item.tax_rate !== undefined) {
+        rate = item.tax_rate / 100;
+      } else if (item.categoria !== null) {
+        rate = isIvaExempt(item.categoria) ? 0 : 0.16;
       }
+      ivaAmt += importe * rate;
     }
     return { subtotal: sub, iva: ivaAmt, total: sub + ivaAmt };
   }, [quote, itemPrices]);

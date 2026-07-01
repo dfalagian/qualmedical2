@@ -106,6 +106,7 @@ interface QuoteItem {
   importe: number;
   tipo_precio?: string | null;
   categoria?: string | null;
+  tax_rate?: number | null;
   is_sub_product?: boolean;
   parent_item_id?: string | null;
 }
@@ -210,7 +211,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
       id: string; nombre_producto: string; marca: string | null;
       lote: string | null; fecha_caducidad: string | null;
       cantidad: number; precio_unitario: number; importe: number;
-      categoria: string | null; is_sub_product?: boolean;
+      categoria: string | null; tax_rate: number | null; is_sub_product?: boolean;
     }>;
   } | null>(null);
 
@@ -285,7 +286,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
       .from("quote_items")
       .select(`
         *,
-        products:product_id (category),
+        products:product_id (category, tax_rate),
         warehouse:warehouse_id (id, name)
       `)
       .eq("quote_id", quoteId)
@@ -297,6 +298,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
     return (data || []).map((item: any) => ({
       ...item,
       categoria: item.products?.category || null,
+      tax_rate: item.products?.tax_rate ?? null,
       warehouse_name: item.warehouse?.name || null,
       products: undefined,
       warehouse: undefined,
@@ -368,6 +370,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
           precio_unitario: item.precio_unitario,
           importe: item.importe,
           categoria: item.categoria ?? null,
+          tax_rate: item.tax_rate ?? null,
           is_sub_product: item.is_sub_product,
         })),
       });
