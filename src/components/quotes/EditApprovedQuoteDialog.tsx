@@ -21,8 +21,7 @@ import {
 } from "@/components/ui/select";
 import { AlertTriangle, Lock, Loader2 } from "lucide-react";
 import { useQuoteActions } from "@/hooks/useQuoteActions";
-
-const CATEGORIAS_EXENTAS_IVA = ["medicamentos", "oncologicos", "inmunoterapia"];
+import { isIvaExempt } from "@/lib/formatters";
 
 interface AdminEditItem {
   id: string;
@@ -113,7 +112,7 @@ export function EditApprovedQuoteDialog({
       const precio = itemPrices[item.id] ?? item.precio_unitario;
       const importe = precio * item.cantidad;
       sub += importe;
-      if (!CATEGORIAS_EXENTAS_IVA.includes(item.categoria || "")) {
+      if (!isIvaExempt(item.categoria)) {
         ivaAmt += importe * 0.16;
       }
     }
