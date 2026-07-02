@@ -420,6 +420,10 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
     setItems(items.filter(item => item.id !== id));
   };
 
+  const handleUpdateItemQuantity = (id: string, cantidad: number) => {
+    setItems(items.map(item => item.id === id ? { ...item, cantidad } : item));
+  };
+
   // Mutation para guardar todo el ingreso
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -864,7 +868,18 @@ export function ProductEntryDialog({ open, onOpenChange }: ProductEntryDialogPro
                       <TableCell>{item.producto}</TableCell>
                       <TableCell className="font-mono text-xs">{item.lote}</TableCell>
                       <TableCell>{item.caducidad}</TableCell>
-                      <TableCell className="text-right font-medium">{item.cantidad}</TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          min="1"
+                          className="h-8 w-20 ml-auto text-right"
+                          value={item.cantidad}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            handleUpdateItemQuantity(item.id, isNaN(val) || val < 1 ? 1 : val);
+                          }}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button
