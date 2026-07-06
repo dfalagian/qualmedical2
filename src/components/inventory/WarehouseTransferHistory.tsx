@@ -6,8 +6,6 @@ import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -79,7 +77,7 @@ export function WarehouseTransferHistory() {
   const [newProductId, setNewProductId] = useState<string>("");
   const [newBatchId, setNewBatchId] = useState<string>("");
   const [newQuantity, setNewQuantity] = useState<number>(1);
-  const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [newProductSearch, setNewProductSearch] = useState("");
   const [receptionDialogGroup, setReceptionDialogGroup] = useState<GroupedTransfer | null>(null);
   const [summaryData, setSummaryData] = useState<{
     group: GroupedTransfer;
@@ -241,6 +239,7 @@ export function WarehouseTransferHistory() {
       setNewProductId("");
       setNewBatchId("");
       setNewQuantity(1);
+      setNewProductSearch("");
       setAddingToGroup(null);
       toast({ title: "Producto agregado a la transferencia" });
     },
@@ -915,46 +914,68 @@ export function WarehouseTransferHistory() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <Plus className="h-3 w-3 text-muted-foreground" />
                           
-                          {/* Searchable product selector */}
-                          <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" size="sm" className="h-7 w-[220px] text-xs justify-start font-normal">
-                                <Search className="h-3 w-3 mr-1 shrink-0" />
-                                {newProductId
-                                  ? availableProducts.find((p: any) => p.id === newProductId)?.name || "Producto"
-                                  : "Buscar producto..."}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[280px] p-0" align="start">
-                              <Command>
-                                <CommandInput placeholder="Buscar por nombre o SKU..." className="text-xs" />
-                                <CommandList>
-                                  <CommandEmpty className="text-xs p-2">No se encontraron productos</CommandEmpty>
-                                  <CommandGroup>
-                                    {availableProducts.map((p: any) => (
-                                      <CommandItem
-                                        key={p.id}
-                                        value={`${p.name} ${p.brand || ""} ${p.sku || ""}`}
-                                        onSelect={() => {
-                                          setNewProductId(p.id);
-                                          setNewBatchId("");
-                                          setProductSearchOpen(false);
-                                        }}
-                                        className="text-xs"
-                                      >
-                                        <div className="flex flex-col">
-                                          <span className="font-medium">{p.name}</span>
-                                          <span className="text-muted-foreground">
-                                            {p.sku ? `${p.sku} · ` : ""}{p.brand ? `${p.brand} · ` : ""}Stock: {p.current_stock} {p.unit || "uds"}
-                                          </span>
-                                        </div>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
+                          {/* Selector de producto: input plano (compatible con lector de código
+                              de barras) + lista por subcadena en nombre/SKU/marca */}
+                          <div className="relative w-[260px]">
+                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Input
+                              value={newProductId
+                                ? (availableProducts.find((p: any) => p.id === newProductId)?.name || "")
+                                : newProductSearch}
+                              placeholder="Buscar por nombre o SKU..."
+                              className="h-7 pl-7 text-xs"
+                              onChange={(e) => {
+                                setNewProductSearch(e.target.value);
+                                if (newProductId) { setNewProductId(""); setNewBatchId(""); }
+                              }}
+                              onKeyDown={(e) => {
+                                // Enter del lector de códigos: si hay exactamente 1 coincidencia, seleccionarla
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const term = newProductSearch.trim().toLowerCase();
+                                  if (!term) return;
+                                  const matches = availableProducts.filter((p: any) =>
+                                    `${p.name} ${p.sku || ""} ${p.brand || ""}`.toLowerCase().includes(term));
+                                  if (matches.length === 1) {
+                                    setNewProductId(matches[0].id);
+                                    setNewBatchId("");
+                                    setNewProductSearch("");
+                                  }
+                                }
+                              }}
+                            />
+                            {!newProductId && newProductSearch.trim() && (
+                              <div className="absolute z-50 mt-1 w-[280px] max-h-56 overflow-y-auto rounded-md border bg-popover shadow-md">
+                                {(() => {
+                                  const term = newProductSearch.trim().toLowerCase();
+                                  const matches = availableProducts.filter((p: any) =>
+                                    `${p.name} ${p.sku || ""} ${p.brand || ""}`.toLowerCase().includes(term));
+                                  if (matches.length === 0) {
+                                    return <p className="text-xs p-2 text-muted-foreground">No se encontraron productos</p>;
+                                  }
+                                  return matches.slice(0, 30).map((p: any) => (
+                                    <button
+                                      key={p.id}
+                                      type="button"
+                                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-accent"
+                                      onClick={() => {
+                                        setNewProductId(p.id);
+                                        setNewBatchId("");
+                                        setNewProductSearch("");
+                                      }}
+                                    >
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{p.name}</span>
+                                        <span className="text-muted-foreground">
+                                          {p.sku ? `${p.sku} · ` : ""}{p.brand ? `${p.brand} · ` : ""}Stock: {p.current_stock} {p.unit || "uds"}
+                                        </span>
+                                      </div>
+                                    </button>
+                                  ));
+                                })()}
+                              </div>
+                            )}
+                          </div>
 
                           {/* Batch selector (appears after product is selected) */}
                           {newProductId && newProductBatches.length > 0 && (
@@ -994,7 +1015,7 @@ export function WarehouseTransferHistory() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            onClick={() => { setAddingToGroup(null); setNewProductId(""); setNewBatchId(""); setNewQuantity(1); }}
+                            onClick={() => { setAddingToGroup(null); setNewProductId(""); setNewBatchId(""); setNewQuantity(1); setNewProductSearch(""); }}
                             title="Cancelar"
                           >
                             <X className="h-3 w-3" />
