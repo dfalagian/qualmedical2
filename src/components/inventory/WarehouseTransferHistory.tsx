@@ -191,6 +191,7 @@ export function WarehouseTransferHistory() {
       return (data || []).map((ws: any) => ({
         id: ws.products?.id,
         name: ws.products?.name,
+        sku: ws.products?.sku,
         brand: ws.products?.brand,
         unit: ws.products?.unit,
         current_stock: ws.current_stock,
@@ -926,14 +927,14 @@ export function WarehouseTransferHistory() {
                             </PopoverTrigger>
                             <PopoverContent className="w-[280px] p-0" align="start">
                               <Command>
-                                <CommandInput placeholder="Buscar por nombre..." className="text-xs" />
+                                <CommandInput placeholder="Buscar por nombre o SKU..." className="text-xs" />
                                 <CommandList>
                                   <CommandEmpty className="text-xs p-2">No se encontraron productos</CommandEmpty>
                                   <CommandGroup>
                                     {availableProducts.map((p: any) => (
                                       <CommandItem
                                         key={p.id}
-                                        value={`${p.name} ${p.brand || ""}`}
+                                        value={`${p.name} ${p.brand || ""} ${p.sku || ""}`}
                                         onSelect={() => {
                                           setNewProductId(p.id);
                                           setNewBatchId("");
@@ -944,7 +945,7 @@ export function WarehouseTransferHistory() {
                                         <div className="flex flex-col">
                                           <span className="font-medium">{p.name}</span>
                                           <span className="text-muted-foreground">
-                                            {p.brand ? `${p.brand} · ` : ""}Stock: {p.current_stock} {p.unit || "uds"}
+                                            {p.sku ? `${p.sku} · ` : ""}{p.brand ? `${p.brand} · ` : ""}Stock: {p.current_stock} {p.unit || "uds"}
                                           </span>
                                         </div>
                                       </CommandItem>
