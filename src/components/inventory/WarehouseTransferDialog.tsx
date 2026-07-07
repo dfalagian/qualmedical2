@@ -30,7 +30,6 @@ import {
   ChevronsUpDown,
   Check
 } from "lucide-react";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -90,6 +89,7 @@ export function WarehouseTransferDialog({
   const [notes, setNotes] = useState("");
   const [transferDate, setTransferDate] = useState<Date>(new Date());
   const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
 
   // Fetch warehouses
   const { data: warehouses = [] } = useQuery({
@@ -111,7 +111,7 @@ export function WarehouseTransferDialog({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("warehouse_stock")
-        .select("product_id, current_stock, products:product_id(id, name, sku, brand, unit, warehouse_id)")
+        .select("product_id, current_stock, products:product_id(id, name, sku, barcode, brand, unit, warehouse_id)")
         .eq("warehouse_id", fromWarehouseId)
         .gt("current_stock", 0);
       if (error) throw error;
@@ -120,6 +120,7 @@ export function WarehouseTransferDialog({
         id: ws.products?.id,
         name: ws.products?.name,
         sku: ws.products?.sku,
+        barcode: ws.products?.barcode,
         brand: ws.products?.brand,
         unit: ws.products?.unit,
         warehouse_id: ws.warehouse_id,
@@ -127,6 +128,40 @@ export function WarehouseTransferDialog({
       })).filter(p => p.id).sort((a: any, b: any) => a.name?.localeCompare(b.name));
     },
     enabled: !!fromWarehouseId,
+  });
+
+  // Coincidencias por nombre / SKU / código de barras en el almacén de origen.
+  // Búsqueda por subcadena exacta (NO difusa como cmdk, que confundía 7501010
+  // con el código 7501041990013 de otro producto por subsecuencia).
+  const productSearchTerm = productSearch.trim().toLowerCase();
+  const productMatches = productSearchTerm
+    ? products.filter((p: any) =>
+        `${p.name} ${p.sku || ""} ${p.barcode || ""} ${p.brand || ""}`.toLowerCase().includes(productSearchTerm))
+    : products;
+
+  // Si no hay coincidencias en el almacén de origen, buscar en OTROS almacenes
+  // para explicar dónde está el stock (evita el confuso "No se encontró producto").
+  const { data: elsewhereMatches = [] } = useQuery({
+    queryKey: ["transfer_dialog_elsewhere", fromWarehouseId, productSearchTerm],
+    queryFn: async () => {
+      const term = productSearch.trim();
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, sku, barcode, warehouse_stock(current_stock, warehouse_id, warehouses(name))")
+        .or(`name.ilike.%${term}%,sku.ilike.%${term}%,barcode.ilike.%${term}%`)
+        .limit(5);
+      if (error) throw error;
+      return (data || [])
+        .map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          stocks: (p.warehouse_stock || [])
+            .filter((ws: any) => Number(ws.current_stock) > 0 && ws.warehouse_id !== fromWarehouseId)
+            .map((ws: any) => ({ warehouse: ws.warehouses?.name || "—", qty: ws.current_stock })),
+        }))
+        .filter((p: any) => p.stocks.length > 0);
+    },
+    enabled: !!fromWarehouseId && productSearchTerm.length >= 2 && productMatches.length === 0,
   });
 
   // Fetch batches for selected product filtered by source warehouse
@@ -588,30 +623,73 @@ export function WarehouseTransferDialog({
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[450px] p-0 z-[9999]" align="start">
-                    <Command>
-                      <CommandInput placeholder="Buscar producto..." />
-                      <CommandList>
-                        <CommandEmpty>No se encontró producto.</CommandEmpty>
-                        <CommandGroup>
-                          {products.map(p => (
-                            <CommandItem
-                              key={p.id}
-                              value={`${p.name} ${p.brand || ''} ${p.sku || ''}`}
-                              onSelect={() => {
-                                setSelectedProductId(p.id);
-                                setSelectedBatchId("");
-                                setProductSearchOpen(false);
-                              }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", selectedProductId === p.id ? "opacity-100" : "opacity-0")} />
-                              <span className="truncate flex-1">{p.name}</span>
-                              {p.brand && <span className="text-xs text-muted-foreground mx-1">{p.brand}</span>}
-                              <Badge variant="secondary" className="ml-2 shrink-0">{p.current_stock}</Badge>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
+                    <div className="p-2">
+                      <Input
+                        autoFocus
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        placeholder="Buscar por nombre, SKU o código de barras..."
+                        className="h-9"
+                        onKeyDown={(e) => {
+                          // Enter del lector de códigos: si hay 1 sola coincidencia, seleccionarla
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (productMatches.length === 1) {
+                              setSelectedProductId(productMatches[0].id);
+                              setSelectedBatchId("");
+                              setProductSearch("");
+                              setProductSearchOpen(false);
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {productMatches.length === 0 ? (
+                        elsewhereMatches.length > 0 ? (
+                          <div className="p-2 space-y-2">
+                            {elsewhereMatches.map((p: any) => (
+                              <div key={p.id} className="text-xs">
+                                <span className="font-medium">{p.name}</span>
+                                <p className="text-amber-700">
+                                  Sin stock en el almacén de origen. Disponible en:{" "}
+                                  {p.stocks.map((s: any) => `${s.warehouse} (${s.qty})`).join(", ")}.
+                                </p>
+                                <p className="text-muted-foreground">
+                                  Cambia el almacén de origen a ese para poder transferirlo.
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm p-3 text-muted-foreground">No se encontró producto.</p>
+                        )
+                      ) : (
+                        productMatches.map((p: any) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+                            onClick={() => {
+                              setSelectedProductId(p.id);
+                              setSelectedBatchId("");
+                              setProductSearch("");
+                              setProductSearchOpen(false);
+                            }}
+                          >
+                            <Check className={cn("h-4 w-4 shrink-0", selectedProductId === p.id ? "opacity-100" : "opacity-0")} />
+                            <span className="truncate flex-1">
+                              {p.name}
+                              {(p.sku || p.barcode) && (
+                                <span className="text-xs text-muted-foreground"> · {p.sku || p.barcode}</span>
+                              )}
+                            </span>
+                            {p.brand && <span className="text-xs text-muted-foreground mx-1">{p.brand}</span>}
+                            <Badge variant="secondary" className="ml-1 shrink-0">{p.current_stock}</Badge>
+                          </button>
+                        ))
+                      )}
+                    </div>
                   </PopoverContent>
                 </Popover>
               </div>
