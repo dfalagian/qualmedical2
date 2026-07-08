@@ -65,14 +65,28 @@ interface ManualTransferItem {
   maxStock: number;
 }
 
+export interface EditTransferGroup {
+  transferGroupId: string | null;
+  transferNumber: number | null;
+  itemIds: string[];
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  notes: string | null;
+  createdAt: string;
+  manualItems: ManualTransferItem[];
+  scannedTags: ScannedTag[];
+}
+
 interface WarehouseTransferDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editGroup?: EditTransferGroup | null;
 }
 
-export function WarehouseTransferDialog({ 
-  open, 
-  onOpenChange 
+export function WarehouseTransferDialog({
+  open,
+  onOpenChange,
+  editGroup,
 }: WarehouseTransferDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -206,6 +220,19 @@ export function WarehouseTransferDialog({
       setTimeout(() => scanInputRef.current?.focus(), 100);
     }
   }, [open]);
+
+  // Modo edición: precargar los datos de la transferencia al abrir
+  useEffect(() => {
+    if (open && editGroup) {
+      setFromWarehouseId(editGroup.fromWarehouseId);
+      setToWarehouseId(editGroup.toWarehouseId);
+      setNotes(editGroup.notes || "");
+      setTransferDate(editGroup.createdAt ? new Date(editGroup.createdAt) : new Date());
+      setManualItems(editGroup.manualItems);
+      setScannedTags(editGroup.scannedTags);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editGroup]);
 
   // Handle RFID scan
   const handleScan = async (epc: string) => {
@@ -364,11 +391,33 @@ export function WarehouseTransferDialog({
   const transferMutation = useMutation({
     mutationFn: async () => {
       const results = { rfidCount: 0, manualCount: 0 };
-      const groupId = crypto.randomUUID();
 
-      const { data: nextNum, error: numError } = await (supabase as any).rpc("get_next_transfer_number");
-      if (numError) throw numError;
-      const transferNumber: number = nextNum;
+      let groupId: string;
+      let transferNumber: number;
+      if (editGroup) {
+        // Edición: conservar grupo/número y reemplazar renglones.
+        // Es seguro porque la transferencia está pendiente (el stock aún no se movió).
+        groupId = editGroup.transferGroupId || crypto.randomUUID();
+        if (editGroup.transferNumber != null) {
+          transferNumber = editGroup.transferNumber;
+        } else {
+          const { data: nn, error: ne } = await (supabase as any).rpc("get_next_transfer_number");
+          if (ne) throw ne;
+          transferNumber = nn;
+        }
+        if (editGroup.itemIds.length > 0) {
+          const { error: delErr } = await supabase
+            .from("warehouse_transfers")
+            .delete()
+            .in("id", editGroup.itemIds);
+          if (delErr) throw delErr;
+        }
+      } else {
+        groupId = crypto.randomUUID();
+        const { data: nextNum, error: numError } = await (supabase as any).rpc("get_next_transfer_number");
+        if (numError) throw numError;
+        transferNumber = nextNum;
+      }
 
       // Save RFID tags as pending transfers (NO stock movement)
       if (scannedTags.length > 0) {
@@ -437,8 +486,10 @@ export function WarehouseTransferDialog({
       });
       
       toast({
-        title: "Transferencia creada como pendiente",
-        description: `${parts.join(" y ")} listos para aprobar. El stock no se moverá hasta que se apruebe.`,
+        title: editGroup ? "Transferencia actualizada" : "Transferencia creada como pendiente",
+        description: editGroup
+          ? `${parts.join(" y ")} guardados. Sigue pendiente de aprobación.`
+          : `${parts.join(" y ")} listos para aprobar. El stock no se moverá hasta que se apruebe.`,
       });
       resetForm();
       onOpenChange(false);
@@ -481,7 +532,7 @@ export function WarehouseTransferDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5 text-primary" />
-            Transferencia entre Almacenes
+            {editGroup ? "Editar Transferencia" : "Transferencia entre Almacenes"}
           </DialogTitle>
         </DialogHeader>
 
@@ -490,7 +541,7 @@ export function WarehouseTransferDialog({
           <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
             <div className="flex-1 space-y-1.5">
               <Label className="text-xs text-muted-foreground">Origen</Label>
-              <Select value={fromWarehouseId} onValueChange={(v) => {
+              <Select disabled={!!editGroup} value={fromWarehouseId} onValueChange={(v) => {
                 setFromWarehouseId(v);
                 setScannedTags([]);
                 setManualItems([]);
@@ -516,13 +567,14 @@ export function WarehouseTransferDialog({
               size="icon"
               onClick={swapWarehouses}
               className="mt-5"
+              disabled={!!editGroup}
             >
               <ArrowRightLeft className="h-4 w-4" />
             </Button>
 
             <div className="flex-1 space-y-1.5">
               <Label className="text-xs text-muted-foreground">Destino</Label>
-              <Select value={toWarehouseId} onValueChange={setToWarehouseId}>
+              <Select disabled={!!editGroup} value={toWarehouseId} onValueChange={setToWarehouseId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Almacén destino" />
                 </SelectTrigger>
@@ -837,9 +889,11 @@ export function WarehouseTransferDialog({
             onClick={() => transferMutation.mutate()}
             disabled={!canTransfer || transferMutation.isPending}
           >
-            {transferMutation.isPending 
-              ? "Guardando..." 
-              : `Crear Pendiente ${totalItems > 0 ? `(${totalItems})` : ""}`
+            {transferMutation.isPending
+              ? "Guardando..."
+              : editGroup
+                ? `Guardar Cambios ${totalItems > 0 ? `(${totalItems})` : ""}`
+                : `Crear Pendiente ${totalItems > 0 ? `(${totalItems})` : ""}`
             }
           </Button>
         </DialogFooter>

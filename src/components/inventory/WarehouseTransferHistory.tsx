@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Printer, ArrowRightLeft, Package, Tag as TagIcon, Check, X, Pencil, Trash2, ChevronDown, ChevronUp, Plus, Search, Eye, Truck, PackageCheck } from "lucide-react";
 import { TransferReceptionScanDialog } from "./TransferReceptionScanDialog";
 import { TransferCompletionSummaryModal } from "./TransferCompletionSummaryModal";
+import { WarehouseTransferDialog, type EditTransferGroup } from "./WarehouseTransferDialog";
 import { openWarehouseTransferPrint, TransferPrintItem, TransferPrintData } from "./warehouseTransferPrint";
 import { useToast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLogger";
@@ -71,6 +72,42 @@ export function WarehouseTransferHistory() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [editDialogGroup, setEditDialogGroup] = useState<EditTransferGroup | null>(null);
+
+  // Construye la precarga del modal de edición a partir de una transferencia agrupada
+  const buildEditGroup = (group: GroupedTransfer): EditTransferGroup => ({
+    transferGroupId: group.groupId ?? null,
+    transferNumber: group.transferNumber ?? null,
+    itemIds: group.items.map((i: any) => i.id),
+    fromWarehouseId: group.fromWarehouseId,
+    toWarehouseId: group.toWarehouseId,
+    notes: group.notes ?? null,
+    createdAt: group.date,
+    manualItems: group.items
+      .filter((i: any) => i.transfer_type === "manual" && i.product_id)
+      .map((i: any) => ({
+        productId: i.product_id,
+        productName: (i.products as any)?.name || "Producto",
+        brand: (i.products as any)?.brand || "",
+        unit: (i.products as any)?.unit || "pieza",
+        batchId: i.batch_id || undefined,
+        batchNumber: (i.product_batches as any)?.batch_number || "",
+        expirationDate: (i.product_batches as any)?.expiration_date || "",
+        quantity: i.quantity || 1,
+        maxStock: 999999,
+      })),
+    scannedTags: group.items
+      .filter((i: any) => i.transfer_type === "rfid" && i.rfid_tag_id)
+      .map((i: any) => ({
+        id: i.rfid_tag_id,
+        epc: (i.rfid_tags as any)?.epc || "",
+        productName: (i.rfid_tags as any)?.products?.name || "Sin producto",
+        brand: (i.rfid_tags as any)?.products?.brand || "",
+        unit: (i.rfid_tags as any)?.products?.unit || "pieza",
+        batchNumber: (i.rfid_tags as any)?.product_batches?.batch_number,
+        expirationDate: (i.rfid_tags as any)?.product_batches?.expiration_date,
+      })),
+  });
   const [confirmAction, setConfirmAction] = useState<{ type: "approve" | "confirm" | "cancel" | "deleteItem"; group?: GroupedTransfer; itemId?: string } | null>(null);
   const [editingItem, setEditingItem] = useState<{ id: string; quantity: number } | null>(null);
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
@@ -769,7 +806,7 @@ export function WarehouseTransferHistory() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-primary hover:text-primary"
-                            onClick={() => setExpandedGroup(group.key)}
+                            onClick={() => setEditDialogGroup(buildEditGroup(group))}
                             title="Editar transferencia"
                           >
                             <Pencil className="h-4 w-4" />
@@ -1114,6 +1151,12 @@ export function WarehouseTransferHistory() {
           transferredItems={summaryData.items}
         />
       )}
+
+      <WarehouseTransferDialog
+        open={!!editDialogGroup}
+        onOpenChange={(o) => { if (!o) setEditDialogGroup(null); }}
+        editGroup={editDialogGroup}
+      />
     </>
   );
 }
