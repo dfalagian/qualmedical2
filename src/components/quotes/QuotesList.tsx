@@ -714,14 +714,14 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                       <TableRow key={quote.id}>
                         <TableCell className="font-medium">{quote.folio}</TableCell>
                         <TableCell>{quote.client?.nombre_cliente || "-"}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">
+                        <TableCell className="max-w-[200px] truncate" title={quote.concepto || undefined}>
                           {quote.concepto || "-"}
                         </TableCell>
                         <TableCell>
                           {format(new Date(quote.fecha_cotizacion), "dd/MM/yyyy")}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          ${quote.total.toFixed(2)}
+                          ${quote.total.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -938,8 +938,8 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                               : "-"}
                           </TableCell>
                           <TableCell className="text-right">{item.cantidad}</TableCell>
-                          <TableCell className="text-right">${item.precio_unitario.toFixed(2)}</TableCell>
-                          <TableCell className="text-right font-medium">${item.importe.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">${item.precio_unitario.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-right font-medium">${item.importe.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                         </TableRow>
                       );
                     })}
@@ -959,17 +959,17 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
                     <div className="w-full max-w-xs space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Subtotal:</span>
-                        <span>${selectedQuote.subtotal.toFixed(2)}</span>
+                        <span>${selectedQuote.subtotal.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                       {calcIva > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">IVA (16% insumos):</span>
-                          <span>${calcIva.toFixed(2)}</span>
+                          <span>${calcIva.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                       )}
                       <div className="flex justify-between text-lg font-bold border-t pt-2">
                         <span>Total:</span>
-                        <span className="text-primary">${calcTotal.toFixed(2)}</span>
+                        <span className="text-primary">${calcTotal.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     </div>
                   </div>

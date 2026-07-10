@@ -49,7 +49,7 @@ export const printQuoteHtml = (data: QuotePrintData) => {
   };
 
   const formatCurrency = (amount: number) => {
-    return `$${amount.toFixed(2)}`;
+    return `$${amount.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   // Check if an item is exempt from IVA (centralized with accent normalization)

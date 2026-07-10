@@ -1151,7 +1151,7 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                                   {stockLevel}
                                 </span>
                                 <span className="text-sm font-semibold text-primary min-w-[70px] text-right">
-                                  ${(product.unit_price || 0).toFixed(2)}
+                                  ${(product.unit_price || 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                                 <Check
                                   className={cn(
@@ -1180,23 +1180,23 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
                 <div className="p-2 rounded border bg-background">
                   <span className="text-muted-foreground block">T1 - Público</span>
-                  <span className="font-semibold">${(selectedProduct.price_type_1 || 0).toFixed(2)}</span>
+                  <span className="font-semibold">${(selectedProduct.price_type_1 || 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className="p-2 rounded border bg-background">
                   <span className="text-muted-foreground block">T2 - Mayoreo</span>
-                  <span className="font-semibold">${(selectedProduct.price_type_2 || 0).toFixed(2)}</span>
+                  <span className="font-semibold">${(selectedProduct.price_type_2 || 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className="p-2 rounded border bg-background">
                   <span className="text-muted-foreground block">T3 - Distribuidor</span>
-                  <span className="font-semibold">${(selectedProduct.price_type_3 || 0).toFixed(2)}</span>
+                  <span className="font-semibold">${(selectedProduct.price_type_3 || 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className="p-2 rounded border bg-background">
                   <span className="text-muted-foreground block">T4 - Especial</span>
-                  <span className="font-semibold">${(selectedProduct.price_type_4 || 0).toFixed(2)}</span>
+                  <span className="font-semibold">${(selectedProduct.price_type_4 || 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className="p-2 rounded border bg-background">
                   <span className="text-muted-foreground block">T5 - VIP</span>
-                  <span className="font-semibold">${(selectedProduct.price_type_5 || 0).toFixed(2)}</span>
+                  <span className="font-semibold">${(selectedProduct.price_type_5 || 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               </div>
             </div>
@@ -1370,11 +1370,11 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                                 className="w-24 h-8 text-right"
                               />
                             ) : (
-                              <span className="font-medium">${item.precio_unitario.toFixed(2)}</span>
+                              <span className="font-medium">${item.precio_unitario.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
-                            ${item.importe.toFixed(2)}
+                            ${item.importe.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </TableCell>
                           <TableCell>
                             <Button
@@ -1421,15 +1421,15 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
             <div className="w-full max-w-xs space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Sub-Total:</span>
-                <span className="font-medium">${subtotal.toFixed(2)}</span>
+                <span className="font-medium">${subtotal.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">IVA (16% insumos):</span>
-                <span className="font-medium">${iva.toFixed(2)}</span>
+                <span className="font-medium">${iva.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>Total:</span>
-                <span className="text-primary">${total.toFixed(2)}</span>
+                <span className="text-primary">${total.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
             
