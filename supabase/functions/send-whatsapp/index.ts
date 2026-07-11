@@ -1,4 +1,4 @@
-const corsHeaders = {
+﻿const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
@@ -13,27 +13,27 @@ interface MessageRequest {
 
 const TEMPLATES: Record<string, (d: Record<string, string>) => string> = {
   document_approved: (d) =>
-    `✅ *QualMedical* - Tu documento ${d.type || ""} ha sido aprobado. Accede al portal: qualmedical.lovable.app`,
+    `âœ… *QualMedical* - Tu documento ${d.type || ""} ha sido aprobado. Accede al portal: qualmedical.lovable.app`,
   document_rejected: (d) =>
-    `❌ *QualMedical* - Tu documento ${d.type || ""} fue rechazado.${d.reason ? ` Razón: ${d.reason}.` : ""} Revisa el portal: qualmedical.lovable.app`,
+    `âŒ *QualMedical* - Tu documento ${d.type || ""} fue rechazado.${d.reason ? ` RazÃ³n: ${d.reason}.` : ""} Revisa el portal: qualmedical.lovable.app`,
   invoice_validated: (d) =>
-    `✅ *QualMedical* - Tu factura ${d.number || ""} ha sido validada correctamente.`,
+    `âœ… *QualMedical* - Tu factura ${d.number || ""} ha sido validada correctamente.`,
   invoice_rejected: (d) =>
-    `❌ *QualMedical* - Tu factura ${d.number || ""} fue rechazada.${d.reason ? ` Razón: ${d.reason}.` : ""} Revisa el portal.`,
+    `âŒ *QualMedical* - Tu factura ${d.number || ""} fue rechazada.${d.reason ? ` RazÃ³n: ${d.reason}.` : ""} Revisa el portal.`,
   payment_completed: (d) =>
-    `💰 *QualMedical* - Se ha registrado tu pago de $${d.amount || "0"} MXN para la factura ${d.number || ""}.`,
+    `ðŸ’° *QualMedical* - Se ha registrado tu pago de $${d.amount || "0"} MXN para la factura ${d.number || ""}.`,
   payment_pending: (d) =>
-    `⏳ *QualMedical* - Tu pago de $${d.amount || "0"} MXN está pendiente de confirmación.`,
+    `â³ *QualMedical* - Tu pago de $${d.amount || "0"} MXN estÃ¡ pendiente de confirmaciÃ³n.`,
   evidence_approved: () =>
-    `✅ *QualMedical* - Tu evidencia de entrega ha sido aprobada.`,
+    `âœ… *QualMedical* - Tu evidencia de entrega ha sido aprobada.`,
   evidence_rejected: (d) =>
-    `❌ *QualMedical* - Tu evidencia de entrega fue rechazada.${d.reason ? ` Razón: ${d.reason}.` : ""} Sube una nueva evidencia.`,
+    `âŒ *QualMedical* - Tu evidencia de entrega fue rechazada.${d.reason ? ` RazÃ³n: ${d.reason}.` : ""} Sube una nueva evidencia.`,
   account_approved: () =>
-    `🎉 *QualMedical* - Tu cuenta de proveedor ha sido aprobada. Ya puedes acceder al portal: qualmedical.lovable.app`,
+    `ðŸŽ‰ *QualMedical* - Tu cuenta de proveedor ha sido aprobada. Ya puedes acceder al portal: qualmedical.lovable.app`,
   account_rejected: (d) =>
-    `❌ *QualMedical* - Tu solicitud de registro fue rechazada.${d.reason ? ` Razón: ${d.reason}.` : ""} Contacta al administrador.`,
+    `âŒ *QualMedical* - Tu solicitud de registro fue rechazada.${d.reason ? ` RazÃ³n: ${d.reason}.` : ""} Contacta al administrador.`,
   pos_sale: (d) =>
-    `🛒 *QualMedical - Nueva Venta POS*\n\n📋 Folio: ${d.folio || "N/A"}\n👤 Vendedor: ${d.vendedor || "N/A"}\n🏢 Cliente: ${d.cliente || "Mostrador"}\n📦 Productos: ${d.productos || "N/A"}\n💰 Total: $${d.total || "0"} MXN\n\n📝 Detalle:\n${d.detalle || "Sin detalle"}`,
+    `ðŸ›’ *QualMedical - Nueva Venta POS*\n\nðŸ“‹ Folio: ${d.folio || "N/A"}\nðŸ‘¤ Vendedor: ${d.vendedor || "N/A"}\nðŸ¢ Cliente: ${d.cliente || "Mostrador"}\nðŸ“¦ Productos: ${d.productos || "N/A"}\nðŸ’° Total: $${d.total || "0"} MXN\n\nðŸ“ Detalle:\n${d.detalle || "Sin detalle"}`,
 };
 
 function formatPhoneNumber(phone: string): string {

@@ -1,15 +1,15 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
-// Schema de validación para crear usuario
+// Schema de validaciÃ³n para crear usuario
 const CreateUserSchema = z.object({
   email: z.string().email().max(255),
   password: z.string().min(6).max(100),
   full_name: z.string().min(1).max(100),
   role: z.enum(['admin', 'proveedor', 'contador', 'contador_proveedor', 'inventario_rfid', 'vendedor']),
   company_name: z.string().max(100).nullable().optional(),
-  rfc: z.string().regex(/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/).nullable().optional(),
+  rfc: z.string().regex(/^[A-ZÃ‘&]{3,4}\d{6}[A-Z0-9]{3}$/).nullable().optional(),
   phone: z.string().max(20).nullable().optional()
 });
 
@@ -93,7 +93,7 @@ serve(async (req) => {
     } catch (error) {
       console.error('Validation error:', error);
       throw new Error(error instanceof z.ZodError 
-        ? `Datos inválidos: ${error.errors.map(e => e.message).join(', ')}`
+        ? `Datos invÃ¡lidos: ${error.errors.map(e => e.message).join(', ')}`
         : 'Formato de datos incorrecto');
     }
 
@@ -112,10 +112,10 @@ serve(async (req) => {
 
     if (authError) {
       console.error("Auth error:", authError);
-      let errorMessage = "Error al crear autenticación";
+      let errorMessage = "Error al crear autenticaciÃ³n";
       
       if (authError.message.includes("already been registered") || authError.message.includes("email_exists")) {
-        errorMessage = "Este email ya está registrado en el sistema";
+        errorMessage = "Este email ya estÃ¡ registrado en el sistema";
       } else {
         errorMessage = authError.message;
       }

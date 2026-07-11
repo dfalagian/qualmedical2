@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
@@ -44,7 +44,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: isAdmin } = await supabaseClient.rpc("is_admin", { _user_id: callerUser.id });
     if (!isAdmin) {
       return new Response(
-        JSON.stringify({ error: "Solo administradores pueden cambiar contraseñas" }),
+        JSON.stringify({ error: "Solo administradores pueden cambiar contraseÃ±as" }),
         { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -60,7 +60,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (newPassword.length < 6) {
       return new Response(
-        JSON.stringify({ error: "La contraseña debe tener al menos 6 caracteres" }),
+        JSON.stringify({ error: "La contraseÃ±a debe tener al menos 6 caracteres" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -81,7 +81,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (updateError) {
       console.error("Error updating password:", updateError);
       return new Response(
-        JSON.stringify({ error: "Error al cambiar contraseña: " + updateError.message }),
+        JSON.stringify({ error: "Error al cambiar contraseÃ±a: " + updateError.message }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -91,7 +91,7 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Contraseña cambiada exitosamente" 
+        message: "ContraseÃ±a cambiada exitosamente" 
       }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
@@ -99,7 +99,7 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error in change-user-password:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Error al cambiar contraseña" }),
+      JSON.stringify({ error: error.message || "Error al cambiar contraseÃ±a" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }

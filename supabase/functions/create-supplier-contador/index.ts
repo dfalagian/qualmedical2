@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+﻿import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     if (authError || !requestingUser) {
       console.error('Auth error:', authError);
       return new Response(
-        JSON.stringify({ error: 'Token inválido' }),
+        JSON.stringify({ error: 'Token invÃ¡lido' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
 
     if (!email || !password || !fullName) {
       return new Response(
-        JSON.stringify({ error: 'Email, contraseña y nombre son requeridos' }),
+        JSON.stringify({ error: 'Email, contraseÃ±a y nombre son requeridos' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return new Response(
-        JSON.stringify({ error: 'Formato de email inválido' }),
+        JSON.stringify({ error: 'Formato de email invÃ¡lido' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
     // Validate password length
     if (password.length < 6) {
       return new Response(
-        JSON.stringify({ error: 'La contraseña debe tener al menos 6 caracteres' }),
+        JSON.stringify({ error: 'La contraseÃ±a debe tener al menos 6 caracteres' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

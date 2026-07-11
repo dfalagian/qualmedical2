@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
 
 const corsHeaders = {
@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Función para extraer el UUID del documento relacionado de un XML de complemento de pago
+// FunciÃ³n para extraer el UUID del documento relacionado de un XML de complemento de pago
 function extractUUIDFromComplementXML(xmlContent: string): {
   uuid_documento_relacionado: string | null;
   uuid_complemento: string | null;
@@ -91,7 +91,7 @@ function extractUUIDFromComplementXML(xmlContent: string): {
     }
   }
 
-  // 5. Extraer número de parcialidad
+  // 5. Extraer nÃºmero de parcialidad
   const parcialidadPatterns = [
     /NumParcialidad\s*=\s*["'](\d+)["']/i,
   ];
@@ -101,7 +101,7 @@ function extractUUIDFromComplementXML(xmlContent: string): {
     const match = cleanXml.match(pattern);
     if (match && match[1]) {
       num_parcialidad = match[1];
-      console.log('Número de parcialidad encontrado:', num_parcialidad);
+      console.log('NÃºmero de parcialidad encontrado:', num_parcialidad);
       break;
     }
   }
@@ -179,7 +179,7 @@ serve(async (req) => {
 
     if (invoiceError || !invoiceData) {
       console.error('Error obteniendo factura:', invoiceError);
-      throw new Error('No se pudo obtener la información de la factura');
+      throw new Error('No se pudo obtener la informaciÃ³n de la factura');
     }
 
     const invoiceUUID = invoiceData.uuid;
@@ -201,16 +201,16 @@ serve(async (req) => {
     
     // Leer el contenido del XML
     const xmlContent = await fileData.text();
-    console.log('XML descargado, tamaño:', xmlContent.length, 'caracteres');
+    console.log('XML descargado, tamaÃ±o:', xmlContent.length, 'caracteres');
 
-    // Extraer información del XML
+    // Extraer informaciÃ³n del XML
     const extractedInfo = extractUUIDFromComplementXML(xmlContent);
-    console.log('Información extraída:', extractedInfo);
+    console.log('InformaciÃ³n extraÃ­da:', extractedInfo);
 
     const extractedUUID = extractedInfo.uuid_documento_relacionado;
     const normalizedInvoiceUUID = invoiceUUID.toUpperCase().trim();
 
-    console.log('UUID extraído del complemento:', extractedUUID);
+    console.log('UUID extraÃ­do del complemento:', extractedUUID);
     console.log('UUID de la factura (normalizado):', normalizedInvoiceUUID);
 
     // Validar que se haya encontrado el UUID
@@ -218,7 +218,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           valid: false,
-          error: 'No se pudo extraer el UUID del documento relacionado del XML. Verifique que el archivo sea un complemento de pago CFDI válido con la sección DoctoRelacionado.',
+          error: 'No se pudo extraer el UUID del documento relacionado del XML. Verifique que el archivo sea un complemento de pago CFDI vÃ¡lido con la secciÃ³n DoctoRelacionado.',
           invoiceUUID: normalizedInvoiceUUID,
           extractedUUID: null,
           extractedInfo
@@ -234,7 +234,7 @@ serve(async (req) => {
     const uuidsMatch = extractedUUID === normalizedInvoiceUUID;
 
     if (!uuidsMatch) {
-      console.warn('⚠️ UUID NO COINCIDE');
+      console.warn('âš ï¸ UUID NO COINCIDE');
       console.warn('UUID Factura:', normalizedInvoiceUUID);
       console.warn('UUID Complemento:', extractedUUID);
       
@@ -254,7 +254,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('✅ UUID VÁLIDO - El complemento corresponde a la factura');
+    console.log('âœ… UUID VÃLIDO - El complemento corresponde a la factura');
 
     return new Response(
       JSON.stringify({

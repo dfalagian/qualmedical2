@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
@@ -44,7 +44,7 @@ serve(async (req) => {
     // Usar la API nativa de Deno para base64 (maneja archivos grandes sin stack overflow)
     const base64Image = base64Encode(imageBuffer);
 
-    // Detectar mime type según extensión
+    // Detectar mime type segÃºn extensiÃ³n
     const lowerPath = filePath.toLowerCase();
     let mimeType = 'image/jpeg';
     if (lowerPath.endsWith('.pdf')) {
@@ -53,23 +53,23 @@ serve(async (req) => {
       mimeType = 'image/png';
     }
 
-    console.log('Imagen descargada, tamaño:', imageBuffer.byteLength, 'mime:', mimeType);
+    console.log('Imagen descargada, tamaÃ±o:', imageBuffer.byteLength, 'mime:', mimeType);
 
-    // Obtener la URL pública para guardarla en la base de datos
+    // Obtener la URL pÃºblica para guardarla en la base de datos
     const { data: { publicUrl } } = supabaseAdmin.storage
       .from('documents')
       .getPublicUrl(filePath);
 
-    // Llamar a Gemini para extraer la información del comprobante
-    console.log('Llamando a Gemini para extraer información del comprobante...');
+    // Llamar a Gemini para extraer la informaciÃ³n del comprobante
+    console.log('Llamando a Gemini para extraer informaciÃ³n del comprobante...');
 
     const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
     if (!GEMINI_API_KEY) {
-      throw new Error('GEMINIKEY no está configurada');
+      throw new Error('GEMINIKEY no estÃ¡ configurada');
     }
 
     const aiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -79,25 +79,25 @@ serve(async (req) => {
               functionDeclarations: [
                 {
                   name: 'extract_payment_info',
-                  description: 'Extrae la información del comprobante de pago bancario',
+                  description: 'Extrae la informaciÃ³n del comprobante de pago bancario',
                   parameters: {
                     type: 'object',
                     properties: {
                       fecha_pago: {
                         type: 'string',
-                        description: 'Fecha de pago en formato YYYY-MM-DD, o null si no está visible'
+                        description: 'Fecha de pago en formato YYYY-MM-DD, o null si no estÃ¡ visible'
                       },
                       numero_cuenta: {
                         type: 'string',
-                        description: 'Número de cuenta destino (puede ser cuenta completa o CLABE), o null si no está visible'
+                        description: 'NÃºmero de cuenta destino (puede ser cuenta completa o CLABE), o null si no estÃ¡ visible'
                       },
                       tipo_cuenta: {
                         type: 'string',
-                        description: 'Tipo de cuenta (Ahorro, Corriente, CLABE, etc.), o null si no está visible'
+                        description: 'Tipo de cuenta (Ahorro, Corriente, CLABE, etc.), o null si no estÃ¡ visible'
                       },
                       monto: {
                         type: 'number',
-                        description: 'Monto/Importe de la transferencia como número decimal, o null si no está visible'
+                        description: 'Monto/Importe de la transferencia como nÃºmero decimal, o null si no estÃ¡ visible'
                       }
                     },
                     required: ['fecha_pago', 'numero_cuenta', 'tipo_cuenta', 'monto']
@@ -123,24 +123,24 @@ serve(async (req) => {
                   }
                 },
                 {
-                  text: `Analiza este comprobante de pago bancario mexicano y extrae la siguiente información:
+                  text: `Analiza este comprobante de pago bancario mexicano y extrae la siguiente informaciÃ³n:
 
 **Instrucciones MUY importantes:**
 1. Busca la fecha de pago/transferencia en el documento
-2. La fecha puede aparecer como "Fecha de pago", "Fecha de operación", "Fecha de transferencia" o similar
+2. La fecha puede aparecer como "Fecha de pago", "Fecha de operaciÃ³n", "Fecha de transferencia" o similar
 3. Devuelve la fecha en formato YYYY-MM-DD
-4. Extrae el número de cuenta destino (puede ser cuenta completa o CLABE)
+4. Extrae el nÃºmero de cuenta destino (puede ser cuenta completa o CLABE)
 5. Identifica el tipo de cuenta (puede ser "Ahorro", "Corriente", "CLABE", etc.)
-6. **CRÍTICO PARA EL MONTO**:
+6. **CRÃTICO PARA EL MONTO**:
    - Busca el monto principal de la transferencia en campos como "Monto", "Importe", "Cantidad", "Referere", "Total"
-   - El monto suele estar precedido por el símbolo "$" o "MXN"
+   - El monto suele estar precedido por el sÃ­mbolo "$" o "MXN"
    - IGNORA montos que aparezcan dentro de razones sociales o nombres de empresas (ej: "SA de CV ($1)" NO es el monto)
-   - IGNORA montos muy pequeños como $1 que suelen ser parte del texto de la empresa
-   - El monto real de una transferencia bancaria típica es mayor a $100
-   - Busca números grandes con formato de moneda (ej: $4,511 o $4511)
-7. Si no encuentras algún dato, devuelve null
+   - IGNORA montos muy pequeÃ±os como $1 que suelen ser parte del texto de la empresa
+   - El monto real de una transferencia bancaria tÃ­pica es mayor a $100
+   - Busca nÃºmeros grandes con formato de moneda (ej: $4,511 o $4511)
+7. Si no encuentras algÃºn dato, devuelve null
 
-Por favor, extrae toda la información solicitada del comprobante de pago.`
+Por favor, extrae toda la informaciÃ³n solicitada del comprobante de pago.`
                 }
               ]
             }
@@ -162,7 +162,7 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
     const parts = aiData.candidates?.[0]?.content?.parts || [];
     const functionCallPart = parts.find((p: any) => p.functionCall);
     if (!functionCallPart) {
-      throw new Error('No se recibió respuesta válida de la IA');
+      throw new Error('No se recibiÃ³ respuesta vÃ¡lida de la IA');
     }
 
     let extractedInfo;
@@ -178,9 +178,9 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
       };
     }
 
-    console.log('Información parseada:', extractedInfo);
+    console.log('InformaciÃ³n parseada:', extractedInfo);
 
-    // Función para sanitizar valores - convertir strings "null", "undefined", etc. a null real
+    // FunciÃ³n para sanitizar valores - convertir strings "null", "undefined", etc. a null real
     const sanitizeValue = (value: any): any => {
       if (value === null || value === undefined) return null;
       if (typeof value === 'string') {
@@ -203,7 +203,7 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
     if (isInstallmentPayment) {
       console.log('Procesando pago de cuota:', installmentId);
       
-      // Obtener la URL pública para guardarla
+      // Obtener la URL pÃºblica para guardarla
       const { data: { publicUrl } } = supabaseAdmin.storage
         .from('documents')
         .getPublicUrl(filePath);
@@ -233,7 +233,7 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
         throw installmentError;
       }
 
-      // Verificar si todas las cuotas están pagadas para actualizar el pago principal
+      // Verificar si todas las cuotas estÃ¡n pagadas para actualizar el pago principal
       const { data: installmentData } = await supabaseAdmin
         .from('payment_installments')
         .select('pago_id')
@@ -255,7 +255,7 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
             .update({ status: 'pagado' })
             .eq('id', installmentData.pago_id);
 
-          // También actualizar la factura
+          // TambiÃ©n actualizar la factura
           const { data: pagoInfo } = await supabaseAdmin
             .from('pagos')
             .select('invoice_id')
@@ -291,10 +291,10 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
       );
     }
 
-    // Procesamiento normal para pagos principales (código original continúa)
+    // Procesamiento normal para pagos principales (cÃ³digo original continÃºa)
 
-    // Obtener información del pago, proveedor y factura
-    console.log('Obteniendo información del pago...');
+    // Obtener informaciÃ³n del pago, proveedor y factura
+    console.log('Obteniendo informaciÃ³n del pago...');
     const { data: pagoData, error: pagoError } = await supabaseAdmin
       .from('pagos')
       .select('supplier_id, datos_bancarios_id, invoice_id, amount')
@@ -302,8 +302,8 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
       .single();
 
     if (pagoError || !pagoData) {
-      console.error('Error obteniendo información del pago:', pagoError);
-      throw new Error('No se pudo obtener información del pago');
+      console.error('Error obteniendo informaciÃ³n del pago:', pagoError);
+      throw new Error('No se pudo obtener informaciÃ³n del pago');
     }
 
     // Obtener monto de la factura
@@ -338,7 +338,7 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
     if (datosBancarios) {
       const discrepanciaDetectada: any = {};
       
-      // Obtener el número de cuenta registrado (preferir numero_cuenta sobre CLABE)
+      // Obtener el nÃºmero de cuenta registrado (preferir numero_cuenta sobre CLABE)
       const numeroCuentaRegistrado = (datosBancarios.numero_cuenta && datosBancarios.numero_cuenta !== 'No encontrado') 
         ? datosBancarios.numero_cuenta 
         : '';
@@ -347,25 +347,25 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
         : '';
       const numeroCuentaComprobante = accountNumber || '';
       
-      console.log('Número de cuenta registrado:', numeroCuentaRegistrado);
+      console.log('NÃºmero de cuenta registrado:', numeroCuentaRegistrado);
       console.log('CLABE registrada:', clabeRegistrada);
-      console.log('Número de cuenta del comprobante:', numeroCuentaComprobante);
+      console.log('NÃºmero de cuenta del comprobante:', numeroCuentaComprobante);
       
-      // Función para extraer solo dígitos
+      // FunciÃ³n para extraer solo dÃ­gitos
       const soloDigitos = (str: string) => str.replace(/\D/g, '');
       
-      // Función para verificar si una cuenta está contenida en una CLABE
-      // La CLABE tiene 18 dígitos: 3 (banco) + 3 (plaza) + 11 (cuenta) + 1 (verificador)
-      // El número de cuenta usualmente son los 11 dígitos del medio (posiciones 6-16)
+      // FunciÃ³n para verificar si una cuenta estÃ¡ contenida en una CLABE
+      // La CLABE tiene 18 dÃ­gitos: 3 (banco) + 3 (plaza) + 11 (cuenta) + 1 (verificador)
+      // El nÃºmero de cuenta usualmente son los 11 dÃ­gitos del medio (posiciones 6-16)
       const cuentaEnClabe = (cuenta: string, clabe: string): boolean => {
         if (!cuenta || !clabe) return false;
         const cuentaLimpia = soloDigitos(cuenta);
         const clabeLimpia = soloDigitos(clabe);
-        // Verificar si la cuenta está contenida en la CLABE
+        // Verificar si la cuenta estÃ¡ contenida en la CLABE
         return clabeLimpia.includes(cuentaLimpia);
       };
       
-      // Función para comparar cuentas con tolerancia a formatos
+      // FunciÃ³n para comparar cuentas con tolerancia a formatos
       const cuentasCoinciden = (cuenta1: string, cuenta2: string, clabe1: string, clabe2: string): boolean => {
         const c1 = soloDigitos(cuenta1);
         const c2 = soloDigitos(cuenta2);
@@ -378,17 +378,17 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
         // Caso 2: Las CLABEs coinciden
         if (cl1 && cl2 && cl1 === cl2) return true;
         
-        // Caso 3: La cuenta del comprobante está en la CLABE registrada
+        // Caso 3: La cuenta del comprobante estÃ¡ en la CLABE registrada
         if (c2 && cl1 && cuentaEnClabe(c2, cl1)) return true;
         
         // Caso 4: La CLABE del comprobante coincide con la registrada
         if (cl2 && cl1 && cl2 === cl1) return true;
         
-        // Caso 5: El comprobante muestra CLABE y la cuenta registrada está en ella
+        // Caso 5: El comprobante muestra CLABE y la cuenta registrada estÃ¡ en ella
         if (c1 && cl2 && cuentaEnClabe(c1, cl2)) return true;
         
-        // Caso 6: Comparar últimos dígitos con tolerancia
-        // Si uno es cuenta (10-11 dígitos) y otro es CLABE (18 dígitos), comparar últimos dígitos
+        // Caso 6: Comparar Ãºltimos dÃ­gitos con tolerancia
+        // Si uno es cuenta (10-11 dÃ­gitos) y otro es CLABE (18 dÃ­gitos), comparar Ãºltimos dÃ­gitos
         if (c1.length >= 10 && c2.length === 18) {
           // c2 es CLABE, extraer cuenta de CLABE (posiciones 6-16, excluyendo verificador)
           const cuentaDeClabe = c2.substring(6, 17);
@@ -400,7 +400,7 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
           if (c2 === cuentaDeClabe || c2.slice(-10) === cuentaDeClabe.slice(-10)) return true;
         }
         
-        // Caso 7: Últimos 10 dígitos coinciden (sin el dígito verificador de CLABE)
+        // Caso 7: Ãšltimos 10 dÃ­gitos coinciden (sin el dÃ­gito verificador de CLABE)
         const u10_1 = c1.slice(-10) || cl1.slice(6, 16);
         const u10_2 = c2.slice(-10) || cl2.slice(6, 16);
         if (u10_1 && u10_2 && u10_1 === u10_2) return true;
@@ -408,14 +408,14 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
         return false;
       };
       
-      // Si hay un número en el comprobante, verificar contra el registrado
+      // Si hay un nÃºmero en el comprobante, verificar contra el registrado
       if (numeroCuentaComprobante) {
         if (!numeroCuentaRegistrado && !clabeRegistrada) {
-          // No hay número de cuenta registrado
+          // No hay nÃºmero de cuenta registrado
           discrepanciaDetectada.numero_cuenta = {
             registrado: 'No encontrado',
             comprobante: numeroCuentaComprobante,
-            mensaje: 'No se encontró número de cuenta registrado en los datos bancarios'
+            mensaje: 'No se encontrÃ³ nÃºmero de cuenta registrado en los datos bancarios'
           };
         } else {
           // Comparar con tolerancia a formatos (cuenta vs CLABE)
@@ -425,10 +425,10 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
             discrepanciaDetectada.numero_cuenta = {
               registrado: numeroCuentaRegistrado || clabeRegistrada,
               comprobante: numeroCuentaComprobante,
-              mensaje: 'El número de cuenta del comprobante no coincide con el registrado'
+              mensaje: 'El nÃºmero de cuenta del comprobante no coincide con el registrado'
             };
           } else {
-            console.log('✅ Cuenta verificada: coincide con los datos registrados');
+            console.log('âœ… Cuenta verificada: coincide con los datos registrados');
           }
         }
       }
@@ -439,9 +439,9 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
           detalles: discrepanciaDetectada,
           titular_registrado: datosBancarios.nombre_cliente
         };
-        console.warn('⚠️ DISCREPANCIAS DETECTADAS:', discrepancias);
+        console.warn('âš ï¸ DISCREPANCIAS DETECTADAS:', discrepancias);
       } else {
-        console.log('✅ Validación exitosa: Datos del comprobante coinciden con los registrados');
+        console.log('âœ… ValidaciÃ³n exitosa: Datos del comprobante coinciden con los registrados');
       }
     }
 
@@ -459,7 +459,7 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
     const remainingAmount = invoiceAmount - totalPaidNow;
     const isFullyPaid = remainingAmount <= 0;
 
-    console.log('Análisis de pagos:', {
+    console.log('AnÃ¡lisis de pagos:', {
       invoiceAmount,
       totalPaidBefore,
       currentPaymentAmount,
@@ -488,7 +488,7 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
 
     // Actualizar pago con el total acumulado
     const pagoUpdateData: any = {
-      comprobante_pago_url: publicUrl, // Último comprobante
+      comprobante_pago_url: publicUrl, // Ãšltimo comprobante
       paid_amount: totalPaidNow,
       status: isFullyPaid ? 'pagado' : 'procesando',
       original_amount: invoiceAmount,
@@ -530,7 +530,7 @@ Por favor, extrae toda la información solicitada del comprobante de pago.`
           totalPaid: totalPaidNow,
           paymentHistory,
           discrepancias,
-          message: `✅ Factura pagada completamente. Total: $${invoiceAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+          message: `âœ… Factura pagada completamente. Total: $${invoiceAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

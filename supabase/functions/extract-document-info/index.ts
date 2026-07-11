@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
 
 const corsHeaders = {
@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Función auxiliar para generar prompts de validación
+// FunciÃ³n auxiliar para generar prompts de validaciÃ³n
 // Helper function to retry API calls with exponential backoff
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
@@ -22,7 +22,7 @@ async function retryWithBackoff<T>(
       lastError = error as Error;
       if (i < maxRetries - 1) {
         const delay = initialDelay * Math.pow(2, i);
-        console.log(`Intento ${i + 1} falló, reintentando en ${delay}ms...`);
+        console.log(`Intento ${i + 1} fallÃ³, reintentando en ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -33,122 +33,122 @@ async function retryWithBackoff<T>(
 
 function getValidationPrompt(documentType: string): string {
   const prompts: Record<string, string> = {
-    'acta_constitutiva': `Analiza esta imagen y determina si contiene información de un ACTA CONSTITUTIVA mexicana.
+    'acta_constitutiva': `Analiza esta imagen y determina si contiene informaciÃ³n de un ACTA CONSTITUTIVA mexicana.
 
-IMPORTANTE: Puede ser una página parcial o fragmento del acta. Solo necesitamos verificar que contenga AL MENOS UNO de estos datos:
-- Razón social de la empresa
+IMPORTANTE: Puede ser una pÃ¡gina parcial o fragmento del acta. Solo necesitamos verificar que contenga AL MENOS UNO de estos datos:
+- RazÃ³n social de la empresa
 - Nombre del representante legal
 - Objeto social (actividades de la empresa)
-- Información del registro público
+- InformaciÃ³n del registro pÃºblico
 
-✅ ES VÁLIDA si la imagen contiene texto relacionado con constitución de sociedad y al menos uno de los datos anteriores.
+âœ… ES VÃLIDA si la imagen contiene texto relacionado con constituciÃ³n de sociedad y al menos uno de los datos anteriores.
 
-❌ NO es válida SOLO si es:
-- Un ticket de compra o recibo común
-- Una foto casual sin relación con documentos legales
-- Una identificación personal (INE, pasaporte)
+âŒ NO es vÃ¡lida SOLO si es:
+- Un ticket de compra o recibo comÃºn
+- Una foto casual sin relaciÃ³n con documentos legales
+- Una identificaciÃ³n personal (INE, pasaporte)
 - Una factura o comprobante fiscal
 
-Sé flexible: el documento puede estar incompleto, ser una página interna, o no tener todos los elementos formales (sellos, firmas). Lo importante es que contenga datos del acta constitutiva.`,
+SÃ© flexible: el documento puede estar incompleto, ser una pÃ¡gina interna, o no tener todos los elementos formales (sellos, firmas). Lo importante es que contenga datos del acta constitutiva.`,
 
-    'constancia_fiscal': `Analiza esta imagen y determina si contiene información de una CONSTANCIA DE SITUACIÓN FISCAL del SAT.
+    'constancia_fiscal': `Analiza esta imagen y determina si contiene informaciÃ³n de una CONSTANCIA DE SITUACIÃ“N FISCAL del SAT.
 
 Solo necesitamos verificar que contenga ALGUNOS de estos datos:
 - RFC del contribuyente
-- Razón social o nombre
-- Régimen fiscal
-- Actividades económicas
+- RazÃ³n social o nombre
+- RÃ©gimen fiscal
+- Actividades econÃ³micas
 - Domicilio fiscal
-- Código postal
-- Fecha de emisión
+- CÃ³digo postal
+- Fecha de emisiÃ³n
 
-✅ ES VÁLIDA si la imagen contiene información fiscal del SAT y al menos 3 de los datos anteriores.
+âœ… ES VÃLIDA si la imagen contiene informaciÃ³n fiscal del SAT y al menos 3 de los datos anteriores.
 
-❌ NO es válida SOLO si es:
-- Un ticket de compra común
+âŒ NO es vÃ¡lida SOLO si es:
+- Un ticket de compra comÃºn
 - Una foto casual sin documentos
-- Una identificación personal (INE)
-- Un recibo de servicios básicos
+- Una identificaciÃ³n personal (INE)
+- Un recibo de servicios bÃ¡sicos
 
-No importa si falta el logo, código de barras, o si la calidad no es perfecta. Lo importante es que contenga datos fiscales.`,
+No importa si falta el logo, cÃ³digo de barras, o si la calidad no es perfecta. Lo importante es que contenga datos fiscales.`,
 
-    'comprobante_domicilio': `Analiza esta imagen y determina si contiene información de un COMPROBANTE DE DOMICILIO (recibo de luz, agua, teléfono, predial, etc.).
+    'comprobante_domicilio': `Analiza esta imagen y determina si contiene informaciÃ³n de un COMPROBANTE DE DOMICILIO (recibo de luz, agua, telÃ©fono, predial, etc.).
 
-Solo necesitamos verificar que contenga estos datos básicos:
-- Nombre del titular o razón social
-- Dirección
-- Código postal
-- Fecha de emisión
+Solo necesitamos verificar que contenga estos datos bÃ¡sicos:
+- Nombre del titular o razÃ³n social
+- DirecciÃ³n
+- CÃ³digo postal
+- Fecha de emisiÃ³n
 
-✅ ES VÁLIDO si la imagen contiene información de un recibo de servicios (CFE, agua, teléfono, predial, etc.) con los datos anteriores.
+âœ… ES VÃLIDO si la imagen contiene informaciÃ³n de un recibo de servicios (CFE, agua, telÃ©fono, predial, etc.) con los datos anteriores.
 
-❌ NO es válido SOLO si es:
+âŒ NO es vÃ¡lido SOLO si es:
 - Un ticket de compra en tienda
 - Una foto casual sin documentos
-- Una identificación personal
+- Una identificaciÃ³n personal
 
-IMPORTANTE: Ignora completamente advertencias como "ESTE DOCUMENTO NO ES UN COMPROBANTE FISCAL" - eso NO importa. Solo nos interesa que contenga los datos de domicilio necesarios. La fecha puede ser de cualquier momento, no hay límite de 3 meses.`,
+IMPORTANTE: Ignora completamente advertencias como "ESTE DOCUMENTO NO ES UN COMPROBANTE FISCAL" - eso NO importa. Solo nos interesa que contenga los datos de domicilio necesarios. La fecha puede ser de cualquier momento, no hay lÃ­mite de 3 meses.`,
 
-    'aviso_funcionamiento': `Analiza esta imagen y determina si contiene información de un AVISO DE FUNCIONAMIENTO mexicano.
+    'aviso_funcionamiento': `Analiza esta imagen y determina si contiene informaciÃ³n de un AVISO DE FUNCIONAMIENTO mexicano.
 
 Solo necesitamos verificar que contenga ALGUNOS de estos datos:
-- Razón social de la empresa
+- RazÃ³n social de la empresa
 - Domicilio del establecimiento
-- Actividad económica
-- Fecha de emisión
+- Actividad econÃ³mica
+- Fecha de emisiÃ³n
 
-✅ ES VÁLIDO si la imagen contiene información relacionada con aviso de funcionamiento sanitario y al menos 2 de los datos anteriores. Puede ser una página completa o un fragmento, con o sin sellos oficiales.
+âœ… ES VÃLIDO si la imagen contiene informaciÃ³n relacionada con aviso de funcionamiento sanitario y al menos 2 de los datos anteriores. Puede ser una pÃ¡gina completa o un fragmento, con o sin sellos oficiales.
 
-❌ NO es válido SOLO si es:
-- Un ticket de compra común
+âŒ NO es vÃ¡lido SOLO si es:
+- Un ticket de compra comÃºn
 - Una foto casual sin documentos
 - Una factura o recibo de servicios
-- Una identificación personal
+- Una identificaciÃ³n personal
 
-No importa si es página principal o interna, con o sin sellos. Lo importante es que contenga datos del aviso de funcionamiento.`,
+No importa si es pÃ¡gina principal o interna, con o sin sellos. Lo importante es que contenga datos del aviso de funcionamiento.`,
 
-    'ine': `Analiza esta imagen y determina si contiene información de una CREDENCIAL INE mexicana.
+    'ine': `Analiza esta imagen y determina si contiene informaciÃ³n de una CREDENCIAL INE mexicana.
 
 Solo necesitamos verificar que contenga ALGUNOS de estos datos:
-- Fotografía del titular
+- FotografÃ­a del titular
 - Nombre completo del titular
 - CURP (18 caracteres)
 - Clave de elector
 
-✅ ES VÁLIDA si la imagen muestra una credencial del INE (frente o reverso) con al menos 2 de los datos anteriores.
+âœ… ES VÃLIDA si la imagen muestra una credencial del INE (frente o reverso) con al menos 2 de los datos anteriores.
 
-❌ NO es válida SOLO si es:
+âŒ NO es vÃ¡lida SOLO si es:
 - Una foto casual sin documentos
-- Una identificación extranjera
+- Una identificaciÃ³n extranjera
 - Una licencia de conducir
 - Un pasaporte
 - Otro tipo de documento
 
-No importa si está vencida, deteriorada, o sin hologramas visibles. Lo importante es que sea una credencial INE con los datos necesarios.`,
+No importa si estÃ¡ vencida, deteriorada, o sin hologramas visibles. Lo importante es que sea una credencial INE con los datos necesarios.`,
 
-    'datos_bancarios': `Analiza esta imagen y determina si contiene información de un ESTADO DE CUENTA BANCARIO mexicano.
+    'datos_bancarios': `Analiza esta imagen y determina si contiene informaciÃ³n de un ESTADO DE CUENTA BANCARIO mexicano.
 
 Solo necesitamos verificar que contenga ALGUNOS de estos datos:
 - Nombre del banco (BBVA, Santander, Banamex, etc.)
-- Número de cuenta
-- Número de cuenta CLABE (18 dígitos)
+- NÃºmero de cuenta
+- NÃºmero de cuenta CLABE (18 dÃ­gitos)
 - Nombre del titular o cliente
 - R.F.C del titular
-- Información financiera (saldos, movimientos)
+- InformaciÃ³n financiera (saldos, movimientos)
 
-✅ ES VÁLIDO si la imagen muestra un estado de cuenta bancario con al menos 3 de los datos anteriores.
+âœ… ES VÃLIDO si la imagen muestra un estado de cuenta bancario con al menos 3 de los datos anteriores.
 
-❌ NO es válido SOLO si es:
-- Un ticket de compra común
+âŒ NO es vÃ¡lido SOLO si es:
+- Un ticket de compra comÃºn
 - Una foto casual sin documentos
-- Una identificación personal
+- Una identificaciÃ³n personal
 - Un recibo de servicios
-- Una factura común
+- Una factura comÃºn
 
 No importa si es parcial, sin logo del banco, o si la calidad no es perfecta. Lo importante es que contenga datos bancarios del titular.`
   };
 
-  return prompts[documentType] || 'Analiza si este documento es válido y del tipo correcto.';
+  return prompts[documentType] || 'Analiza si este documento es vÃ¡lido y del tipo correcto.';
 }
 
 serve(async (req) => {
@@ -194,7 +194,7 @@ serve(async (req) => {
       .update({ extraction_status: 'processing' })
       .eq('id', documentId);
 
-    // Función auxiliar para convertir imagen a base64
+    // FunciÃ³n auxiliar para convertir imagen a base64
     const imageToBase64 = async (imagePath: string) => {
       const { data: fileData, error: downloadError } = await supabaseClient
         .storage
@@ -229,22 +229,22 @@ serve(async (req) => {
       return { base64: btoa(binary), mimeType, size: fileData.size };
     };
 
-    // Determinar cuántas páginas procesar según el tipo de documento
+    // Determinar cuÃ¡ntas pÃ¡ginas procesar segÃºn el tipo de documento
     const pageLimit: Record<string, number> = {
-      'constancia_fiscal': 2,      // Primera página: datos básicos, Segunda: regímenes
-      'comprobante_domicilio': 1,  // Siempre es una página
+      'constancia_fiscal': 2,      // Primera pÃ¡gina: datos bÃ¡sicos, Segunda: regÃ­menes
+      'comprobante_domicilio': 1,  // Siempre es una pÃ¡gina
       'ine': 2,                    // Frente y reverso
-      'datos_bancarios': 3,        // Primeras páginas tienen la info clave
-      'aviso_funcionamiento': 5,   // Info clave en primeras páginas
-      'acta_constitutiva': 5       // Procesar en bloques de 5 páginas (implementación especial más adelante)
+      'datos_bancarios': 3,        // Primeras pÃ¡ginas tienen la info clave
+      'aviso_funcionamiento': 5,   // Info clave en primeras pÃ¡ginas
+      'acta_constitutiva': 5       // Procesar en bloques de 5 pÃ¡ginas (implementaciÃ³n especial mÃ¡s adelante)
     };
 
-    // Obtener todas las imágenes disponibles
+    // Obtener todas las imÃ¡genes disponibles
     const allImages = document.image_urls && document.image_urls.length > 0 
       ? document.image_urls 
       : [document.file_url.split('/documents/')[1]];
 
-    console.log(`Documento tiene ${allImages.length} página(s) totales, tipo: "${document.document_type}"`);
+    console.log(`Documento tiene ${allImages.length} pÃ¡gina(s) totales, tipo: "${document.document_type}"`);
 
     // Para ACTA CONSTITUTIVA: procesamiento especial por bloques
     let imageDataArray: Array<{ base64: string; mimeType: string; size: number }> = [];
@@ -253,12 +253,12 @@ serve(async (req) => {
     if (document.document_type === 'acta_constitutiva' && allImages.length > 5) {
       // Procesamiento por bloques para actas largas
       const BLOCK_SIZE = 5;
-      const MAX_BLOCKS = 4; // Máximo 20 páginas (4 bloques)
+      const MAX_BLOCKS = 4; // MÃ¡ximo 20 pÃ¡ginas (4 bloques)
       const totalBlocks = Math.min(Math.ceil(allImages.length / BLOCK_SIZE), MAX_BLOCKS);
       
-      console.log(`⚙️ Acta Constitutiva con ${allImages.length} páginas - procesando en ${totalBlocks} bloques de ${BLOCK_SIZE} páginas`);
+      console.log(`âš™ï¸ Acta Constitutiva con ${allImages.length} pÃ¡ginas - procesando en ${totalBlocks} bloques de ${BLOCK_SIZE} pÃ¡ginas`);
       
-      // Procesar primer bloque para la validación
+      // Procesar primer bloque para la validaciÃ³n
       const firstBlockImages = allImages.slice(0, BLOCK_SIZE);
       for (const imagePath of firstBlockImages) {
         try {
@@ -271,21 +271,21 @@ serve(async (req) => {
         }
       }
       
-      console.log(`✅ Primer bloque cargado (${firstBlockImages.length} páginas) - Tamaño: ${totalSize} bytes`);
+      console.log(`âœ… Primer bloque cargado (${firstBlockImages.length} pÃ¡ginas) - TamaÃ±o: ${totalSize} bytes`);
       
     } else {
       // Procesamiento normal para otros documentos o actas cortas
       const maxPages = pageLimit[document.document_type] || 3;
       const imagesToProcess = allImages.slice(0, maxPages);
       
-      console.log(`Procesando las primeras ${imagesToProcess.length} páginas`);
+      console.log(`Procesando las primeras ${imagesToProcess.length} pÃ¡ginas`);
       
       for (const imagePath of imagesToProcess) {
         try {
           const imageData = await imageToBase64(imagePath);
           imageDataArray.push(imageData);
           totalSize += imageData.size;
-          console.log(`Página procesada - Tamaño: ${imageData.size} bytes, Tipo: ${imageData.mimeType}`);
+          console.log(`PÃ¡gina procesada - TamaÃ±o: ${imageData.size} bytes, Tipo: ${imageData.mimeType}`);
         } catch (error) {
           console.error('Error procesando imagen:', error);
           await supabaseClient
@@ -293,28 +293,28 @@ serve(async (req) => {
             .update({ extraction_status: 'failed' })
             .eq('id', documentId);
           return new Response(
-            JSON.stringify({ error: 'Error procesando las imágenes del documento' }),
+            JSON.stringify({ error: 'Error procesando las imÃ¡genes del documento' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
       }
     }
 
-    console.log(`Total de páginas cargadas inicialmente: ${imageDataArray.length}, Tamaño total: ${totalSize} bytes`);
+    console.log(`Total de pÃ¡ginas cargadas inicialmente: ${imageDataArray.length}, TamaÃ±o total: ${totalSize} bytes`);
     
     if (totalSize > 2000000) {
-      console.log('⚠️ ADVERTENCIA: Documento muy grande detectado. Esto puede causar timeouts.');
+      console.log('âš ï¸ ADVERTENCIA: Documento muy grande detectado. Esto puede causar timeouts.');
     }
 
-    console.log('Llamando a Claude para extraer información y validar autenticidad');
+    console.log('Llamando a Claude para extraer informaciÃ³n y validar autenticidad');
     console.log('Tipo de documento:', document.document_type);
 
     const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
     if (!GEMINI_API_KEY) {
-      throw new Error('GEMINIKEY no está configurado');
+      throw new Error('GEMINIKEY no estÃ¡ configurado');
     }
 
-    // PASO 1: Primero validar que el documento sea legítimo
+    // PASO 1: Primero validar que el documento sea legÃ­timo
     console.log('Validando autenticidad del documento con IA...');
     const validationPrompt = getValidationPrompt(document.document_type);
     
@@ -322,20 +322,20 @@ serve(async (req) => {
     try {
       validationResponse = await retryWithBackoff(async () => {
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               system_instruction: {
-                parts: [{ text: 'Eres un experto en validación de documentos legales y fiscales mexicanos. Tu trabajo es determinar si una imagen contiene el tipo de documento esperado o si es una imagen falsa/irrelevante.' }]
+                parts: [{ text: 'Eres un experto en validaciÃ³n de documentos legales y fiscales mexicanos. Tu trabajo es determinar si una imagen contiene el tipo de documento esperado o si es una imagen falsa/irrelevante.' }]
               },
               tools: [
                 {
                   functionDeclarations: [
                     {
                       name: 'validate_document',
-                      description: 'Validar si el documento es auténtico y del tipo correcto',
+                      description: 'Validar si el documento es autÃ©ntico y del tipo correcto',
                       parameters: {
                         type: 'object',
                         properties: {
@@ -345,16 +345,16 @@ serve(async (req) => {
                           },
                           confidence_score: {
                             type: 'number',
-                            description: 'Puntuación de confianza de 0 a 100 sobre la autenticidad del documento'
+                            description: 'PuntuaciÃ³n de confianza de 0 a 100 sobre la autenticidad del documento'
                           },
                           validation_notes: {
                             type: 'string',
-                            description: 'Notas sobre por qué el documento es válido o no. Si es inválido, explicar qué se detectó en la imagen.'
+                            description: 'Notas sobre por quÃ© el documento es vÃ¡lido o no. Si es invÃ¡lido, explicar quÃ© se detectÃ³ en la imagen.'
                           },
                           detected_issues: {
                             type: 'array',
                             items: { type: 'string' },
-                            description: 'Lista de problemas específicos detectados (baja calidad, texto ilegible, no es el documento correcto, etc.)'
+                            description: 'Lista de problemas especÃ­ficos detectados (baja calidad, texto ilegible, no es el documento correcto, etc.)'
                           }
                         },
                         required: ['is_valid_type', 'confidence_score', 'validation_notes', 'detected_issues']
@@ -395,19 +395,19 @@ serve(async (req) => {
         return response;
       }, 2, 2000); // 2 reintentos con delay inicial de 2 segundos
     } catch (retryError) {
-      console.error('Error después de múltiples reintentos:', retryError);
+      console.error('Error despuÃ©s de mÃºltiples reintentos:', retryError);
       
       await supabaseClient
         .from('documents')
         .update({ 
           extraction_status: 'failed',
-          validation_errors: ['El servicio de procesamiento está temporalmente saturado. Por favor intenta de nuevo en unos minutos.']
+          validation_errors: ['El servicio de procesamiento estÃ¡ temporalmente saturado. Por favor intenta de nuevo en unos minutos.']
         })
         .eq('id', documentId);
       
       return new Response(
         JSON.stringify({ 
-          error: 'El servicio de IA está temporalmente no disponible. Por favor intenta más tarde.' 
+          error: 'El servicio de IA estÃ¡ temporalmente no disponible. Por favor intenta mÃ¡s tarde.' 
         }),
         { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -418,13 +418,13 @@ serve(async (req) => {
     const validationFnCall = validationParts.find((p: any) => p.functionCall);
 
     if (!validationFnCall) {
-      throw new Error('No se recibió validación del documento');
+      throw new Error('No se recibiÃ³ validaciÃ³n del documento');
     }
 
     const validationResult = validationFnCall.functionCall.args;
-    console.log('Resultado de validación:', validationResult);
+    console.log('Resultado de validaciÃ³n:', validationResult);
 
-    // Si el documento no es válido, marcarlo y no continuar con la extracción
+    // Si el documento no es vÃ¡lido, marcarlo y no continuar con la extracciÃ³n
     // Somos permisivos con todos los documentos (umbral de 30)
     const confidenceThreshold = 30;
     
@@ -432,8 +432,8 @@ serve(async (req) => {
       console.log('Documento rechazado por IA - no es del tipo correcto o confianza baja');
       
       const invalidationErrors = [
-        `⚠️ DOCUMENTO NO VÁLIDO: ${validationResult.validation_notes}`,
-        ...validationResult.detected_issues.map((issue: string) => `• ${issue}`)
+        `âš ï¸ DOCUMENTO NO VÃLIDO: ${validationResult.validation_notes}`,
+        ...validationResult.detected_issues.map((issue: string) => `â€¢ ${issue}`)
       ];
 
       await supabaseClient
@@ -447,7 +447,7 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ 
-          error: 'Documento no válido',
+          error: 'Documento no vÃ¡lido',
           validation_errors: invalidationErrors,
           confidence_score: validationResult.confidence_score
         }),
@@ -455,27 +455,27 @@ serve(async (req) => {
       );
     }
 
-    // PASO 2: Si el documento pasó la validación, extraer información
-    // Configurar el prompt y herramientas según el tipo de documento
+    // PASO 2: Si el documento pasÃ³ la validaciÃ³n, extraer informaciÃ³n
+    // Configurar el prompt y herramientas segÃºn el tipo de documento
     let systemPrompt = '';
     let userPrompt = '';
     let toolConfig: any = null;
     let updateFields: any = {};
 
     if (document.document_type === 'acta_constitutiva') {
-      systemPrompt = 'Eres un asistente especializado en extraer información de actas constitutivas mexicanas. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información del acta constitutiva: Razón Social, Representante Legal, Objeto Social, y Registro Público. Si algún dato no está disponible, indica "No encontrado".';
+      systemPrompt = 'Eres un asistente especializado en extraer informaciÃ³n de actas constitutivas mexicanas. Extrae la informaciÃ³n solicitada de forma precisa y estructurada.';
+      userPrompt = 'Extrae la siguiente informaciÃ³n del acta constitutiva: RazÃ³n Social, Representante Legal, Objeto Social, y Registro PÃºblico. Si algÃºn dato no estÃ¡ disponible, indica "No encontrado".';
       toolConfig = {
         tools: [{ functionDeclarations: [{
           name: 'extract_acta_info',
-          description: 'Extraer información estructurada del acta constitutiva',
+          description: 'Extraer informaciÃ³n estructurada del acta constitutiva',
           parameters: {
             type: 'object',
             properties: {
-              razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
+              razon_social: { type: 'string', description: 'RazÃ³n social o nombre legal de la empresa' },
               representante_legal: { type: 'string', description: 'Nombre completo del representante legal' },
-              objeto_social: { type: 'string', description: 'Descripción del objeto social de la empresa' },
-              registro_publico: { type: 'string', description: 'Información del registro público (número, fecha, notaría, etc.)' }
+              objeto_social: { type: 'string', description: 'DescripciÃ³n del objeto social de la empresa' },
+              registro_publico: { type: 'string', description: 'InformaciÃ³n del registro pÃºblico (nÃºmero, fecha, notarÃ­a, etc.)' }
             },
             required: ['razon_social', 'representante_legal', 'objeto_social', 'registro_publico']
           }
@@ -483,67 +483,67 @@ serve(async (req) => {
         toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['extract_acta_info'] } }
       };
     } else if (document.document_type === 'constancia_fiscal') {
-      systemPrompt = 'Eres un experto en documentos fiscales del SAT mexicano. Tu trabajo es extraer SOLO la información exacta que se te solicita, sin confundir conceptos.';
-      userPrompt = `Lee esta constancia de situación fiscal del SAT.
+      systemPrompt = 'Eres un experto en documentos fiscales del SAT mexicano. Tu trabajo es extraer SOLO la informaciÃ³n exacta que se te solicita, sin confundir conceptos.';
+      userPrompt = `Lee esta constancia de situaciÃ³n fiscal del SAT.
 
-**PASO 1 - BUSCA EL RÉGIMEN FISCAL (MUY IMPORTANTE - LEE CON ATENCIÓN):**
+**PASO 1 - BUSCA EL RÃ‰GIMEN FISCAL (MUY IMPORTANTE - LEE CON ATENCIÃ“N):**
 
-BUSCA específicamente una TABLA o SECCIÓN llamada "Regímenes" (en PLURAL). 
-⚠️ NO confundas con "Régimen Capital" que es diferente.
+BUSCA especÃ­ficamente una TABLA o SECCIÃ“N llamada "RegÃ­menes" (en PLURAL). 
+âš ï¸ NO confundas con "RÃ©gimen Capital" que es diferente.
 
-Dónde buscar:
-- Busca una tabla con el encabezado "Regímenes" (usualmente en la segunda página)
-- Puede estar en una tabla con columnas como: Régimen | Fecha Inicio | Fecha Fin
-- O en una lista bajo el título "Regímenes"
+DÃ³nde buscar:
+- Busca una tabla con el encabezado "RegÃ­menes" (usualmente en la segunda pÃ¡gina)
+- Puede estar en una tabla con columnas como: RÃ©gimen | Fecha Inicio | Fecha Fin
+- O en una lista bajo el tÃ­tulo "RegÃ­menes"
 
-El régimen fiscal PUEDE aparecer en DOS formatos:
+El rÃ©gimen fiscal PUEDE aparecer en DOS formatos:
 
-FORMATO 1 (PREFERIDO) - Con código numérico del SAT:
-✅ "601 - General de Ley Personas Morales"
-✅ "626 - Régimen Simplificado de Confianza"
-✅ "612 - Personas Físicas con Actividades Empresariales y Profesionales"
+FORMATO 1 (PREFERIDO) - Con cÃ³digo numÃ©rico del SAT:
+âœ… "601 - General de Ley Personas Morales"
+âœ… "626 - RÃ©gimen Simplificado de Confianza"
+âœ… "612 - Personas FÃ­sicas con Actividades Empresariales y Profesionales"
 
-FORMATO 2 (TAMBIÉN VÁLIDO) - Solo nombre (sin código):
-✅ "Régimen General de Ley Personas Morales"
-✅ "Régimen Simplificado de Confianza"
-✅ "Personas Físicas con Actividades Empresariales y Profesionales"
+FORMATO 2 (TAMBIÃ‰N VÃLIDO) - Solo nombre (sin cÃ³digo):
+âœ… "RÃ©gimen General de Ley Personas Morales"
+âœ… "RÃ©gimen Simplificado de Confianza"
+âœ… "Personas FÃ­sicas con Actividades Empresariales y Profesionales"
 
-⚠️ IMPORTANTE - Lo que NO ES régimen fiscal (IGNORA ESTOS CAMPOS):
-❌ Campo "Régimen Capital: SOCIEDAD ANONIMA DE CAPITAL VARIABLE" - NO es régimen fiscal
-❌ "S.A. DE C.V." - es tipo de sociedad, NO régimen fiscal
-❌ "PERSONA MORAL" o "PERSONA FÍSICA" - es tipo de persona, NO régimen fiscal
+âš ï¸ IMPORTANTE - Lo que NO ES rÃ©gimen fiscal (IGNORA ESTOS CAMPOS):
+âŒ Campo "RÃ©gimen Capital: SOCIEDAD ANONIMA DE CAPITAL VARIABLE" - NO es rÃ©gimen fiscal
+âŒ "S.A. DE C.V." - es tipo de sociedad, NO rÃ©gimen fiscal
+âŒ "PERSONA MORAL" o "PERSONA FÃSICA" - es tipo de persona, NO rÃ©gimen fiscal
 
 REGLA FINAL:
-1. Busca la tabla/sección "Regímenes" (plural)
-2. Ignora completamente el campo "Régimen Capital"
-3. Extrae el régimen con o sin código
-4. Solo escribe "No encontrado" si no existe la sección "Regímenes"
+1. Busca la tabla/secciÃ³n "RegÃ­menes" (plural)
+2. Ignora completamente el campo "RÃ©gimen Capital"
+3. Extrae el rÃ©gimen con o sin cÃ³digo
+4. Solo escribe "No encontrado" si no existe la secciÃ³n "RegÃ­menes"
 
-**PASO 2 - EXTRAE LOS DEMÁS CAMPOS:**
-- Razón Social: Nombre legal de la persona o empresa
-- RFC: 12-13 caracteres alfanuméricos
-- Actividad Económica: Descripción de la actividad principal
-- Régimen Tributario: Tipo de constitución legal (S.A. DE C.V., PERSONA FÍSICA, etc.)
-- Dirección: Domicilio fiscal completo
-- Código Postal: 5 dígitos
-- Fecha de Emisión: Formato YYYY-MM-DD
+**PASO 2 - EXTRAE LOS DEMÃS CAMPOS:**
+- RazÃ³n Social: Nombre legal de la persona o empresa
+- RFC: 12-13 caracteres alfanumÃ©ricos
+- Actividad EconÃ³mica: DescripciÃ³n de la actividad principal
+- RÃ©gimen Tributario: Tipo de constituciÃ³n legal (S.A. DE C.V., PERSONA FÃSICA, etc.)
+- DirecciÃ³n: Domicilio fiscal completo
+- CÃ³digo Postal: 5 dÃ­gitos
+- Fecha de EmisiÃ³n: Formato YYYY-MM-DD
 
-Si NO encuentras algún dato, escribe "No encontrado".`;
+Si NO encuentras algÃºn dato, escribe "No encontrado".`;
       toolConfig = {
         tools: [{ functionDeclarations: [{
           name: 'extract_constancia_info',
-          description: 'Extraer información estructurada de la constancia de situación fiscal',
+          description: 'Extraer informaciÃ³n estructurada de la constancia de situaciÃ³n fiscal',
           parameters: {
             type: 'object',
             properties: {
-              razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
+              razon_social: { type: 'string', description: 'RazÃ³n social o nombre legal de la empresa' },
               rfc: { type: 'string', description: 'RFC del contribuyente' },
-              actividad_economica: { type: 'string', description: 'Actividad económica principal' },
-              regimen_tributario: { type: 'string', description: 'Tipo de constitución legal (ej: SOCIEDAD ANONIMA DE CAPITAL VARIABLE, PERSONA FÍSICA, etc.)' },
-              regimen_fiscal: { type: 'string', description: 'Régimen fiscal del SAT. PUEDE tener dos formatos: 1) Código de 3 dígitos + guión + descripción (ej: "601 - General de Ley Personas Morales", "626 - Régimen Simplificado de Confianza"), 2) Solo nombre del régimen sin código (ej: "Régimen Simplificado de Confianza", "General de Ley Personas Morales"). NUNCA extraer tipos de constitución como "SOCIEDAD ANONIMA" o "S.A. DE C.V." - esos NO son regímenes fiscales. Si no encuentras ninguna mención del régimen fiscal en el documento, devuelve "No encontrado".' },
-              direccion: { type: 'string', description: 'Dirección completa del domicilio fiscal' },
-              codigo_postal: { type: 'string', description: 'Código postal del domicilio fiscal (5 dígitos)' },
-              fecha_emision: { type: 'string', description: 'Fecha de emisión de la constancia en formato YYYY-MM-DD' }
+              actividad_economica: { type: 'string', description: 'Actividad econÃ³mica principal' },
+              regimen_tributario: { type: 'string', description: 'Tipo de constituciÃ³n legal (ej: SOCIEDAD ANONIMA DE CAPITAL VARIABLE, PERSONA FÃSICA, etc.)' },
+              regimen_fiscal: { type: 'string', description: 'RÃ©gimen fiscal del SAT. PUEDE tener dos formatos: 1) CÃ³digo de 3 dÃ­gitos + guiÃ³n + descripciÃ³n (ej: "601 - General de Ley Personas Morales", "626 - RÃ©gimen Simplificado de Confianza"), 2) Solo nombre del rÃ©gimen sin cÃ³digo (ej: "RÃ©gimen Simplificado de Confianza", "General de Ley Personas Morales"). NUNCA extraer tipos de constituciÃ³n como "SOCIEDAD ANONIMA" o "S.A. DE C.V." - esos NO son regÃ­menes fiscales. Si no encuentras ninguna menciÃ³n del rÃ©gimen fiscal en el documento, devuelve "No encontrado".' },
+              direccion: { type: 'string', description: 'DirecciÃ³n completa del domicilio fiscal' },
+              codigo_postal: { type: 'string', description: 'CÃ³digo postal del domicilio fiscal (5 dÃ­gitos)' },
+              fecha_emision: { type: 'string', description: 'Fecha de emisiÃ³n de la constancia en formato YYYY-MM-DD' }
             },
             required: ['razon_social', 'rfc', 'actividad_economica', 'regimen_tributario', 'regimen_fiscal', 'direccion', 'codigo_postal', 'fecha_emision']
           }
@@ -551,19 +551,19 @@ Si NO encuentras algún dato, escribe "No encontrado".`;
         toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['extract_constancia_info'] } }
       };
     } else if (document.document_type === 'comprobante_domicilio') {
-      systemPrompt = 'Eres un asistente especializado en extraer información de comprobantes de domicilio (recibos de luz, agua, teléfono, predial, etc.). Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información del comprobante de domicilio: Razón Social o Nombre del titular, RFC (si está disponible), Código Postal, y Fecha de Emisión. Si algún dato no está disponible, indica "No encontrado".';
+      systemPrompt = 'Eres un asistente especializado en extraer informaciÃ³n de comprobantes de domicilio (recibos de luz, agua, telÃ©fono, predial, etc.). Extrae la informaciÃ³n solicitada de forma precisa y estructurada.';
+      userPrompt = 'Extrae la siguiente informaciÃ³n del comprobante de domicilio: RazÃ³n Social o Nombre del titular, RFC (si estÃ¡ disponible), CÃ³digo Postal, y Fecha de EmisiÃ³n. Si algÃºn dato no estÃ¡ disponible, indica "No encontrado".';
       toolConfig = {
         tools: [{ functionDeclarations: [{
           name: 'extract_comprobante_domicilio_info',
-          description: 'Extraer información estructurada del comprobante de domicilio',
+          description: 'Extraer informaciÃ³n estructurada del comprobante de domicilio',
           parameters: {
             type: 'object',
             properties: {
-              razon_social: { type: 'string', description: 'Razón social o nombre del titular del servicio' },
-              rfc: { type: 'string', description: 'RFC del titular (si está disponible en el documento)' },
-              codigo_postal: { type: 'string', description: 'Código postal del domicilio (5 dígitos)' },
-              fecha_emision: { type: 'string', description: 'Fecha de emisión del comprobante en formato YYYY-MM-DD' }
+              razon_social: { type: 'string', description: 'RazÃ³n social o nombre del titular del servicio' },
+              rfc: { type: 'string', description: 'RFC del titular (si estÃ¡ disponible en el documento)' },
+              codigo_postal: { type: 'string', description: 'CÃ³digo postal del domicilio (5 dÃ­gitos)' },
+              fecha_emision: { type: 'string', description: 'Fecha de emisiÃ³n del comprobante en formato YYYY-MM-DD' }
             },
             required: ['razon_social', 'codigo_postal', 'fecha_emision']
           }
@@ -571,52 +571,52 @@ Si NO encuentras algún dato, escribe "No encontrado".`;
         toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['extract_comprobante_domicilio_info'] } }
       };
     } else if (document.document_type === 'aviso_funcionamiento') {
-      systemPrompt = 'Eres un asistente experto en extraer información de Avisos de Funcionamiento emitidos por COFEPRIS en México. Analiza TODA la imagen con atención al detalle.';
+      systemPrompt = 'Eres un asistente experto en extraer informaciÃ³n de Avisos de Funcionamiento emitidos por COFEPRIS en MÃ©xico. Analiza TODA la imagen con atenciÃ³n al detalle.';
       userPrompt = `Lee CUIDADOSAMENTE toda esta imagen de un Aviso de Funcionamiento de COFEPRIS.
 
-**PASO 1 - Localiza estos elementos básicos:**
-- Razón Social de la empresa (busca en la parte superior del documento)
-- Dirección completa del establecimiento (calle, número, colonia, CP, municipio, estado)
+**PASO 1 - Localiza estos elementos bÃ¡sicos:**
+- RazÃ³n Social de la empresa (busca en la parte superior del documento)
+- DirecciÃ³n completa del establecimiento (calle, nÃºmero, colonia, CP, municipio, estado)
 
-**PASO 2 - BUSCA ESPECÍFICAMENTE esta sección:**
+**PASO 2 - BUSCA ESPECÃFICAMENTE esta secciÃ³n:**
 "5. Datos del responsable sanitario (excepto para productos y servicios)"
 
-Esta sección puede aparecer:
+Esta secciÃ³n puede aparecer:
 - En la parte media o inferior del documento
-- Con o sin el número "5."
+- Con o sin el nÃºmero "5."
 - Puede decir solo "Datos del responsable sanitario"
-- Puede aparecer en cualquier formato o tamaño de letra
+- Puede aparecer en cualquier formato o tamaÃ±o de letra
 
-**DENTRO de esta sección del responsable sanitario, busca:**
+**DENTRO de esta secciÃ³n del responsable sanitario, busca:**
 - Nombre completo de una PERSONA (no de la empresa)
-- CURP de esa persona (18 caracteres alfanuméricos)
-- Puede tener títulos profesionales como: Médico, QFB, Dr., Dra., Químico, Farmacéutico
+- CURP de esa persona (18 caracteres alfanumÃ©ricos)
+- Puede tener tÃ­tulos profesionales como: MÃ©dico, QFB, Dr., Dra., QuÃ­mico, FarmacÃ©utico
 
 **IMPORTANTE:**
-1. El responsable sanitario es UNA PERSONA FÍSICA, NO es la empresa
+1. El responsable sanitario es UNA PERSONA FÃSICA, NO es la empresa
 2. Es DIFERENTE al representante legal
 3. Su CURP es diferente al RFC de la empresa
-4. Lee TODO el texto de la imagen, línea por línea
-5. Si ves el texto "5. Datos del responsable sanitario" en CUALQUIER parte, examina el área debajo de ese texto
-6. Solo indica "No encontrado" si después de leer TODA la imagen no encuentras esta sección específica
+4. Lee TODO el texto de la imagen, lÃ­nea por lÃ­nea
+5. Si ves el texto "5. Datos del responsable sanitario" en CUALQUIER parte, examina el Ã¡rea debajo de ese texto
+6. Solo indica "No encontrado" si despuÃ©s de leer TODA la imagen no encuentras esta secciÃ³n especÃ­fica
 
 Extrae:
 - razon_social: Nombre de la empresa
-- direccion: Dirección completa del establecimiento  
+- direccion: DirecciÃ³n completa del establecimiento  
 - responsable_sanitario_nombre: Nombre completo de la persona responsable sanitario
 - responsable_sanitario_curp: CURP del responsable sanitario`;
 
       toolConfig = {
         tools: [{ functionDeclarations: [{
           name: 'extract_aviso_funcionamiento_info',
-          description: 'Extraer información estructurada del aviso de funcionamiento',
+          description: 'Extraer informaciÃ³n estructurada del aviso de funcionamiento',
           parameters: {
             type: 'object',
             properties: {
-              razon_social: { type: 'string', description: 'Razón social o nombre legal de la empresa' },
-              direccion: { type: 'string', description: 'Dirección completa del establecimiento' },
+              razon_social: { type: 'string', description: 'RazÃ³n social o nombre legal de la empresa' },
+              direccion: { type: 'string', description: 'DirecciÃ³n completa del establecimiento' },
               responsable_sanitario_nombre: { type: 'string', description: 'Nombre completo del responsable sanitario' },
-              responsable_sanitario_curp: { type: 'string', description: 'CURP del responsable sanitario (si está disponible)' }
+              responsable_sanitario_curp: { type: 'string', description: 'CURP del responsable sanitario (si estÃ¡ disponible)' }
             },
             required: ['razon_social', 'direccion', 'responsable_sanitario_nombre']
           }
@@ -624,12 +624,12 @@ Extrae:
         toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['extract_aviso_funcionamiento_info'] } }
       };
     } else if (document.document_type === 'ine') {
-      systemPrompt = 'Eres un asistente especializado en extraer información de credenciales INE mexicanas. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información de la credencial INE: Nombre completo del titular y CURP. Si algún dato no está disponible, indica "No encontrado".';
+      systemPrompt = 'Eres un asistente especializado en extraer informaciÃ³n de credenciales INE mexicanas. Extrae la informaciÃ³n solicitada de forma precisa y estructurada.';
+      userPrompt = 'Extrae la siguiente informaciÃ³n de la credencial INE: Nombre completo del titular y CURP. Si algÃºn dato no estÃ¡ disponible, indica "No encontrado".';
       toolConfig = {
         tools: [{ functionDeclarations: [{
           name: 'extract_ine_info',
-          description: 'Extraer información estructurada de la credencial INE',
+          description: 'Extraer informaciÃ³n estructurada de la credencial INE',
           parameters: {
             type: 'object',
             properties: {
@@ -642,18 +642,18 @@ Extrae:
         toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['extract_ine_info'] } }
       };
     } else if (document.document_type === 'datos_bancarios') {
-      systemPrompt = 'Eres un asistente especializado en extraer información de estados de cuenta bancarios mexicanos. Extrae la información solicitada de forma precisa y estructurada.';
-      userPrompt = 'Extrae la siguiente información del estado de cuenta bancario: Nombre del Banco (usualmente aparece en la parte superior izquierda o encabezado), Número de Cuenta, Número de Cuenta CLABE (18 dígitos), y Nombre del Cliente/Titular. Si algún dato no está disponible, indica "No encontrado".';
+      systemPrompt = 'Eres un asistente especializado en extraer informaciÃ³n de estados de cuenta bancarios mexicanos. Extrae la informaciÃ³n solicitada de forma precisa y estructurada.';
+      userPrompt = 'Extrae la siguiente informaciÃ³n del estado de cuenta bancario: Nombre del Banco (usualmente aparece en la parte superior izquierda o encabezado), NÃºmero de Cuenta, NÃºmero de Cuenta CLABE (18 dÃ­gitos), y Nombre del Cliente/Titular. Si algÃºn dato no estÃ¡ disponible, indica "No encontrado".';
       toolConfig = {
         tools: [{ functionDeclarations: [{
           name: 'extract_datos_bancarios_info',
-          description: 'Extraer información estructurada del estado de cuenta bancario',
+          description: 'Extraer informaciÃ³n estructurada del estado de cuenta bancario',
           parameters: {
             type: 'object',
             properties: {
               nombre_banco: { type: 'string', description: 'Nombre del banco (ej: BBVA, Santander, Banamex). Usualmente aparece en la parte superior o encabezado del documento' },
-              numero_cuenta: { type: 'string', description: 'Número de cuenta bancaria' },
-              numero_cuenta_clabe: { type: 'string', description: 'Número de cuenta CLABE (18 dígitos)' },
+              numero_cuenta: { type: 'string', description: 'NÃºmero de cuenta bancaria' },
+              numero_cuenta_clabe: { type: 'string', description: 'NÃºmero de cuenta CLABE (18 dÃ­gitos)' },
               nombre_cliente: { type: 'string', description: 'Nombre completo del titular o cliente de la cuenta' }
             },
             required: ['nombre_banco', 'numero_cuenta', 'numero_cuenta_clabe', 'nombre_cliente']
@@ -662,11 +662,11 @@ Extrae:
         toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['extract_datos_bancarios_info'] } }
       };
     } else {
-      throw new Error(`Tipo de documento no soportado para extracción: ${document.document_type}`);
+      throw new Error(`Tipo de documento no soportado para extracciÃ³n: ${document.document_type}`);
     }
 
     const aiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -702,7 +702,7 @@ Extrae:
           .update({ extraction_status: 'failed' })
           .eq('id', documentId);
         return new Response(
-          JSON.stringify({ error: 'Límite de solicitudes excedido, intenta más tarde' }),
+          JSON.stringify({ error: 'LÃ­mite de solicitudes excedido, intenta mÃ¡s tarde' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -713,7 +713,7 @@ Extrae:
           .update({ extraction_status: 'failed' })
           .eq('id', documentId);
         return new Response(
-          JSON.stringify({ error: 'Créditos de IA agotados' }),
+          JSON.stringify({ error: 'CrÃ©ditos de IA agotados' }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -727,7 +727,7 @@ Extrae:
     const aiParts = aiData.candidates?.[0]?.content?.parts || [];
     const aiFnCall = aiParts.find((p: any) => p.functionCall);
     if (!aiFnCall) {
-      console.error('No se recibió functionCall en la respuesta');
+      console.error('No se recibiÃ³ functionCall en la respuesta');
       await supabaseClient
         .from('documents')
         .update({ extraction_status: 'failed' })
@@ -739,15 +739,15 @@ Extrae:
     }
 
     let extractedInfo = aiFnCall.functionCall.args;
-    console.log('Información extraída del primer bloque:', extractedInfo);
+    console.log('InformaciÃ³n extraÃ­da del primer bloque:', extractedInfo);
 
-    // PROCESAMIENTO ADICIONAL PARA ACTA CONSTITUTIVA CON BLOQUES MÚLTIPLES
+    // PROCESAMIENTO ADICIONAL PARA ACTA CONSTITUTIVA CON BLOQUES MÃšLTIPLES
     if (document.document_type === 'acta_constitutiva' && allImages.length > 5) {
       const BLOCK_SIZE = 5;
       const MAX_BLOCKS = 4;
       let currentBlock = 1; // Ya procesamos el bloque 0
       
-      // Función para verificar si falta información crítica
+      // FunciÃ³n para verificar si falta informaciÃ³n crÃ­tica
       const isMissingCriticalInfo = (info: any) => {
         return (
           !info.razon_social || info.razon_social === 'No encontrado' ||
@@ -757,7 +757,7 @@ Extrae:
         );
       };
       
-      // Función para consolidar información (priorizar datos completos)
+      // FunciÃ³n para consolidar informaciÃ³n (priorizar datos completos)
       const consolidateInfo = (current: any, newInfo: any) => {
         return {
           razon_social: (newInfo.razon_social && newInfo.razon_social !== 'No encontrado') 
@@ -775,15 +775,15 @@ Extrae:
         };
       };
       
-      // Procesar bloques adicionales si falta información
+      // Procesar bloques adicionales si falta informaciÃ³n
       while (isMissingCriticalInfo(extractedInfo) && currentBlock < MAX_BLOCKS && (currentBlock * BLOCK_SIZE) < allImages.length) {
         const startPage = currentBlock * BLOCK_SIZE;
         const endPage = Math.min(startPage + BLOCK_SIZE, allImages.length);
         const blockImages = allImages.slice(startPage, endPage);
         
-        console.log(`📄 Procesando bloque ${currentBlock + 1}: páginas ${startPage + 1}-${endPage} (faltan datos en bloque anterior)`);
+        console.log(`ðŸ“„ Procesando bloque ${currentBlock + 1}: pÃ¡ginas ${startPage + 1}-${endPage} (faltan datos en bloque anterior)`);
         
-        // Cargar imágenes del siguiente bloque
+        // Cargar imÃ¡genes del siguiente bloque
         const blockImageData: Array<{ base64: string; mimeType: string; size: number }> = [];
         for (const imagePath of blockImages) {
           try {
@@ -796,14 +796,14 @@ Extrae:
         }
         
         if (blockImageData.length === 0) {
-          console.log('⚠️ No se pudieron cargar más páginas, deteniendo procesamiento por bloques');
+          console.log('âš ï¸ No se pudieron cargar mÃ¡s pÃ¡ginas, deteniendo procesamiento por bloques');
           break;
         }
         
         // Procesar este bloque con IA
         try {
           const blockResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -814,7 +814,7 @@ Extrae:
                   {
                     role: 'user',
                     parts: [
-                      { text: `${userPrompt}\n\nNOTA: Estás analizando las páginas ${startPage + 1}-${endPage} de un acta. Extrae SOLO la información que encuentres en estas páginas.` },
+                      { text: `${userPrompt}\n\nNOTA: EstÃ¡s analizando las pÃ¡ginas ${startPage + 1}-${endPage} de un acta. Extrae SOLO la informaciÃ³n que encuentres en estas pÃ¡ginas.` },
                       ...blockImageData.map(imgData => ({
                         inline_data: {
                           mime_type: imgData.mimeType,
@@ -836,18 +836,18 @@ Extrae:
 
             if (blockFnCall) {
               const blockInfo = blockFnCall.functionCall.args;
-              console.log(`✅ Información adicional extraída del bloque ${currentBlock + 1}:`, blockInfo);
+              console.log(`âœ… InformaciÃ³n adicional extraÃ­da del bloque ${currentBlock + 1}:`, blockInfo);
               
-              // Consolidar información
+              // Consolidar informaciÃ³n
               extractedInfo = consolidateInfo(extractedInfo, blockInfo);
-              console.log('📊 Información consolidada:', extractedInfo);
+              console.log('ðŸ“Š InformaciÃ³n consolidada:', extractedInfo);
             }
           } else {
-            console.log(`⚠️ Error procesando bloque ${currentBlock + 1}, continuando con información actual`);
+            console.log(`âš ï¸ Error procesando bloque ${currentBlock + 1}, continuando con informaciÃ³n actual`);
           }
         } catch (blockError) {
           console.error(`Error en bloque ${currentBlock + 1}:`, blockError);
-          // Continuar con la información que tenemos
+          // Continuar con la informaciÃ³n que tenemos
         }
         
         currentBlock++;
@@ -855,25 +855,25 @@ Extrae:
       
       // Resumen final
       const missingFields = [];
-      if (!extractedInfo.razon_social || extractedInfo.razon_social === 'No encontrado') missingFields.push('Razón Social');
+      if (!extractedInfo.razon_social || extractedInfo.razon_social === 'No encontrado') missingFields.push('RazÃ³n Social');
       if (!extractedInfo.representante_legal || extractedInfo.representante_legal === 'No encontrado') missingFields.push('Representante Legal');
       if (!extractedInfo.objeto_social || extractedInfo.objeto_social === 'No encontrado') missingFields.push('Objeto Social');
-      if (!extractedInfo.registro_publico || extractedInfo.registro_publico === 'No encontrado') missingFields.push('Registro Público');
+      if (!extractedInfo.registro_publico || extractedInfo.registro_publico === 'No encontrado') missingFields.push('Registro PÃºblico');
       
       if (missingFields.length > 0) {
-        console.log(`⚠️ Campos no encontrados después de procesar ${currentBlock} bloques: ${missingFields.join(', ')}`);
+        console.log(`âš ï¸ Campos no encontrados despuÃ©s de procesar ${currentBlock} bloques: ${missingFields.join(', ')}`);
       } else {
-        console.log(`✅ Información completa obtenida después de procesar ${currentBlock} bloque(s)`);
+        console.log(`âœ… InformaciÃ³n completa obtenida despuÃ©s de procesar ${currentBlock} bloque(s)`);
       }
     }
 
-    console.log('✨ Información final extraída:', extractedInfo);
+    console.log('âœ¨ InformaciÃ³n final extraÃ­da:', extractedInfo);
 
-    // Validar información extraída
+    // Validar informaciÃ³n extraÃ­da
     const validationErrors: string[] = [];
     let isValid = true;
 
-    // Validaciones de fecha de emisión (constancia fiscal y comprobante domicilio)
+    // Validaciones de fecha de emisiÃ³n (constancia fiscal y comprobante domicilio)
     if ((document.document_type === 'constancia_fiscal' || document.document_type === 'comprobante_domicilio') && extractedInfo.fecha_emision) {
       try {
         const fechaEmision = new Date(extractedInfo.fecha_emision);
@@ -883,11 +883,11 @@ Extrae:
 
         if (fechaEmision < tresMesesAtras) {
           const tipoDoc = document.document_type === 'constancia_fiscal' ? 'La constancia' : 'El comprobante';
-          validationErrors.push(`${tipoDoc} tiene más de 3 meses de antigüedad. Se requiere un documento actualizado.`);
+          validationErrors.push(`${tipoDoc} tiene mÃ¡s de 3 meses de antigÃ¼edad. Se requiere un documento actualizado.`);
           isValid = false;
         }
 
-        console.log('Validación de fecha:', {
+        console.log('ValidaciÃ³n de fecha:', {
           tipoDocumento: document.document_type,
           fechaEmision: fechaEmision.toISOString(),
           tresMesesAtras: tresMesesAtras.toISOString(),
@@ -895,12 +895,12 @@ Extrae:
         });
       } catch (error) {
         console.error('Error validando fecha:', error);
-        validationErrors.push('No se pudo validar la fecha de emisión');
+        validationErrors.push('No se pudo validar la fecha de emisiÃ³n');
         isValid = false;
       }
     }
 
-    // Preparar campos a actualizar según el tipo de documento
+    // Preparar campos a actualizar segÃºn el tipo de documento
     if (document.document_type === 'acta_constitutiva') {
       updateFields = {
         razon_social: extractedInfo.razon_social,
@@ -970,7 +970,7 @@ Extrae:
       };
     }
 
-    // Actualizar el documento con la información extraída
+    // Actualizar el documento con la informaciÃ³n extraÃ­da
     const { error: updateError } = await supabaseClient
       .from('documents')
       .update(updateFields)
@@ -983,14 +983,14 @@ Extrae:
 
     console.log('Documento actualizado exitosamente con confianza:', validationResult.confidence_score);
 
-    // Agregar nota de validación al inicio si hay advertencias
+    // Agregar nota de validaciÃ³n al inicio si hay advertencias
     if (validationResult.detected_issues.length > 0) {
       validationErrors.unshift(`Nivel de confianza: ${validationResult.confidence_score}% - ${validationResult.validation_notes}`);
     }
 
-    // Realizar validación cruzada entre constancia_fiscal y comprobante_domicilio
+    // Realizar validaciÃ³n cruzada entre constancia_fiscal y comprobante_domicilio
     if (document.document_type === 'constancia_fiscal' || document.document_type === 'comprobante_domicilio') {
-      console.log('Iniciando validación cruzada entre constancia fiscal y comprobante domicilio...');
+      console.log('Iniciando validaciÃ³n cruzada entre constancia fiscal y comprobante domicilio...');
       
       // Obtener todos los documentos del proveedor
       const { data: supplierDocs, error: docsError } = await supabaseClient
@@ -1005,7 +1005,7 @@ Extrae:
         const comprobanteDomicilio = supplierDocs.find(d => d.document_type === 'comprobante_domicilio');
 
         if (constanciaFiscal && comprobanteDomicilio) {
-          console.log('Validando RFC, Razón Social y Código Postal:', {
+          console.log('Validando RFC, RazÃ³n Social y CÃ³digo Postal:', {
             constancia: { rfc: constanciaFiscal.rfc, razon_social: constanciaFiscal.razon_social, codigo_postal: constanciaFiscal.codigo_postal },
             comprobante: { rfc: comprobanteDomicilio.rfc, razon_social: comprobanteDomicilio.razon_social, codigo_postal: comprobanteDomicilio.codigo_postal }
           });
@@ -1017,24 +1017,24 @@ Extrae:
             errors.push(`El RFC no coincide entre documentos. Constancia: ${constanciaFiscal.rfc}, Comprobante: ${comprobanteDomicilio.rfc}`);
           }
 
-          // Validar Razón Social (normalizar para comparación)
+          // Validar RazÃ³n Social (normalizar para comparaciÃ³n)
           if (constanciaFiscal.razon_social && comprobanteDomicilio.razon_social) {
             const razonSocialConstancia = constanciaFiscal.razon_social.trim().toLowerCase();
             const razonSocialComprobante = comprobanteDomicilio.razon_social.trim().toLowerCase();
             
             if (razonSocialConstancia !== razonSocialComprobante) {
-              errors.push(`La Razón Social no coincide entre documentos. Constancia: "${constanciaFiscal.razon_social}", Comprobante: "${comprobanteDomicilio.razon_social}"`);
+              errors.push(`La RazÃ³n Social no coincide entre documentos. Constancia: "${constanciaFiscal.razon_social}", Comprobante: "${comprobanteDomicilio.razon_social}"`);
             }
           }
 
-          // Validar Código Postal
+          // Validar CÃ³digo Postal
           if (constanciaFiscal.codigo_postal && comprobanteDomicilio.codigo_postal && constanciaFiscal.codigo_postal !== comprobanteDomicilio.codigo_postal) {
-            errors.push(`El Código Postal no coincide entre documentos. Constancia: ${constanciaFiscal.codigo_postal}, Comprobante: ${comprobanteDomicilio.codigo_postal}`);
+            errors.push(`El CÃ³digo Postal no coincide entre documentos. Constancia: ${constanciaFiscal.codigo_postal}, Comprobante: ${comprobanteDomicilio.codigo_postal}`);
           }
 
           if (errors.length > 0) {
             // Hay errores, actualizar ambos documentos
-            console.log('Errores de validación encontrados:', errors);
+            console.log('Errores de validaciÃ³n encontrados:', errors);
             
             for (const doc of [constanciaFiscal, comprobanteDomicilio]) {
               // Obtener errores actuales y combinar
@@ -1045,9 +1045,9 @@ Extrae:
                 .single();
 
               const currentErrors = currentDoc?.validation_errors || [];
-              // Filtrar errores antiguos de RFC, Razón Social y Código Postal, agregar nuevos
+              // Filtrar errores antiguos de RFC, RazÃ³n Social y CÃ³digo Postal, agregar nuevos
               const filteredErrors = currentErrors.filter(
-                (err: string) => !err.includes('RFC no coincide') && !err.includes('Razón Social no coincide') && !err.includes('Código Postal no coincide')
+                (err: string) => !err.includes('RFC no coincide') && !err.includes('RazÃ³n Social no coincide') && !err.includes('CÃ³digo Postal no coincide')
               );
               const combinedErrors = [...filteredErrors, ...errors];
 
@@ -1060,8 +1060,8 @@ Extrae:
                 .eq('id', doc.id);
             }
           } else {
-            // No hay errores, limpiar errores de RFC, Razón Social y Código Postal
-            console.log('RFC, Razón Social y Código Postal coinciden correctamente');
+            // No hay errores, limpiar errores de RFC, RazÃ³n Social y CÃ³digo Postal
+            console.log('RFC, RazÃ³n Social y CÃ³digo Postal coinciden correctamente');
             
             for (const doc of [constanciaFiscal, comprobanteDomicilio]) {
               const { data: currentDoc } = await supabaseClient
@@ -1072,7 +1072,7 @@ Extrae:
 
               if (currentDoc && currentDoc.validation_errors) {
                 const filteredErrors = currentDoc.validation_errors.filter(
-                  (err: string) => !err.includes('RFC no coincide') && !err.includes('Razón Social no coincide') && !err.includes('Código Postal no coincide')
+                  (err: string) => !err.includes('RFC no coincide') && !err.includes('RazÃ³n Social no coincide') && !err.includes('CÃ³digo Postal no coincide')
                 );
                 
                 await supabaseClient
@@ -1089,9 +1089,9 @@ Extrae:
       }
     }
 
-    // Realizar validación cruzada entre aviso_funcionamiento y constancia_fiscal
+    // Realizar validaciÃ³n cruzada entre aviso_funcionamiento y constancia_fiscal
     if (document.document_type === 'aviso_funcionamiento' || document.document_type === 'constancia_fiscal') {
-      console.log('Iniciando validación cruzada entre aviso de funcionamiento y constancia fiscal...');
+      console.log('Iniciando validaciÃ³n cruzada entre aviso de funcionamiento y constancia fiscal...');
       
       // Obtener todos los documentos del proveedor
       const { data: supplierDocs, error: docsError } = await supabaseClient
@@ -1106,14 +1106,14 @@ Extrae:
         const avisoFuncionamiento = supplierDocs.find(d => d.document_type === 'aviso_funcionamiento');
 
         if (constanciaFiscal && avisoFuncionamiento) {
-          console.log('Validando Razón Social y Dirección:', {
+          console.log('Validando RazÃ³n Social y DirecciÃ³n:', {
             constancia: { razon_social: constanciaFiscal.razon_social, direccion: constanciaFiscal.direccion },
             aviso: { razon_social: avisoFuncionamiento.razon_social, direccion: avisoFuncionamiento.direccion }
           });
 
           const errors: string[] = [];
 
-          // Validar Razón Social (normalizar para comparación)
+          // Validar RazÃ³n Social (normalizar para comparaciÃ³n)
           if (constanciaFiscal.razon_social && avisoFuncionamiento.razon_social) {
             const normalize = (str: string) => str.trim().toLowerCase()
               .replace(/\s+/g, ' ')
@@ -1124,15 +1124,15 @@ Extrae:
             const razonSocialAviso = normalize(avisoFuncionamiento.razon_social);
             
             if (razonSocialConstancia === razonSocialAviso) {
-              errors.push(`✅ Coincidencia confirmada: Razón Social en Constancia Fiscal (${constanciaFiscal.razon_social}) coincide con Aviso de Funcionamiento (${avisoFuncionamiento.razon_social})`);
+              errors.push(`âœ… Coincidencia confirmada: RazÃ³n Social en Constancia Fiscal (${constanciaFiscal.razon_social}) coincide con Aviso de Funcionamiento (${avisoFuncionamiento.razon_social})`);
             } else if (razonSocialConstancia.includes(razonSocialAviso) || razonSocialAviso.includes(razonSocialConstancia)) {
-              errors.push(`✅ Coincidencia confirmada: Razón Social similar - Constancia Fiscal: ${constanciaFiscal.razon_social}, Aviso de Funcionamiento: ${avisoFuncionamiento.razon_social}`);
+              errors.push(`âœ… Coincidencia confirmada: RazÃ³n Social similar - Constancia Fiscal: ${constanciaFiscal.razon_social}, Aviso de Funcionamiento: ${avisoFuncionamiento.razon_social}`);
             } else {
-              errors.push(`❌ La Razón Social no coincide entre documentos. Constancia Fiscal: "${constanciaFiscal.razon_social}", Aviso de Funcionamiento: "${avisoFuncionamiento.razon_social}"`);
+              errors.push(`âŒ La RazÃ³n Social no coincide entre documentos. Constancia Fiscal: "${constanciaFiscal.razon_social}", Aviso de Funcionamiento: "${avisoFuncionamiento.razon_social}"`);
             }
           }
 
-          // Validar Dirección (normalizar para comparación)
+          // Validar DirecciÃ³n (normalizar para comparaciÃ³n)
           if (constanciaFiscal.direccion && avisoFuncionamiento.direccion) {
             const normalize = (str: string) => str.trim().toLowerCase()
               .replace(/\s+/g, ' ')
@@ -1143,17 +1143,17 @@ Extrae:
             const direccionAviso = normalize(avisoFuncionamiento.direccion);
             
             if (direccionConstancia === direccionAviso) {
-              errors.push(`✅ Coincidencia confirmada: Dirección en Constancia Fiscal (${constanciaFiscal.direccion}) coincide con Aviso de Funcionamiento (${avisoFuncionamiento.direccion})`);
+              errors.push(`âœ… Coincidencia confirmada: DirecciÃ³n en Constancia Fiscal (${constanciaFiscal.direccion}) coincide con Aviso de Funcionamiento (${avisoFuncionamiento.direccion})`);
             } else if (direccionConstancia.includes(direccionAviso) || direccionAviso.includes(direccionConstancia)) {
-              errors.push(`✅ Coincidencia confirmada: Dirección similar - Constancia Fiscal: ${constanciaFiscal.direccion}, Aviso de Funcionamiento: ${avisoFuncionamiento.direccion}`);
+              errors.push(`âœ… Coincidencia confirmada: DirecciÃ³n similar - Constancia Fiscal: ${constanciaFiscal.direccion}, Aviso de Funcionamiento: ${avisoFuncionamiento.direccion}`);
             } else {
-              errors.push(`❌ La Dirección no coincide entre documentos. Constancia Fiscal: "${constanciaFiscal.direccion}", Aviso de Funcionamiento: "${avisoFuncionamiento.direccion}"`);
+              errors.push(`âŒ La DirecciÃ³n no coincide entre documentos. Constancia Fiscal: "${constanciaFiscal.direccion}", Aviso de Funcionamiento: "${avisoFuncionamiento.direccion}"`);
             }
           }
 
           if (errors.length > 0) {
             // Hay errores, actualizar ambos documentos
-            console.log('Errores de validación encontrados:', errors);
+            console.log('Errores de validaciÃ³n encontrados:', errors);
             
             for (const doc of [constanciaFiscal, avisoFuncionamiento]) {
               // Obtener errores actuales y combinar
@@ -1166,8 +1166,8 @@ Extrae:
               const currentErrors = currentDoc?.validation_errors || [];
               // Filtrar errores antiguos entre aviso y constancia, agregar nuevos
               const filteredErrors = currentErrors.filter(
-                (err: string) => !err.includes('Razón Social') && 
-                                 !err.includes('Dirección') &&
+                (err: string) => !err.includes('RazÃ³n Social') && 
+                                 !err.includes('DirecciÃ³n') &&
                                  !err.includes('Coincidencia confirmada')
               );
               const combinedErrors = [...filteredErrors, ...errors];
@@ -1181,8 +1181,8 @@ Extrae:
                 .eq('id', doc.id);
             }
           } else {
-            // No hay errores, limpiar errores de validación entre aviso y constancia
-            console.log('Razón Social y Dirección coinciden correctamente');
+            // No hay errores, limpiar errores de validaciÃ³n entre aviso y constancia
+            console.log('RazÃ³n Social y DirecciÃ³n coinciden correctamente');
             
             for (const doc of [constanciaFiscal, avisoFuncionamiento]) {
               const { data: currentDoc } = await supabaseClient
@@ -1193,8 +1193,8 @@ Extrae:
 
               if (currentDoc && currentDoc.validation_errors) {
                 const filteredErrors = currentDoc.validation_errors.filter(
-                  (err: string) => !err.includes('Razón Social') && 
-                                   !err.includes('Dirección') &&
+                  (err: string) => !err.includes('RazÃ³n Social') && 
+                                   !err.includes('DirecciÃ³n') &&
                                    !err.includes('Coincidencia confirmada')
                 );
                 
@@ -1212,9 +1212,9 @@ Extrae:
       }
     }
 
-    // Realizar validación cruzada entre datos_bancarios y constancia_fiscal
+    // Realizar validaciÃ³n cruzada entre datos_bancarios y constancia_fiscal
     if (document.document_type === 'datos_bancarios' || document.document_type === 'constancia_fiscal') {
-      console.log('Iniciando validación cruzada entre datos bancarios y constancia fiscal...');
+      console.log('Iniciando validaciÃ³n cruzada entre datos bancarios y constancia fiscal...');
       
       // Obtener todos los documentos del proveedor
       const { data: supplierDocs, error: docsError } = await supabaseClient
@@ -1224,23 +1224,23 @@ Extrae:
         .in('document_type', ['datos_bancarios', 'constancia_fiscal'])
         .eq('extraction_status', 'completed');
       
-      console.log('Documentos encontrados para validación Datos Bancarios-Constancia:', supplierDocs);
+      console.log('Documentos encontrados para validaciÃ³n Datos Bancarios-Constancia:', supplierDocs);
 
       if (!docsError && supplierDocs) {
         const datosBancarios = supplierDocs.find(d => d.document_type === 'datos_bancarios');
         const constanciaFiscal = supplierDocs.find(d => d.document_type === 'constancia_fiscal');
 
         if (datosBancarios && constanciaFiscal) {
-          console.log('Validando Nombre de Cliente con Razón Social:', {
+          console.log('Validando Nombre de Cliente con RazÃ³n Social:', {
             datos_bancarios: { nombre_cliente: datosBancarios.nombre_cliente },
             constancia_fiscal: { razon_social: constanciaFiscal.razon_social }
           });
 
           const errors: string[] = [];
 
-          // Validar que el nombre del cliente coincida con la razón social
+          // Validar que el nombre del cliente coincida con la razÃ³n social
           if (datosBancarios.nombre_cliente && constanciaFiscal.razon_social) {
-            // Normalizar: convertir a mayúsculas y eliminar espacios extra
+            // Normalizar: convertir a mayÃºsculas y eliminar espacios extra
             const normalizarTexto = (texto: string) => {
               return texto.trim().toUpperCase().replace(/\s+/g, ' ');
             };
@@ -1249,17 +1249,17 @@ Extrae:
             const razonSocialNorm = normalizarTexto(constanciaFiscal.razon_social);
             
             if (nombreClienteNorm === razonSocialNorm) {
-              errors.push(`✅ Coincidencia confirmada: Nombre del cliente en Datos Bancarios (${datosBancarios.nombre_cliente}) coincide con Razón Social en Constancia Fiscal (${constanciaFiscal.razon_social})`);
+              errors.push(`âœ… Coincidencia confirmada: Nombre del cliente en Datos Bancarios (${datosBancarios.nombre_cliente}) coincide con RazÃ³n Social en Constancia Fiscal (${constanciaFiscal.razon_social})`);
             } else if (nombreClienteNorm.includes(razonSocialNorm) || razonSocialNorm.includes(nombreClienteNorm)) {
-              errors.push(`✅ Coincidencia confirmada: Nombre similar - Datos Bancarios: ${datosBancarios.nombre_cliente}, Constancia Fiscal: ${constanciaFiscal.razon_social}`);
+              errors.push(`âœ… Coincidencia confirmada: Nombre similar - Datos Bancarios: ${datosBancarios.nombre_cliente}, Constancia Fiscal: ${constanciaFiscal.razon_social}`);
             } else {
-              errors.push(`❌ El Nombre del Cliente en Datos Bancarios no coincide con la Razón Social en Constancia Fiscal. Datos Bancarios: "${datosBancarios.nombre_cliente}", Constancia Fiscal: "${constanciaFiscal.razon_social}"`);
+              errors.push(`âŒ El Nombre del Cliente en Datos Bancarios no coincide con la RazÃ³n Social en Constancia Fiscal. Datos Bancarios: "${datosBancarios.nombre_cliente}", Constancia Fiscal: "${constanciaFiscal.razon_social}"`);
             }
           }
 
           if (errors.length > 0) {
             // Hay errores, actualizar ambos documentos
-            console.log('Errores de validación encontrados:', errors);
+            console.log('Errores de validaciÃ³n encontrados:', errors);
             
             for (const doc of [datosBancarios, constanciaFiscal]) {
               // Obtener errores actuales y combinar
@@ -1282,13 +1282,13 @@ Extrae:
                 .from('documents')
                 .update({
                   validation_errors: combinedErrors,
-                  is_valid: !combinedErrors.some((err: string) => err.startsWith('❌'))
+                  is_valid: !combinedErrors.some((err: string) => err.startsWith('âŒ'))
                 })
                 .eq('id', doc.id);
             }
           } else {
-            // No hay errores, limpiar errores de validación entre datos bancarios y constancia
-            console.log('Nombre del Cliente coincide correctamente con Razón Social');
+            // No hay errores, limpiar errores de validaciÃ³n entre datos bancarios y constancia
+            console.log('Nombre del Cliente coincide correctamente con RazÃ³n Social');
             
             for (const doc of [datosBancarios, constanciaFiscal]) {
               const { data: currentDoc } = await supabaseClient
@@ -1308,7 +1308,7 @@ Extrae:
                   .from('documents')
                   .update({
                     validation_errors: filteredErrors,
-                    is_valid: filteredErrors.length === 0 || !filteredErrors.some((err: string) => err.startsWith('❌'))
+                    is_valid: filteredErrors.length === 0 || !filteredErrors.some((err: string) => err.startsWith('âŒ'))
                   })
                   .eq('id', doc.id);
               }
@@ -1318,9 +1318,9 @@ Extrae:
       }
     }
 
-    // Realizar validación cruzada entre INE y aviso_funcionamiento (responsable sanitario)
+    // Realizar validaciÃ³n cruzada entre INE y aviso_funcionamiento (responsable sanitario)
     if (document.document_type === 'ine' || document.document_type === 'aviso_funcionamiento') {
-      console.log('Iniciando validación cruzada entre INE y aviso de funcionamiento...');
+      console.log('Iniciando validaciÃ³n cruzada entre INE y aviso de funcionamiento...');
       
       // Obtener todos los documentos del proveedor
       const { data: supplierDocs, error: docsError } = await supabaseClient
@@ -1330,7 +1330,7 @@ Extrae:
         .in('document_type', ['ine', 'aviso_funcionamiento'])
         .eq('extraction_status', 'completed');
       
-      console.log('Documentos encontrados para validación INE-Aviso:', supplierDocs);
+      console.log('Documentos encontrados para validaciÃ³n INE-Aviso:', supplierDocs);
 
       if (!docsError && supplierDocs) {
         const ine = supplierDocs.find(d => d.document_type === 'ine');
@@ -1344,32 +1344,32 @@ Extrae:
 
           const errors: string[] = [];
 
-          // PRIORIDAD 1: Validar CURP (identificador único más confiable)
+          // PRIORIDAD 1: Validar CURP (identificador Ãºnico mÃ¡s confiable)
           let curpCoincide = false;
           if (ine.curp && avisoFuncionamiento.curp) {
             // Verificar si el dato fue encontrado (no es "No encontrado")
             if (avisoFuncionamiento.curp.toLowerCase().includes('no encontrado')) {
-              errors.push(`⚠️ Los datos del responsable sanitario no se encontraron en la imagen del Aviso de Funcionamiento procesada. Si el documento tiene múltiples páginas, asegúrate de subir la página que contiene el "Apartado 5: Datos del responsable sanitario".`);
+              errors.push(`âš ï¸ Los datos del responsable sanitario no se encontraron en la imagen del Aviso de Funcionamiento procesada. Si el documento tiene mÃºltiples pÃ¡ginas, asegÃºrate de subir la pÃ¡gina que contiene el "Apartado 5: Datos del responsable sanitario".`);
             } else if (ine.curp.trim().toUpperCase() === avisoFuncionamiento.curp.trim().toUpperCase()) {
               // CURP coincide - esto es suficiente para validar
               curpCoincide = true;
-              console.log('✅ CURP del responsable sanitario coincide perfectamente:', ine.curp);
-              errors.push(`✅ Coincidencia confirmada: CURP del responsable sanitario en INE (${ine.curp}) coincide con Aviso de Funcionamiento (${avisoFuncionamiento.curp})`);
+              console.log('âœ… CURP del responsable sanitario coincide perfectamente:', ine.curp);
+              errors.push(`âœ… Coincidencia confirmada: CURP del responsable sanitario en INE (${ine.curp}) coincide con Aviso de Funcionamiento (${avisoFuncionamiento.curp})`);
             } else {
-              errors.push(`❌ El CURP del responsable sanitario no coincide. INE: ${ine.curp}, Aviso de Funcionamiento: ${avisoFuncionamiento.curp}`);
+              errors.push(`âŒ El CURP del responsable sanitario no coincide. INE: ${ine.curp}, Aviso de Funcionamiento: ${avisoFuncionamiento.curp}`);
             }
           }
 
-          // PRIORIDAD 2: Validar Nombre solo si el CURP NO coincide (como validación adicional)
+          // PRIORIDAD 2: Validar Nombre solo si el CURP NO coincide (como validaciÃ³n adicional)
           if (!curpCoincide && ine.nombre_completo_ine && avisoFuncionamiento.representante_legal) {
             // Verificar si el dato fue encontrado (no es "No encontrado")
             if (!avisoFuncionamiento.representante_legal.toLowerCase().includes('no encontrado')) {
-              // Normalizar: convertir a minúsculas, eliminar espacios extra y ordenar palabras alfabéticamente
+              // Normalizar: convertir a minÃºsculas, eliminar espacios extra y ordenar palabras alfabÃ©ticamente
               const normalizarNombre = (nombre: string) => {
                 return nombre.trim().toLowerCase()
                   .split(/\s+/)  // Dividir por espacios
-                  .filter(palabra => palabra.length > 0)  // Eliminar strings vacíos
-                  .sort()  // Ordenar alfabéticamente
+                  .filter(palabra => palabra.length > 0)  // Eliminar strings vacÃ­os
+                  .sort()  // Ordenar alfabÃ©ticamente
                   .join(' ');  // Unir con espacio
               };
               
@@ -1384,7 +1384,7 @@ Extrae:
 
           if (errors.length > 0) {
             // Hay errores, actualizar ambos documentos
-            console.log('Errores de validación encontrados:', errors);
+            console.log('Errores de validaciÃ³n encontrados:', errors);
             
             for (const doc of [ine, avisoFuncionamiento]) {
               // Obtener errores actuales y combinar
@@ -1399,7 +1399,7 @@ Extrae:
               const filteredErrors = currentErrors.filter(
                 (err: string) => !err.includes('Nombre Completo del responsable sanitario') && 
                                  !err.includes('CURP del responsable sanitario') &&
-                                 !err.includes('⚠️ Los datos del responsable sanitario') &&
+                                 !err.includes('âš ï¸ Los datos del responsable sanitario') &&
                                  !err.includes('Coincidencia confirmada')
               );
               const combinedErrors = [...filteredErrors, ...errors];
@@ -1413,7 +1413,7 @@ Extrae:
                 .eq('id', doc.id);
             }
           } else {
-            // No hay errores, limpiar errores de validación entre INE y aviso
+            // No hay errores, limpiar errores de validaciÃ³n entre INE y aviso
             console.log('Nombre Completo y CURP del responsable sanitario coinciden correctamente');
             
             for (const doc of [ine, avisoFuncionamiento]) {
@@ -1427,7 +1427,7 @@ Extrae:
                 const filteredErrors = currentDoc.validation_errors.filter(
                   (err: string) => !err.includes('Nombre Completo del responsable sanitario') && 
                                    !err.includes('CURP del responsable sanitario') &&
-                                   !err.includes('⚠️ Los datos del responsable sanitario') &&
+                                   !err.includes('âš ï¸ Los datos del responsable sanitario') &&
                                    !err.includes('Coincidencia confirmada')
                 );
                 
@@ -1445,7 +1445,7 @@ Extrae:
       }
     }
 
-    // Obtener el documento actualizado con todos sus errores de validación
+    // Obtener el documento actualizado con todos sus errores de validaciÃ³n
     const { data: updatedDoc } = await supabaseClient
       .from('documents')
       .select('validation_errors, is_valid')

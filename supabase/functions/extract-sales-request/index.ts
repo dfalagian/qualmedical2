@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
 
 const corsHeaders = {
@@ -97,7 +97,7 @@ serve(async (req) => {
             } catch {
               contentParts.push({
                 type: 'text',
-                text: `Se adjuntó un archivo "${request.file_name}" de tipo ${mimeType} que no se puede leer como texto.`,
+                text: `Se adjuntÃ³ un archivo "${request.file_name}" de tipo ${mimeType} que no se puede leer como texto.`,
               });
             }
           }
@@ -118,7 +118,7 @@ serve(async (req) => {
     if (!hasContent) {
       await supabase.from('sales_requests').update({
         extraction_status: 'failed',
-        extracted_data: { error: 'No se encontró contenido para analizar' },
+        extracted_data: { error: 'No se encontrÃ³ contenido para analizar' },
       }).eq('id', requestId);
 
       return new Response(JSON.stringify({ error: 'Sin contenido' }), {
@@ -128,9 +128,9 @@ serve(async (req) => {
 
     // Add instruction
     contentParts.unshift({
-      text: `Analiza el siguiente documento o texto de un proveedor y extrae TODA la información posible.
+      text: `Analiza el siguiente documento o texto de un proveedor y extrae TODA la informaciÃ³n posible.
 
-Responde ÚNICAMENTE con un objeto JSON válido con las siguientes secciones (incluye solo las que apliquen):
+Responde ÃšNICAMENTE con un objeto JSON vÃ¡lido con las siguientes secciones (incluye solo las que apliquen):
 
 {
   "tipo_documento": "factura | lista_productos | cotizacion | orden_compra | otro",
@@ -158,25 +158,25 @@ Responde ÚNICAMENTE con un objeto JSON válido con las siguientes secciones (in
       "unidad": ""
     }
   ],
-  "texto_extraido": "Texto completo extraído del documento"
+  "texto_extraido": "Texto completo extraÃ­do del documento"
 }
 
-Si algún campo no está disponible, omítelo. No inventes datos.`,
+Si algÃºn campo no estÃ¡ disponible, omÃ­telo. No inventes datos.`,
     });
 
-    console.log('Enviando a Gemini para extracción...');
+    console.log('Enviando a Gemini para extracciÃ³n...');
 
     const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
-    if (!GEMINI_API_KEY) throw new Error('GEMINIKEY no está configurado');
+    if (!GEMINI_API_KEY) throw new Error('GEMINIKEY no estÃ¡ configurado');
 
     const aiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: 'Eres un experto en análisis de documentos comerciales y fiscales mexicanos. Extraes información estructurada de facturas, listas de productos, cotizaciones y otros documentos. Responde siempre en JSON válido.' }]
+            parts: [{ text: 'Eres un experto en anÃ¡lisis de documentos comerciales y fiscales mexicanos. Extraes informaciÃ³n estructurada de facturas, listas de productos, cotizaciones y otros documentos. Responde siempre en JSON vÃ¡lido.' }]
           },
           contents: [{ role: 'user', parts: contentParts }],
           generationConfig: { maxOutputTokens: 4096 },
@@ -192,7 +192,7 @@ Si algún campo no está disponible, omítelo. No inventes datos.`,
       if (status === 429) {
         await supabase.from('sales_requests').update({
           extraction_status: 'failed',
-          extracted_data: { error: 'Límite de solicitudes excedido' },
+          extracted_data: { error: 'LÃ­mite de solicitudes excedido' },
         }).eq('id', requestId);
         return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }

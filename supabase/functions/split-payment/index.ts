@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
 
 const corsHeaders = {
@@ -21,7 +21,7 @@ serve(async (req) => {
     }
 
     if (dates.length !== installmentCount) {
-      throw new Error('El número de fechas debe coincidir con el número de cuotas');
+      throw new Error('El nÃºmero de fechas debe coincidir con el nÃºmero de cuotas');
     }
 
     // Inicializar Supabase Admin Client
@@ -29,7 +29,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Obtener información del pago
+    // Obtener informaciÃ³n del pago
     const { data: pagoData, error: pagoError } = await supabaseAdmin
       .from('pagos')
       .select('invoice_id, supplier_id, original_amount')
@@ -38,7 +38,7 @@ serve(async (req) => {
 
     if (pagoError || !pagoData) {
       console.error('Error obteniendo pago:', pagoError);
-      throw new Error('No se pudo obtener información del pago');
+      throw new Error('No se pudo obtener informaciÃ³n del pago');
     }
 
     // Calcular monto por cuota

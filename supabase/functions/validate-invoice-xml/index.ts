@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -8,7 +8,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   console.log('=== INICIO validate-invoice-xml ===');
-  console.log('Método:', req.method);
+  console.log('MÃ©todo:', req.method);
   console.log('Headers:', Object.fromEntries(req.headers.entries()));
 
   if (req.method === 'OPTIONS') {
@@ -27,7 +27,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'El cuerpo de la solicitud no es JSON válido',
+          error: 'El cuerpo de la solicitud no es JSON vÃ¡lido',
           details: parseError instanceof Error ? parseError.message : 'Error desconocido'
         }),
         { 
@@ -65,13 +65,13 @@ serve(async (req) => {
     }
 
     const xmlText = await xmlData.text();
-    console.log('XML descargado exitosamente, tamaño:', xmlText.length);
+    console.log('XML descargado exitosamente, tamaÃ±o:', xmlText.length);
 
     // Extraer FormaPago y MetodoPago usando regex
     // FormaPago es un atributo del elemento Comprobante
-    // MetodoPago también es un atributo del elemento Comprobante
+    // MetodoPago tambiÃ©n es un atributo del elemento Comprobante
     
-    // Extraer información del comprobante
+    // Extraer informaciÃ³n del comprobante
     // Buscar Total primero en el elemento Comprobante (puede tener namespace)
     const formaPagoMatch = xmlText.match(/FormaPago="([^"]+)"/);
     const metodoPagoMatch = xmlText.match(/MetodoPago="([^"]+)"/);
@@ -80,8 +80,8 @@ serve(async (req) => {
     const tipoComprobanteMatch = xmlText.match(/TipoDeComprobante="([^"]+)"/);
 
     
-    // Mejorar extracción de Total - buscar en diferentes formatos posibles
-    // El atributo Total está en el elemento cfdi:Comprobante
+    // Mejorar extracciÃ³n de Total - buscar en diferentes formatos posibles
+    // El atributo Total estÃ¡ en el elemento cfdi:Comprobante
     let totalMatch = xmlText.match(/(?:[a-zA-Z0-9]+:)?Comprobante[^>]*Total="([0-9.]+)"/);
     if (!totalMatch) {
       totalMatch = xmlText.match(/\bTotal="([0-9.]+)"/);
@@ -97,13 +97,13 @@ serve(async (req) => {
     const fechaMatch = xmlText.match(/Fecha="([^"]+)"/);
     const lugarExpedicionMatch = xmlText.match(/LugarExpedicion="([^"]+)"/);
     
-    console.log('Total extraído:', totalMatch ? totalMatch[1] : 'NO ENCONTRADO');
-    console.log('SubTotal extraído:', subtotalMatch ? subtotalMatch[1] : 'NO ENCONTRADO');
+    console.log('Total extraÃ­do:', totalMatch ? totalMatch[1] : 'NO ENCONTRADO');
+    console.log('SubTotal extraÃ­do:', subtotalMatch ? subtotalMatch[1] : 'NO ENCONTRADO');
 
     // Extraer UUID (TimbreFiscalDigital)
     const uuidMatch = xmlText.match(/UUID="([^"]+)"/);
     
-    // Extraer información del emisor
+    // Extraer informaciÃ³n del emisor
     const emisorNombreMatch = xmlText.match(/(?:[a-zA-Z0-9]+:)?Emisor[^>]*Nombre="([^"]+)"/);
     const emisorRfcMatch = xmlText.match(/(?:[a-zA-Z0-9]+:)?Emisor[^>]*Rfc="([^"]+)"/);
     const emisorRegimenMatch = xmlText.match(/RegimenFiscal="([^"]+)"/);
@@ -112,7 +112,7 @@ serve(async (req) => {
     const receptorRfcMatch = xmlText.match(/(?:[a-zA-Z0-9]+:)?Receptor[^>]*Rfc="([^"]+)"/);
     const receptorUsoCfdiMatch = xmlText.match(/UsoCFDI="([^"]+)"/);
 
-    // VALIDACIÓN CRÍTICA: Verificar que el RFC del receptor sea de QualMedical
+    // VALIDACIÃ“N CRÃTICA: Verificar que el RFC del receptor sea de QualMedical
     const receptorRfc = receptorRfcMatch ? receptorRfcMatch[1] : null;
     const RFC_QUALMEDICAL = 'QME240321HF3';
     
@@ -124,8 +124,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'RFC del receptor inválido',
-          mensaje: `El RFC del receptor en la factura (${receptorRfc || 'no especificado'}) no corresponde a QualMedical (${RFC_QUALMEDICAL}). Por favor verifica que la factura esté emitida correctamente.`
+          error: 'RFC del receptor invÃ¡lido',
+          mensaje: `El RFC del receptor en la factura (${receptorRfc || 'no especificado'}) no corresponde a QualMedical (${RFC_QUALMEDICAL}). Por favor verifica que la factura estÃ© emitida correctamente.`
         }),
         { 
           status: 200, // Usar 200 para validaciones de negocio
@@ -198,7 +198,7 @@ serve(async (req) => {
         }
       }
     } else {
-      console.log('⚠️ No se encontró bloque de Impuestos consolidados, sumando impuestos de conceptos');
+      console.log('âš ï¸ No se encontrÃ³ bloque de Impuestos consolidados, sumando impuestos de conceptos');
       
       // Fallback: buscar todos los impuestos y SUMAR por tipo de impuesto
       // Mapas para acumular totales por tipo de impuesto
@@ -260,7 +260,7 @@ serve(async (req) => {
       console.log('Retenciones acumuladas:', impuestosDetalle.retenciones);
     }
 
-    // Extraer conceptos/artículos - soportar con o sin namespace (cfdi:Concepto, Concepto, o cualquier prefijo)
+    // Extraer conceptos/artÃ­culos - soportar con o sin namespace (cfdi:Concepto, Concepto, o cualquier prefijo)
     const conceptosRegex = /<(?:[a-zA-Z0-9]+:)?Concepto\s([^>]*)(?:>|\/\s*>)/g;
     const conceptos = [];
     let conceptoMatch;
@@ -302,18 +302,18 @@ serve(async (req) => {
     const lugarExpedicion = lugarExpedicionMatch ? lugarExpedicionMatch[1] : null;
     const uuid = uuidMatch ? uuidMatch[1] : null;
 
-    // Construir número de factura (Serie + Folio, o solo Folio, o UUID si no hay Folio)
+    // Construir nÃºmero de factura (Serie + Folio, o solo Folio, o UUID si no hay Folio)
     let invoiceNumber = serie ? `${serie}-${folio}` : folio;
     
-    // Si no hay Folio, usar el UUID como número de factura
+    // Si no hay Folio, usar el UUID como nÃºmero de factura
     if (!invoiceNumber && uuid) {
       invoiceNumber = uuid;
-      console.log('⚠️ Factura sin Folio/Serie, usando UUID como número de factura:', uuid);
+      console.log('âš ï¸ Factura sin Folio/Serie, usando UUID como nÃºmero de factura:', uuid);
     }
 
-    console.log('Información extraída del XML:');
+    console.log('InformaciÃ³n extraÃ­da del XML:');
     console.log('- Tipo de comprobante:', tipoComprobante);
-    console.log('- Número de factura:', invoiceNumber);
+    console.log('- NÃºmero de factura:', invoiceNumber);
     console.log('- Total:', total);
     console.log('- UUID:', uuid);
     console.log('- Emisor:', emisorNombreMatch?.[1]);
@@ -321,7 +321,7 @@ serve(async (req) => {
     console.log('- Impuestos detallados - Traslados:', impuestosDetalle.traslados.length);
     console.log('- Impuestos detallados - Retenciones:', impuestosDetalle.retenciones.length);
 
-    // VALIDACIÓN CRÍTICA: Si FormaPago = 99, entonces MetodoPago DEBE ser PPD
+    // VALIDACIÃ“N CRÃTICA: Si FormaPago = 99, entonces MetodoPago DEBE ser PPD
     if (formaPago === '99' && metodoPago !== 'PPD') {
       console.log('ERROR: FormaPago=99 pero MetodoPago no es PPD');
       
@@ -329,8 +329,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Validación de factura fallida',
-          mensaje: 'Error en el XML: Cuando la Forma de Pago es 99, el Método de Pago debe ser PPD. Se detectó Método de Pago: ' + (metodoPago || 'no especificado') + '.'
+          error: 'ValidaciÃ³n de factura fallida',
+          mensaje: 'Error en el XML: Cuando la Forma de Pago es 99, el MÃ©todo de Pago debe ser PPD. Se detectÃ³ MÃ©todo de Pago: ' + (metodoPago || 'no especificado') + '.'
         }),
         { 
           status: 200, // Usar 200 para validaciones de negocio
@@ -346,7 +346,7 @@ serve(async (req) => {
     // FormaPago = 99 (Por definir) y MetodoPago = PPD (Pago en parcialidades o diferido)
     const requiereComplemento = formaPago === '99' && metodoPago === 'PPD';
 
-    console.log('¿Requiere complemento de pago?:', requiereComplemento);
+    console.log('Â¿Requiere complemento de pago?:', requiereComplemento);
 
     return new Response(
       JSON.stringify({
@@ -372,8 +372,8 @@ serve(async (req) => {
         conceptos,
         requiereComplemento,
         mensaje: requiereComplemento 
-          ? 'Esta factura requiere un complemento de pago. Por favor, súbelo cuando esté disponible.'
-          : 'Factura válida'
+          ? 'Esta factura requiere un complemento de pago. Por favor, sÃºbelo cuando estÃ© disponible.'
+          : 'Factura vÃ¡lida'
       }),
       { 
         headers: { 

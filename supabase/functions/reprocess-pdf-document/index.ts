@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
 
 const corsHeaders = {
@@ -107,28 +107,28 @@ serve(async (req) => {
     }
     pdfBase64 = btoa(pdfBase64);
 
-    console.log('PDF descargado y convertido a base64, tamaño:', pdfArrayBuffer.byteLength, 'bytes');
+    console.log('PDF descargado y convertido a base64, tamaÃ±o:', pdfArrayBuffer.byteLength, 'bytes');
 
     const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
     if (!GEMINI_API_KEY) {
-      throw new Error('GEMINIKEY no está configurado');
+      throw new Error('GEMINIKEY no estÃ¡ configurado');
     }
 
     console.log(`Procesando PDF con Gemini...`);
 
     const extractionResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: `Eres un experto en análisis de documentos legales y fiscales mexicanos. Tu trabajo es:
+            parts: [{ text: `Eres un experto en anÃ¡lisis de documentos legales y fiscales mexicanos. Tu trabajo es:
 1. Verificar que el documento sea del tipo correcto: ${document.document_type}
-2. Extraer la información relevante del documento
-3. Determinar el número total de páginas del documento
+2. Extraer la informaciÃ³n relevante del documento
+3. Determinar el nÃºmero total de pÃ¡ginas del documento
 
-Responde SIEMPRE en formato JSON válido.` }]
+Responde SIEMPRE en formato JSON vÃ¡lido.` }]
           },
           contents: [
             {
@@ -141,29 +141,29 @@ Responde SIEMPRE en formato JSON válido.` }]
                   }
                 },
                 {
-                  text: `Analiza este documento PDF que debería ser de tipo "${document.document_type}".
+                  text: `Analiza este documento PDF que deberÃ­a ser de tipo "${document.document_type}".
 
-Extrae la siguiente información según el tipo de documento:
+Extrae la siguiente informaciÃ³n segÃºn el tipo de documento:
 
 Para acta_constitutiva:
 - razon_social: nombre de la empresa
 - representante_legal: nombre del representante
 - objeto_social: actividades de la empresa
 - registro_publico: datos del registro
-- total_pages: número total de páginas
+- total_pages: nÃºmero total de pÃ¡ginas
 
 Para constancia_fiscal:
 - rfc: RFC del contribuyente
-- razon_social: nombre o razón social
-- regimen_fiscal: régimen tributario
+- razon_social: nombre o razÃ³n social
+- regimen_fiscal: rÃ©gimen tributario
 - actividad_economica: actividades
 - codigo_postal: CP del domicilio
-- direccion: dirección fiscal
-- total_pages: número total de páginas
+- direccion: direcciÃ³n fiscal
+- total_pages: nÃºmero total de pÃ¡ginas
 
-Para otros documentos, extrae la información relevante disponible.
+Para otros documentos, extrae la informaciÃ³n relevante disponible.
 
-Responde ÚNICAMENTE con un objeto JSON con los campos encontrados y un campo "is_valid" (boolean) indicando si es un documento válido del tipo esperado.`
+Responde ÃšNICAMENTE con un objeto JSON con los campos encontrados y un campo "is_valid" (boolean) indicando si es un documento vÃ¡lido del tipo esperado.`
                 }
               ]
             }
@@ -212,14 +212,14 @@ Responde ÚNICAMENTE con un objeto JSON con los campos encontrados y un campo "i
       extractedInfo = { raw_response: responseContent };
     }
 
-    // Actualizar el documento con la información extraída
+    // Actualizar el documento con la informaciÃ³n extraÃ­da
     const updateData: any = {
       extraction_status: 'completed',
       extracted_at: new Date().toISOString(),
       is_valid: extractedInfo.is_valid !== false,
     };
 
-    // Mapear campos según el tipo de documento
+    // Mapear campos segÃºn el tipo de documento
     if (extractedInfo.razon_social) updateData.razon_social = extractedInfo.razon_social;
     if (extractedInfo.representante_legal) updateData.representante_legal = extractedInfo.representante_legal;
     if (extractedInfo.objeto_social) updateData.objeto_social = extractedInfo.objeto_social;
@@ -230,7 +230,7 @@ Responde ÚNICAMENTE con un objeto JSON con los campos encontrados y un campo "i
     if (extractedInfo.codigo_postal) updateData.codigo_postal = extractedInfo.codigo_postal;
     if (extractedInfo.direccion) updateData.direccion = extractedInfo.direccion;
 
-    // Guardar notas de validación si existen
+    // Guardar notas de validaciÃ³n si existen
     if (extractedInfo.validation_notes || extractedInfo.notes) {
       updateData.validation_errors = [extractedInfo.validation_notes || extractedInfo.notes];
     }

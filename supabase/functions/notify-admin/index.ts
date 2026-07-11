@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
 
 const corsHeaders = {
@@ -37,8 +37,8 @@ const getEmailTemplate = (type: string, data: any) => {
       subject: `Nuevo documento pendiente: ${data?.document_type || 'Documento'}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #f59e0b;">Documento Pendiente de Revisión</h2>
-          <p>Se ha subido un nuevo documento que requiere revisión:</p>
+          <h2 style="color: #f59e0b;">Documento Pendiente de RevisiÃ³n</h2>
+          <p>Se ha subido un nuevo documento que requiere revisiÃ³n:</p>
           <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 15px 0;">
             <p><strong>Tipo:</strong> ${data?.document_type || 'Documento'}</p>
             <p><strong>Proveedor:</strong> ${data?.supplier_name || 'Sin nombre'}</p>
@@ -56,10 +56,10 @@ const getEmailTemplate = (type: string, data: any) => {
       subject: `Nueva factura pendiente: ${data?.invoice_number || 'Factura'}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #f59e0b;">Factura Pendiente de Validación</h2>
-          <p>Se ha subido una nueva factura que requiere validación:</p>
+          <h2 style="color: #f59e0b;">Factura Pendiente de ValidaciÃ³n</h2>
+          <p>Se ha subido una nueva factura que requiere validaciÃ³n:</p>
           <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 15px 0;">
-            <p><strong>Número:</strong> ${data?.invoice_number || 'Sin número'}</p>
+            <p><strong>NÃºmero:</strong> ${data?.invoice_number || 'Sin nÃºmero'}</p>
             <p><strong>Proveedor:</strong> ${data?.supplier_name || 'Sin nombre'}</p>
             <p><strong>Monto:</strong> $${data?.amount || '0.00'}</p>
             <p><strong>Fecha de subida:</strong> ${new Date().toLocaleDateString()}</p>
@@ -73,17 +73,17 @@ const getEmailTemplate = (type: string, data: any) => {
       `
     },
     extraction_completed: {
-      subject: `Extracción completada: ${data?.document_type || 'Documento'}`,
+      subject: `ExtracciÃ³n completada: ${data?.document_type || 'Documento'}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #22c55e;">Extracción de Datos Completada ✓</h2>
-          <p>La extracción de datos se ha completado exitosamente:</p>
+          <h2 style="color: #22c55e;">ExtracciÃ³n de Datos Completada âœ“</h2>
+          <p>La extracciÃ³n de datos se ha completado exitosamente:</p>
           <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 15px 0;">
             <p><strong>Documento:</strong> ${data?.document_type || 'Documento'}</p>
             <p><strong>Proveedor:</strong> ${data?.supplier_name || 'Sin nombre'}</p>
-            ${data?.extracted_data ? `<p><strong>Datos extraídos:</strong> ${JSON.stringify(data.extracted_data, null, 2)}</p>` : ''}
+            ${data?.extracted_data ? `<p><strong>Datos extraÃ­dos:</strong> ${JSON.stringify(data.extracted_data, null, 2)}</p>` : ''}
           </div>
-          <p>Los datos están listos para su revisión.</p>
+          <p>Los datos estÃ¡n listos para su revisiÃ³n.</p>
           <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
             Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #22c55e;">https://qualmedical.iakan.es</a>
           </p>
@@ -92,11 +92,11 @@ const getEmailTemplate = (type: string, data: any) => {
       `
     },
     extraction_failed: {
-      subject: `Error en extracción: ${data?.document_type || 'Documento'}`,
+      subject: `Error en extracciÃ³n: ${data?.document_type || 'Documento'}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #ef4444;">Error en Extracción de Datos</h2>
-          <p>Ha ocurrido un error durante la extracción de datos:</p>
+          <h2 style="color: #ef4444;">Error en ExtracciÃ³n de Datos</h2>
+          <p>Ha ocurrido un error durante la extracciÃ³n de datos:</p>
           <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 15px 0;">
             <p><strong>Documento:</strong> ${data?.document_type || 'Documento'}</p>
             <p><strong>Proveedor:</strong> ${data?.supplier_name || 'Sin nombre'}</p>
@@ -121,7 +121,7 @@ const getEmailTemplate = (type: string, data: any) => {
             <p><strong>Asunto:</strong> ${data?.subject || 'Sin asunto'}</p>
             <p>${data?.message || ''}</p>
           </div>
-          <p>Por favor, inicia sesión en el sistema para responder.</p>
+          <p>Por favor, inicia sesiÃ³n en el sistema para responder.</p>
           <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
             Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #3b82f6;">https://qualmedical.iakan.es</a>
           </p>
@@ -136,7 +136,7 @@ const getEmailTemplate = (type: string, data: any) => {
           <h2 style="color: #3b82f6;">Comprobante de Pago Subido</h2>
           <p>Se ha subido un nuevo comprobante de pago:</p>
           <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 15px 0;">
-            <p><strong>Factura:</strong> ${data?.invoice_number || 'Sin número'}</p>
+            <p><strong>Factura:</strong> ${data?.invoice_number || 'Sin nÃºmero'}</p>
             <p><strong>Proveedor:</strong> ${data?.supplier_name || 'Sin nombre'}</p>
             <p><strong>Monto:</strong> $${data?.amount || '0.00'}</p>
             <p><strong>Fecha de subida:</strong> ${new Date().toLocaleDateString()}</p>
@@ -152,8 +152,8 @@ const getEmailTemplate = (type: string, data: any) => {
   };
 
   return templates[type as keyof typeof templates] || {
-    subject: "Notificación del sistema",
-    html: `<p>Tienes una nueva notificación administrativa.</p>`
+    subject: "NotificaciÃ³n del sistema",
+    html: `<p>Tienes una nueva notificaciÃ³n administrativa.</p>`
   };
 };
 

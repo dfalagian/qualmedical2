@@ -51,6 +51,7 @@ interface UpdateApprovedQuoteParams {
   subtotal: number;
   total: number;
   motivoCorreccion: string;
+  isRemision?: boolean;
   items: Array<{ id: string; precio_unitario: number; importe: number }>;
 }
 
@@ -674,6 +675,7 @@ export const useQuoteActions = () => {
           notes: params.notes || null,
           subtotal: params.subtotal,
           total: params.total,
+          ...(params.isRemision !== undefined ? { is_remision: params.isRemision } : {}),
           updated_at: new Date().toISOString(),
         })
         .eq("id", params.quoteId)

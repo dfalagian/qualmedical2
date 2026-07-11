@@ -1,4 +1,4 @@
-import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
+﻿import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -157,7 +157,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
       sqlScript += '\n';
     }
 
-    // ÍNDICES (excluyendo los de PK/UNIQUE constraints)
+    // ÃNDICES (excluyendo los de PK/UNIQUE constraints)
     const indexes = (await client.queryObject<{ indexdef: string }>`
       SELECT indexdef FROM pg_indexes
       WHERE schemaname = 'public'
@@ -168,7 +168,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
       ORDER BY tablename, indexname
     `).rows;
     if (indexes.length > 0) {
-      sqlScript += `-- ==== ÍNDICES ====\n`;
+      sqlScript += `-- ==== ÃNDICES ====\n`;
       for (const i of indexes) sqlScript += `${i.indexdef};\n`;
       sqlScript += '\n';
     }
@@ -207,7 +207,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
     }
     sqlScript += '\n';
 
-    // POLÍTICAS RLS
+    // POLÃTICAS RLS
     const policies = (await client.queryObject<{
       tablename: string; policyname: string; permissive: string;
       roles: string[]; cmd: string; qual: string | null; with_check: string | null;
@@ -217,7 +217,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
       ORDER BY tablename, policyname
     `).rows;
     if (policies.length > 0) {
-      sqlScript += `-- ==== POLÍTICAS RLS ====\n`;
+      sqlScript += `-- ==== POLÃTICAS RLS ====\n`;
       for (const p of policies) {
         const cmd = p.cmd === '*' ? 'ALL' : p.cmd;
         sqlScript += `CREATE POLICY "${p.policyname}" ON public.${p.tablename} AS ${p.permissive} FOR ${cmd} TO ${p.roles.join(', ')}`;
@@ -228,7 +228,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
       sqlScript += '\n';
     }
 
-    sqlScript += `-- Fin. Tablas:${tables.length} Funciones:${functions.length} Triggers:${triggers.length} Políticas:${policies.length}\n`;
+    sqlScript += `-- Fin. Tablas:${tables.length} Funciones:${functions.length} Triggers:${triggers.length} PolÃ­ticas:${policies.length}\n`;
 
     await client.end();
 

@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
@@ -37,7 +37,7 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({
           success: false,
           status: "misconfigured",
-          message: `Faltan variables de configuración SMTP: ${missing.join(", ")}`,
+          message: `Faltan variables de configuraciÃ³n SMTP: ${missing.join(", ")}`,
           config: {
             host: smtpHost || "No configurado",
             port: smtpPort || "No configurado",
@@ -57,15 +57,15 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Attempting SMTP connection to ${smtpHost}:${port}...`);
 
     // IMPORTANTE:
-    // - En este runtime, STARTTLS (587) suele fallar de forma no-determinista con librerías SMTP.
-    // - Para pruebas de conectividad, sólo soportamos de forma confiable TLS implícito (465).
+    // - En este runtime, STARTTLS (587) suele fallar de forma no-determinista con librerÃ­as SMTP.
+    // - Para pruebas de conectividad, sÃ³lo soportamos de forma confiable TLS implÃ­cito (465).
     if (port !== 465) {
       return new Response(
         JSON.stringify({
           success: false,
           status: "warning",
           message:
-            "La verificación SMTP con STARTTLS (587) no es confiable en este entorno cloud. Para probar SMTP aquí, usa puerto 465 (TLS implícito) o migra a un proveedor HTTP (recomendado) como Resend.",
+            "La verificaciÃ³n SMTP con STARTTLS (587) no es confiable en este entorno cloud. Para probar SMTP aquÃ­, usa puerto 465 (TLS implÃ­cito) o migra a un proveedor HTTP (recomendado) como Resend.",
           config: {
             host: smtpHost,
             port: smtpPort,
@@ -92,12 +92,12 @@ const handler = async (req: Request): Promise<Response> => {
           success: false,
           status: "misconfigured",
           message:
-            "SMTP_FROM_EMAIL no es un correo válido. Usa formato email@dominio.com (o Nombre <email@dominio.com>).",
+            "SMTP_FROM_EMAIL no es un correo vÃ¡lido. Usa formato email@dominio.com (o Nombre <email@dominio.com>).",
           config: {
             host: smtpHost,
             port: smtpPort,
             user: smtpUser ? "Configurado" : "No configurado",
-            from: "Formato inválido",
+            from: "Formato invÃ¡lido",
           },
         }),
         {
@@ -113,7 +113,7 @@ const handler = async (req: Request): Promise<Response> => {
         connection: {
           hostname: smtpHost,
           port,
-          tls: true, // 465 = TLS implícito
+          tls: true, // 465 = TLS implÃ­cito
           auth: {
             username: smtpUser,
             password: smtpPassword,
@@ -124,9 +124,9 @@ const handler = async (req: Request): Promise<Response> => {
       await client.send({
         from: fromEmail,
         to: "falagian@gmail.com",
-        subject: "Test de conexión SMTP - QualMedical",
+        subject: "Test de conexiÃ³n SMTP - QualMedical",
         content:
-          "Este es un mensaje de prueba para verificar la configuración SMTP (TLS 465).",
+          "Este es un mensaje de prueba para verificar la configuraciÃ³n SMTP (TLS 465).",
       });
 
       console.log("SMTP connection successful!");
@@ -135,7 +135,7 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({
           success: true,
           status: "connected",
-          message: "Conexión SMTP exitosa (TLS 465)",
+          message: "ConexiÃ³n SMTP exitosa (TLS 465)",
           config: {
             host: smtpHost,
             port: smtpPort,
@@ -165,16 +165,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (details.includes("authentication") || details.includes("535") || details.includes("auth")) {
       errorType = "auth_error";
-      errorMessage = "Error de autenticación SMTP. Verifica el usuario y contraseña.";
+      errorMessage = "Error de autenticaciÃ³n SMTP. Verifica el usuario y contraseÃ±a.";
     } else if (details.includes("timeout") || details.includes("ETIMEDOUT")) {
       errorType = "timeout";
       errorMessage = "Tiempo de espera agotado. El servidor SMTP no responde.";
     } else if (details.includes("ENOTFOUND") || details.includes("getaddrinfo")) {
       errorType = "host_not_found";
-      errorMessage = "No se encontró el servidor SMTP. Verifica el host.";
+      errorMessage = "No se encontrÃ³ el servidor SMTP. Verifica el host.";
     } else if (details.includes("ECONNREFUSED")) {
       errorType = "connection_refused";
-      errorMessage = "Conexión rechazada. Verifica el puerto y configuración TLS.";
+      errorMessage = "ConexiÃ³n rechazada. Verifica el puerto y configuraciÃ³n TLS.";
     }
 
     return new Response(

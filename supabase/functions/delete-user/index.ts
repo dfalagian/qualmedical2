@@ -1,8 +1,8 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
-// Schema de validación para eliminar usuario
+// Schema de validaciÃ³n para eliminar usuario
 const DeleteUserSchema = z.object({
   userId: z.string().uuid()
 });
@@ -31,7 +31,7 @@ serve(async (req) => {
     // Get the JWT token and decode it to get the user ID
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('No se proporcionó autorización');
+      throw new Error('No se proporcionÃ³ autorizaciÃ³n');
     }
 
     const token = authHeader.replace('Bearer ', '');
@@ -66,7 +66,7 @@ serve(async (req) => {
       validatedData = DeleteUserSchema.parse(body);
     } catch (error) {
       console.error('Validation error:', error);
-      throw new Error('userId debe ser un UUID válido');
+      throw new Error('userId debe ser un UUID vÃ¡lido');
     }
 
     const { userId } = validatedData;
@@ -124,7 +124,7 @@ serve(async (req) => {
 
     if (deleteError) {
       console.error('Error deleting auth user:', deleteError);
-      throw new Error('Error al eliminar usuario de autenticación');
+      throw new Error('Error al eliminar usuario de autenticaciÃ³n');
     }
 
     console.log('User deleted successfully:', userId);

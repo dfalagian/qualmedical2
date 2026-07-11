@@ -65,6 +65,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { BatchSelectionDialog } from "./BatchSelectionDialog";
 import { InventoryExitScanDialog } from "./InventoryExitScanDialog";
 import { EditApprovedQuoteDialog } from "./EditApprovedQuoteDialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Quote {
   id: string;
@@ -159,7 +160,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
-  const { approveQuote, cancelQuote, isApproving, isCancelling } = useQuoteActions();
+  const { approveQuote, cancelQuote, saveQuote, isApproving, isCancelling } = useQuoteActions();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -193,6 +194,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
   // Cancel confirmation
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [quoteToCancel, setQuoteToCancel] = useState<Quote | null>(null);
+  const [duplicateOnCancel, setDuplicateOnCancel] = useState(false);
   
   // Delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -205,6 +207,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
     id: string; folio: string; concepto: string | null;
     fecha_cotizacion: string; fecha_entrega: string | null;
     notes: string | null; client_id: string;
+    is_remision: boolean;
     client: { id: string; nombre_cliente: string };
     subtotal: number; total: number;
     items: Array<{
@@ -357,6 +360,7 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
         fecha_entrega: quote.fecha_entrega,
         notes: quote.notes ?? null,
         client_id: quote.client.id,
+        is_remision: quote.is_remision,
         client: { id: quote.client.id, nombre_cliente: quote.client.nombre_cliente },
         subtotal: quote.subtotal,
         total: quote.total,
@@ -575,15 +579,68 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
   // Start cancel process
   const handleStartCancel = (quote: Quote) => {
     setQuoteToCancel(quote);
+    setDuplicateOnCancel(false);
     setCancelDialogOpen(true);
+  };
+
+  // Duplicate a quote into a new draft, returns the new folio
+  const duplicateQuote = async (quote: Quote): Promise<string> => {
+    const items = await fetchQuoteItems(quote.id);
+    const toDate = (s: string | null) => (s ? new Date(`${s}T12:00:00`) : null);
+
+    const { data: folioData, error: folioError } = await supabase.rpc("generate_quote_folio");
+    if (folioError) throw folioError;
+    const folioNueva = folioData as string;
+
+    await saveQuote({
+      clientId: quote.client.id,
+      folio: folioNueva,
+      concepto: quote.concepto || "",
+      fechaCotizacion: new Date(),
+      fechaEntrega: toDate(quote.fecha_entrega),
+      facturaAnterior: quote.factura_anterior || undefined,
+      fechaFacturaAnterior: toDate(quote.fecha_factura_anterior || null) || undefined,
+      montoFacturaAnterior: quote.monto_factura_anterior || undefined,
+      subtotal: quote.subtotal,
+      total: quote.total,
+      notes: quote.notes || undefined,
+      items: items.map((item) => ({
+        id: item.id,
+        product_id: item.product_id,
+        batch_id: item.batch_id,
+        warehouse_id: item.warehouse_id ?? null,
+        nombre_producto: item.nombre_producto,
+        marca: item.marca,
+        lote: item.lote,
+        fecha_caducidad: item.fecha_caducidad,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario,
+        importe: item.importe,
+        tipo_precio: item.tipo_precio,
+        categoria: item.categoria,
+        tax_rate: item.tax_rate,
+        is_sub_product: item.is_sub_product,
+        parent_item_id: item.parent_item_id,
+      })) as any,
+    });
+
+    return folioNueva;
   };
 
   // Confirm cancel
   const handleConfirmCancel = async () => {
     if (!quoteToCancel) return;
-    
+
     try {
       await cancelQuote(quoteToCancel.id);
+      if (duplicateOnCancel) {
+        try {
+          const folioNueva = await duplicateQuote(quoteToCancel);
+          toast.success(`Cotización duplicada como borrador: ${folioNueva}`);
+        } catch (dupError: any) {
+          toast.error("Cancelada, pero no se pudo duplicar: " + dupError.message);
+        }
+      }
       setCancelDialogOpen(false);
       setQuoteToCancel(null);
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
@@ -1089,6 +1146,16 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
               Esta acción devolverá el stock de los productos al inventario.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="flex items-center gap-2 rounded-md border p-3">
+            <Checkbox
+              id="dup-on-cancel"
+              checked={duplicateOnCancel}
+              onCheckedChange={(v) => setDuplicateOnCancel(v === true)}
+            />
+            <label htmlFor="dup-on-cancel" className="text-sm cursor-pointer">
+              Duplicar esta cotización en una nueva (borrador)
+            </label>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isCancelling}>No, mantener</AlertDialogCancel>
             <AlertDialogAction

@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
@@ -41,7 +41,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (!smtpHost || !smtpUser || !smtpPassword || !smtpFromEmail) {
       console.error("Missing SMTP configuration");
       return new Response(
-        JSON.stringify({ error: "Configuración de correo incompleta. Contacta al administrador." }),
+        JSON.stringify({ error: "ConfiguraciÃ³n de correo incompleta. Contacta al administrador." }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -51,7 +51,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (!emailRegex.test(smtpFromEmail)) {
       console.error("Invalid SMTP_FROM_EMAIL format:", smtpFromEmail);
       return new Response(
-        JSON.stringify({ error: "Formato de correo remitente inválido. Contacta al administrador." }),
+        JSON.stringify({ error: "Formato de correo remitente invÃ¡lido. Contacta al administrador." }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -73,7 +73,7 @@ const handler = async (req: Request): Promise<Response> => {
       // Don't reveal if email exists or not for security
       console.log("Email not found, returning success anyway for security");
       return new Response(
-        JSON.stringify({ success: true, message: "Si el correo existe, recibirás un enlace de recuperación" }),
+        JSON.stringify({ success: true, message: "Si el correo existe, recibirÃ¡s un enlace de recuperaciÃ³n" }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -89,7 +89,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (linkError) {
       console.error("Error generating recovery link:", linkError);
-      throw new Error("Error al generar enlace de recuperación");
+      throw new Error("Error al generar enlace de recuperaciÃ³n");
     }
 
     console.log("Recovery link generated successfully");
@@ -116,7 +116,7 @@ const handler = async (req: Request): Promise<Response> => {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Recuperación de Contraseña</title>
+  <title>RecuperaciÃ³n de ContraseÃ±a</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
@@ -128,7 +128,7 @@ const handler = async (req: Request): Promise<Response> => {
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); border-radius: 12px 12px 0 0;">
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
-                🔐 Recuperación de Contraseña
+                ðŸ” RecuperaciÃ³n de ContraseÃ±a
               </h1>
             </td>
           </tr>
@@ -140,7 +140,7 @@ const handler = async (req: Request): Promise<Response> => {
                 Hola <strong>${userName}</strong>,
               </p>
               <p style="margin: 0 0 20px; color: #555555; font-size: 16px; line-height: 1.6;">
-                Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>QualMedical</strong>.
+                Recibimos una solicitud para restablecer la contraseÃ±a de tu cuenta en <strong>QualMedical</strong>.
               </p>
               
               <!-- Button -->
@@ -149,24 +149,24 @@ const handler = async (req: Request): Promise<Response> => {
                   <td style="text-align: center;">
                     <a href="${recoveryLink}" 
                        style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);">
-                      Restablecer Contraseña
+                      Restablecer ContraseÃ±a
                     </a>
                   </td>
                 </tr>
               </table>
               
               <p style="margin: 20px 0; color: #666666; font-size: 14px; line-height: 1.6;">
-                Si no solicitaste este cambio, puedes ignorar este correo. Tu contraseña permanecerá sin cambios.
+                Si no solicitaste este cambio, puedes ignorar este correo. Tu contraseÃ±a permanecerÃ¡ sin cambios.
               </p>
               
               <p style="margin: 20px 0; color: #888888; font-size: 13px; line-height: 1.6;">
-                Este enlace expirará en 24 horas por seguridad.
+                Este enlace expirarÃ¡ en 24 horas por seguridad.
               </p>
               
               <!-- Link fallback -->
               <div style="margin-top: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 8px;">
                 <p style="margin: 0 0 10px; color: #666666; font-size: 13px;">
-                  Si el botón no funciona, copia y pega este enlace en tu navegador:
+                  Si el botÃ³n no funciona, copia y pega este enlace en tu navegador:
                 </p>
                 <p style="margin: 0; word-break: break-all; color: #1e3a5f; font-size: 12px;">
                   ${recoveryLink}
@@ -179,10 +179,10 @@ const handler = async (req: Request): Promise<Response> => {
           <tr>
             <td style="padding: 30px 40px; background-color: #f8f9fa; border-radius: 0 0 12px 12px; text-align: center;">
               <p style="margin: 0; color: #888888; font-size: 13px;">
-                © 2026 QualMedical - Portal de Proveedores
+                Â© 2026 QualMedical - Portal de Proveedores
               </p>
               <p style="margin: 10px 0 0; color: #aaaaaa; font-size: 12px;">
-                Este es un correo automático, por favor no respondas a este mensaje.
+                Este es un correo automÃ¡tico, por favor no respondas a este mensaje.
               </p>
             </td>
           </tr>
@@ -196,15 +196,15 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     if (!recoveryLink) {
-      throw new Error("No se pudo generar el enlace de recuperación");
+      throw new Error("No se pudo generar el enlace de recuperaciÃ³n");
     }
 
     try {
       await client.send({
         from: smtpFromEmail,
         to: email,
-        subject: "🔐 Recupera tu contraseña - QualMedical",
-        content: `Hola ${userName}, haz clic en este enlace para restablecer tu contraseña: ${recoveryLink}`,
+        subject: "ðŸ” Recupera tu contraseÃ±a - QualMedical",
+        content: `Hola ${userName}, haz clic en este enlace para restablecer tu contraseÃ±a: ${recoveryLink}`,
         html: emailHtml,
       });
     } catch (smtpError: any) {
@@ -216,14 +216,14 @@ const handler = async (req: Request): Promise<Response> => {
         return new Response(
           JSON.stringify({
             error:
-              "Credenciales SMTP inválidas. Verifica SMTP_USER/SMTP_PASSWORD (muchas veces es una contraseña de aplicación).",
+              "Credenciales SMTP invÃ¡lidas. Verifica SMTP_USER/SMTP_PASSWORD (muchas veces es una contraseÃ±a de aplicaciÃ³n).",
           }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
 
       return new Response(
-        JSON.stringify({ error: "No se pudo enviar el correo por SMTP. Revisa la configuración." }),
+        JSON.stringify({ error: "No se pudo enviar el correo por SMTP. Revisa la configuraciÃ³n." }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     } finally {
@@ -237,14 +237,14 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Recovery email sent successfully to:", email);
 
     return new Response(
-      JSON.stringify({ success: true, message: "Correo de recuperación enviado" }),
+      JSON.stringify({ success: true, message: "Correo de recuperaciÃ³n enviado" }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
 
   } catch (error: any) {
     console.error("Error in send-recovery-email:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Error al enviar correo de recuperación" }),
+      JSON.stringify({ error: error.message || "Error al enviar correo de recuperaciÃ³n" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }

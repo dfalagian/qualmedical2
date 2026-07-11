@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,7 +15,7 @@ serve(async (req) => {
     
     if (!imageBase64) {
       return new Response(
-        JSON.stringify({ error: "No se proporcionó imagen" }),
+        JSON.stringify({ error: "No se proporcionÃ³ imagen" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -30,29 +30,29 @@ serve(async (req) => {
     const mediaType = dataUrlMatch ? dataUrlMatch[1] : "image/jpeg";
     const rawBase64 = dataUrlMatch ? dataUrlMatch[2] : imageBase64;
 
-    console.log("Iniciando análisis de imagen con IA mejorada...");
+    console.log("Iniciando anÃ¡lisis de imagen con IA mejorada...");
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: `Eres un experto en análisis de inventarios médicos con visión artificial avanzada.
-Tu tarea es contar con máxima precisión el número de cajas de medicamentos en imágenes.
+            parts: [{ text: `Eres un experto en anÃ¡lisis de inventarios mÃ©dicos con visiÃ³n artificial avanzada.
+Tu tarea es contar con mÃ¡xima precisiÃ³n el nÃºmero de cajas de medicamentos en imÃ¡genes.
 
-INSTRUCCIONES CRÍTICAS:
+INSTRUCCIONES CRÃTICAS:
 1. Cuenta SOLO cajas completas y claramente visibles
 2. NO cuentes cajas parcialmente visibles o cortadas por el borde
 3. Si hay cajas apiladas, cuenta cada caja individual visible
-4. Si la calidad de imagen es baja, indícalo en tu análisis
+4. Si la calidad de imagen es baja, indÃ­calo en tu anÃ¡lisis
 5. Proporciona un nivel de confianza en tu conteo (Alto/Medio/Bajo)
-6. Identifica si hay etiquetas o códigos visibles en las cajas
-7. Describe la organización espacial de las cajas
-8. Detecta si hay anomalías (cajas dañadas, mal etiquetadas, etc.)
+6. Identifica si hay etiquetas o cÃ³digos visibles en las cajas
+7. Describe la organizaciÃ³n espacial de las cajas
+8. Detecta si hay anomalÃ­as (cajas daÃ±adas, mal etiquetadas, etc.)
 
-IMPORTANTE: Sé conservador en el conteo. Es mejor reportar menos cajas con alta confianza que más cajas con incertidumbre.` }]
+IMPORTANTE: SÃ© conservador en el conteo. Es mejor reportar menos cajas con alta confianza que mÃ¡s cajas con incertidumbre.` }]
           },
           contents: [
             {
@@ -65,22 +65,22 @@ IMPORTANTE: Sé conservador en el conteo. Es mejor reportar menos cajas con alta
                   }
                 },
                 {
-                  text: `Analiza esta imagen de inventario médico y proporciona:
+                  text: `Analiza esta imagen de inventario mÃ©dico y proporciona:
 
 FORMATO DE RESPUESTA (usa EXACTAMENTE este formato):
 ---
-Total de cajas: [número entero]
+Total de cajas: [nÃºmero entero]
 Confianza: [Alto/Medio/Bajo]
 Calidad de imagen: [Excelente/Buena/Regular/Mala]
 ---
 
-DETALLES DEL ANÁLISIS:
-1. Distribución espacial: [describe cómo están organizadas las cajas]
-2. Características visibles: [describe etiquetas, códigos, condición de las cajas]
-3. Observaciones importantes: [cualquier detalle relevante o anomalía]
+DETALLES DEL ANÃLISIS:
+1. DistribuciÃ³n espacial: [describe cÃ³mo estÃ¡n organizadas las cajas]
+2. CaracterÃ­sticas visibles: [describe etiquetas, cÃ³digos, condiciÃ³n de las cajas]
+3. Observaciones importantes: [cualquier detalle relevante o anomalÃ­a]
 4. Recomendaciones: [sugerencias para mejorar el conteo si aplica]
 
-Si la calidad de imagen es insuficiente para un conteo preciso, indícalo claramente.`
+Si la calidad de imagen es insuficiente para un conteo preciso, indÃ­calo claramente.`
                 }
               ]
             }
@@ -97,14 +97,14 @@ Si la calidad de imagen es insuficiente para un conteo preciso, indícalo claram
       if (response.status === 429) {
         console.error("Rate limit alcanzado");
         return new Response(
-          JSON.stringify({ error: "Límite de solicitudes excedido. Intenta de nuevo más tarde." }),
+          JSON.stringify({ error: "LÃ­mite de solicitudes excedido. Intenta de nuevo mÃ¡s tarde." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       if (response.status === 402) {
-        console.error("Créditos insuficientes");
+        console.error("CrÃ©ditos insuficientes");
         return new Response(
-          JSON.stringify({ error: "Créditos insuficientes. Por favor, añade fondos a tu cuenta." }),
+          JSON.stringify({ error: "CrÃ©ditos insuficientes. Por favor, aÃ±ade fondos a tu cuenta." }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -120,12 +120,12 @@ Si la calidad de imagen es insuficiente para un conteo preciso, indícalo claram
     const analysis = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!analysis) {
-      throw new Error("No se recibió respuesta del modelo");
+      throw new Error("No se recibiÃ³ respuesta del modelo");
     }
 
-    console.log("Análisis recibido:", analysis);
+    console.log("AnÃ¡lisis recibido:", analysis);
 
-    // Extraer datos estructurados del análisis
+    // Extraer datos estructurados del anÃ¡lisis
     const countMatch = analysis.match(/Total de cajas:\s*(\d+)/i);
     const confidenceMatch = analysis.match(/Confianza:\s*(Alto|Medio|Bajo)/i);
     const qualityMatch = analysis.match(/Calidad de imagen:\s*(Excelente|Buena|Regular|Mala)/i);
@@ -134,22 +134,22 @@ Si la calidad de imagen es insuficiente para un conteo preciso, indícalo claram
     const confidence = confidenceMatch ? confidenceMatch[1] : "Desconocido";
     const imageQuality = qualityMatch ? qualityMatch[1] : "Desconocido";
 
-    // Validaciones automáticas
+    // Validaciones automÃ¡ticas
     const warnings = [];
     if (count === null) {
-      warnings.push("⚠️ No se pudo extraer un conteo numérico del análisis");
+      warnings.push("âš ï¸ No se pudo extraer un conteo numÃ©rico del anÃ¡lisis");
     }
     if (confidence === "Bajo") {
-      warnings.push("⚠️ El análisis tiene confianza baja - considera tomar otra foto");
+      warnings.push("âš ï¸ El anÃ¡lisis tiene confianza baja - considera tomar otra foto");
     }
     if (imageQuality === "Mala" || imageQuality === "Regular") {
-      warnings.push("⚠️ Calidad de imagen subóptima - se recomienda mejor iluminación");
+      warnings.push("âš ï¸ Calidad de imagen subÃ³ptima - se recomienda mejor iluminaciÃ³n");
     }
     if (count && count === 0) {
-      warnings.push("⚠️ No se detectaron cajas en la imagen");
+      warnings.push("âš ï¸ No se detectaron cajas en la imagen");
     }
 
-    console.log("Conteo extraído:", count);
+    console.log("Conteo extraÃ­do:", count);
     console.log("Confianza:", confidence);
     console.log("Calidad de imagen:", imageQuality);
     console.log("Advertencias:", warnings);
@@ -163,7 +163,7 @@ Si la calidad de imagen es insuficiente para un conteo preciso, indícalo claram
         warnings: warnings.length > 0 ? warnings : undefined,
         success: true,
         metadata: {
-          model: "gemini-2.0-flash",
+          model: "gemini-2.5-flash",
           timestamp: new Date().toISOString(),
         }
       }),

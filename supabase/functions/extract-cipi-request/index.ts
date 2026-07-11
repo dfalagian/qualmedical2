@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     await supabase.from('cipi_requests').update({ extraction_status: 'processing' }).eq('id', requestId);
 
     const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
-    if (!GEMINI_API_KEY) throw new Error('GEMINIKEY no está configurado');
+    if (!GEMINI_API_KEY) throw new Error('GEMINIKEY no estÃ¡ configurado');
 
     const contentParts: any[] = [];
     let hasContent = false;
@@ -103,11 +103,11 @@ Deno.serve(async (req) => {
     }
 
     contentParts.unshift({
-      text: `Analiza el documento/texto de una solicitud médica (CIPI, CIPI Pro o CEMI) y extrae la información.
+      text: `Analiza el documento/texto de una solicitud mÃ©dica (CIPI, CIPI Pro o CEMI) y extrae la informaciÃ³n.
 
-IMPORTANTE: Excluye cualquier fila que NO sea un producto real. Las filas que contienen textos informativos como condiciones de pago, métodos de pago, datos bancarios (CLABE, cuenta, banco), notas legales, avisos sobre IVA, honorarios médicos, cláusulas, instrucciones de pago o cualquier texto que no sea un producto médico concreto, NO deben incluirse en el listado. Ejemplos de filas a EXCLUIR: "Los precios ya incluyen IVA en los rubros de servicios e insumos médicos...", "Los métodos de pago son: pago con terminal y transferencia electrónica: BANCOMER...", "La cotización incluye honorarios médicos, preparación, suministro y aplicación de infusión.". Solo incluye filas que representen medicamentos, insumos, soluciones u otros productos médicos concretos con descripción de producto real, cantidad y precio.
+IMPORTANTE: Excluye cualquier fila que NO sea un producto real. Las filas que contienen textos informativos como condiciones de pago, mÃ©todos de pago, datos bancarios (CLABE, cuenta, banco), notas legales, avisos sobre IVA, honorarios mÃ©dicos, clÃ¡usulas, instrucciones de pago o cualquier texto que no sea un producto mÃ©dico concreto, NO deben incluirse en el listado. Ejemplos de filas a EXCLUIR: "Los precios ya incluyen IVA en los rubros de servicios e insumos mÃ©dicos...", "Los mÃ©todos de pago son: pago con terminal y transferencia electrÃ³nica: BANCOMER...", "La cotizaciÃ³n incluye honorarios mÃ©dicos, preparaciÃ³n, suministro y aplicaciÃ³n de infusiÃ³n.". Solo incluye filas que representen medicamentos, insumos, soluciones u otros productos mÃ©dicos concretos con descripciÃ³n de producto real, cantidad y precio.
 
-Responde ÚNICAMENTE con JSON válido:
+Responde ÃšNICAMENTE con JSON vÃ¡lido:
 {
   "datos_encabezado": {
     "empresa": "", "razon_social": "", "rfc": "", "cfdi": "",
@@ -124,17 +124,17 @@ Responde ÚNICAMENTE con JSON válido:
   ],
   "subtotal": 0, "impuestos": 0, "total": 0
 }
-Si algún campo no está disponible, omítelo. No inventes datos.`,
+Si algÃºn campo no estÃ¡ disponible, omÃ­telo. No inventes datos.`,
     });
 
     const aiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: 'Experto en documentos médicos mexicanos. Extrae info estructurada. Responde siempre en JSON válido.' }]
+            parts: [{ text: 'Experto en documentos mÃ©dicos mexicanos. Extrae info estructurada. Responde siempre en JSON vÃ¡lido.' }]
           },
           contents: [{ role: 'user', parts: contentParts }],
           generationConfig: { maxOutputTokens: 4096 },
@@ -176,13 +176,13 @@ Si algún campo no está disponible, omítelo. No inventes datos.`,
             (!p.marca || p.marca === '') &&
             desc.length > 100
           );
-          const hasPaymentKeywords = /m[eé]todos?\s+de\s+pago|transferencia\s+electr[oó]nica|datos?\s+bancari|clabe|n[uú]mero\s+de\s+cuenta|condiciones\s+de\s+pago/i.test(desc);
+          const hasPaymentKeywords = /m[eÃ©]todos?\s+de\s+pago|transferencia\s+electr[oÃ³]nica|datos?\s+bancari|clabe|n[uÃº]mero\s+de\s+cuenta|condiciones\s+de\s+pago/i.test(desc);
           return !isInformational && !hasPaymentKeywords;
         })
         .map((p: any) => ({
           cipi_request_id: requestId,
           categoria: p.categoria || null,
-          descripcion: p.descripcion || 'Sin descripción',
+          descripcion: p.descripcion || 'Sin descripciÃ³n',
           marca: p.marca || null,
           lote: p.lote || null,
           caducidad: p.caducidad || null,

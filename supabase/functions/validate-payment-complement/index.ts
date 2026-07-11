@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
@@ -33,7 +33,7 @@ serve(async (req) => {
 
     if (invoiceError || !invoiceData) {
       console.error('Error obteniendo factura:', invoiceError);
-      throw new Error('No se pudo obtener la información de la factura');
+      throw new Error('No se pudo obtener la informaciÃ³n de la factura');
     }
 
     const invoiceUUID = invoiceData.uuid;
@@ -62,11 +62,11 @@ serve(async (req) => {
       mimeType = 'image/png';
     }
 
-    console.log('Archivo descargado, tamaño:', fileBuffer.byteLength);
+    console.log('Archivo descargado, tamaÃ±o:', fileBuffer.byteLength);
 
     const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
     if (!GEMINI_API_KEY) {
-      throw new Error('GEMINIKEY no está configurada');
+      throw new Error('GEMINIKEY no estÃ¡ configurada');
     }
 
     console.log('Llamando a Gemini para extraer UUID del complemento...');
@@ -74,13 +74,13 @@ serve(async (req) => {
     const isPdf = mimeType === 'application/pdf';
 
     const aiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: 'Eres un experto en análisis de Complementos de Pago CFDI mexicanos. Extraes información estructurada con precisión.' }]
+            parts: [{ text: 'Eres un experto en anÃ¡lisis de Complementos de Pago CFDI mexicanos. Extraes informaciÃ³n estructurada con precisiÃ³n.' }]
           },
           tools: [
             {
@@ -97,11 +97,11 @@ serve(async (req) => {
                       },
                       monto_pagado: {
                         type: 'number',
-                        description: 'Monto pagado en el complemento, o null si no está visible'
+                        description: 'Monto pagado en el complemento, o null si no estÃ¡ visible'
                       },
                       fecha_pago: {
                         type: 'string',
-                        description: 'Fecha de pago en formato YYYY-MM-DD, o null si no está visible'
+                        description: 'Fecha de pago en formato YYYY-MM-DD, o null si no estÃ¡ visible'
                       },
                       uuid_complemento: {
                         type: 'string',
@@ -133,14 +133,14 @@ serve(async (req) => {
                 {
                   text: `Este es un Complemento de Pago CFDI mexicano. Necesito que extraigas el UUID del documento fiscal digital relacionado.
 
-**Instrucciones CRÍTICAS:**
+**Instrucciones CRÃTICAS:**
 
-1. **Busca el UUID del documento relacionado** - En un complemento de pago CFDI, hay una sección llamada "Documentos Relacionados" o "DoctoRelacionado" que contiene el UUID de la factura que se está pagando.
+1. **Busca el UUID del documento relacionado** - En un complemento de pago CFDI, hay una secciÃ³n llamada "Documentos Relacionados" o "DoctoRelacionado" que contiene el UUID de la factura que se estÃ¡ pagando.
 
-2. **El UUID tiene formato estándar** - Es una cadena de 36 caracteres con formato: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (8-4-4-4-12 caracteres hexadecimales separados por guiones).
+2. **El UUID tiene formato estÃ¡ndar** - Es una cadena de 36 caracteres con formato: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (8-4-4-4-12 caracteres hexadecimales separados por guiones).
 
 3. **Ubicaciones comunes del UUID:**
-   - En la sección "Documentos Relacionados" o "DoctoRelacionado"
+   - En la secciÃ³n "Documentos Relacionados" o "DoctoRelacionado"
    - Campo "IdDocumento" o "UUID Documento"
    - Puede aparecer como "Folio Fiscal del Documento" o similar
 
@@ -148,9 +148,9 @@ serve(async (req) => {
    - El UUID del propio complemento (Folio Fiscal del Complemento)
    - El UUID debe ser el del DOCUMENTO RELACIONADO/PAGADO
 
-5. **Extrae también:**
+5. **Extrae tambiÃ©n:**
    - El monto pagado en este complemento (campo "ImpPagado" o similar)
-   - La fecha de pago si está visible`
+   - La fecha de pago si estÃ¡ visible`
                 }
               ]
             }
@@ -172,24 +172,24 @@ serve(async (req) => {
     const parts = aiData.candidates?.[0]?.content?.parts || [];
     const functionCallPart = parts.find((p: any) => p.functionCall);
     if (!functionCallPart) {
-      throw new Error('No se recibió respuesta válida de la IA');
+      throw new Error('No se recibiÃ³ respuesta vÃ¡lida de la IA');
     }
 
     const extractedInfo = functionCallPart.functionCall.args;
 
-    console.log('Información extraída del complemento:', extractedInfo);
+    console.log('InformaciÃ³n extraÃ­da del complemento:', extractedInfo);
 
     const extractedUUID = extractedInfo.uuid_documento_relacionado?.toUpperCase()?.trim();
     const normalizedInvoiceUUID = invoiceUUID.toUpperCase().trim();
 
-    console.log('UUID extraído del complemento:', extractedUUID);
+    console.log('UUID extraÃ­do del complemento:', extractedUUID);
     console.log('UUID de la factura (normalizado):', normalizedInvoiceUUID);
 
     if (!extractedUUID) {
       return new Response(
         JSON.stringify({
           valid: false,
-          error: 'No se pudo extraer el UUID del documento relacionado del complemento de pago. Asegúrese de que el archivo sea legible y contenga un complemento de pago CFDI válido.',
+          error: 'No se pudo extraer el UUID del documento relacionado del complemento de pago. AsegÃºrese de que el archivo sea legible y contenga un complemento de pago CFDI vÃ¡lido.',
           invoiceUUID: normalizedInvoiceUUID,
           extractedUUID: null,
           extractedInfo
@@ -201,7 +201,7 @@ serve(async (req) => {
     const uuidsMatch = extractedUUID === normalizedInvoiceUUID;
 
     if (!uuidsMatch) {
-      console.warn('⚠️ UUID NO COINCIDE');
+      console.warn('âš ï¸ UUID NO COINCIDE');
       console.warn('UUID Factura:', normalizedInvoiceUUID);
       console.warn('UUID Complemento:', extractedUUID);
 
@@ -218,7 +218,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('✅ UUID VÁLIDO - El complemento corresponde a la factura');
+    console.log('âœ… UUID VÃLIDO - El complemento corresponde a la factura');
 
     return new Response(
       JSON.stringify({

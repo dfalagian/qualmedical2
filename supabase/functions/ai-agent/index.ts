@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -7,14 +7,14 @@ const corsHeaders = {
 };
 
 const tools = [
-  // ── CONSULTAS (solo lectura) ──────────────────────────────────────────────
+  // â”€â”€ CONSULTAS (solo lectura) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
     name: "consultar_stock",
     description: "Consulta el stock actual de productos en los almacenes.",
     input_schema: {
       type: "object",
       properties: {
-        almacen: { type: "string", description: "Nombre del almacén. Ej: 'Principal', 'CITIO'." },
+        almacen: { type: "string", description: "Nombre del almacÃ©n. Ej: 'Principal', 'CITIO'." },
         producto: { type: "string", description: "Nombre o parte del nombre del producto." },
         solo_con_stock: { type: "boolean", description: "Si true, solo devuelve productos con stock > 0." },
       },
@@ -27,8 +27,8 @@ const tools = [
       type: "object",
       properties: {
         estado: { type: "string", description: "Estado: 'borrador', 'aprobada', 'rechazada', 'cancelada'." },
-        limite: { type: "number", description: "Máximo de resultados. Default 10." },
-        folio: { type: "string", description: "Folio específico a buscar." },
+        limite: { type: "number", description: "MÃ¡ximo de resultados. Default 10." },
+        folio: { type: "string", description: "Folio especÃ­fico a buscar." },
       },
     },
   },
@@ -40,19 +40,19 @@ const tools = [
       properties: {
         producto: { type: "string", description: "Nombre o parte del nombre del producto." },
         tipo: { type: "string", description: "Tipo: 'entrada', 'salida', 'ajuste', 'transferencia'." },
-        limite: { type: "number", description: "Máximo de resultados. Default 20." },
-        referencia_id: { type: "string", description: "UUID de la cotización para ver sus movimientos." },
+        limite: { type: "number", description: "MÃ¡ximo de resultados. Default 20." },
+        referencia_id: { type: "string", description: "UUID de la cotizaciÃ³n para ver sus movimientos." },
       },
     },
   },
   {
     name: "consultar_productos",
-    description: "Busca productos en el catálogo con precios y stock.",
+    description: "Busca productos en el catÃ¡logo con precios y stock.",
     input_schema: {
       type: "object",
       properties: {
         busqueda: { type: "string", description: "Texto para buscar en nombre, marca o SKU." },
-        limite: { type: "number", description: "Máximo de resultados. Default 20." },
+        limite: { type: "number", description: "MÃ¡ximo de resultados. Default 20." },
       },
     },
   },
@@ -63,31 +63,31 @@ const tools = [
       type: "object",
       properties: {
         busqueda: { type: "string", description: "Nombre o RFC del cliente." },
-        limite: { type: "number", description: "Máximo de resultados. Default 10." },
+        limite: { type: "number", description: "MÃ¡ximo de resultados. Default 10." },
       },
     },
   },
 
-  // ── ACCIONES (requieren confirmación explícita del usuario) ───────────────
+  // â”€â”€ ACCIONES (requieren confirmaciÃ³n explÃ­cita del usuario) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
     name: "aprobar_cotizacion",
-    description: "Aprueba una cotización en estado borrador. SOLO ejecutar cuando el usuario haya confirmado explícitamente con 'sí', 'confirmo', 'procede' u otra confirmación clara. Nunca ejecutar sin confirmación.",
+    description: "Aprueba una cotizaciÃ³n en estado borrador. SOLO ejecutar cuando el usuario haya confirmado explÃ­citamente con 'sÃ­', 'confirmo', 'procede' u otra confirmaciÃ³n clara. Nunca ejecutar sin confirmaciÃ³n.",
     input_schema: {
       type: "object",
       properties: {
-        folio: { type: "string", description: "Folio de la cotización a aprobar. Ej: 'COT-QUAL-2026-001'." },
-        warehouse_id: { type: "string", description: "UUID del almacén desde donde se descuenta el stock." },
+        folio: { type: "string", description: "Folio de la cotizaciÃ³n a aprobar. Ej: 'COT-QUAL-2026-001'." },
+        warehouse_id: { type: "string", description: "UUID del almacÃ©n desde donde se descuenta el stock." },
       },
       required: ["folio", "warehouse_id"],
     },
   },
   {
     name: "rechazar_cotizacion",
-    description: "Rechaza una cotización. SOLO ejecutar cuando el usuario haya confirmado explícitamente.",
+    description: "Rechaza una cotizaciÃ³n. SOLO ejecutar cuando el usuario haya confirmado explÃ­citamente.",
     input_schema: {
       type: "object",
       properties: {
-        folio: { type: "string", description: "Folio de la cotización a rechazar." },
+        folio: { type: "string", description: "Folio de la cotizaciÃ³n a rechazar." },
         motivo: { type: "string", description: "Motivo del rechazo." },
       },
       required: ["folio"],
@@ -97,7 +97,7 @@ const tools = [
 
 async function executeTool(name: string, input: Record<string, unknown>, supabase: ReturnType<typeof createClient>) {
   try {
-    // ── CONSULTAS ────────────────────────────────────────────────────────────
+    // â”€â”€ CONSULTAS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (name === "consultar_stock") {
       let warehouseIds: string[] | null = null;
       let productIds: string[] | null = null;
@@ -105,12 +105,12 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
       if (input.almacen) {
         const { data } = await supabase.from("warehouses").select("id, name").ilike("name", `%${input.almacen}%`);
         warehouseIds = (data || []).map((w: { id: string }) => w.id);
-        if (warehouseIds.length === 0) return { error: `No se encontró almacén "${input.almacen}"` };
+        if (warehouseIds.length === 0) return { error: `No se encontrÃ³ almacÃ©n "${input.almacen}"` };
       }
       if (input.producto) {
         const { data } = await supabase.from("products").select("id").or(`name.ilike.%${input.producto}%,brand.ilike.%${input.producto}%`).eq("is_active", true);
         productIds = (data || []).map((p: { id: string }) => p.id);
-        if (productIds.length === 0) return { error: `No se encontró producto "${input.producto}"` };
+        if (productIds.length === 0) return { error: `No se encontrÃ³ producto "${input.producto}"` };
       }
 
       let query = supabase
@@ -167,7 +167,7 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
       if (input.producto) {
         const { data } = await supabase.from("products").select("id").or(`name.ilike.%${input.producto}%,brand.ilike.%${input.producto}%`);
         productIds = (data || []).map((p: { id: string }) => p.id);
-        if (productIds.length === 0) return { error: `No se encontró producto "${input.producto}"` };
+        if (productIds.length === 0) return { error: `No se encontrÃ³ producto "${input.producto}"` };
       }
 
       let query = supabase
@@ -230,20 +230,20 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
       return { total: (data || []).length, clientes: data };
     }
 
-    // ── ACCIONES ─────────────────────────────────────────────────────────────
+    // â”€â”€ ACCIONES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (name === "aprobar_cotizacion") {
       const { folio, warehouse_id } = input as { folio: string; warehouse_id: string };
 
-      // 1. Obtener la cotización
+      // 1. Obtener la cotizaciÃ³n
       const { data: quote, error: quoteError } = await supabase
         .from("quotes")
         .select("id, folio, status, total, quote_items(product_id, nombre_producto, cantidad)")
         .ilike("folio", `%${folio}%`)
         .single();
 
-      if (quoteError || !quote) return { error: `Cotización "${folio}" no encontrada` };
+      if (quoteError || !quote) return { error: `CotizaciÃ³n "${folio}" no encontrada` };
       if ((quote as Record<string, unknown>).status !== "borrador") {
-        return { error: `La cotización ${folio} ya está en estado "${(quote as Record<string, unknown>).status}" — solo se pueden aprobar cotizaciones en borrador` };
+        return { error: `La cotizaciÃ³n ${folio} ya estÃ¡ en estado "${(quote as Record<string, unknown>).status}" â€” solo se pueden aprobar cotizaciones en borrador` };
       }
 
       // 2. Verificar stock para cada item
@@ -310,11 +310,11 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
           new_stock: newStock,
           reference_type: "quote",
           reference_id: (quote as Record<string, unknown>).id,
-          notes: `Aprobación cotización ${folio} (agente IA)`,
+          notes: `AprobaciÃ³n cotizaciÃ³n ${folio} (agente IA)`,
         });
       }
 
-      // 4. Actualizar estado de la cotización
+      // 4. Actualizar estado de la cotizaciÃ³n
       const { error: statusError } = await supabase
         .from("quotes")
         .update({ status: "aprobada" })
@@ -324,7 +324,7 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
 
       return {
         success: true,
-        mensaje: `✅ Cotización ${folio} aprobada correctamente. Se descontaron ${items.length} producto(s) del stock.`,
+        mensaje: `âœ… CotizaciÃ³n ${folio} aprobada correctamente. Se descontaron ${items.length} producto(s) del stock.`,
       };
     }
 
@@ -337,9 +337,9 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
         .ilike("folio", `%${folio}%`)
         .single();
 
-      if (quoteError || !quote) return { error: `Cotización "${folio}" no encontrada` };
+      if (quoteError || !quote) return { error: `CotizaciÃ³n "${folio}" no encontrada` };
       if ((quote as Record<string, unknown>).status === "aprobada") {
-        return { error: `La cotización ${folio} ya está aprobada y no puede rechazarse` };
+        return { error: `La cotizaciÃ³n ${folio} ya estÃ¡ aprobada y no puede rechazarse` };
       }
 
       const { error } = await supabase
@@ -348,7 +348,7 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
         .eq("id", (quote as Record<string, unknown>).id);
 
       if (error) return { error: error.message };
-      return { success: true, mensaje: `✅ Cotización ${folio} rechazada.` };
+      return { success: true, mensaje: `âœ… CotizaciÃ³n ${folio} rechazada.` };
     }
 
     return { error: `Herramienta desconocida: ${name}` };
@@ -357,22 +357,22 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
   }
 }
 
-const SYSTEM_PROMPT = `Eres un agente de control e inteligencia para QualMedical2, una plataforma de gestión de inventario y ventas de productos médicos.
+const SYSTEM_PROMPT = `Eres un agente de control e inteligencia para QualMedical2, una plataforma de gestiÃ³n de inventario y ventas de productos mÃ©dicos.
 
 Tu rol es ayudar al equipo (especialmente a Ismael) a auditar, monitorear y operar el sistema.
 
-MODO SUPERVISADO — REGLA CRÍTICA:
+MODO SUPERVISADO â€” REGLA CRÃTICA:
 - Las herramientas "aprobar_cotizacion" y "rechazar_cotizacion" son acciones irreversibles.
-- NUNCA las ejecutes sin confirmación explícita del usuario.
-- Cuando el usuario pida aprobar o rechazar, primero consulta los datos, muestra un resumen claro de lo que vas a hacer y pregunta: "¿Confirmas que debo proceder?"
-- Solo ejecuta la acción cuando el usuario responda afirmativamente ("sí", "confirmo", "procede", "adelante" o similar).
+- NUNCA las ejecutes sin confirmaciÃ³n explÃ­cita del usuario.
+- Cuando el usuario pida aprobar o rechazar, primero consulta los datos, muestra un resumen claro de lo que vas a hacer y pregunta: "Â¿Confirmas que debo proceder?"
+- Solo ejecuta la acciÃ³n cuando el usuario responda afirmativamente ("sÃ­", "confirmo", "procede", "adelante" o similar).
 - Si hay duda, NO ejecutes.
 
 Comportamiento general:
-- Responde siempre en español
+- Responde siempre en espaÃ±ol
 - Usa las herramientas para obtener datos reales antes de responder
-- Presenta los datos de forma clara con listas cuando sea útil
-- Si detectas algo inusual (stock insuficiente, cotización ya procesada, etc.), avisa antes de actuar`;
+- Presenta los datos de forma clara con listas cuando sea Ãºtil
+- Si detectas algo inusual (stock insuficiente, cotizaciÃ³n ya procesada, etc.), avisa antes de actuar`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {

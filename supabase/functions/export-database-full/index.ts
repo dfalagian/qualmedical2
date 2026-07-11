@@ -1,4 +1,4 @@
-import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
+﻿import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
     let sqlScript = `-- QualMedical Database Full Backup (Schema + Data)
 -- Generated: ${new Date().toISOString()}
--- ADVERTENCIA: Contiene información sensible. Manéjelo con cuidado.
+-- ADVERTENCIA: Contiene informaciÃ³n sensible. ManÃ©jelo con cuidado.
 
 SET session_replication_role = 'replica';  -- Desactiva triggers/FKs durante la carga
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -182,7 +182,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
       sqlScript += '\n';
     }
 
-    // ÍNDICES (no PK/UNIQUE)
+    // ÃNDICES (no PK/UNIQUE)
     const indexes = (await client.queryObject<{ indexdef: string }>`
       SELECT indexdef FROM pg_indexes
       WHERE schemaname = 'public'
@@ -193,7 +193,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
       ORDER BY tablename, indexname
     `).rows;
     if (indexes.length > 0) {
-      sqlScript += `-- ==== ÍNDICES ====\n`;
+      sqlScript += `-- ==== ÃNDICES ====\n`;
       for (const i of indexes) sqlScript += `${i.indexdef};\n`;
       sqlScript += '\n';
     }
@@ -232,7 +232,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
     }
     sqlScript += '\n';
 
-    // POLÍTICAS
+    // POLÃTICAS
     const policies = (await client.queryObject<{
       tablename: string; policyname: string; permissive: string;
       roles: string[]; cmd: string; qual: string | null; with_check: string | null;
@@ -242,7 +242,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
       ORDER BY tablename, policyname
     `).rows;
     if (policies.length > 0) {
-      sqlScript += `-- ==== POLÍTICAS RLS ====\n`;
+      sqlScript += `-- ==== POLÃTICAS RLS ====\n`;
       for (const p of policies) {
         const cmd = p.cmd === '*' ? 'ALL' : p.cmd;
         sqlScript += `CREATE POLICY "${p.policyname}" ON public.${p.tablename} AS ${p.permissive} FOR ${cmd} TO ${p.roles.join(', ')}`;
@@ -253,7 +253,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
       sqlScript += '\n';
     }
 
-    // ==== DATOS de TODAS las tablas (paginación 1000) ====
+    // ==== DATOS de TODAS las tablas (paginaciÃ³n 1000) ====
     sqlScript += `-- ==== DATOS DE LAS TABLAS ====\n`;
     let totalRows = 0;
     const tableRowCounts: Record<string, number> = {};
@@ -293,7 +293,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
       }
     }
 
-    // Resetear secuencias al máximo valor existente
+    // Resetear secuencias al mÃ¡ximo valor existente
     if (sequences.length > 0) {
       sqlScript += `\n-- ==== RESET SECUENCIAS ====\n`;
       for (const s of sequences) {
@@ -302,7 +302,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
     }
 
     sqlScript += `\nSET session_replication_role = 'origin';\n`;
-    sqlScript += `\n-- Tablas:${tables.length} Funciones:${functions.length} Triggers:${triggers.length} Políticas:${policies.length} Filas:${totalRows}\n`;
+    sqlScript += `\n-- Tablas:${tables.length} Funciones:${functions.length} Triggers:${triggers.length} PolÃ­ticas:${policies.length} Filas:${totalRows}\n`;
 
     await client.end();
 

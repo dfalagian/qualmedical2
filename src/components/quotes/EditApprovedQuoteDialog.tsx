@@ -44,6 +44,7 @@ interface AdminEditQuote {
   fecha_entrega: string | null;
   notes: string | null;
   client_id: string;
+  is_remision: boolean;
   client: { id: string; nombre_cliente: string };
   subtotal: number;
   total: number;
@@ -73,6 +74,7 @@ export function EditApprovedQuoteDialog({
   const [notes, setNotes] = useState("");
   const [motivo, setMotivo] = useState("");
   const [itemPrices, setItemPrices] = useState<Record<string, number>>({});
+  const [isRemision, setIsRemision] = useState(false);
 
   // Reset state when a new quote is loaded
   useEffect(() => {
@@ -83,6 +85,7 @@ export function EditApprovedQuoteDialog({
       setFechaCotizacion(quote.fecha_cotizacion);
       setFechaEntrega(quote.fecha_entrega || "");
       setNotes(quote.notes || "");
+      setIsRemision(quote.is_remision ?? false);
       setMotivo("");
       setItemPrices(
         Object.fromEntries(quote.items.map((i) => [i.id, i.precio_unitario]))
@@ -144,6 +147,7 @@ export function EditApprovedQuoteDialog({
       subtotal,
       total,
       motivoCorreccion: motivo.trim(),
+      isRemision,
       items,
     });
 
@@ -218,6 +222,21 @@ export function EditApprovedQuoteDialog({
                 value={fechaEntrega}
                 onChange={(e) => setFechaEntrega(e.target.value)}
               />
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <Label>Tipo de venta</Label>
+              <Select
+                value={isRemision ? "remision" : "factura"}
+                onValueChange={(v) => setIsRemision(v === "remision")}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo de venta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="factura">Factura</SelectItem>
+                  <SelectItem value="remision">Remisión</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5 col-span-2">
               <Label>Notas</Label>

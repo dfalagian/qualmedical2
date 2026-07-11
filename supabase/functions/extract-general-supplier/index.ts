@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,37 +25,37 @@ serve(async (req) => {
 
     const GEMINI_API_KEY = Deno.env.get('GEMINIKEY');
     if (!GEMINI_API_KEY) {
-      throw new Error('GEMINIKEY no está configurado');
+      throw new Error('GEMINIKEY no estÃ¡ configurado');
     }
 
-    console.log('Extrayendo información de factura de proveedor...');
+    console.log('Extrayendo informaciÃ³n de factura de proveedor...');
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: `Eres un experto en análisis de facturas mexicanas (CFDI). Tu trabajo es extraer la información del EMISOR de la factura (el proveedor que emite la factura, NO el receptor).
+            parts: [{ text: `Eres un experto en anÃ¡lisis de facturas mexicanas (CFDI). Tu trabajo es extraer la informaciÃ³n del EMISOR de la factura (el proveedor que emite la factura, NO el receptor).
 
 Extrae los siguientes campos del EMISOR:
 - rfc: RFC del emisor (proveedor)
-- razon_social: Nombre o razón social del emisor
+- razon_social: Nombre o razÃ³n social del emisor
 - nombre_comercial: Nombre comercial si es diferente (opcional)
-- direccion: Dirección fiscal completa
-- codigo_postal: Código postal (puede aparecer en "Lugar de Expedición")
-- telefono: Teléfono si aparece
+- direccion: DirecciÃ³n fiscal completa
+- codigo_postal: CÃ³digo postal (puede aparecer en "Lugar de ExpediciÃ³n")
+- telefono: TelÃ©fono si aparece
 - email: Email si aparece
-- regimen_fiscal: Régimen fiscal del emisor
-- lugar_expedicion: Código postal del lugar de expedición
+- regimen_fiscal: RÃ©gimen fiscal del emisor
+- lugar_expedicion: CÃ³digo postal del lugar de expediciÃ³n
 
 IMPORTANTE:
 - El EMISOR es quien VENDE/FACTURA (ej: Costco)
 - El RECEPTOR es quien COMPRA (ej: QualMedical)
 - Extrae SOLO los datos del EMISOR
 
-Responde ÚNICAMENTE con un objeto JSON válido con los campos encontrados. Si un campo no está presente, omítelo del JSON.` }]
+Responde ÃšNICAMENTE con un objeto JSON vÃ¡lido con los campos encontrados. Si un campo no estÃ¡ presente, omÃ­telo del JSON.` }]
           },
           contents: [
             {
@@ -69,8 +69,8 @@ Responde ÚNICAMENTE con un objeto JSON válido con los campos encontrados. Si u
                 },
                 {
                   text: isPdf
-                    ? 'Analiza este PDF de factura y extrae la información del EMISOR (proveedor). Responde solo con JSON.'
-                    : 'Analiza esta imagen de factura y extrae la información del EMISOR (proveedor). Responde solo con JSON.'
+                    ? 'Analiza este PDF de factura y extrae la informaciÃ³n del EMISOR (proveedor). Responde solo con JSON.'
+                    : 'Analiza esta imagen de factura y extrae la informaciÃ³n del EMISOR (proveedor). Responde solo con JSON.'
                 }
               ]
             }
@@ -105,7 +105,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con los campos encontrados. Si u
       console.error('Error parseando respuesta:', parseError);
       return new Response(
         JSON.stringify({ 
-          error: 'No se pudo extraer información de la imagen',
+          error: 'No se pudo extraer informaciÃ³n de la imagen',
           raw_response: content 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

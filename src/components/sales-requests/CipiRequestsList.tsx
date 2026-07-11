@@ -165,12 +165,14 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
         const quoteItems = items.map((item: any) => {
           let productId = item.product_id || null;
           let officialName: string | null = null;
+          let officialBrand: string | null = null;
 
-          // If already linked, use the OFFICIAL catalog name (never the extracted name)
+          // If already linked, use the OFFICIAL catalog name/brand (never the extracted)
           if (productId) {
             const catalogProduct = catalogById.get(productId);
             if (catalogProduct) {
               officialName = catalogProduct.name;
+              officialBrand = catalogProduct.brand;
             }
           }
 
@@ -184,6 +186,7 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
             if (matches.length === 1) {
               productId = matches[0].id;
               officialName = matches[0].name; // Use official catalog name
+              officialBrand = matches[0].brand;
             } else if (matches.length > 1 && item.marca) {
               const brandMatch = matches.find(
                 p => p.brand && p.brand.toLowerCase().trim() === item.marca.toLowerCase().trim()
@@ -191,6 +194,7 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
               if (brandMatch) {
                 productId = brandMatch.id;
                 officialName = brandMatch.name; // Use official catalog name
+                officialBrand = brandMatch.brand;
               }
             }
           }
@@ -205,7 +209,7 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
             batch_id: item.batch_id || null,
             warehouse_id: item.warehouse_id || null,
             nombre_producto: nombreFinal,
-            marca: item.marca,
+            marca: officialBrand || item.marca || null,
             lote: item.lote,
             fecha_caducidad: item.caducidad,
             cantidad: item.cantidad,

@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
@@ -44,7 +44,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: isAdmin } = await supabaseClient.rpc("is_admin", { _user_id: callerUser.id });
     if (!isAdmin) {
       return new Response(
-        JSON.stringify({ error: "Solo administradores pueden generar enlaces de recuperación" }),
+        JSON.stringify({ error: "Solo administradores pueden generar enlaces de recuperaciÃ³n" }),
         { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -92,7 +92,7 @@ const handler = async (req: Request): Promise<Response> => {
     
     if (!recoveryLink) {
       return new Response(
-        JSON.stringify({ error: "No se pudo generar el enlace de recuperación" }),
+        JSON.stringify({ error: "No se pudo generar el enlace de recuperaciÃ³n" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -103,7 +103,7 @@ const handler = async (req: Request): Promise<Response> => {
       JSON.stringify({ 
         success: true, 
         recoveryLink: recoveryLink,
-        message: "Enlace de recuperación generado exitosamente" 
+        message: "Enlace de recuperaciÃ³n generado exitosamente" 
       }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
@@ -111,7 +111,7 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error in generate-recovery-link:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Error al generar enlace de recuperación" }),
+      JSON.stringify({ error: error.message || "Error al generar enlace de recuperaciÃ³n" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }

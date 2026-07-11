@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
+﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
             });
           } catch (botError: any) {
             console.error("Bot query error:", botError);
-            await sendWhatsAppReply(from, "⚠️ Error al procesar tu consulta. Intenta de nuevo en un momento.");
+            await sendWhatsAppReply(from, "âš ï¸ Error al procesar tu consulta. Intenta de nuevo en un momento.");
           }
           // Return early - bot users don't create sales requests
         } else {
@@ -298,7 +298,7 @@ Deno.serve(async (req) => {
 
               if (insertError) {
                 console.error("Sales request insert error:", insertError);
-                await sendWhatsAppReply(from, "⚠️ Error al registrar tu solicitud. Intenta de nuevo.");
+                await sendWhatsAppReply(from, "âš ï¸ Error al registrar tu solicitud. Intenta de nuevo.");
               } else {
                 console.log("Sales request created:", inserted.id);
 
@@ -311,13 +311,13 @@ Deno.serve(async (req) => {
 
                 await sendWhatsAppReply(
                   from,
-                  `✅ ¡Solicitud recibida, ${requester.name}! Tu pedido ha sido registrado y será procesado.\n\nTendrás una respuesta ni bien sea procesada por un responsable.\n\nMuchas gracias. 🙏`
+                  `âœ… Â¡Solicitud recibida, ${requester.name}! Tu pedido ha sido registrado y serÃ¡ procesado.\n\nTendrÃ¡s una respuesta ni bien sea procesada por un responsable.\n\nMuchas gracias. ðŸ™`
                 );
               }
             } else {
               await sendWhatsAppReply(
                 from,
-                `¡Hola ${requester.name}! 👋\n\nPuedes subir una imagen, PDF, Excel o texto libre y yo interpretaré tu solicitud.\n\nTendrás una respuesta ni bien sea procesada por un responsable.\n\nMuchas gracias. 🙏`
+                `Â¡Hola ${requester.name}! ðŸ‘‹\n\nPuedes subir una imagen, PDF, Excel o texto libre y yo interpretarÃ© tu solicitud.\n\nTendrÃ¡s una respuesta ni bien sea procesada por un responsable.\n\nMuchas gracias. ðŸ™`
               );
             }
           } else {

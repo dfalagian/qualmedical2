@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
@@ -10,7 +10,7 @@ const corsHeaders = {
 const getDocumentTypeName = (type: string): string => {
   const types: Record<string, string> = {
     ine: "Credencial INE",
-    constancia_fiscal: "Constancia de Situación Fiscal",
+    constancia_fiscal: "Constancia de SituaciÃ³n Fiscal",
     comprobante_domicilio: "Comprobante de Domicilio",
     aviso_funcionamiento: "Aviso de Funcionamiento",
     datos_bancarios: "Datos Bancarios"
@@ -21,7 +21,7 @@ const getDocumentTypeName = (type: string): string => {
 const getEmailTemplate = (type: string, data: any): { subject: string; html: string } => {
   const templates: Record<string, (data: any) => { subject: string; html: string }> = {
     document_approved: (data) => ({
-      subject: `✅ Documento Aprobado - ${getDocumentTypeName(data.document_type)}`,
+      subject: `âœ… Documento Aprobado - ${getDocumentTypeName(data.document_type)}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -102,11 +102,11 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
           <body>
             <div class="container">
               <div class="header">
-                <h1>✓ Documento Aprobado</h1>
+                <h1>âœ“ Documento Aprobado</h1>
               </div>
               
               <div class="success-notice">
-                <h2>¡Excelente noticia!</h2>
+                <h2>Â¡Excelente noticia!</h2>
                 <p>Tu documento ha sido validado exitosamente</p>
               </div>
 
@@ -116,7 +116,7 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
                 <p>Te informamos que el siguiente documento ha sido <strong>aprobado</strong>:</p>
                 
                 <div class="info-box">
-                  <p><strong>📄 Documento:</strong> ${getDocumentTypeName(data.document_type)}</p>
+                  <p><strong>ðŸ“„ Documento:</strong> ${getDocumentTypeName(data.document_type)}</p>
                 </div>
 
                 ${data.extracted_data?.rfc ? `
@@ -126,13 +126,13 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
                 ` : ''}
 
                 <div class="warning-box">
-                  <p><strong>⚠️ Nota importante:</strong> Si aún tienes otros documentos pendientes de validación, te requerimos que tu cuenta será activada completamente una vez que todos los documentos sean aprobados.</p>
+                  <p><strong>âš ï¸ Nota importante:</strong> Si aÃºn tienes otros documentos pendientes de validaciÃ³n, te requerimos que tu cuenta serÃ¡ activada completamente una vez que todos los documentos sean aprobados.</p>
                 </div>
               </div>
 
               <div class="footer">
                 <p>Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #22c55e; text-decoration: none;">https://qualmedical.iakan.es</a></p>
-                <p style="margin-top: 10px;">Este es un mensaje automático del Sistema QualMedical</p>
+                <p style="margin-top: 10px;">Este es un mensaje automÃ¡tico del Sistema QualMedical</p>
               </div>
             </div>
           </body>
@@ -141,7 +141,7 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
     }),
     
     document_rejected: (data) => ({
-      subject: `❌ Documento Rechazado - ${getDocumentTypeName(data.document_type)}`,
+      subject: `âŒ Documento Rechazado - ${getDocumentTypeName(data.document_type)}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -224,28 +224,28 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
           <body>
             <div class="container">
               <div class="header">
-                <h1>⚠️ Documentación Pendiente</h1>
+                <h1>âš ï¸ DocumentaciÃ³n Pendiente</h1>
               </div>
               
               <div class="alert-box">
                 <h2>Estimado(a) ${data.supplier_name || 'proveedor'},</h2>
-                <p>Tu documentación ha sido revisada y requiere correcciones.</p>
+                <p>Tu documentaciÃ³n ha sido revisada y requiere correcciones.</p>
               </div>
 
               <div class="content">
-                <p>Hemos revisado la documentación de tu registro en el Sistema CITIO y encontramos que los siguientes documentos no han sido aprobados:</p>
+                <p>Hemos revisado la documentaciÃ³n de tu registro en el Sistema CITIO y encontramos que los siguientes documentos no han sido aprobados:</p>
                 
                 <div class="document-list">
-                  <h3>📋 Documentos que requieren atención:</h3>
+                  <h3>ðŸ“‹ Documentos que requieren atenciÃ³n:</h3>
                   <div class="document-item">
-                    <strong>• ${getDocumentTypeName(data.document_type)}</strong>
+                    <strong>â€¢ ${getDocumentTypeName(data.document_type)}</strong>
                     <p style="margin: 5px 0 0 20px; color: #991b1b;">Documento rechazado. Por favor, revise y vuelva a subir.</p>
                   </div>
                 </div>
 
                 ${data.notes ? `
                 <div style="background: #fef3c7; border-left: 3px solid #f59e0b; padding: 15px; margin: 20px 0;">
-                  <p style="margin: 0;"><strong>📝 Nota del revisor:</strong></p>
+                  <p style="margin: 0;"><strong>ðŸ“ Nota del revisor:</strong></p>
                   <p style="margin: 10px 0 0 0;">${data.notes}</p>
                 </div>
                 ` : ''}
@@ -253,7 +253,7 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
 
               <div class="footer">
                 <p>Acceder al portal: <a href="https://qualmedical.iakan.es" style="color: #ef4444; text-decoration: none;">https://qualmedical.iakan.es</a></p>
-                <p style="margin-top: 10px;">Este es un mensaje automático del Sistema QualMedical</p>
+                <p style="margin-top: 10px;">Este es un mensaje automÃ¡tico del Sistema QualMedical</p>
               </div>
             </div>
           </body>
@@ -262,7 +262,7 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
     }),
 
     supplier_approved: () => ({
-      subject: "🎉 ¡Felicidades! Tu cuenta ha sido aprobada",
+      subject: "ðŸŽ‰ Â¡Felicidades! Tu cuenta ha sido aprobada",
       html: `
         <!DOCTYPE html>
         <html>
@@ -285,22 +285,22 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
           <body>
             <div class="container">
               <div class="header">
-                <div class="celebration-icon">🎉</div>
-                <h1 style="margin: 0; font-size: 28px;">¡Tu cuenta ha sido aprobada!</h1>
+                <div class="celebration-icon">ðŸŽ‰</div>
+                <h1 style="margin: 0; font-size: 28px;">Â¡Tu cuenta ha sido aprobada!</h1>
               </div>
               <div class="content">
-                <p><strong>¡Excelente noticia!</strong></p>
-                <p>Tu documentación ha sido validada y tu cuenta está activa.</p>
+                <p><strong>Â¡Excelente noticia!</strong></p>
+                <p>Tu documentaciÃ³n ha sido validada y tu cuenta estÃ¡ activa.</p>
                 <div class="feature-list">
                   <h3>Ahora puedes:</h3>
-                  <div class="feature-item"><span class="check-icon">✓</span> Subir tus facturas</div>
-                  <div class="feature-item"><span class="check-icon">✓</span> Ver el estado de tus pagos</div>
-                  <div class="feature-item"><span class="check-icon">✓</span> Acceder a todas las funcionalidades</div>
+                  <div class="feature-item"><span class="check-icon">âœ“</span> Subir tus facturas</div>
+                  <div class="feature-item"><span class="check-icon">âœ“</span> Ver el estado de tus pagos</div>
+                  <div class="feature-item"><span class="check-icon">âœ“</span> Acceder a todas las funcionalidades</div>
                 </div>
                 <center><a href="https://qualmedical.iakan.es" class="cta-button">Acceder al Portal</a></center>
               </div>
               <div class="footer">
-                <p>QualMedical - Sistema de Gestión de Proveedores</p>
+                <p>QualMedical - Sistema de GestiÃ³n de Proveedores</p>
               </div>
             </div>
           </body>
@@ -309,7 +309,7 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
     }),
 
     evidence_approved: (data) => ({
-      subject: `✅ Evidencia de Entrega Aprobada - Factura ${data.invoice_number}`,
+      subject: `âœ… Evidencia de Entrega Aprobada - Factura ${data.invoice_number}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -390,11 +390,11 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
           <body>
             <div class="container">
               <div class="header">
-                <h1>✓ Evidencia de Entrega Aprobada</h1>
+                <h1>âœ“ Evidencia de Entrega Aprobada</h1>
               </div>
               
               <div class="success-notice">
-                <h2>¡La evidencia ha sido validada!</h2>
+                <h2>Â¡La evidencia ha sido validada!</h2>
                 <p>Tu evidencia de entrega fue revisada y aprobada por el equipo administrativo</p>
               </div>
 
@@ -404,14 +404,14 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
                 <p>Nos complace informarte que la evidencia de entrega que proporcionaste ha sido aprobada exitosamente.</p>
 
                 <div class="info-box">
-                  <p><strong>📄 Factura:</strong> ${data.invoice_number}</p>
-                  <p><strong>💰 Monto:</strong> $${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</p>
-                  <p><strong>✅ Estado:</strong> Evidencia Aprobada</p>
+                  <p><strong>ðŸ“„ Factura:</strong> ${data.invoice_number}</p>
+                  <p><strong>ðŸ’° Monto:</strong> $${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</p>
+                  <p><strong>âœ… Estado:</strong> Evidencia Aprobada</p>
                 </div>
 
                 <div class="next-steps">
-                  <p><strong>🎯 Siguiente paso:</strong></p>
-                  <p>Ahora que tu evidencia ha sido aprobada, el administrador procederá a subir el comprobante de pago correspondiente.</p>
+                  <p><strong>ðŸŽ¯ Siguiente paso:</strong></p>
+                  <p>Ahora que tu evidencia ha sido aprobada, el administrador procederÃ¡ a subir el comprobante de pago correspondiente.</p>
                 </div>
 
                 <p>Puedes dar seguimiento al estado de tu pago en el portal:</p>
@@ -423,8 +423,8 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
               </div>
 
               <div class="footer">
-                <p>Este es un mensaje automático del Sistema QualMedical</p>
-                <p>© 2025 QualMedical. Todos los derechos reservados.</p>
+                <p>Este es un mensaje automÃ¡tico del Sistema QualMedical</p>
+                <p>Â© 2025 QualMedical. Todos los derechos reservados.</p>
               </div>
             </div>
           </body>
@@ -433,7 +433,7 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
     }),
 
     evidence_rejected: (data) => ({
-      subject: `❌ Evidencia de Entrega Rechazada - Factura ${data.invoice_number}`,
+      subject: `âŒ Evidencia de Entrega Rechazada - Factura ${data.invoice_number}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -523,7 +523,7 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
           <body>
             <div class="container">
               <div class="header">
-                <h1>⚠️ Evidencia de Entrega Rechazada</h1>
+                <h1>âš ï¸ Evidencia de Entrega Rechazada</h1>
               </div>
               
               <div class="alert-box">
@@ -537,22 +537,22 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
                 <p>Hemos revisado la evidencia de entrega que proporcionaste y lamentablemente no cumple con los requisitos necesarios.</p>
 
                 <div class="info-box">
-                  <p><strong>📄 Factura:</strong> ${data.invoice_number}</p>
-                  <p><strong>💰 Monto:</strong> $${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</p>
-                  <p><strong>❌ Estado:</strong> Evidencia Rechazada</p>
+                  <p><strong>ðŸ“„ Factura:</strong> ${data.invoice_number}</p>
+                  <p><strong>ðŸ’° Monto:</strong> $${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</p>
+                  <p><strong>âŒ Estado:</strong> Evidencia Rechazada</p>
                 </div>
 
                 ${data.rejection_reason ? `
                 <div class="reason-box">
-                  <p><strong>📝 Razón del rechazo:</strong></p>
+                  <p><strong>ðŸ“ RazÃ³n del rechazo:</strong></p>
                   <p style="margin: 10px 0 0 0;">${data.rejection_reason}</p>
                 </div>
                 ` : ''}
 
                 <div class="action-box">
-                  <p><strong>🔧 Acción requerida:</strong></p>
-                  <p>Por favor, revisa la razón del rechazo y vuelve a subir la evidencia de entrega con las correcciones necesarias.</p>
-                  <p style="margin-top: 10px;"><strong>Nota:</strong> Asegúrate de que las imágenes sean claras, legibles y muestren la entrega completa del pedido.</p>
+                  <p><strong>ðŸ”§ AcciÃ³n requerida:</strong></p>
+                  <p>Por favor, revisa la razÃ³n del rechazo y vuelve a subir la evidencia de entrega con las correcciones necesarias.</p>
+                  <p style="margin-top: 10px;"><strong>Nota:</strong> AsegÃºrate de que las imÃ¡genes sean claras, legibles y muestren la entrega completa del pedido.</p>
                 </div>
 
                 <p style="text-align: center; margin-top: 20px;">
@@ -563,8 +563,8 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
               </div>
 
               <div class="footer">
-                <p>Este es un mensaje automático del Sistema QualMedical</p>
-                <p>© 2025 QualMedical. Todos los derechos reservados.</p>
+                <p>Este es un mensaje automÃ¡tico del Sistema QualMedical</p>
+                <p>Â© 2025 QualMedical. Todos los derechos reservados.</p>
               </div>
             </div>
           </body>
@@ -573,7 +573,7 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
     }),
 
     invoice_status_processing: (data) => ({
-      subject: `🔄 Factura en Procesamiento - ${data.invoice_number}`,
+      subject: `ðŸ”„ Factura en Procesamiento - ${data.invoice_number}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -658,11 +658,11 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
           <body>
             <div class="container">
               <div class="header">
-                <h1>🔄 Factura en Procesamiento</h1>
+                <h1>ðŸ”„ Factura en Procesamiento</h1>
               </div>
               
               <div class="info-notice">
-                <h2>Tu factura está siendo procesada</h2>
+                <h2>Tu factura estÃ¡ siendo procesada</h2>
                 <p>Estamos tramitando el pago de tu factura</p>
               </div>
 
@@ -672,20 +672,20 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
                 <p>Te informamos que tu factura ha sido marcada como <strong>EN PROCESAMIENTO</strong>. Esto significa que estamos tramitando el pago correspondiente.</p>
 
                 <div class="info-box">
-                  <p><strong>📄 Factura:</strong> ${data.invoice_number}</p>
-                  <p><strong>💰 Monto:</strong> $${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</p>
-                  <p><strong>🔄 Estado:</strong> En Procesamiento</p>
+                  <p><strong>ðŸ“„ Factura:</strong> ${data.invoice_number}</p>
+                  <p><strong>ðŸ’° Monto:</strong> $${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</p>
+                  <p><strong>ðŸ”„ Estado:</strong> En Procesamiento</p>
                 </div>
 
                 <div class="timeline">
-                  <p><strong>📋 Proceso de pago:</strong></p>
-                  <div class="timeline-step">✅ Factura recibida y validada</div>
-                  <div class="timeline-step">✅ Evidencia de entrega aprobada</div>
-                  <div class="timeline-step"><strong>🔄 En proceso de pago (Estado actual)</strong></div>
-                  <div class="timeline-step">⏳ Pago completado</div>
+                  <p><strong>ðŸ“‹ Proceso de pago:</strong></p>
+                  <div class="timeline-step">âœ… Factura recibida y validada</div>
+                  <div class="timeline-step">âœ… Evidencia de entrega aprobada</div>
+                  <div class="timeline-step"><strong>ðŸ”„ En proceso de pago (Estado actual)</strong></div>
+                  <div class="timeline-step">â³ Pago completado</div>
                 </div>
 
-                <p>Recibirás una nueva notificación cuando el pago haya sido completado.</p>
+                <p>RecibirÃ¡s una nueva notificaciÃ³n cuando el pago haya sido completado.</p>
 
                 <p style="text-align: center; margin-top: 20px;">
                   <a href="https://qualmedical.iakan.es" style="display: inline-block; padding: 12px 30px; background: #3b82f6; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
@@ -695,8 +695,8 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
               </div>
 
               <div class="footer">
-                <p>Este es un mensaje automático del Sistema QualMedical</p>
-                <p>© 2025 QualMedical. Todos los derechos reservados.</p>
+                <p>Este es un mensaje automÃ¡tico del Sistema QualMedical</p>
+                <p>Â© 2025 QualMedical. Todos los derechos reservados.</p>
               </div>
             </div>
           </body>
@@ -705,7 +705,7 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
     }),
 
     invoice_status_paid: (data) => ({
-      subject: `✅ Pago Completado - Factura ${data.invoice_number}`,
+      subject: `âœ… Pago Completado - Factura ${data.invoice_number}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -795,8 +795,8 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
           <body>
             <div class="container">
               <div class="header">
-                <div class="success-icon">🎉</div>
-                <h1>¡Pago Completado!</h1>
+                <div class="success-icon">ðŸŽ‰</div>
+                <h1>Â¡Pago Completado!</h1>
               </div>
               
               <div class="success-notice">
@@ -807,7 +807,7 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
               <div class="content">
                 <p><strong>Estimado proveedor,</strong></p>
                 
-                <p>¡Excelente noticia! Nos complace informarte que el pago de tu factura ha sido completado exitosamente.</p>
+                <p>Â¡Excelente noticia! Nos complace informarte que el pago de tu factura ha sido completado exitosamente.</p>
 
                 <div class="payment-box">
                   <p style="margin: 0; color: #6b7280; font-size: 14px;">MONTO PAGADO</p>
@@ -815,14 +815,14 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
                 </div>
 
                 <div class="info-box">
-                  <p><strong>📄 Factura:</strong> ${data.invoice_number}</p>
-                  <p><strong>📅 Fecha de Pago:</strong> ${new Date(data.payment_date).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-                  <p><strong>✅ Estado:</strong> Pagado</p>
+                  <p><strong>ðŸ“„ Factura:</strong> ${data.invoice_number}</p>
+                  <p><strong>ðŸ“… Fecha de Pago:</strong> ${new Date(data.payment_date).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                  <p><strong>âœ… Estado:</strong> Pagado</p>
                 </div>
 
                 <p style="background: #fef3c7; border-left: 3px solid #f59e0b; padding: 15px; margin: 20px 0;">
-                  <strong>📋 Comprobante de pago:</strong><br>
-                  Puedes consultar el comprobante de pago en el portal, en la sección de facturas.
+                  <strong>ðŸ“‹ Comprobante de pago:</strong><br>
+                  Puedes consultar el comprobante de pago en el portal, en la secciÃ³n de facturas.
                 </p>
 
                 <p style="text-align: center; margin-top: 25px;">
@@ -832,13 +832,13 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
                 </p>
 
                 <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
-                  Gracias por tu colaboración y profesionalismo.
+                  Gracias por tu colaboraciÃ³n y profesionalismo.
                 </p>
               </div>
 
               <div class="footer">
-                <p>Este es un mensaje automático del Sistema QualMedical</p>
-                <p>© 2025 QualMedical. Todos los derechos reservados.</p>
+                <p>Este es un mensaje automÃ¡tico del Sistema QualMedical</p>
+                <p>Â© 2025 QualMedical. Todos los derechos reservados.</p>
               </div>
             </div>
           </body>
@@ -847,7 +847,7 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
     }),
 
     invoice_status_rejected: (data) => ({
-      subject: `❌ Factura Rechazada - ${data.invoice_number}`,
+      subject: `âŒ Factura Rechazada - ${data.invoice_number}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -937,7 +937,7 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
           <body>
             <div class="container">
               <div class="header">
-                <h1>⚠️ Factura Rechazada</h1>
+                <h1>âš ï¸ Factura Rechazada</h1>
               </div>
               
               <div class="alert-box">
@@ -948,24 +948,24 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
               <div class="content">
                 <p><strong>Estimado proveedor,</strong></p>
                 
-                <p>Lamentamos informarte que tu factura ha sido <strong>RECHAZADA</strong> y no podrá ser procesada para pago.</p>
+                <p>Lamentamos informarte que tu factura ha sido <strong>RECHAZADA</strong> y no podrÃ¡ ser procesada para pago.</p>
 
                 <div class="info-box">
-                  <p><strong>📄 Factura:</strong> ${data.invoice_number}</p>
-                  <p><strong>💰 Monto:</strong> $${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</p>
-                  <p><strong>❌ Estado:</strong> Rechazado</p>
+                  <p><strong>ðŸ“„ Factura:</strong> ${data.invoice_number}</p>
+                  <p><strong>ðŸ’° Monto:</strong> $${parseFloat(data.invoice_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</p>
+                  <p><strong>âŒ Estado:</strong> Rechazado</p>
                 </div>
 
                 ${data.rejection_reason ? `
                 <div class="reason-box">
-                  <p><strong>📝 Razón del rechazo:</strong></p>
+                  <p><strong>ðŸ“ RazÃ³n del rechazo:</strong></p>
                   <p style="margin: 10px 0 0 0;">${data.rejection_reason}</p>
                 </div>
                 ` : ''}
 
                 <div class="action-box">
-                  <p><strong>🔧 Acción requerida:</strong></p>
-                  <p>Por favor, revisa la razón del rechazo y toma las acciones necesarias. Si tienes dudas, contacta al departamento administrativo.</p>
+                  <p><strong>ðŸ”§ AcciÃ³n requerida:</strong></p>
+                  <p>Por favor, revisa la razÃ³n del rechazo y toma las acciones necesarias. Si tienes dudas, contacta al departamento administrativo.</p>
                   <p style="margin-top: 10px;"><strong>Nota:</strong> Es posible que necesites emitir una nueva factura corregida.</p>
                 </div>
 
@@ -977,9 +977,9 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
               </div>
 
               <div class="footer">
-                <p>Para más información, contacta al departamento de administración</p>
-                <p>Este es un mensaje automático del Sistema QualMedical</p>
-                <p>© 2025 QualMedical. Todos los derechos reservados.</p>
+                <p>Para mÃ¡s informaciÃ³n, contacta al departamento de administraciÃ³n</p>
+                <p>Este es un mensaje automÃ¡tico del Sistema QualMedical</p>
+                <p>Â© 2025 QualMedical. Todos los derechos reservados.</p>
               </div>
             </div>
           </body>
@@ -989,8 +989,8 @@ const getEmailTemplate = (type: string, data: any): { subject: string; html: str
   };
 
   return templates[type] ? templates[type](data) : {
-    subject: "Notificación del Sistema",
-    html: "<p>Ha recibido una notificación del sistema.</p>"
+    subject: "NotificaciÃ³n del Sistema",
+    html: "<p>Ha recibido una notificaciÃ³n del sistema.</p>"
   };
 };
 
@@ -1051,7 +1051,7 @@ serve(async (req) => {
     console.log('Email enviado exitosamente');
 
     return new Response(
-      JSON.stringify({ success: true, message: "Notificación enviada" }),
+      JSON.stringify({ success: true, message: "NotificaciÃ³n enviada" }),
       { headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
 

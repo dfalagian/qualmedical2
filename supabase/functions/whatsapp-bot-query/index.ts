@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
+﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -53,8 +53,8 @@ async function getContextData(supabase: any, question: string) {
         const perWh = wsMap[p.id];
         const whDetail = perWh
           ? Object.entries(perWh).map(([wh, qty]) => `${wh}: ${qty}`).join(", ")
-          : "Sin stock por almacén";
-        return `- ${p.name} | SKU: ${p.sku} | Stock Global: ${p.current_stock ?? 0} ${p.unit || 'pza'} | Por almacén: [${whDetail}] | Categoría: ${p.category || 'N/A'} | Marca: ${p.brand || 'N/A'} | Precio: $${p.price_with_tax || 0}${p.description ? ` | Desc: ${p.description}` : ''}`;
+          : "Sin stock por almacÃ©n";
+        return `- ${p.name} | SKU: ${p.sku} | Stock Global: ${p.current_stock ?? 0} ${p.unit || 'pza'} | Por almacÃ©n: [${whDetail}] | CategorÃ­a: ${p.category || 'N/A'} | Marca: ${p.brand || 'N/A'} | Precio: $${p.price_with_tax || 0}${p.description ? ` | Desc: ${p.description}` : ''}`;
       }).join("\n"));
   }
 
@@ -84,7 +84,7 @@ async function getContextData(supabase: any, question: string) {
         borrador: quotes.filter((q: any) => q.status === "borrador").length,
         canceladas: quotes.filter((q: any) => q.status === "cancelada").length,
       };
-      context.push(`COTIZACIONES (últimas 50):\nResumen: ${stats.total} total, ${stats.aprobadas} aprobadas ($${totalVentas.toFixed(2)} MXN), ${stats.borrador} borradores, ${stats.canceladas} canceladas\n` +
+      context.push(`COTIZACIONES (Ãºltimas 50):\nResumen: ${stats.total} total, ${stats.aprobadas} aprobadas ($${totalVentas.toFixed(2)} MXN), ${stats.borrador} borradores, ${stats.canceladas} canceladas\n` +
         quotes.slice(0, 20).map((q: any) => 
           `- ${q.folio} | ${q.status} | $${q.total} | ${q.fecha_cotizacion} | Cliente: ${q.clients?.nombre_cliente || 'N/A'} | ${q.concepto || ''}`
         ).join("\n"));
@@ -108,7 +108,7 @@ async function getContextData(supabase: any, question: string) {
             .eq("quote_id", targetQuote.id);
           
           if (quoteItems?.length) {
-            context.push(`DETALLE DE PRODUCTOS DE COTIZACIÓN ${targetQuote.folio}:\nCliente: ${targetQuote.clients?.nombre_cliente || 'N/A'} | Total: $${targetQuote.total} | Estado: ${targetQuote.status}\n` +
+            context.push(`DETALLE DE PRODUCTOS DE COTIZACIÃ“N ${targetQuote.folio}:\nCliente: ${targetQuote.clients?.nombre_cliente || 'N/A'} | Total: $${targetQuote.total} | Estado: ${targetQuote.status}\n` +
               quoteItems.map((i: any) => 
                 `- ${i.nombre_producto} | Cant: ${i.cantidad} | P.Unit: $${i.precio_unitario} | Importe: $${i.importe}${i.marca ? ` | Marca: ${i.marca}` : ''}${i.lote ? ` | Lote: ${i.lote}` : ''}${i.fecha_caducidad ? ` | Cad: ${i.fecha_caducidad}` : ''}`
               ).join("\n"));
@@ -156,7 +156,7 @@ async function getContextData(supabase: any, question: string) {
         pendientes: orders.filter((o: any) => o.status === "pendiente").length,
         recibidas: orders.filter((o: any) => o.status === "recibida").length,
       };
-      context.push(`ÓRDENES DE COMPRA (últimas 50):\nResumen: ${stats.total} total ($${totalCompras.toFixed(2)} MXN), ${stats.pendientes} pendientes, ${stats.recibidas} recibidas\n` +
+      context.push(`Ã“RDENES DE COMPRA (Ãºltimas 50):\nResumen: ${stats.total} total ($${totalCompras.toFixed(2)} MXN), ${stats.pendientes} pendientes, ${stats.recibidas} recibidas\n` +
         orders.slice(0, 15).map((o: any) => 
           `- ${o.order_number} | ${o.status} | $${o.amount} ${o.currency} | Entrega: ${o.delivery_date || 'N/A'} | Proveedor: ${o.profiles?.company_name || o.profiles?.full_name || 'N/A'}`
         ).join("\n"));
@@ -172,7 +172,7 @@ async function getContextData(supabase: any, question: string) {
       .limit(30);
     
     if (requests?.length) {
-      context.push(`SOLICITUDES DE VENTA (últimas 30):\n` +
+      context.push(`SOLICITUDES DE VENTA (Ãºltimas 30):\n` +
         requests.map((r: any) => 
           `- ${r.folio || 'S/F'} | Tipo: ${r.type} | ${r.status} | Empresa: ${r.empresa || 'N/A'} | $${r.total || 0}`
         ).join("\n"));
@@ -189,7 +189,7 @@ async function getContextData(supabase: any, question: string) {
     
     if (salesInvoices?.length) {
       const totalFacturado = salesInvoices.reduce((s: number, i: any) => s + (i.total || 0), 0);
-      context.push(`FACTURAS DE VENTA (últimas 30):\nTotal facturado: $${totalFacturado.toFixed(2)} MXN\n` +
+      context.push(`FACTURAS DE VENTA (Ãºltimas 30):\nTotal facturado: $${totalFacturado.toFixed(2)} MXN\n` +
         salesInvoices.map((i: any) => 
           `- ${i.folio} | $${i.total} ${i.currency} | ${i.fecha_emision || 'N/A'} | ${i.receptor_nombre || 'N/A'}`
         ).join("\n"));
@@ -228,7 +228,7 @@ Deno.serve(async (req) => {
 
     if (!botUser) {
       return new Response(
-        JSON.stringify({ authorized: false, reply: "No estás autorizado para usar el bot de consultas." }),
+        JSON.stringify({ authorized: false, reply: "No estÃ¡s autorizado para usar el bot de consultas." }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -255,21 +255,21 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1024,
-        system: `Eres el asistente IA de QualMedical, una empresa de distribución de medicamentos y dispositivos médicos.
-Respondes preguntas de gerentes sobre el estado del negocio: inventario, ventas, cotizaciones, órdenes de compra y solicitudes de venta.
+        system: `Eres el asistente IA de QualMedical, una empresa de distribuciÃ³n de medicamentos y dispositivos mÃ©dicos.
+Respondes preguntas de gerentes sobre el estado del negocio: inventario, ventas, cotizaciones, Ã³rdenes de compra y solicitudes de venta.
 
 REGLAS:
-- Responde SIEMPRE en español
-- Sé conciso y directo, adaptado para lectura en WhatsApp
+- Responde SIEMPRE en espaÃ±ol
+- SÃ© conciso y directo, adaptado para lectura en WhatsApp
 - Usa emojis moderadamente para mejor legibilidad
-- Formatea números con separadores de miles y 2 decimales
-- No inventes datos, solo usa la información proporcionada
-- Si la pregunta no está relacionada con el negocio, indica amablemente que solo puedes responder consultas del sistema
+- Formatea nÃºmeros con separadores de miles y 2 decimales
+- No inventes datos, solo usa la informaciÃ³n proporcionada
+- Si la pregunta no estÃ¡ relacionada con el negocio, indica amablemente que solo puedes responder consultas del sistema
 
-BÚSQUEDA DE PRODUCTOS:
-- Cuando el usuario pregunte por un producto, busca en TODA la lista usando coincidencias parciales y sinónimos comunes
-- Por ejemplo: "aguja" puede coincidir con "Aguja hipodérmica", "Aguja para insulina", etc.
-- "bata" puede coincidir con "Bata quirúrgica estéril", "Bata desechable", etc.
+BÃšSQUEDA DE PRODUCTOS:
+- Cuando el usuario pregunte por un producto, busca en TODA la lista usando coincidencias parciales y sinÃ³nimos comunes
+- Por ejemplo: "aguja" puede coincidir con "Aguja hipodÃ©rmica", "Aguja para insulina", etc.
+- "bata" puede coincidir con "Bata quirÃºrgica estÃ©ril", "Bata desechable", etc.
 - Si encuentras varios productos que coinciden, muestra TODOS los resultados relevantes
 - Si no encuentras coincidencia exacta, busca por palabras similares o relacionadas
 - NUNCA digas que no existe un producto sin antes revisar toda la lista cuidadosamente
@@ -289,7 +289,7 @@ ${contextData}`,
       const errText = await aiResponse.text();
       console.error("AI gateway error:", aiResponse.status, errText);
       return new Response(
-        JSON.stringify({ error: "Error consultando IA", reply: "⚠️ Error al procesar tu consulta. Intenta de nuevo." }),
+        JSON.stringify({ error: "Error consultando IA", reply: "âš ï¸ Error al procesar tu consulta. Intenta de nuevo." }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
