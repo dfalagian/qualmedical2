@@ -273,12 +273,15 @@ export function CipiUploadDialog({ open, onOpenChange, type, onSuccess }: CipiUp
       // Parse Excel client-side
       const parsed = await parseExcel(file);
 
-      // Upload file to storage
-      const filePath = `cipi/${type}/${Date.now()}_${file.name}`;
+      // Upload file to storage (nombre sanitizado para evitar problemas con acentos/Ñ/espacios)
+      const safeName = file.name
+        .normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-zA-Z0-9._-]/g, "_");
+      const filePath = `cipi/${type}/${Date.now()}_${safeName}`;
       const { error: uploadError } = await supabase.storage
         .from("sales-requests")
         .upload(filePath, file);
-      
+
       const fileUrl = uploadError ? null : filePath;
 
       // Parse date values
@@ -401,9 +404,16 @@ export function CipiUploadDialog({ open, onOpenChange, type, onSuccess }: CipiUp
 
     setUploading(true);
     try {
-      // Upload file to storage
-      const filePath = `cipi/${type}/${Date.now()}_${file.name}`;
-      await supabase.storage.from("sales-requests").upload(filePath, file);
+      // Upload file to storage. Nombre sanitizado: acentos/Ñ/espacios en la ruta
+      // rompían la descarga en la edge function (error "Sin contenido").
+      const safeName = file.name
+        .normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-zA-Z0-9._-]/g, "_");
+      const filePath = `cipi/${type}/${Date.now()}_${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from("sales-requests")
+        .upload(filePath, file);
+      if (uploadError) throw uploadError;
 
       // Create request with pending extraction
       const { data: request, error } = await supabase
