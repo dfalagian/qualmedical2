@@ -105,6 +105,8 @@ export const useQuoteActions = () => {
       if (quoteError) throw quoteError;
 
       // Insertar items
+      // Orden de visualización: se preserva vía sort_order (índice en el arreglo)
+      const orderMap = new Map(params.items.map((it, idx) => [it.id, idx]));
       // First pass: insert parent items to get their DB ids
       const parentItems = params.items.filter(item => !item.is_sub_product);
       const subItems = params.items.filter(item => item.is_sub_product);
@@ -123,6 +125,7 @@ export const useQuoteActions = () => {
         importe: item.importe,
         tipo_precio: item.tipo_precio || "1",
         is_sub_product: false,
+        sort_order: orderMap.get(item.id) ?? 0,
       }));
 
       let parentIdMap = new Map<string, string>();
@@ -158,6 +161,7 @@ export const useQuoteActions = () => {
           tipo_precio: item.tipo_precio || "1",
           is_sub_product: true,
           parent_item_id: item.parent_item_id ? (parentIdMap.get(item.parent_item_id) || item.parent_item_id) : null,
+          sort_order: orderMap.get(item.id) ?? 0,
         }));
 
         const { error: subError } = await supabase
@@ -220,6 +224,7 @@ export const useQuoteActions = () => {
       if (deleteError) throw deleteError;
 
       // Insert parent items first, then sub-items with resolved parent_item_id
+      const orderMap = new Map(params.items.map((it, idx) => [it.id, idx]));
       const parentItems = params.items.filter(item => !item.is_sub_product);
       const subItems = params.items.filter(item => item.is_sub_product);
 
@@ -240,6 +245,7 @@ export const useQuoteActions = () => {
           importe: item.importe,
           tipo_precio: item.tipo_precio || "1",
           is_sub_product: false,
+          sort_order: orderMap.get(item.id) ?? 0,
         }));
 
         const { data: insertedParents, error: parentError } = await supabase
@@ -270,6 +276,7 @@ export const useQuoteActions = () => {
           tipo_precio: item.tipo_precio || "1",
           is_sub_product: true,
           parent_item_id: item.parent_item_id ? (parentIdMap.get(item.parent_item_id) || null) : null,
+          sort_order: orderMap.get(item.id) ?? 0,
         }));
 
         const { error: subError } = await supabase

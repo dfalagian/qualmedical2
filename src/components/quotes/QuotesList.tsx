@@ -293,7 +293,8 @@ export const QuotesList = ({ onEditQuote }: QuotesListProps) => {
         warehouse:warehouse_id (id, name)
       `)
       .eq("quote_id", quoteId)
-      .order("created_at");
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
     
     if (error) throw error;
     

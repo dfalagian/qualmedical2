@@ -27,6 +27,7 @@ import {
   DollarSign,
   Link2,
   Search,
+  GripVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -207,6 +208,41 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
 
   // Quote items
   const [quoteItems, setQuoteItems] = useState<QuoteItem[]>([]);
+  const [dragId, setDragId] = useState<string | null>(null);
+
+  // Reordena las filas por arrastre. Solo se arrastran productos padre; sus
+  // sub-productos viajan junto con el padre. Al soltar sobre otra fila, el
+  // producto arrastrado se coloca en esa posición.
+  const handleReorderItems = (draggedId: string, targetId: string) => {
+    if (draggedId === targetId) return;
+    setQuoteItems((prev) => {
+      const parents = prev.filter((i) => !i.is_sub_product);
+      const subsByParent = new Map<string, QuoteItem[]>();
+      for (const i of prev) {
+        if (i.is_sub_product && i.parent_item_id) {
+          if (!subsByParent.has(i.parent_item_id)) subsByParent.set(i.parent_item_id, []);
+          subsByParent.get(i.parent_item_id)!.push(i);
+        }
+      }
+      const targetItem = prev.find((i) => i.id === targetId);
+      const targetParentId = targetItem?.is_sub_product ? targetItem.parent_item_id : targetId;
+      const fromIdx = parents.findIndex((p) => p.id === draggedId);
+      const toIdx = parents.findIndex((p) => p.id === targetParentId);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
+      const reordered = [...parents];
+      const [moved] = reordered.splice(fromIdx, 1);
+      reordered.splice(toIdx, 0, moved);
+      const flat: QuoteItem[] = [];
+      for (const p of reordered) {
+        flat.push(p);
+        const subs = subsByParent.get(p.id);
+        if (subs) flat.push(...subs);
+      }
+      const included = new Set(flat.map((i) => i.id));
+      for (const i of prev) if (!included.has(i.id)) flat.push(i);
+      return flat;
+    });
+  };
   
   // Linking unmatched items state
   const [linkingItemId, setLinkingItemId] = useState<string | null>(null);
@@ -1231,14 +1267,37 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                       const isManual = item.tipo_precio === "manual";
                       const isSubProduct = item.is_sub_product === true;
                       return (
-                        <TableRow key={item.id} className={cn(
+                        <TableRow
+                          key={item.id}
+                          onDragOver={(e) => { if (dragId) e.preventDefault(); }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (dragId) handleReorderItems(dragId, item.id);
+                            setDragId(null);
+                          }}
+                          className={cn(
                           isMultiBatch && "bg-amber-50/50 dark:bg-amber-950/20",
                           isSubProduct && "bg-muted/30",
-                          !item.product_id && "bg-destructive/5"
+                          !item.product_id && "bg-destructive/5",
+                          dragId === item.id && "opacity-50"
                         )}>
                           <TableCell className="font-medium">
                             <div className="flex flex-col gap-0.5">
                               <div className="flex items-center gap-2">
+                                {!isSubProduct && (
+                                  <span
+                                    draggable
+                                    onDragStart={(e) => {
+                                      setDragId(item.id);
+                                      e.dataTransfer.effectAllowed = "move";
+                                    }}
+                                    onDragEnd={() => setDragId(null)}
+                                    className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
+                                    title="Arrastrar para reordenar"
+                                  >
+                                    <GripVertical className="h-4 w-4" />
+                                  </span>
+                                )}
                                 <span className={cn(
                                   "break-words",
                                   isSubProduct && "pl-4 text-muted-foreground italic"
