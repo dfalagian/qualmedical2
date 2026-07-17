@@ -394,11 +394,11 @@ export function SalesRequestsCitioOrders() {
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
 
-  const getPatientName = (order: ExternalOrder) => {
+  function getPatientName(order: ExternalOrder) {
     if (!order.patients) return null;
     const p = order.patients;
     return [p.first_name, p.second_name, p.first_lastname, p.second_lastname].filter(Boolean).join(" ");
-  };
+  }
 
   const statusLabels: Record<string, string> = {
     pending: "Pendiente",
