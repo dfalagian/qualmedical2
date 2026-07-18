@@ -151,10 +151,10 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
         // Always fetch catalog to get OFFICIAL names and for fallback matching
         const { data: prods } = await supabase
           .from("products")
-          .select("id, name, brand")
+          .select("id, name, brand, price_type_1")
           .eq("is_active", true)
           .eq("catalog_only", false);
-        const productsCatalog: Array<{ id: string; name: string; brand: string | null }> = prods || [];
+        const productsCatalog: Array<{ id: string; name: string; brand: string | null; price_type_1: number | null }> = prods || [];
 
         // Build a lookup map for quick access by id
         const catalogById = new Map(productsCatalog.map(p => [p.id, p]));
@@ -166,13 +166,15 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
           let productId = item.product_id || null;
           let officialName: string | null = null;
           let officialBrand: string | null = null;
+          let priceType1: number | null = null;
 
-          // If already linked, use the OFFICIAL catalog name/brand (never the extracted)
+          // If already linked, use the OFFICIAL catalog name/brand/precio1 (never the extracted)
           if (productId) {
             const catalogProduct = catalogById.get(productId);
             if (catalogProduct) {
               officialName = catalogProduct.name;
               officialBrand = catalogProduct.brand;
+              priceType1 = catalogProduct.price_type_1 != null ? Number(catalogProduct.price_type_1) : null;
             }
           }
 
@@ -187,6 +189,7 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
               productId = matches[0].id;
               officialName = matches[0].name; // Use official catalog name
               officialBrand = matches[0].brand;
+              priceType1 = matches[0].price_type_1 != null ? Number(matches[0].price_type_1) : null;
             } else if (matches.length > 1 && item.marca) {
               const brandMatch = matches.find(
                 p => p.brand && p.brand.toLowerCase().trim() === item.marca.toLowerCase().trim()
@@ -195,12 +198,20 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
                 productId = brandMatch.id;
                 officialName = brandMatch.name; // Use official catalog name
                 officialBrand = brandMatch.brand;
+                priceType1 = brandMatch.price_type_1 != null ? Number(brandMatch.price_type_1) : null;
               }
             }
           }
 
           // Use official catalog name if found, otherwise fall back to extracted description
           const nombreFinal = officialName || item.matched_product_name || item.descripcion;
+
+          // Precio: si el documento no trae precio (caso CIPI, precio 0) y el producto
+          // está vinculado al catálogo, usar Precio 1 (T1 - Público) automáticamente.
+          const extractedPrice = Number(item.precio_unitario) || 0;
+          const useCatalogPrice = extractedPrice <= 0 && priceType1 != null && priceType1 > 0;
+          const finalPrice = useCatalogPrice ? priceType1! : extractedPrice;
+          const finalTipoPrecio = useCatalogPrice ? '1' : 'manual';
 
           return {
             quote_id: quote.id,
@@ -213,9 +224,9 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
             lote: item.lote,
             fecha_caducidad: item.caducidad,
             cantidad: item.cantidad,
-            precio_unitario: item.precio_unitario || 0,
-            importe: (item.precio_unitario || 0) * (item.cantidad || 1),
-            tipo_precio: 'manual',
+            precio_unitario: finalPrice,
+            importe: finalPrice * (item.cantidad || 1),
+            tipo_precio: finalTipoPrecio,
           };
         });
 

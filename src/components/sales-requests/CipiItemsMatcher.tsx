@@ -39,6 +39,8 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
   const [showPerRowOverride, setShowPerRowOverride] = useState(false);
   const [applyingBulk, setApplyingBulk] = useState(false);
   const stableOrderRef = useRef<string[]>([]);
+  // Ítems donde el usuario eligió explícitamente "Sin lote": no re-auto-seleccionar.
+  const userClearedBatchRef = useRef<Set<string>>(new Set());
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["cipi-request-items", requestId],
@@ -209,6 +211,7 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
   };
 
   const handleClearLote = async (itemId: string) => {
+    userClearedBatchRef.current.add(itemId);
     try {
       const { error } = await supabase
         .from("cipi_request_items")
@@ -223,6 +226,9 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
   };
 
   const handleSelectBatch = async (itemId: string, batchId: string | null) => {
+    // Recordar si el usuario deja "Sin lote" para no volver a autocompletarlo.
+    if (batchId) userClearedBatchRef.current.delete(itemId);
+    else userClearedBatchRef.current.add(itemId);
     try {
       // When the batch changes, clear warehouse_id because it may no longer be valid
       // for the new lote (a warehouse that held lote A might not hold lote B).
@@ -309,6 +315,20 @@ export function CipiItemsMatcher({ requestId }: CipiItemsMatcherProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generalWarehouseId]);
+
+  // Auto-seleccionar el lote cuando el producto vinculado tiene UN solo lote
+  // disponible (con stock). Si el usuario eligió "Sin lote" a propósito, se respeta.
+  useEffect(() => {
+    for (const item of items as any[]) {
+      if (!item.product_id || item.batch_id) continue;
+      if (userClearedBatchRef.current.has(item.id)) continue;
+      const batches = batchesByProduct[item.product_id] || [];
+      if (batches.length === 1) {
+        handleSelectBatch(item.id, batches[0].id);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, batchesByProduct]);
 
   const categoryColors: Record<string, string> = {
     MEDICAMENTOS: "bg-blue-100 text-blue-800",
