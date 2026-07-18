@@ -213,13 +213,53 @@ export function BatchTraceabilityModal() {
         }
       }
 
+      // Resolve unit prices per movement:
+      // - Salidas (venta): precio de venta unitario del renglón de la cotización.
+      // - Entradas (OC): costo de compra unitario del renglón de la orden de compra.
+      const salePriceMap: Record<string, number> = {};
+      if (quoteIds.length > 0) {
+        const { data: qItems } = await supabase
+          .from("quote_items")
+          .select("quote_id, product_id, precio_unitario")
+          .in("quote_id", quoteIds);
+        for (const qi of (qItems || []) as any[]) {
+          if (qi.product_id != null) salePriceMap[`${qi.quote_id}__${qi.product_id}`] = Number(qi.precio_unitario);
+        }
+      }
+
+      const costPriceMap: Record<string, number> = {};
+      if (poIds.length > 0) {
+        const { data: poItems } = await supabase
+          .from("purchase_order_items")
+          .select("purchase_order_id, product_id, unit_price")
+          .in("purchase_order_id", poIds);
+        for (const pi of (poItems || []) as any[]) {
+          if (pi.product_id != null) costPriceMap[`${pi.purchase_order_id}__${pi.product_id}`] = Number(pi.unit_price);
+        }
+      }
+
       // Attach resolved data
-      return movs.map((m) => ({
-        ...m,
-        _resolved_reference: m.reference_id
-          ? (quoteFolioMap[m.reference_id] || poNumberMap[m.reference_id] || null)
-          : null,
-      }));
+      return movs.map((m) => {
+        let _unit_price: number | null = null;
+        let _unit_price_kind: "costo" | "precio" | null = null;
+        if (m.reference_id && m.product_id) {
+          if (m.reference_type === "purchase_order") {
+            const v = costPriceMap[`${m.reference_id}__${m.product_id}`];
+            if (v != null) { _unit_price = v; _unit_price_kind = "costo"; }
+          } else if (m.reference_type === "venta" || m.reference_type === "cancelacion_venta" || !m.reference_type) {
+            const v = salePriceMap[`${m.reference_id}__${m.product_id}`];
+            if (v != null) { _unit_price = v; _unit_price_kind = "precio"; }
+          }
+        }
+        return {
+          ...m,
+          _resolved_reference: m.reference_id
+            ? (quoteFolioMap[m.reference_id] || poNumberMap[m.reference_id] || null)
+            : null,
+          _unit_price,
+          _unit_price_kind,
+        };
+      });
     },
     enabled: open,
   });
@@ -560,6 +600,7 @@ export function BatchTraceabilityModal() {
                         <TableHead>Producto</TableHead>
                         <TableHead>Lote</TableHead>
                         <TableHead className="text-center">Cantidad</TableHead>
+                        <TableHead className="text-right">Costo/Precio Unit.</TableHead>
                         <TableHead className="text-center">Stock</TableHead>
                         <TableHead>Ubicación</TableHead>
                         <TableHead>Referencia</TableHead>
@@ -604,6 +645,19 @@ export function BatchTraceabilityModal() {
                             <span className="ml-1 font-mono text-sm">
                               {mov.movement_type === "entrada" ? "+" : "-"}{mov.quantity}
                             </span>
+                          </TableCell>
+                          <TableCell className="text-right text-xs">
+                            {mov._unit_price != null ? (
+                              <span className={cn(
+                                "font-medium",
+                                mov._unit_price_kind === "costo" ? "text-green-700" : "text-blue-700"
+                              )}>
+                                {mov._unit_price_kind === "costo" ? "Costo: " : "Precio: "}
+                                ${Number(mov._unit_price).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-center">
                             <span className="text-muted-foreground">{mov.previous_stock ?? "-"}</span>
