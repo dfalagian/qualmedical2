@@ -1270,9 +1270,13 @@ export const QuotesManagement = ({ quoteToEdit, onEditComplete }: QuotesManageme
                         <TableRow
                           key={item.id}
                           onDragOver={(e) => { if (dragId) e.preventDefault(); }}
+                          onDragEnter={() => {
+                            // Reordena en vivo al pasar por encima -> arrastre libre
+                            // (poder saltar del lugar 8 al 1 directamente).
+                            if (dragId && dragId !== item.id) handleReorderItems(dragId, item.id);
+                          }}
                           onDrop={(e) => {
                             e.preventDefault();
-                            if (dragId) handleReorderItems(dragId, item.id);
                             setDragId(null);
                           }}
                           className={cn(
