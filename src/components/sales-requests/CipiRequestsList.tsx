@@ -90,7 +90,8 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
       const { data: items, error: itemsError } = await supabase
         .from("cipi_request_items")
         .select("*")
-        .eq("cipi_request_id", request.id);
+        .eq("cipi_request_id", request.id)
+        .order("created_at", { ascending: true });  // conservar el orden del PDF
       if (itemsError) throw itemsError;
 
       // Find or use a default client
@@ -162,7 +163,7 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
         const normalizeForMatch = (str: string) =>
           str.toLowerCase().replace(/\s+/g, '').replace(/\./g, '').replace(/\//g, '').trim();
 
-        const quoteItems = items.map((item: any) => {
+        const quoteItems = items.map((item: any, index: number) => {
           let productId = item.product_id || null;
           let officialName: string | null = null;
           let officialBrand: string | null = null;
@@ -227,6 +228,7 @@ export function CipiRequestsList({ type, title }: CipiRequestsListProps) {
             precio_unitario: finalPrice,
             importe: finalPrice * (item.cantidad || 1),
             tipo_precio: finalTipoPrecio,
+            sort_order: index,   // mantener el orden del PDF en la cotización
           };
         });
 
