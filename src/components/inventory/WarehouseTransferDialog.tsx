@@ -337,7 +337,7 @@ export function WarehouseTransferDialog({
     if (existing) {
       toast({
         title: "Producto/lote ya agregado",
-        description: "Elimínalo primero si deseas cambiar la cantidad.",
+        description: "Puedes editar la cantidad directamente en la lista de abajo.",
         variant: "destructive",
       });
       return;
@@ -385,6 +385,25 @@ export function WarehouseTransferDialog({
   // Remove manual item
   const removeManualItem = (productId: string, batchId?: string) => {
     setManualItems(prev => prev.filter(i => !(i.productId === productId && (i.batchId || undefined) === batchId)));
+  };
+
+  // Editar la cantidad de un producto ya agregado (sin tener que borrarlo).
+  const updateManualItemQuantity = (productId: string, batchId: string | undefined, value: number) => {
+    setManualItems(prev => prev.map(i => {
+      if (i.productId === productId && (i.batchId || undefined) === batchId) {
+        const max = i.maxStock ?? value;
+        const q = Math.max(1, Math.min(value || 1, max));
+        if (value > max) {
+          toast({
+            title: "Cantidad mayor al stock",
+            description: `Disponible: ${max}. Se ajustó al máximo.`,
+            variant: "destructive",
+          });
+        }
+        return { ...i, quantity: q };
+      }
+      return i;
+    }));
   };
 
   // Transfer mutation - now saves as "pendiente" without moving stock
@@ -824,7 +843,18 @@ export function WarehouseTransferDialog({
                           {item.expirationDate && (
                             <span className="text-xs text-muted-foreground shrink-0">Cad: {item.expirationDate}</span>
                           )}
-                          <Badge variant="secondary" className="shrink-0">{item.quantity} uds</Badge>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Input
+                              type="number"
+                              min={1}
+                              max={item.maxStock}
+                              value={item.quantity}
+                              onChange={(e) => updateManualItemQuantity(item.productId, item.batchId, parseInt(e.target.value) || 1)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-7 w-16 text-center px-1"
+                            />
+                            <span className="text-xs text-muted-foreground">uds</span>
+                          </div>
                         </div>
                         <Button
                           variant="ghost"
