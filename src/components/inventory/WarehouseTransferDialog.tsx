@@ -824,7 +824,7 @@ export function WarehouseTransferDialog({
             {manualItems.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Productos a transferir:</Label>
-                <ScrollArea className={manualItems.length > 3 ? "h-32" : ""}>
+                <ScrollArea className={manualItems.length > 4 ? "h-[46vh] max-h-[520px]" : ""}>
                   <div className="space-y-1 border rounded-lg p-2">
                     {manualItems.map((item, index) => (
                       <div 
