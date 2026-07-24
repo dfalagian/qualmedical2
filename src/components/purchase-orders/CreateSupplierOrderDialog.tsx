@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { logActivity } from "@/lib/activityLogger";
+import { parseXmlContent } from "@/lib/cfdiParser";
 import { useAuth } from "@/hooks/useAuth";
 import { isIvaExempt } from "@/lib/formatters";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,7 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Package, Trash2, FileText, History, Building2, User, CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
+import { Package, Trash2, FileText, History, Building2, User, CalendarIcon, Check, ChevronsUpDown, Upload } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
 import { openPurchaseOrderPrint } from "./purchaseOrderHtmlPrint";
 import { Badge } from "@/components/ui/badge";
@@ -195,6 +196,66 @@ export const CreateSupplierOrderDialog = ({
         unitsPerBox: null,
       },
     ]);
+  };
+
+  // ---- Cargar orden desde un XML (CFDI) ----------------------------------
+  const xmlInputRef = useRef<HTMLInputElement>(null);
+
+  const normalizeMatch = (s: string) =>
+    (s || "").toLowerCase().replace(/\s+/g, "").replace(/\./g, "").replace(/\//g, "").trim();
+
+  const handleXmlFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const cfdi = parseXmlContent(text);
+
+      const rfc = (cfdi.emisor_rfc || "").toUpperCase().trim();
+      const reg = registeredSuppliers?.find((s: any) => (s.rfc || "").toUpperCase().trim() === rfc);
+      const gen = generalSuppliers?.find((s: any) => (s.rfc || "").toUpperCase().trim() === rfc);
+      if (reg) { setSelectedSupplier(reg.id); setSupplierType("registered"); }
+      else if (gen) { setSelectedSupplier(gen.id); setSupplierType("general"); }
+      else {
+        toast.warning(`Proveedor no encontrado (RFC ${rfc} · ${cfdi.emisor_nombre}). Selecciónalo o créalo manualmente.`);
+      }
+
+      const catalog = products || [];
+      const consolidated = new Map<string, SelectedProduct>();
+      const noMatch: string[] = [];
+      for (const it of cfdi.items) {
+        const target = normalizeMatch(it.descripcion);
+        const prod = catalog.find((p: any) => normalizeMatch(p.name) === target);
+        if (!prod) { noMatch.push(`${it.descripcion} (x${it.cantidad})`); continue; }
+        const savedPrice = prod.price_type_1 != null ? Number(prod.price_type_1) : (prod.unit_price ?? 0);
+        const manualPrice = Number(it.valor_unitario) || 0;
+        const cantidad = it.cantidad || 1;
+        const ex = consolidated.get(prod.id);
+        if (ex) {
+          ex.quantity += cantidad;
+          ex.total = (ex.manualPrice ?? ex.savedPrice) * ex.quantity;
+        } else {
+          const effective = manualPrice || savedPrice;
+          consolidated.set(prod.id, {
+            id: prod.id, name: prod.name, sku: prod.sku,
+            quantity: cantidad,
+            unitPrice: effective, savedPrice, manualPrice,
+            total: effective * cantidad,
+            category: prod.category || null,
+            notes: "Pieza", unitsPerBox: null,
+          });
+        }
+      }
+      setSelectedProducts(Array.from(consolidated.values()));
+      setDescription(`Importado de XML — Factura ${cfdi.folio} · UUID ${cfdi.uuid}`);
+
+      const ok = consolidated.size;
+      if (noMatch.length) {
+        toast.warning(`${ok} producto(s) emparejado(s). ${noMatch.length} sin emparejar: ${noMatch.slice(0, 4).join("; ")}${noMatch.length > 4 ? "…" : ""}. Agrégalos manualmente.`);
+      } else {
+        toast.success(`XML cargado: ${ok} producto(s) emparejado(s).`);
+      }
+    } catch (e: any) {
+      toast.error("No se pudo leer el XML: " + (e.message || "archivo inválido"));
+    }
   };
 
   const removeProduct = (productId: string) => {
@@ -438,8 +499,24 @@ export const CreateSupplierOrderDialog = ({
               Nueva Orden de Compra a Proveedor
             </DialogTitle>
             <DialogDescription>
-              Selecciona productos y genera la orden de compra
+              Selecciona productos y genera la orden de compra, o cárgala desde un XML (CFDI).
             </DialogDescription>
+            <input
+              ref={xmlInputRef}
+              type="file"
+              accept=".xml,text/xml,application/xml"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleXmlFile(f); e.target.value = ""; }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5 w-fit mt-1"
+              onClick={() => xmlInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4" /> Cargar desde XML (CFDI)
+            </Button>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto flex flex-col gap-4">
