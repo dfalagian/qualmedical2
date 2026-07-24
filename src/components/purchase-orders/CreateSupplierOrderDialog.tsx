@@ -40,7 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Package, Trash2, FileText, History, Building2, User, CalendarIcon, Check, ChevronsUpDown, Upload } from "lucide-react";
+import { Package, Trash2, FileText, History, Building2, User, CalendarIcon, Check, ChevronsUpDown, Upload, Plus } from "lucide-react";
 import { ProductCombobox } from "./ProductCombobox";
 import { openPurchaseOrderPrint } from "./purchaseOrderHtmlPrint";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +66,14 @@ interface SelectedProduct {
 
 const IVA_RATE = 0.16;
 
+// Renglón del XML pendiente de vincular con un producto del catálogo
+interface XmlRow {
+  descripcion: string;
+  cantidad: number;
+  valor_unitario: number;
+  matchedProductId: string | null;
+}
+
 interface CreateSupplierOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -82,6 +90,7 @@ export const CreateSupplierOrderDialog = ({
   const [orderNumber, setOrderNumber] = useState("");
   const [description, setDescription] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
+  const [xmlRows, setXmlRows] = useState<XmlRow[]>([]);
   const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(undefined);
   const [supplierPopoverOpen, setSupplierPopoverOpen] = useState(false);
 
@@ -218,44 +227,65 @@ export const CreateSupplierOrderDialog = ({
         toast.warning(`Proveedor no encontrado (RFC ${rfc} · ${cfdi.emisor_nombre}). Selecciónalo o créalo manualmente.`);
       }
 
+      // TODOS los conceptos van a la lista de emparejado (auto-match por nombre)
       const catalog = products || [];
-      const consolidated = new Map<string, SelectedProduct>();
-      const noMatch: string[] = [];
-      for (const it of cfdi.items) {
+      const rows: XmlRow[] = cfdi.items.map((it) => {
         const target = normalizeMatch(it.descripcion);
         const prod = catalog.find((p: any) => normalizeMatch(p.name) === target);
-        if (!prod) { noMatch.push(`${it.descripcion} (x${it.cantidad})`); continue; }
-        const savedPrice = prod.price_type_1 != null ? Number(prod.price_type_1) : (prod.unit_price ?? 0);
-        const manualPrice = Number(it.valor_unitario) || 0;
-        const cantidad = it.cantidad || 1;
-        const ex = consolidated.get(prod.id);
-        if (ex) {
-          ex.quantity += cantidad;
-          ex.total = (ex.manualPrice ?? ex.savedPrice) * ex.quantity;
-        } else {
-          const effective = manualPrice || savedPrice;
-          consolidated.set(prod.id, {
-            id: prod.id, name: prod.name, sku: prod.sku,
-            quantity: cantidad,
-            unitPrice: effective, savedPrice, manualPrice,
-            total: effective * cantidad,
-            category: prod.category || null,
-            notes: "Pieza", unitsPerBox: null,
-          });
-        }
-      }
-      setSelectedProducts(Array.from(consolidated.values()));
+        return {
+          descripcion: it.descripcion,
+          cantidad: it.cantidad || 1,
+          valor_unitario: Number(it.valor_unitario) || 0,
+          matchedProductId: prod?.id ?? null,
+        };
+      });
+      setXmlRows(rows);
       setDescription(`Importado de XML — Factura ${cfdi.folio} · UUID ${cfdi.uuid}`);
 
-      const ok = consolidated.size;
-      if (noMatch.length) {
-        toast.warning(`${ok} producto(s) emparejado(s). ${noMatch.length} sin emparejar: ${noMatch.slice(0, 4).join("; ")}${noMatch.length > 4 ? "…" : ""}. Agrégalos manualmente.`);
-      } else {
-        toast.success(`XML cargado: ${ok} producto(s) emparejado(s).`);
-      }
+      const auto = rows.filter((r) => r.matchedProductId).length;
+      toast.success(`XML cargado: ${cfdi.items.length} concepto(s), ${auto} emparejado(s) automáticamente. Vincula los faltantes y agrégalos a la orden.`);
     } catch (e: any) {
       toast.error("No se pudo leer el XML: " + (e.message || "archivo inválido"));
     }
+  };
+
+  // Vincular un renglón del XML a un producto del catálogo
+  const setXmlRowProduct = (index: number, productId: string) => {
+    setXmlRows((rows) => rows.map((r, i) => (i === index ? { ...r, matchedProductId: productId } : r)));
+  };
+
+  // Pasar a la orden los renglones ya vinculados (consolidando por producto)
+  const agregarXmlAlaOrden = () => {
+    const catalog = products || [];
+    const matched = xmlRows.filter((r) => r.matchedProductId);
+    if (matched.length === 0) { toast.error("Vincula al menos un producto con el catálogo."); return; }
+    const map = new Map<string, SelectedProduct>();
+    for (const p of selectedProducts) map.set(p.id, { ...p });
+    for (const r of matched) {
+      const prod = catalog.find((p: any) => p.id === r.matchedProductId);
+      if (!prod) continue;
+      const savedPrice = prod.price_type_1 != null ? Number(prod.price_type_1) : (prod.unit_price ?? 0);
+      const manualPrice = r.valor_unitario || 0;
+      const ex = map.get(prod.id);
+      if (ex) {
+        ex.quantity += r.cantidad;
+        ex.total = (ex.manualPrice ?? ex.savedPrice) * ex.quantity;
+      } else {
+        const effective = manualPrice || savedPrice;
+        map.set(prod.id, {
+          id: prod.id, name: prod.name, sku: prod.sku,
+          quantity: r.cantidad,
+          unitPrice: effective, savedPrice, manualPrice,
+          total: effective * r.cantidad,
+          category: prod.category || null,
+          notes: "Pieza", unitsPerBox: null,
+        });
+      }
+    }
+    setSelectedProducts(Array.from(map.values()));
+    const restantes = xmlRows.filter((r) => !r.matchedProductId);
+    setXmlRows(restantes);
+    toast.success(`${matched.length} producto(s) agregado(s) a la orden.` + (restantes.length ? ` Quedan ${restantes.length} sin vincular.` : ""));
   };
 
   const removeProduct = (productId: string) => {
@@ -642,6 +672,47 @@ export const CreateSupplierOrderDialog = ({
               onAddProduct={handleAddProduct}
             />
 
+            {/* Panel de emparejado del XML */}
+            {xmlRows.length > 0 && (
+              <div className="border rounded-lg p-3 space-y-2 bg-amber-50/50 dark:bg-amber-950/20">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-sm font-semibold">
+                    Conceptos del XML — vincula con tu catálogo ({xmlRows.length})
+                  </Label>
+                  <Button type="button" size="sm" onClick={agregarXmlAlaOrden} className="gap-1 shrink-0">
+                    <Plus className="h-4 w-4" /> Agregar a la orden
+                  </Button>
+                </div>
+                <div className="max-h-64 overflow-auto space-y-1">
+                  {xmlRows.map((row, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "flex items-center gap-2 p-2 rounded",
+                        row.matchedProductId ? "bg-green-50 dark:bg-green-950/30" : "bg-red-50 dark:bg-red-950/30"
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{row.descripcion}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Cant: {row.cantidad} · P.Unit: ${row.valor_unitario.toFixed(2)}
+                        </p>
+                      </div>
+                      <XmlRowPicker
+                        products={products || []}
+                        valueId={row.matchedProductId}
+                        onPick={(id) => setXmlRowProduct(i, id)}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Los renglones en <span className="text-red-600 font-medium">rojo</span> no coinciden — selecciónales el producto.
+                  Al dar “Agregar a la orden”, los vinculados pasan abajo. (Crear producto nuevo: próximamente.)
+                </p>
+              </div>
+            )}
+
             {/* Products Table */}
             <div className="border rounded-lg bg-background">
               <div className="h-[280px] overflow-auto">
@@ -807,3 +878,67 @@ export const CreateSupplierOrderDialog = ({
     </>
   );
 };
+
+// Selector de producto del catálogo para un renglón del XML.
+function XmlRowPicker({
+  products,
+  valueId,
+  onPick,
+}: {
+  products: any[];
+  valueId: string | null;
+  onPick: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [term, setTerm] = useState("");
+  const selected = products.find((p) => p.id === valueId);
+  const filtered = !term
+    ? products
+    : products.filter(
+        (p) =>
+          p.name.toLowerCase().includes(term.toLowerCase()) ||
+          (p.sku || "").toLowerCase().includes(term.toLowerCase())
+      );
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={cn(
+            "w-56 justify-between shrink-0 h-9 font-normal",
+            !selected && "text-destructive border-destructive/40"
+          )}
+        >
+          <span className="truncate">{selected ? selected.name : "Seleccionar producto…"}</span>
+          <ChevronsUpDown className="ml-1 h-3.5 w-3.5 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[360px] p-0" align="end">
+        <Command shouldFilter={false}>
+          <CommandInput placeholder="Buscar por nombre o SKU…" value={term} onValueChange={setTerm} />
+          <CommandList>
+            <CommandEmpty>No se encontraron productos.</CommandEmpty>
+            <CommandGroup>
+              {filtered.slice(0, 50).map((p) => (
+                <CommandItem
+                  key={p.id}
+                  value={p.id}
+                  onSelect={() => { onPick(p.id); setOpen(false); }}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">SKU: {p.sku}</p>
+                  </div>
+                  <Check className={cn("h-4 w-4 shrink-0", valueId === p.id ? "opacity-100" : "opacity-0")} />
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
