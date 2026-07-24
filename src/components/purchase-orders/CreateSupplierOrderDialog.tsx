@@ -91,6 +91,9 @@ export const CreateSupplierOrderDialog = ({
   const [description, setDescription] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
   const [xmlRows, setXmlRows] = useState<XmlRow[]>([]);
+  const [productosLocales, setProductosLocales] = useState<any[]>([]);
+  const [crearIdx, setCrearIdx] = useState<number | null>(null);
+  const [nuevoProd, setNuevoProd] = useState({ name: "", sku: "", category: "Insumos", tax_rate: 16, price: 0 });
   const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(undefined);
   const [supplierPopoverOpen, setSupplierPopoverOpen] = useState(false);
 
@@ -174,6 +177,38 @@ export const CreateSupplierOrderDialog = ({
     },
   });
 
+  // Catálogo + productos creados al vuelo (para que aparezcan de inmediato)
+  const allProducts = useMemo(
+    () => [...(products || []), ...productosLocales],
+    [products, productosLocales]
+  );
+
+  // Crear un producto nuevo desde un renglón del XML y vincularlo
+  const crearProducto = async () => {
+    if (!nuevoProd.name.trim() || !nuevoProd.sku.trim()) {
+      toast.error("Nombre y SKU son obligatorios."); return;
+    }
+    const { data, error } = await supabase.from("products").insert({
+      sku: nuevoProd.sku.trim().toUpperCase(),
+      name: nuevoProd.name.trim(),
+      category: nuevoProd.category || null,
+      unit: "pieza",
+      price_type_1: nuevoProd.price || null,
+      tax_rate: nuevoProd.tax_rate ?? 16,
+      minimum_stock: 0,
+      current_stock: 0,
+      is_active: true,
+      catalog_only: false,
+      rfid_required: false,
+    }).select("id, name, sku, unit_price, current_stock, price_type_1, brand, category").single();
+    if (error) { toast.error("No se pudo crear: " + error.message); return; }
+    setProductosLocales((p) => [...p, data]);
+    if (crearIdx != null) setXmlRowProduct(crearIdx, data.id);
+    queryClient.invalidateQueries({ queryKey: ["products_for_order"] });
+    toast.success(`Producto "${data.name}" creado y vinculado.`);
+    setCrearIdx(null);
+  };
+
   const handleAddProduct = (
     product: { id: string; name: string; sku: string; unit_price: number | null; category?: string | null },
     quantity: number,
@@ -228,7 +263,7 @@ export const CreateSupplierOrderDialog = ({
       }
 
       // TODOS los conceptos van a la lista de emparejado (auto-match por nombre)
-      const catalog = products || [];
+      const catalog = allProducts;
       const rows: XmlRow[] = cfdi.items.map((it) => {
         const target = normalizeMatch(it.descripcion);
         const prod = catalog.find((p: any) => normalizeMatch(p.name) === target);
@@ -256,7 +291,7 @@ export const CreateSupplierOrderDialog = ({
 
   // Pasar a la orden los renglones ya vinculados (consolidando por producto)
   const agregarXmlAlaOrden = () => {
-    const catalog = products || [];
+    const catalog = allProducts;
     const matched = xmlRows.filter((r) => r.matchedProductId);
     if (matched.length === 0) { toast.error("Vincula al menos un producto con el catálogo."); return; }
     const map = new Map<string, SelectedProduct>();
@@ -668,7 +703,7 @@ export const CreateSupplierOrderDialog = ({
 
             {/* Product Combobox */}
             <ProductCombobox
-              products={products || []}
+              products={allProducts}
               onAddProduct={handleAddProduct}
             />
 
@@ -699,10 +734,24 @@ export const CreateSupplierOrderDialog = ({
                         </p>
                       </div>
                       <XmlRowPicker
-                        products={products || []}
+                        products={allProducts}
                         valueId={row.matchedProductId}
                         onPick={(id) => setXmlRowProduct(i, id)}
                       />
+                      {!row.matchedProductId && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0 h-9 text-xs gap-1"
+                          onClick={() => {
+                            setNuevoProd({ name: row.descripcion, sku: "", category: "Insumos", tax_rate: 16, price: row.valor_unitario });
+                            setCrearIdx(i);
+                          }}
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Crear
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -870,6 +919,60 @@ export const CreateSupplierOrderDialog = ({
                 <FileText className="h-4 w-4" />
                 {createOrderMutation.isPending ? "Creando..." : "Crear y Ver PDF"}
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mini-form: crear producto desde un renglón del XML */}
+      <Dialog open={crearIdx !== null} onOpenChange={(o) => { if (!o) setCrearIdx(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Crear producto</DialogTitle>
+            <DialogDescription>Se agrega al catálogo y queda vinculado a este renglón del XML.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Nombre</Label>
+              <Input value={nuevoProd.name} onChange={(e) => setNuevoProd({ ...nuevoProd, name: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>SKU *</Label>
+                <Input value={nuevoProd.sku} onChange={(e) => setNuevoProd({ ...nuevoProd, sku: e.target.value })} placeholder="Clave única" className="font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>IVA</Label>
+                <Select value={String(nuevoProd.tax_rate)} onValueChange={(v) => setNuevoProd({ ...nuevoProd, tax_rate: Number(v) })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="16">16%</SelectItem>
+                    <SelectItem value="0">0% (exento)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Categoría</Label>
+                <Select value={nuevoProd.category} onValueChange={(v) => setNuevoProd({ ...nuevoProd, category: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Medicamentos">Medicamentos</SelectItem>
+                    <SelectItem value="Oncológicos">Oncológicos</SelectItem>
+                    <SelectItem value="Inmunoterapia">Inmunoterapia</SelectItem>
+                    <SelectItem value="Insumos">Insumos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Precio de venta</Label>
+                <Input type="number" step="0.01" value={nuevoProd.price} onChange={(e) => setNuevoProd({ ...nuevoProd, price: Number(e.target.value) || 0 })} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCrearIdx(null)}>Cancelar</Button>
+              <Button onClick={crearProducto}>Crear y vincular</Button>
             </div>
           </div>
         </DialogContent>
